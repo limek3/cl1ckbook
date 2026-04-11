@@ -3,21 +3,23 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowRight, KeyRound, Mail, Sparkles } from 'lucide-react';
+import { ArrowRight, CheckCircle2, KeyRound, Mail, ShieldCheck, Sparkles } from 'lucide-react';
 import { BrandLogo } from '@/components/brand/brand-logo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { createClient } from '@/lib/supabase/client';
+import { useMobile } from '@/hooks/use-mobile';
 
 const authConfigured = Boolean(
   process.env.NEXT_PUBLIC_SUPABASE_URL &&
-  (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+    (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
 );
 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isMobile = useMobile();
   const redirectTo = useMemo(() => searchParams.get('redirectTo') || '/dashboard', [searchParams]);
   const [mode, setMode] = useState<'password' | 'magic'>('password');
   const [email, setEmail] = useState('');
@@ -46,7 +48,7 @@ export default function LoginPage() {
       router.replace(redirectTo);
       router.refresh();
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Could not sign in.');
+      setError(error instanceof Error ? error.message : 'Не удалось выполнить вход.');
     } finally {
       setBusy(false);
     }
@@ -72,30 +74,54 @@ export default function LoginPage() {
         throw error;
       }
 
-      setMessage('Письмо для входа отправлено. Откройте ссылку из email.');
+      setMessage('Ссылка для входа отправлена на почту. Откройте письмо и продолжите вход.');
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Could not send the magic link.');
+      setError(error instanceof Error ? error.message : 'Не удалось отправить ссылку.');
     } finally {
       setBusy(false);
     }
   };
 
+  const featureItems = [
+    {
+      title: 'Быстрый вход',
+      text: 'Откройте кабинет за пару секунд и сразу продолжайте рабочий день.',
+      icon: Sparkles,
+    },
+    {
+      title: 'Безопасная сессия',
+      text: 'Вход и доступ к данным защищены через авторизацию Supabase.',
+      icon: ShieldCheck,
+    },
+    {
+      title: 'Все в одном месте',
+      text: 'Записи, шаблоны, чаты и публичная страница доступны в одном кабинете.',
+      icon: CheckCircle2,
+    },
+  ];
+
   if (!authConfigured) {
     return (
-      <main className="min-h-screen bg-background px-4 py-8 text-foreground">
-        <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-[920px] items-center justify-center">
-          <div className="grid w-full gap-5 rounded-[32px] border border-border bg-card/72 p-6 shadow-[var(--shadow-soft)] lg:grid-cols-[1.05fr_420px] lg:p-8">
-            <div className="space-y-5">
-              <BrandLogo className="w-[92px]" />
+      <main className="min-h-screen bg-background px-3 py-4 text-foreground md:px-4 md:py-8">
+        <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-[920px] items-center justify-center md:min-h-[calc(100vh-4rem)]">
+          <div className="grid w-full gap-4 rounded-[28px] border border-border bg-card/72 p-4 shadow-[var(--shadow-soft)] md:gap-5 md:rounded-[32px] md:p-6 lg:grid-cols-[1.05fr_420px] lg:p-8">
+            <div className="space-y-4">
+              <BrandLogo className={isMobile ? 'w-[76px]' : 'w-[92px]'} />
               <div>
-                <div className="text-[28px] font-semibold tracking-tight text-foreground">КликБук auth setup</div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background/80 px-3 py-1 text-[12px] text-muted-foreground">
+                  <Sparkles className="size-3.5" />
+                  КликБук
+                </div>
+                <div className="mt-4 text-[24px] font-semibold tracking-tight text-foreground md:text-[30px]">
+                  Вход пока не настроен
+                </div>
                 <div className="mt-3 max-w-[520px] text-[14px] leading-7 text-muted-foreground">
-                  Добавьте публичные Supabase-переменные в <code>.env.local</code>, затем перезапустите dev-server.
+                  Добавьте параметры Supabase в <code>.env.local</code>, затем перезапустите dev-сервер.
                 </div>
               </div>
 
-              <div className="rounded-[24px] border border-border bg-background/70 p-5">
-                <div className="text-[13px] font-medium text-foreground">Нужно заполнить</div>
+              <div className="rounded-[22px] border border-border bg-background/70 p-4 md:p-5">
+                <div className="text-[13px] font-medium text-foreground">Что нужно заполнить</div>
                 <div className="mt-3 space-y-2 font-mono text-[12px] leading-6 text-muted-foreground">
                   <div>NEXT_PUBLIC_SUPABASE_URL=...</div>
                   <div>NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...</div>
@@ -105,14 +131,14 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-dashed border-border bg-background/60 p-6">
+            <div className="rounded-[24px] border border-dashed border-border bg-background/60 p-5 md:rounded-[28px] md:p-6">
               <div className="inline-flex items-center gap-2 rounded-full border border-border bg-accent/40 px-3 py-1 text-[12px] text-muted-foreground">
                 <Sparkles className="size-3.5" />
-                Auth is not configured yet
+                Подключение авторизации
               </div>
-              <div className="mt-4 text-[22px] font-semibold text-foreground">Подключите Supabase Auth</div>
+              <div className="mt-4 text-[22px] font-semibold text-foreground">После настройки откроется форма входа</div>
               <div className="mt-3 text-[14px] leading-7 text-muted-foreground">
-                После добавления переменных эта страница переключится на форму входа.
+                Как только переменные будут добавлены, вы сможете входить по паролю или по ссылке из письма.
               </div>
               <div className="mt-6">
                 <Button asChild variant="outline">
@@ -127,37 +153,39 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background px-4 py-8 text-foreground">
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-[980px] items-center justify-center">
-        <div className="grid w-full gap-5 rounded-[32px] border border-border bg-card/72 p-6 shadow-[var(--shadow-soft)] lg:grid-cols-[1.08fr_420px] lg:p-8">
-          <div className="space-y-6">
-            <BrandLogo className="w-[92px]" />
+    <main className="min-h-screen bg-background px-3 py-4 text-foreground md:px-4 md:py-8">
+      <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-[980px] items-center justify-center md:min-h-[calc(100vh-4rem)]">
+        <div className="grid w-full gap-4 rounded-[28px] border border-border bg-card/72 p-4 shadow-[var(--shadow-soft)] md:gap-5 md:rounded-[32px] md:p-6 lg:grid-cols-[1.02fr_420px] lg:p-8">
+          <div className="space-y-5">
+            <BrandLogo className={isMobile ? 'w-[76px]' : 'w-[92px]'} />
+
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background/80 px-3 py-1 text-[12px] text-muted-foreground">
                 <Sparkles className="size-3.5" />
-                Авторизация и рабочее пространство
+                Кабинет КликБук
               </div>
-              <div className="mt-4 text-[30px] font-semibold tracking-tight text-foreground">Вход в кабинет КликБук</div>
+              <div className="mt-4 text-[26px] font-semibold tracking-tight text-foreground md:text-[30px]">
+                Войдите в кабинет
+              </div>
               <div className="mt-3 max-w-[520px] text-[14px] leading-7 text-muted-foreground">
-                После входа вам будут доступны кабинет, профиль, шаблоны и чаты с сохранением всех рабочих данных.
+                Управляйте записями, сообщениями и публичной страницей в одном рабочем пространстве.
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              {[
-                { title: 'Вход', text: 'безопасная сессия' },
-                { title: 'Кабинет', text: 'одно рабочее пространство' },
-                { title: 'Чаты', text: 'бот, переносы и шаблоны' },
-              ].map((item) => (
-                <div key={item.title} className="rounded-[22px] border border-border bg-background/70 p-4">
-                  <div className="text-[12px] text-muted-foreground">{item.title}</div>
-                  <div className="mt-2 text-[14px] font-medium text-foreground">{item.text}</div>
+            <div className={isMobile ? 'grid gap-2' : 'grid gap-3 sm:grid-cols-3'}>
+              {featureItems.map((item) => (
+                <div key={item.title} className="rounded-[20px] border border-border bg-background/70 p-4">
+                  <div className="inline-flex size-9 items-center justify-center rounded-[14px] border border-border bg-card/80 text-muted-foreground">
+                    <item.icon className="size-4" />
+                  </div>
+                  <div className="mt-3 text-[14px] font-medium text-foreground">{item.title}</div>
+                  <div className="mt-1 text-[12px] leading-5 text-muted-foreground">{item.text}</div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="rounded-[28px] border border-border bg-background/70 p-5">
+          <div className="rounded-[24px] border border-border bg-background/72 p-4 md:rounded-[28px] md:p-5">
             <div className="inline-flex rounded-full border border-border bg-card/80 p-1">
               <button
                 type="button"
@@ -171,18 +199,18 @@ export default function LoginPage() {
                 onClick={() => setMode('magic')}
                 className={`rounded-full px-3.5 py-2 text-[12px] font-medium transition ${mode === 'magic' ? 'bg-foreground text-background' : 'text-muted-foreground'}`}
               >
-                Email-ссылка
+                Ссылка на вход
               </button>
             </div>
 
             <div className="mt-5">
               <div className="text-[22px] font-semibold text-foreground">
-                {mode === 'password' ? 'Вход по email и паролю' : 'Вход по email-ссылке'}
+                {mode === 'password' ? 'Вход по email и паролю' : 'Вход по ссылке из письма'}
               </div>
               <div className="mt-2 text-[13px] leading-6 text-muted-foreground">
                 {mode === 'password'
-                  ? 'Используйте свой аккаунт для входа в кабинет.'
-                  : 'Мы отправим безопасную ссылку для входа в кабинет.'}
+                  ? 'Используйте существующий аккаунт КликБук.'
+                  : 'Мы отправим письмо со ссылкой для безопасного входа в кабинет.'}
               </div>
             </div>
 
@@ -199,7 +227,7 @@ export default function LoginPage() {
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     className="pl-9"
-                    placeholder="name@example.com"
+                    placeholder="hello@klikbuk.rf"
                   />
                 </div>
               </div>

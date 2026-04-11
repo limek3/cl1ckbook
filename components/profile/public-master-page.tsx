@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { getMaxHref, getPhoneHref, getTelegramHref } from '@/lib/contact-links';
 import { cn } from '@/lib/utils';
+import { useMobile } from '@/hooks/use-mobile';
 import type { MasterProfile } from '@/lib/types';
 import { getPublicButtonClassName } from '@/lib/appearance';
 import { accentPalette } from '@/lib/appearance-palette';
@@ -89,6 +90,7 @@ export function PublicMasterPage({
   const { hasHydrated, getDemoProfileBySlug, getPublicPath } = useApp();
   const { locale } = useLocale();
   const { settings: localSettings } = useAppearance();
+  const isMobile = useMobile();
   const [remoteProfile, setRemoteProfile] = useState<MasterProfile | null>(null);
   const [remoteAppearance, setRemoteAppearance] = useState<AppearanceSettings | null>(null);
   const [remoteLoading, setRemoteLoading] = useState(!isDemo);
@@ -148,7 +150,7 @@ export function PublicMasterPage({
         loading: 'Загружаем страницу мастера…',
         call: 'Позвонить',
         whatsapp: 'MAX',
-        telegram: 'Телеграм',
+        telegram: 'Telegram',
         quickActions: 'Быстрые действия',
         hiddenContact: 'После подтверждения',
       }
@@ -189,7 +191,7 @@ export function PublicMasterPage({
     return (
       <div className="min-h-screen bg-background text-foreground" style={publicAccentStyle}>
         <SiteHeader compact />
-        <div className="workspace-page">
+        <div className={cn('workspace-page', isMobile && '!px-2 !pt-2 !pb-[calc(88px+env(safe-area-inset-bottom))]')}>
           <div className="workspace-card rounded-[18px] p-8">
             <div className="animate-pulse">
               <div className="h-4 w-48 rounded-full bg-accent/70" />
@@ -208,7 +210,7 @@ export function PublicMasterPage({
     return (
       <div className="min-h-screen bg-background text-foreground" style={publicAccentStyle}>
         <SiteHeader compact />
-        <div className="workspace-page">
+        <div className={cn('workspace-page', isMobile && '!px-2 !pt-2 !pb-[calc(88px+env(safe-area-inset-bottom))]')}>
           <div className="workspace-card rounded-[18px] p-8 text-center">
             <div className="text-[22px] font-semibold text-foreground">{labels.notFound}</div>
             <div className="mt-4">
@@ -235,11 +237,11 @@ export function PublicMasterPage({
     ? 'flex flex-col items-center text-center'
     : settings.publicHeroLayout === 'compact'
       ? 'grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]'
-      : 'flex flex-wrap items-start justify-between gap-4';
+      : cn('flex flex-wrap items-start justify-between', isMobile ? 'gap-3' : 'gap-4');
 
   const introClass = settings.publicHeroLayout === 'centered'
     ? 'flex min-w-0 flex-col items-center gap-4'
-    : 'flex min-w-0 items-start gap-4';
+    : cn('flex min-w-0 items-start', isMobile ? 'gap-3' : 'gap-4');
 
   const compactHero = settings.publicHeroLayout === 'compact';
   const sectionClass = buildSectionClass(settings);
@@ -291,33 +293,35 @@ export function PublicMasterPage({
       ? { label: labels.telegram, href: getTelegramHref(profile.telegram), icon: <Globe2 className="size-4" />, primary: false, external: true }
       : null,
   ].filter(Boolean) as Array<{ label: string; href?: string; icon: ReactNode; primary: boolean; external?: boolean }>;
+  const quickActionsToRender = isMobile ? quickActions.slice(0, 2) : quickActions;
+  const servicesToRender = isMobile ? profile.services.slice(0, 4) : profile.services;
 
   return (
     <div className="min-h-screen bg-background text-foreground" style={publicAccentStyle}>
       <SiteHeader compact />
-      <div className="workspace-page">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_372px]">
-          <div className="space-y-5">
+      <div className={cn('workspace-page', isMobile && '!px-2 !pt-2 !pb-[calc(88px+env(safe-area-inset-bottom))]')}>
+        <div className={cn('grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_372px]', isMobile && 'gap-3')}>
+          <div className={cn('space-y-5', isMobile && 'space-y-3')}>
             <section
               className={cn(
-                'rounded-[22px] border p-5 md:p-6',
+                'rounded-[24px] border p-4 md:p-6',
                 heroClass,
                 surfaceClass,
                 settings.publicCardStyle === 'editorial' && 'border-primary/20',
                 settings.publicCardStyle === 'compact' && 'p-4 md:p-5',
               )}
             >
-              <div className={cn('border-b border-border pb-5', heroLayoutClass)}>
+              <div className={cn('border-b border-border pb-4 md:pb-5', heroLayoutClass)}>
                 <div className={introClass}>
-                  <MasterAvatar name={profile.name} avatar={profile.avatar} className={cn(compactHero ? 'h-16 w-16 rounded-[18px]' : 'h-20 w-20 rounded-[22px]')} />
+                  <MasterAvatar name={profile.name} avatar={profile.avatar} className={cn(compactHero ? 'h-16 w-16 rounded-[18px]' : isMobile ? 'h-14 w-14 rounded-[16px]' : 'h-20 w-20 rounded-[22px]')} />
                   <div className={cn('min-w-0', settings.publicHeroLayout === 'centered' && 'flex flex-col items-center')}>
                     <div className="flex flex-wrap items-center gap-2">
-                      <h1 className={cn('truncate font-semibold tracking-[-0.03em] text-foreground', compactHero ? 'text-[24px]' : 'text-[28px]')}>
+                      <h1 className={cn('truncate font-semibold tracking-[-0.03em] text-foreground', compactHero ? 'text-[24px]' : isMobile ? 'text-[19px]' : 'text-[28px]')}>
                         {profile.name}
                       </h1>
                       {isDemo ? <Badge variant="outline">{labels.demoBadge}</Badge> : null}
                     </div>
-                    <div className="mt-1 text-[14px] text-muted-foreground">{profile.profession}</div>
+                    <div className="mt-1 text-[13px] text-muted-foreground md:text-[14px]">{profile.profession}</div>
                     <div className={cn('mt-3 flex flex-wrap items-center gap-2', settings.publicHeroLayout === 'centered' && 'justify-center')}>
                       <Badge variant="outline">
                         <MapPin className="size-3.5" />
@@ -329,27 +333,27 @@ export function PublicMasterPage({
                   </div>
                 </div>
 
-                <div className={cn('rounded-[16px] border border-border px-4 py-3', settings.publicHeroLayout === 'centered' ? 'mt-4' : compactHero ? 'self-start' : '', settings.publicSurface === 'contrast' ? 'bg-primary/8' : 'bg-accent/30')}>
+                <div className={cn('rounded-[16px] border border-border px-3 py-2.5 md:px-4', settings.publicHeroLayout === 'centered' ? 'mt-4' : compactHero ? 'self-start' : '', settings.publicSurface === 'contrast' ? 'bg-primary/8' : 'bg-accent/30', isMobile && 'w-full')}>
                   <RatingStars value={rating} />
                   <div className="mt-2 text-[13px] text-foreground">{rating.toFixed(1)} · {profile.reviewCount ?? reviews.length}</div>
                   <div className="text-[11px] text-muted-foreground">{profile.responseTime || labels.secure}</div>
                 </div>
               </div>
 
-              <p className={cn('max-w-[760px] text-[14px] leading-7 text-muted-foreground', compactHero ? 'mt-4' : 'mt-5', settings.publicHeroLayout === 'centered' && 'mx-auto text-center')}>
+              <p className={cn('max-w-[760px] text-[13px] text-muted-foreground md:text-[14px] md:leading-7', compactHero ? 'mt-3' : 'mt-3 md:mt-5', settings.publicHeroLayout === 'centered' && 'mx-auto text-center', isMobile ? 'line-clamp-3 leading-5' : 'leading-6')}>
                 {profile.bio}
               </p>
 
-              {quickActions.length > 0 ? (
-                <div className={cn('mt-4 flex flex-wrap gap-2', settings.publicHeroLayout === 'centered' && 'justify-center')}>
+              {quickActionsToRender.length > 0 ? (
+                <div className={cn('mt-4 grid gap-2 sm:flex sm:flex-wrap', isMobile ? 'grid-cols-2' : '', settings.publicHeroLayout === 'centered' && 'justify-center')}>
                   <div className="sr-only">{labels.quickActions}</div>
-                  {quickActions.map((action) => (
+                  {quickActionsToRender.map((action) => (
                     <Button
                       key={action.label}
                       asChild
                       variant={action.primary ? 'default' : 'outline'}
                       size="sm"
-                      className={action.primary ? primaryActionClass : secondaryActionClass}
+                      className={cn(isMobile ? 'h-10 text-[13px]' : '', 'w-full justify-center sm:w-auto', action.primary ? primaryActionClass : secondaryActionClass)}
                     >
                       <a href={action.href} target={action.external ? '_blank' : undefined} rel={action.external ? 'noreferrer' : undefined}>
                         {action.icon}
@@ -361,21 +365,31 @@ export function PublicMasterPage({
               ) : null}
 
               <div className={serviceLayoutClass}>
-                {profile.services.map((service) => (
-                  <div key={service} className={serviceCardClass}>
+                {servicesToRender.map((service) => (
+                  <div key={service} className={cn(serviceCardClass, isMobile && 'text-[12.5px]')}>
                     {service}
                   </div>
                 ))}
               </div>
             </section>
 
-            <section className="grid gap-5 lg:grid-cols-2">
+            {isMobile ? (
+              <section className={cn(sectionClass, surfaceClass)}>
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <div className="text-[16px] font-semibold text-foreground">{labels.bookingTitle}</div>
+                  <Badge variant="outline">{locale === 'ru' ? 'Онлайн' : 'Online'}</Badge>
+                </div>
+                <BookingForm profile={profile} embedded />
+              </section>
+            ) : null}
+
+            <section className="grid gap-4 md:gap-5 lg:grid-cols-2">
               <div className={cn(sectionClass, surfaceClass)}>
                 <div className="text-[16px] font-semibold text-foreground">{labels.contactsTitle}</div>
-                <div className="mt-4 grid gap-2">
-                  {profile.phone ? <ContactCard compact={settings.publicSectionStyle !== 'cards'} label="Phone" value={profile.phone} href={profile.hidePhone ? undefined : getPhoneHref(profile.phone)} hidden={Boolean(profile.hidePhone)} hiddenLabel={labels.hiddenContact} icon={<Phone className="size-4" />} /> : null}
+                <div className="mt-3 grid gap-2">
+                  {profile.phone ? <ContactCard compact={settings.publicSectionStyle !== 'cards'} label={locale === 'ru' ? 'Телефон' : 'Phone'} value={profile.phone} href={profile.hidePhone ? undefined : getPhoneHref(profile.phone)} hidden={Boolean(profile.hidePhone)} hiddenLabel={labels.hiddenContact} icon={<Phone className="size-4" />} /> : null}
                   {profile.whatsapp ? <ContactCard compact={settings.publicSectionStyle !== 'cards'} label="MAX" value={profile.whatsapp} href={profile.hideWhatsapp ? undefined : getMaxHref(profile.whatsapp, locale === 'ru' ? `Здравствуйте! Хочу уточнить запись к ${profile.name}.` : `Hello! I would like to clarify a booking with ${profile.name}.`)} hidden={Boolean(profile.hideWhatsapp)} hiddenLabel={labels.hiddenContact} icon={<MessageCircle className="size-4" />} /> : null}
-                  {profile.telegram ? <ContactCard compact={settings.publicSectionStyle !== 'cards'} label={labels.telegram} value={profile.telegram} href={profile.hideTelegram ? undefined : getTelegramHref(profile.telegram)} hidden={Boolean(profile.hideTelegram)} hiddenLabel={labels.hiddenContact} icon={<Globe2 className="size-4" />} /> : null}
+                  {profile.telegram ? <ContactCard compact={settings.publicSectionStyle !== 'cards'} label={locale === 'ru' ? 'Телеграм' : 'Telegram'} value={profile.telegram} href={profile.hideTelegram ? undefined : getTelegramHref(profile.telegram)} hidden={Boolean(profile.hideTelegram)} hiddenLabel={labels.hiddenContact} icon={<Globe2 className="size-4" />} /> : null}
                 </div>
               </div>
 
@@ -483,7 +497,7 @@ export function PublicMasterPage({
             ) : null}
           </div>
 
-          <div className={cn('xl:sticky xl:top-[84px] xl:self-start xl:max-h-[calc(100vh-112px)] xl:overflow-y-auto', settings.publicBookingStyle === 'step' && '2xl:top-[96px]')}>
+          <div className={cn('hidden xl:block xl:sticky xl:top-[84px] xl:self-start xl:max-h-[calc(100vh-112px)] xl:overflow-y-auto', settings.publicBookingStyle === 'step' && '2xl:top-[96px]')}>
             <section className={cn(sectionClass, surfaceClass)}>
               <BookingForm profile={profile} embedded />
             </section>

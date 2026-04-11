@@ -5,13 +5,10 @@ import { useSearchParams } from 'next/navigation';
 import {
   ArrowRightLeft,
   Bot,
+  ChevronLeft,
   CalendarClock,
-  CalendarDays,
   CheckCheck,
-  ChevronRight,
-  Clock3,
   Download,
-  MessageSquareQuote,
   Plus,
   Search,
   SendHorizonal,
@@ -32,8 +29,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type {
   ChatDeliveryState,
   ChatMessageRecord,
@@ -43,6 +38,7 @@ import type {
 import { getDashboardDemoStorageKey, isDashboardDemoEnabled } from '@/lib/dashboard-demo';
 import { getDashboardDemoChatThreads } from '@/lib/demo-data';
 import { cn } from '@/lib/utils';
+import { useMobile } from '@/hooks/use-mobile';
 
 type SegmentFilter = 'all' | ChatThreadRecord['segment'];
 type ChannelFilter = 'all' | ChatThreadRecord['channel'];
@@ -81,30 +77,6 @@ function formatLongDateLabel(value: string, locale: 'ru' | 'en') {
     weekday: 'short',
   }).format(new Date(value));
 }
-
-function toLocalIsoDate(date: Date) {
-  const timezoneOffset = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 10);
-}
-
-function addDaysIso(offset: number) {
-  const date = new Date();
-  date.setDate(date.getDate() + offset);
-  return toLocalIsoDate(date);
-}
-
-function formatPickerDateLabel(value: string, locale: 'ru' | 'en') {
-  return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
-    day: 'numeric',
-    month: 'long',
-  }).format(new Date(`${value}T00:00:00`));
-}
-
-const TIME_OPTIONS = Array.from({ length: 24 }, (_, index) => {
-  const hour = 9 + Math.floor(index / 2);
-  const minute = index % 2 === 0 ? '00' : '30';
-  return `${String(hour).padStart(2, '0')}:${minute}`;
-});
 
 function deliveryLabel(value: ChatDeliveryState | null | undefined, locale: 'ru' | 'en') {
   if (!value) return null;
@@ -210,14 +182,14 @@ function segmentBadgeLabel(segment: ChatThreadRecord['segment'], locale: 'ru' | 
     return {
       new: 'Новый',
       active: 'В работе',
-      followup: 'Follow-up',
+      followup: 'Повторный контакт',
     }[segment];
   }
 
   return {
     new: 'New',
     active: 'Active',
-    followup: 'Follow-up',
+    followup: 'Повторный контакт',
   }[segment];
 }
 
@@ -226,14 +198,15 @@ export default function DashboardChatsPage() {
   const searchParams = useSearchParams();
   const demoMode = demoModeFromHook || isDashboardDemoEnabled(searchParams);
   const demoStorageKey = getDashboardDemoStorageKey('chats');
+  const isMobile = useMobile();
 
   const labels = locale === 'ru'
     ? {
         badge: demoMode ? 'Демо-входящие' : 'Входящие',
         title: 'Чаты',
         description: demoMode
-          ? 'Примеры переписок, статусов и быстрых действий собраны в одном окне.'
-          : 'Все переписки, переносы и быстрые ответы собраны в одном окне.',
+          ? 'Готовые переписки, быстрые действия и статусы в одном окне.'
+          : 'Компактный inbox для переписок, переносов и быстрых ответов.',
         search: 'Поиск по имени, номеру или тексту',
         allThreads: 'Все',
         newThreads: 'Новые',
@@ -244,7 +217,7 @@ export default function DashboardChatsPage() {
         prioritySort: 'Приоритет',
         unreadSort: 'Непрочитанные',
         total: 'Всего',
-        selected: 'Открыто',
+        selected: 'Открыт',
         demo: 'Демо-режим',
         live: 'Рабочие данные',
         createThread: 'Новый чат',
@@ -279,13 +252,13 @@ export default function DashboardChatsPage() {
         addClientError: 'Нужно заполнить имя и телефон.',
         loadError: 'Не удалось загрузить чаты.',
         sendError: 'Не удалось отправить сообщение.',
-        byBot: 'через бот КликБук',
+        byBot: 'через КликБук бот',
         unread: 'непрочитано',
         openThread: 'Открыть чат',
         closeCreate: 'Скрыть форму',
       }
     : {
-        badge: demoMode ? 'Demo inbox' : 'Inbox',
+        badge: demoMode ? 'Демо-входящие' : 'Входящие',
         title: 'Chats',
         description: demoMode
           ? 'Ready-made chats, quick actions, and statuses in one window.'
@@ -294,15 +267,15 @@ export default function DashboardChatsPage() {
         allThreads: 'All',
         newThreads: 'New',
         activeThreads: 'Active',
-        followupThreads: 'Follow-up',
+        followupThreads: 'Повторный контакт',
         allChannels: 'Channels',
         recentSort: 'Newest',
         prioritySort: 'Priority',
         unreadSort: 'Unread',
         total: 'Total',
         selected: 'Opened',
-        demo: 'Demo mode',
-        live: 'Live data',
+        demo: 'Демо-режим',
+        live: 'Рабочие данные',
         createThread: 'New chat',
         createInline: 'Add client',
         clientName: 'Client name',
@@ -328,14 +301,14 @@ export default function DashboardChatsPage() {
         export: 'Export',
         confirm: 'Confirm',
         reschedule: 'Reschedule',
-        followup: 'Follow-up',
+        followup: 'Повторный контакт',
         date: 'Date',
         time: 'Time',
         applyTransfer: 'Prepare reschedule',
         addClientError: 'Client name and phone are required.',
         loadError: 'Could not load chats.',
         sendError: 'Could not send the message.',
-        byBot: 'via КликБук bot',
+        byBot: 'via КликБук бот',
         unread: 'unread',
         openThread: 'Open chat',
         closeCreate: 'Hide form',
@@ -359,10 +332,21 @@ export default function DashboardChatsPage() {
   const [transferDate, setTransferDate] = useState('');
   const [transferTime, setTransferTime] = useState('12:30');
   const [isSending, setIsSending] = useState(false);
+  const [mobilePane, setMobilePane] = useState<'list' | 'thread'>('list');
 
   const activeThread = useMemo(() => {
     return threads.find((item) => item.id === activeThreadId) ?? null;
   }, [activeThreadId, threads]);
+
+
+  useEffect(() => {
+    if (!isMobile) {
+      setMobilePane('thread');
+      return;
+    }
+
+    setMobilePane(activeThreadId ? 'thread' : 'list');
+  }, [activeThreadId, isMobile]);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -642,7 +626,6 @@ export default function DashboardChatsPage() {
     setDraft(buildBotDraft('reschedule', activeThread, locale, nextVisit));
   };
 
-
   const handleTemplateChange = (value: string) => {
     setSelectedTemplateId(value);
 
@@ -657,168 +640,13 @@ export default function DashboardChatsPage() {
     setDraft(selectedTemplate.content);
   };
 
-  const quickTransferPresets = useMemo(
-    () => [
-      { id: 'today', label: locale === 'ru' ? 'Сегодня' : 'Today', date: addDaysIso(0), time: '12:30' },
-      { id: 'tomorrow', label: locale === 'ru' ? 'Завтра' : 'Tomorrow', date: addDaysIso(1), time: '13:00' },
-      { id: 'plus-two', label: locale === 'ru' ? 'Через 2 дня' : 'In 2 days', date: addDaysIso(2), time: '15:30' },
-    ],
-    [locale],
-  );
-
-  const assistantSlots = useMemo(() => {
-    const nextDate = activeThread?.nextVisit ?? addDaysIso(1);
-    const altDate = addDaysIso(2);
-
-    return [
-      { id: 'slot-1', date: nextDate, time: '12:30' },
-      { id: 'slot-2', date: nextDate, time: '15:00' },
-      { id: 'slot-3', date: altDate, time: '18:00' },
-    ];
-  }, [activeThread?.nextVisit]);
-
-  const channelLabel = (value: ChatThreadRecord['channel']) => {
-    if (locale !== 'ru') return value;
-    if (value === 'Telegram') return 'Телеграм';
-    return value;
-  };
-
-  const assistantSummary = useMemo(() => {
-    if (!activeThread) {
-      return locale === 'ru'
-        ? {
-            title: 'Выберите чат',
-            detail: 'Здесь появятся подсказки по ответу, ближайшие окна и быстрые действия по записи.',
-          }
-        : {
-            title: 'Choose a chat',
-            detail: 'The assistant will suggest the next step, quick replies, and reschedule slots.',
-          };
-    }
-
-    if (activeThread.unreadCount > 0) {
-      return locale === 'ru'
-        ? {
-            title: 'Нужно ответить клиенту',
-            detail: 'Сначала ответьте на вопрос клиента, затем предложите подтверждение или другое время.',
-          }
-        : {
-            title: 'Reply to the client',
-            detail: 'It is better to answer the incoming question first, then offer a confirmation or reschedule.',
-          };
-    }
-
-    if (activeThread.segment === 'new') {
-      return locale === 'ru'
-        ? {
-            title: 'Помогите завершить запись',
-            detail: 'Короткий ответ и один понятный следующий шаг помогают быстрее получить подтверждение.',
-          }
-        : {
-            title: 'Guide the chat to confirmation',
-            detail: 'A short confirmation with one clear next step works best here.',
-          };
-    }
-
-    if (activeThread.segment === 'followup') {
-      return locale === 'ru'
-        ? {
-            title: 'Верните клиента в запись',
-            detail: 'Покажите два ближайших окна и отправьте короткое напоминание без лишнего текста.',
-          }
-        : {
-            title: 'Bring the client back',
-            detail: 'Show two nearest slots and keep the post-visit message short.',
-          };
-    }
-
-    return locale === 'ru'
-      ? {
-          title: 'Диалог под контролем',
-          detail: 'Можно отправить подтверждение, уточнить время или быстро предложить новое окно.',
-        }
-      : {
-          title: 'The chat is under control',
-          detail: 'You can confirm, clarify the time, or prepare a reschedule.',
-        };
-  }, [activeThread, locale]);
-
-  const applyQuickTransfer = (date: string, time: string) => {
-    setTransferDate(date);
-    setTransferTime(time);
-    setComposerFlow('reschedule');
-
-    if (!activeThread) return;
-
-    const nextVisit = `${date} ${time}`.trim();
-    setDraft(buildBotDraft('reschedule', activeThread, locale, nextVisit));
-  };
-
-  const handleAssistantScenario = (kind: 'confirm' | 'clarify' | 'slots') => {
-    if (!activeThread) return;
-
-    if (kind === 'confirm') {
-      handleApplyBotFlow('confirm');
-      return;
-    }
-
-    if (kind === 'clarify') {
-      setComposerFlow(null);
-      setDraft(
-        locale === 'ru'
-          ? `Здравствуйте, ${activeThread.clientName}! Подскажите, пожалуйста, какое время вам сейчас удобнее: первая половина дня или ближе к вечеру?`
-          : `Hi ${activeThread.clientName}! Please let me know which time works better for you right now: earlier in the day or closer to the evening?`,
-      );
-      return;
-    }
-
-    setComposerFlow('followup');
-    setDraft(
-      locale === 'ru'
-        ? `Здравствуйте, ${activeThread.clientName}! Могу предложить ближайшие окна: ${assistantSlots
-            .slice(0, 2)
-            .map((slot) => `${formatPickerDateLabel(slot.date, locale)}, ${slot.time}`)
-            .join(' или ')}. Какой вариант вам удобнее?`
-        : `Hi ${activeThread.clientName}! I can offer the nearest slots: ${assistantSlots
-            .slice(0, 2)
-            .map((slot) => `${formatPickerDateLabel(slot.date, locale)}, ${slot.time}`)
-            .join(' or ')}. Which option works better for you?`,
-    );
-  };
-
-  const handleExportThread = async () => {
-    if (!activeThread) return;
-
-    const content = activeThread.messages
-      .map((message) => {
-        const author = message.author === 'client'
-          ? activeThread.clientName
-          : message.viaBot
-            ? 'КликБук бот'
-            : locale === 'ru'
-              ? 'Мастер'
-              : 'Owner';
-
-        return `[${formatDateLabel(message.createdAt, locale)} ${formatTimeLabel(message.createdAt, locale)}] ${author}: ${message.body}`;
-      })
-      .join('\n');
-
-    const file = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(file);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `${activeThread.clientName.replace(/\s+/g, '-').toLowerCase()}-chat.txt`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-  };
-
   if (!hasHydrated) {
     return null;
   }
 
   return (
-    <WorkspaceShell className="overflow-hidden">
-      <div className="workspace-page flex h-[calc(100svh-22px)] min-h-[calc(100svh-22px)] w-full min-w-0 flex-col gap-3 overflow-hidden !px-2 !pt-2 !pb-2 xl:h-[calc(100svh-28px)] xl:min-h-[calc(100svh-28px)] xl:!px-2.5 xl:!pt-2.5 xl:!pb-2.5">
+    <WorkspaceShell className="overflow-hidden md:overflow-visible">
+      <div className="workspace-page flex min-h-[calc(100svh-64px)] w-full min-w-0 flex-col gap-3 overflow-hidden !px-2 !pt-2 !pb-[calc(72px+env(safe-area-inset-bottom))] md:h-[calc(100svh-22px)] md:min-h-[calc(100svh-22px)] md:!pb-2 xl:h-[calc(100svh-28px)] xl:min-h-[calc(100svh-28px)] xl:!px-2.5 xl:!pt-2.5 xl:!pb-2.5">
         <section className="workspace-card flex shrink-0 flex-wrap items-start justify-between gap-3 rounded-[20px] px-4 py-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -834,7 +662,7 @@ export default function DashboardChatsPage() {
             <p className="mt-1 max-w-[720px] text-[12px] leading-5 text-muted-foreground">{labels.description}</p>
           </div>
 
-          <div className="grid shrink-0 grid-cols-3 gap-2">
+          <div className={cn("grid w-full shrink-0 grid-cols-3 gap-2 sm:w-auto", isMobile && "mt-1")}>
             <div className="workspace-soft-panel rounded-[14px] px-3 py-2 text-left">
               <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{labels.total}</div>
               <div className="mt-1 text-[18px] font-semibold text-foreground">{threads.length}</div>
@@ -851,35 +679,35 @@ export default function DashboardChatsPage() {
         </section>
 
         <section className="workspace-card relative min-h-0 flex-1 overflow-hidden rounded-[20px] p-0">
-          <div className="grid h-full min-h-0 overflow-hidden rounded-[inherit] lg:grid-cols-[296px_minmax(0,1fr)] xl:grid-cols-[292px_minmax(0,1.08fr)_320px]">
-            <aside className="flex min-h-0 flex-col border-b border-border bg-card/84 lg:border-b-0 lg:border-r">
-              <div className="relative z-[2] space-y-3 border-b border-border bg-card/94 px-3 py-3 backdrop-blur">
-                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-1 xl:grid-cols-[minmax(0,1fr)_auto]">
-                  <label className="workspace-input flex h-10 items-center gap-2 rounded-[14px] px-3">
-                    <Search className="size-4 text-muted-foreground" />
-                    <input
+          <div className={cn("grid h-full min-h-0 overflow-hidden rounded-[inherit]", isMobile ? "grid-cols-1" : "lg:grid-cols-[280px_minmax(0,1fr)]")}>
+            <aside className={cn("flex min-h-0 flex-col border-b border-border bg-card/84 lg:border-b-0 lg:border-r", isMobile && mobilePane === "thread" && "hidden")}>
+              <div className="relative z-[2] space-y-2.5 border-b border-border bg-card/94 px-3 py-3 backdrop-blur">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                  <div className="relative min-w-0">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
                       value={query}
                       onChange={(event) => setQuery(event.target.value)}
                       placeholder={labels.search}
-                      className="h-full w-full bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground"
+                      className="workspace-input h-9 pl-9 text-[12.5px]"
                     />
-                  </label>
+                  </div>
 
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-10 rounded-[14px] px-3.5"
-                    onClick={() => setShowCreatePanel((current) => !current)}
+                    onClick={() => setShowCreatePanel((value) => !value)}
+                    className="h-9 shrink-0 px-3"
                   >
                     <Plus className="size-4" />
                     {showCreatePanel ? labels.closeCreate : labels.createThread}
                   </Button>
                 </div>
 
-                <div className="grid gap-2 grid-cols-2">
+                <div className={cn("grid gap-2", isMobile ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-[92px_148px_minmax(0,1fr)]")}>
                   <Select value={segmentFilter} onValueChange={(value) => setSegmentFilter(value as SegmentFilter)}>
-                    <SelectTrigger className="h-10 w-full min-w-0 rounded-[14px] px-3.5 pr-4 text-[12.5px]">
+                    <SelectTrigger className="workspace-input h-10 w-full min-w-0 px-3 pr-8 text-[13px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -891,7 +719,7 @@ export default function DashboardChatsPage() {
                   </Select>
 
                   <Select value={channelFilter} onValueChange={(value) => setChannelFilter(value as ChannelFilter)}>
-                    <SelectTrigger className="h-10 w-full min-w-0 rounded-[14px] px-3.5 pr-4 text-[12.5px]">
+                    <SelectTrigger className="workspace-input h-10 w-full min-w-0 px-3 pr-8 text-[13px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -902,7 +730,7 @@ export default function DashboardChatsPage() {
                   </Select>
 
                   <Select value={sortMode} onValueChange={(value) => setSortMode(value as SortMode)}>
-                    <SelectTrigger className="col-span-2 h-10 w-full min-w-0 rounded-[14px] px-3.5 pr-4 text-[12.5px]">
+                    <SelectTrigger className="workspace-input col-span-2 h-10 w-full min-w-0 px-3 pr-8 text-[13px] sm:col-span-1">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -922,13 +750,13 @@ export default function DashboardChatsPage() {
                       value={newClientName}
                       onChange={(event) => setNewClientName(event.target.value)}
                       placeholder={labels.clientName}
-                      className="workspace-input h-10 rounded-[14px]"
+                      className="workspace-input h-9"
                     />
                     <Input
                       value={newClientPhone}
                       onChange={(event) => setNewClientPhone(event.target.value)}
                       placeholder={labels.clientPhone}
-                      className="workspace-input h-10 rounded-[14px]"
+                      className="workspace-input h-9"
                     />
                     <div className="flex items-center justify-end gap-2">
                       <Button type="button" variant="ghost" size="sm" onClick={() => setShowCreatePanel(false)}>
@@ -966,26 +794,27 @@ export default function DashboardChatsPage() {
                           type="button"
                           onClick={() => {
                             setActiveThreadId(thread.id);
+                            if (isMobile) setMobilePane('thread');
                             void applyLocalThreadPatch(thread.id, { unreadCount: 0 });
                           }}
                           className={cn(
-                            'group w-full rounded-[18px] border px-3 py-3 text-left transition-[border-color,background-color,transform] duration-200',
+                            'group w-full rounded-[16px] border px-3 py-2.5 text-left transition-[border-color,background-color,transform,box-shadow] duration-200',
                             active
-                              ? 'border-border bg-accent/50'
-                              : 'border-border/90 bg-card/68 hover:border-border hover:bg-accent/24',
+                              ? 'border-primary/26 bg-primary/[0.08]'
+                              : 'border-border/90 bg-card/68 hover:border-primary/18 hover:bg-accent/24',
                           )}
                           aria-label={labels.openThread}
                         >
                           <div className="flex items-start gap-3">
                             <div
                               className={cn(
-                                'flex size-10 shrink-0 items-center justify-center rounded-[14px] border text-[11px] font-semibold',
+                                'flex size-9 shrink-0 items-center justify-center rounded-[12px] border text-[11px] font-semibold',
                                 active
-                                  ? 'border-border bg-background text-foreground'
+                                  ? 'border-primary/18 bg-background text-primary'
                                   : 'border-border bg-background text-foreground',
                               )}
                             >
-                              {thread.unreadCount > 0 ? thread.unreadCount : getInitials(thread.clientName)}
+                              {getInitials(thread.clientName)}
                             </div>
 
                             <div className="min-w-0 flex-1">
@@ -994,19 +823,24 @@ export default function DashboardChatsPage() {
                                 {thread.isPriority ? (
                                   <Star className="size-3.5 shrink-0 fill-primary text-primary" />
                                 ) : null}
+                                {thread.unreadCount > 0 ? (
+                                  <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
+                                    {thread.unreadCount}
+                                  </span>
+                                ) : null}
                               </div>
 
                               <div className="mt-0.5 flex items-center gap-1.5 text-[10.5px] text-muted-foreground">
-                                <span>{channelLabel(thread.channel)}</span>
+                                <span>{thread.channel}</span>
                                 <span>•</span>
                                 <span>{formatDateLabel(thread.lastMessageAt, locale)}</span>
                               </div>
 
-                              <div className="mt-1.5 line-clamp-2 text-[11px] leading-[1.1rem] text-muted-foreground">
+                              <div className="mt-1 line-clamp-2 text-[11px] leading-[1.1rem] text-muted-foreground">
                                 {thread.lastMessagePreview || '—'}
                               </div>
 
-                              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                                 <Badge variant="outline" className="h-[21px] rounded-full px-2 text-[9.5px]">
                                   {segmentBadgeLabel(thread.segment, locale)}
                                 </Badge>
@@ -1027,16 +861,22 @@ export default function DashboardChatsPage() {
               </div>
             </aside>
 
-            <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] bg-card/70">
-              <header className="relative z-[1] flex flex-wrap items-start justify-between gap-3 border-b border-border bg-card/94 px-4 py-3 backdrop-blur">
+            <div className={cn("grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] bg-card/70", isMobile && mobilePane === "list" && "hidden")}>
+              <header className="relative z-[1] flex flex-wrap items-start justify-between gap-3 border-b border-border bg-card/94 px-3 py-3 backdrop-blur md:px-4">
                 <div className="min-w-0 flex-1">
                   {activeThread ? (
                     <>
-                      <div className="flex flex-wrap items-center gap-2">
+                      <div className="mb-2 flex items-center gap-2 md:mb-0">
+                        {isMobile ? (
+                          <Button type="button" variant="ghost" size="icon-sm" onClick={() => setMobilePane('list')}>
+                            <ChevronLeft className="size-4" />
+                          </Button>
+                        ) : null}
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
                         <div className="truncate text-[16px] font-semibold tracking-[-0.02em] text-foreground">
                           {activeThread.clientName}
                         </div>
-                        <Badge variant="outline">{channelLabel(activeThread.channel)}</Badge>
+                        <Badge variant="outline">{activeThread.channel}</Badge>
                         <Badge variant="outline">{segmentBadgeLabel(activeThread.segment, locale)}</Badge>
                         {activeThread.botConnected ? (
                           <Badge variant="outline">
@@ -1044,24 +884,40 @@ export default function DashboardChatsPage() {
                             КликБук бот
                           </Badge>
                         ) : null}
+                        </div>
                       </div>
 
-                      <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                        <div className="workspace-soft-panel inline-flex items-center gap-2 rounded-full px-3 py-1.5">
-                          <span>{labels.clientPhone}</span>
-                          <span className="font-medium text-foreground">{activeThread.clientPhone}</span>
+                      {isMobile ? (
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                          <div className="workspace-soft-panel inline-flex items-center gap-2 rounded-full px-3 py-1.5">
+                            <span>{labels.clientPhone}</span>
+                            <span className="font-medium text-foreground">{activeThread.clientPhone}</span>
+                          </div>
+                          <div className="workspace-soft-panel inline-flex items-center gap-2 rounded-full px-3 py-1.5">
+                            <span>{labels.nextVisit}</span>
+                            <span className="max-w-[180px] truncate font-medium text-foreground">
+                              {activeThread.nextVisit ? formatLongDateLabel(activeThread.nextVisit, locale) : labels.notScheduled}
+                            </span>
+                          </div>
                         </div>
-                        <div className="workspace-soft-panel inline-flex items-center gap-2 rounded-full px-3 py-1.5">
-                          <span>{labels.source}</span>
-                          <span className="max-w-[180px] truncate font-medium text-foreground">{activeThread.source || '—'}</span>
+                      ) : (
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                          <div className="workspace-soft-panel inline-flex items-center gap-2 rounded-full px-3 py-1.5">
+                            <span>{labels.clientPhone}</span>
+                            <span className="font-medium text-foreground">{activeThread.clientPhone}</span>
+                          </div>
+                          <div className="workspace-soft-panel inline-flex items-center gap-2 rounded-full px-3 py-1.5">
+                            <span>{labels.source}</span>
+                            <span className="max-w-[180px] truncate font-medium text-foreground">{activeThread.source || '—'}</span>
+                          </div>
+                          <div className="workspace-soft-panel inline-flex items-center gap-2 rounded-full px-3 py-1.5">
+                            <span>{labels.nextVisit}</span>
+                            <span className="max-w-[210px] truncate font-medium text-foreground">
+                              {activeThread.nextVisit ? formatLongDateLabel(activeThread.nextVisit, locale) : labels.notScheduled}
+                            </span>
+                          </div>
                         </div>
-                        <div className="workspace-soft-panel inline-flex items-center gap-2 rounded-full px-3 py-1.5">
-                          <span>{labels.nextVisit}</span>
-                          <span className="max-w-[210px] truncate font-medium text-foreground">
-                            {activeThread.nextVisit ? formatLongDateLabel(activeThread.nextVisit, locale) : labels.notScheduled}
-                          </span>
-                        </div>
-                      </div>
+                      )}
                     </>
                   ) : (
                     <div className="text-[14px] font-semibold text-foreground">{labels.emptyThread}</div>
@@ -1101,7 +957,7 @@ export default function DashboardChatsPage() {
                     {activeThread?.isPriority ? labels.priorityOn : labels.priorityOff}
                   </Button>
 
-                  <Button type="button" variant="outline" size="sm" disabled={!activeThread} onClick={handleExportThread}>
+                  <Button type="button" variant="outline" size="sm">
                     <Download className="size-4" />
                     {labels.export}
                   </Button>
@@ -1113,55 +969,43 @@ export default function DashboardChatsPage() {
                   <div className="flex h-full min-h-[240px] flex-col items-center justify-center rounded-[20px] border border-dashed border-border/90 px-6 text-center">
                     <div className="text-[15px] font-semibold text-foreground">{labels.emptyThread}</div>
                     <div className="mt-2 max-w-[480px] text-[12px] leading-5 text-muted-foreground">
-                      {labels.emptyThreadHint}
+                      {isMobile ? labels.emptyListHint : labels.emptyThreadHint}
                     </div>
                   </div>
                 ) : (
-                  <div className="mx-auto flex w-full max-w-[820px] flex-col gap-2.5">
-                    {activeThread.messages.map((message, index) => {
+                  <div className="mx-auto flex w-full max-w-[760px] flex-col gap-2.5 md:px-0">
+                    {activeThread.messages.map((message) => {
                       const mine = message.author === 'master' || message.author === 'system';
                       const status = deliveryLabel(message.deliveryState, locale);
-                      const currentDay = message.createdAt.slice(0, 10);
-                      const previousDay = activeThread.messages[index - 1]?.createdAt.slice(0, 10);
-                      const showDayDivider = currentDay !== previousDay;
 
                       return (
-                        <div key={message.id} className="space-y-2">
-                          {showDayDivider ? (
-                            <div className="flex items-center gap-3 py-2">
-                              <div className="h-px flex-1 bg-border" />
-                              <div className="text-[10.5px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                                {formatLongDateLabel(message.createdAt, locale)}
-                              </div>
-                              <div className="h-px flex-1 bg-border" />
-                            </div>
-                          ) : null}
-
-                          <div className={cn('flex', mine ? 'justify-end' : 'justify-start')}>
-                            <div
-                              className={cn(
-                                'max-w-[76%] rounded-[20px] border px-4 py-3 shadow-sm',
-                                mine
-                                  ? 'border-primary/18 bg-primary/[0.08] text-foreground'
-                                  : 'border-border bg-card text-foreground',
-                              )}
-                            >
-                              <div className="whitespace-pre-wrap text-[13px] leading-5.5">{message.body}</div>
-                              <div className="mt-2 flex items-center justify-end gap-2 text-[10.5px] text-muted-foreground">
-                                {message.viaBot ? (
-                                  <span className="inline-flex items-center gap-1">
-                                    <Bot className="size-3" />
-                                    {labels.byBot}
-                                  </span>
-                                ) : null}
-                                {status ? (
-                                  <span className="inline-flex items-center gap-1">
-                                    <CheckCheck className="size-3" />
-                                    {status}
-                                  </span>
-                                ) : null}
-                                <span>{formatTimeLabel(message.createdAt, locale)}</span>
-                              </div>
+                        <div
+                          key={message.id}
+                          className={cn('flex', mine ? 'justify-end' : 'justify-start')}
+                        >
+                          <div
+                            className={cn(
+                              'max-w-[88%] rounded-[18px] border px-3.5 py-3 shadow-sm md:max-w-[78%] md:px-4',
+                              mine
+                                ? 'border-primary/18 bg-primary/[0.08] text-foreground'
+                                : 'border-border bg-card text-foreground',
+                            )}
+                          >
+                            <div className="whitespace-pre-wrap text-[13px] leading-5.5">{message.body}</div>
+                            <div className="mt-2 flex items-center justify-end gap-2 text-[10.5px] text-muted-foreground">
+                              {message.viaBot ? (
+                                <span className="inline-flex items-center gap-1">
+                                  <Bot className="size-3" />
+                                  {labels.byBot}
+                                </span>
+                              ) : null}
+                              {status ? (
+                                <span className="inline-flex items-center gap-1">
+                                  <CheckCheck className="size-3" />
+                                  {status}
+                                </span>
+                              ) : null}
+                              <span>{formatTimeLabel(message.createdAt, locale)}</span>
                             </div>
                           </div>
                         </div>
@@ -1171,7 +1015,7 @@ export default function DashboardChatsPage() {
                 )}
               </div>
 
-              <footer className="border-t border-border bg-card/92 px-4 py-3">
+              <footer className="border-t border-border bg-card/92 px-3 py-3 md:px-4">
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <Button type="button" variant="outline" size="sm" disabled={!activeThread} onClick={() => handleApplyBotFlow('confirm')}>
@@ -1189,75 +1033,31 @@ export default function DashboardChatsPage() {
                   </div>
 
                   {composerFlow === 'reschedule' ? (
-                    <div className="workspace-soft-panel space-y-3 rounded-[20px] border border-border/80 bg-background/40 p-3.5">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{locale === 'ru' ? 'Новый слот' : 'New slot'}</div>
-                      <div className="flex flex-wrap gap-2">
-                        {quickTransferPresets.map((preset) => (
-                          <Button
-                            key={preset.id}
-                            type="button"
-                            variant={transferDate === preset.date ? 'default' : 'outline'}
-                            size="sm"
-                            className="h-9 rounded-full px-4"
-                            onClick={() => applyQuickTransfer(preset.date, preset.time)}
-                          >
-                            {preset.label}
-                          </Button>
-                        ))}
-                      </div>
-
-                      <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_168px_auto]">
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button type="button" variant="outline" className="h-11 justify-between rounded-[16px] border-border bg-background/70 px-4 shadow-none">
-                              <span className="inline-flex items-center gap-2">
-                                <CalendarDays className="size-4 text-muted-foreground" />
-                                {transferDate ? formatPickerDateLabel(transferDate, locale) : labels.date}
-                              </span>
-                              <span className="text-[11px] text-muted-foreground">{locale === 'ru' ? 'выбрать' : 'pick'}</span>
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto rounded-[20px] border-border/90 p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={transferDate ? new Date(`${transferDate}T00:00:00`) : undefined}
-                              onSelect={(date) => {
-                                if (!date) return;
-                                const nextDate = toLocalIsoDate(date);
-                                setTransferDate(nextDate);
-                              }}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
-
-                        <Select value={transferTime} onValueChange={setTransferTime}>
-                          <SelectTrigger className="h-11 w-full rounded-[16px] border-border bg-background/70 px-4 text-[12.5px] shadow-none">
-                            <span className="inline-flex items-center gap-2">
-                              <Clock3 className="size-4" />
-                              <SelectValue />
-                            </span>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {TIME_OPTIONS.map((value) => (
-                              <SelectItem key={value} value={value}>
-                                {value}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-
-                        <Button type="button" onClick={handleApplyTransfer} disabled={!activeThread || !transferDate} className="h-11 rounded-[16px] px-4">
-                          <CalendarClock className="size-4" />
-                          {labels.applyTransfer}
-                        </Button>
-                      </div>
+                    <div className="workspace-soft-panel grid gap-2 rounded-[16px] p-3 sm:grid-cols-[minmax(0,1fr)_132px_auto]">
+                      <Input
+                        type="date"
+                        value={transferDate}
+                        onChange={(event) => setTransferDate(event.target.value)}
+                        className="workspace-input h-9"
+                        aria-label={labels.date}
+                      />
+                      <Input
+                        type="time"
+                        value={transferTime}
+                        onChange={(event) => setTransferTime(event.target.value)}
+                        className="workspace-input h-9"
+                        aria-label={labels.time}
+                      />
+                      <Button type="button" onClick={handleApplyTransfer} disabled={!activeThread || !transferDate} className="h-9">
+                        <CalendarClock className="size-4" />
+                        {labels.applyTransfer}
+                      </Button>
                     </div>
                   ) : null}
 
-                  <div className="grid gap-3 xl:grid-cols-[184px_minmax(0,1fr)]">
+                  <div className={cn("grid gap-3", isMobile ? "grid-cols-1" : "xl:grid-cols-[184px_minmax(0,1fr)]")}>
                     <Select value={selectedTemplateId} onValueChange={handleTemplateChange}>
-                      <SelectTrigger className="h-10 w-full rounded-[14px] px-3 pr-4">
+                      <SelectTrigger className="workspace-input h-9 w-full px-3 pr-8">
                         <SelectValue placeholder={labels.templatePlaceholder} />
                       </SelectTrigger>
                       <SelectContent>
@@ -1275,7 +1075,7 @@ export default function DashboardChatsPage() {
                         value={draft}
                         onChange={(event) => setDraft(event.target.value)}
                         placeholder={labels.messagePlaceholder}
-                        className="workspace-input min-h-[88px] resize-none rounded-[16px] px-3 py-2.5 text-[13px]"
+                        className="workspace-input min-h-[88px] resize-none px-3 py-2.5 text-[13px]"
                         disabled={!activeThread}
                       />
 
@@ -1302,119 +1102,6 @@ export default function DashboardChatsPage() {
                 </div>
               </footer>
             </div>
-
-            <aside className="hidden min-h-0 flex-col border-l border-border bg-card/84 xl:flex">
-              <div className="border-b border-border px-4 py-4">
-                <div className="rounded-[22px] border border-border bg-gradient-to-b from-accent/35 to-transparent p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-foreground">
-                        КликБук ассистент
-                      </div>
-                      <div className="mt-1 text-[17px] font-semibold tracking-[-0.02em] text-foreground">
-                        {assistantSummary.title}
-                      </div>
-                    </div>
-                    <div className="flex size-10 items-center justify-center rounded-[14px] border border-border bg-background/70 text-foreground">
-                      <Sparkles className="size-4.5" />
-                    </div>
-                  </div>
-                  <p className="mt-3 text-[12px] leading-5 text-muted-foreground">{assistantSummary.detail}</p>
-                </div>
-              </div>
-
-              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 scrollbar-thin">
-                <div className="workspace-soft-panel rounded-[18px] p-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    {locale === 'ru' ? 'Следующий шаг' : 'Next step'}
-                  </div>
-                  <div className="mt-2 text-[14px] font-semibold text-foreground">
-                    {activeThread
-                      ? locale === 'ru'
-                        ? `Подготовить аккуратный ответ для ${activeThread.clientName}`
-                        : `Prepare a clean reply for ${activeThread.clientName}`
-                      : assistantSummary.title}
-                  </div>
-                  <div className="mt-1 text-[12px] leading-5 text-muted-foreground">
-                    {locale === 'ru'
-                      ? 'Ассистент не заменяет вас, но быстро собирает понятный следующий шаг, чтобы не тратить время на рутину.'
-                      : 'The assistant does not replace you, but it quickly shapes the next step so you waste less time on routine.'}
-                  </div>
-                </div>
-
-                <div className="workspace-soft-panel rounded-[18px] p-4">
-                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    <MessageSquareQuote className="size-3.5" />
-                    {locale === 'ru' ? 'Быстрые сценарии' : 'Quick scenarios'}
-                  </div>
-                  <div className="mt-3 grid gap-2">
-                    <Button type="button" variant="outline" className="justify-between rounded-[14px]" disabled={!activeThread} onClick={() => handleAssistantScenario('confirm')}>
-                      {locale === 'ru' ? 'Подтвердить запись' : 'Confirm booking'}
-                      <ChevronRight className="size-4" />
-                    </Button>
-                    <Button type="button" variant="outline" className="justify-between rounded-[14px]" disabled={!activeThread} onClick={() => handleAssistantScenario('clarify')}>
-                      {locale === 'ru' ? 'Уточнить удобное время' : 'Clarify the best time'}
-                      <ChevronRight className="size-4" />
-                    </Button>
-                    <Button type="button" variant="outline" className="justify-between rounded-[14px]" disabled={!activeThread} onClick={() => handleAssistantScenario('slots')}>
-                      {locale === 'ru' ? 'Предложить 2 ближайших окна' : 'Offer 2 nearest slots'}
-                      <ChevronRight className="size-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="workspace-soft-panel rounded-[18px] p-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    {locale === 'ru' ? 'Быстрый перенос' : 'Quick reschedule'}
-                  </div>
-                  <div className="mt-3 grid gap-2">
-                    {assistantSlots.map((slot) => (
-                      <button
-                        key={slot.id}
-                        type="button"
-                        onClick={() => applyQuickTransfer(slot.date, slot.time)}
-                        className="flex items-center justify-between rounded-[14px] border border-border bg-card/68 px-3 py-3 text-left transition-colors hover:border-primary/20 hover:bg-accent/24"
-                        disabled={!activeThread}
-                      >
-                        <div>
-                          <div className="text-[12.5px] font-semibold text-foreground">
-                            {formatPickerDateLabel(slot.date, locale)}
-                          </div>
-                          <div className="mt-0.5 text-[11px] text-muted-foreground">{slot.time}</div>
-                        </div>
-                        <ChevronRight className="size-4 text-muted-foreground" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="workspace-soft-panel rounded-[18px] p-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    {locale === 'ru' ? 'Карточка клиента' : 'Client card'}
-                  </div>
-                  <div className="mt-3 space-y-3 text-[12px]">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-muted-foreground">{labels.clientPhone}</span>
-                      <span className="font-medium text-foreground">{activeThread?.clientPhone ?? '—'}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-muted-foreground">{labels.source}</span>
-                      <span className="max-w-[170px] truncate font-medium text-foreground">{activeThread?.source ?? '—'}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-muted-foreground">{labels.nextVisit}</span>
-                      <span className="max-w-[170px] truncate font-medium text-foreground">
-                        {activeThread?.nextVisit ? formatLongDateLabel(activeThread.nextVisit, locale) : labels.notScheduled}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-muted-foreground">{labels.unread}</span>
-                      <span className="font-medium text-foreground">{activeThread?.unreadCount ?? 0}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </aside>
           </div>
         </section>
       </div>

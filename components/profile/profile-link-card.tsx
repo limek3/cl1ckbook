@@ -55,7 +55,7 @@ export function ProfileLinkCard({
         share: 'Поделиться',
       }
     : {
-        title: locale === 'ru' ? 'Публичная ссылка' : 'Public link',
+        title: 'Public link',
         description: 'Copy the URL or the ready message and send it to a client.',
         copy: copied ? 'Copied' : 'Copy link',
         copyMessage: 'Copy message',

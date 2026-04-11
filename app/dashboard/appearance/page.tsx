@@ -245,9 +245,9 @@ function NeutralTonePicker({
   onChange: (value: AppearanceSettings['neutralTone']) => void;
 }) {
   const options: Array<Option<AppearanceSettings['neutralTone']>> = [
-    { value: 'zinc', label: locale === 'ru' ? 'Цинк' : 'Zinc' },
-    { value: 'slate', label: locale === 'ru' ? 'Сланец' : 'Slate' },
-    { value: 'stone', label: locale === 'ru' ? 'Камень' : 'Stone' },
+    { value: 'zinc', label: 'Zinc' },
+    { value: 'slate', label: 'Slate' },
+    { value: 'stone', label: 'Stone' },
   ];
 
   return (
@@ -316,11 +316,9 @@ function SummaryBadge({ label, value }: { label: string; value: string }) {
 function WorkspacePreview({
   settings,
   displayTheme,
-  locale,
 }: {
   settings: AppearanceSettings;
   displayTheme: 'light' | 'dark';
-  locale: 'ru' | 'en';
 }) {
   const isDark = displayTheme === 'dark';
   const accent = accentPalette[settings.accentTone];
@@ -330,12 +328,8 @@ function WorkspacePreview({
       <div className={cn('rounded-[16px] border p-3', isDark ? 'border-white/8 bg-[#0b0e13]' : 'border-black/8 bg-white')}>
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className={cn('text-[11px] font-semibold', isDark ? 'text-white/92' : 'text-black/88')}>
-              {locale === 'ru' ? 'Кабинет' : 'Dashboard'}
-            </div>
-            <div className={cn('text-[10px]', isDark ? 'text-white/46' : 'text-black/46')}>
-              {locale === 'ru' ? 'Предпросмотр' : 'Preview'}
-            </div>
+            <div className={cn('text-[11px] font-semibold', isDark ? 'text-white/92' : 'text-black/88')}>Dashboard</div>
+            <div className={cn('text-[10px]', isDark ? 'text-white/46' : 'text-black/46')}>Preview</div>
           </div>
           <span className="rounded-full px-2 py-1 text-[9px] font-medium text-white" style={{ background: accent.solid }}>
             {settings.accentTone}
@@ -473,7 +467,7 @@ export default function DashboardAppearancePage() {
         topbarDensity: 'Верхняя панель',
         topbarDensityDescription: 'Высота и воздух в верхней полосе.',
         motion: 'Анимация отклика',
-        motionDescription: 'Наведение, выпадающие списки и другие переходы.',
+        motionDescription: 'Hover, dropdown и другие переходы.',
         density: 'Плотность',
         densityDescription: 'Высота контролов и расстояния между элементами.',
         radius: 'Радиус',
@@ -487,30 +481,30 @@ export default function DashboardAppearancePage() {
         cover: 'Обложка',
         coverDescription: 'Первое впечатление от публичной страницы.',
         publicAccent: 'Акцент страницы',
-        publicAccentDescription: 'Главный цвет кнопки записи и акцентных блоков.',
+        publicAccentDescription: 'Главный цвет кнопки записи и highlight-блоков.',
         publicButton: 'Кнопка записи',
-        publicButtonDescription: 'Форма основной кнопки записи.',
+        publicButtonDescription: 'Форма основной CTA-кнопки.',
         publicCard: 'Карточка мастера',
         publicCardDescription: 'Подача главного блока мастера.',
         services: 'Услуги',
         servicesDescription: 'Как показывать список услуг.',
         booking: 'Блок записи',
         bookingDescription: 'Насколько заметен сценарий записи.',
-        hero: 'Верхний блок',
+        hero: 'Композиция hero',
         heroDescription: 'Расположение верхних блоков.',
         surface: 'Характер секций',
         surfaceDescription: 'Общее ощущение вторичных секций.',
         sections: 'Вторичные секции',
-        sectionsDescription: 'Вопросы, контакты, отзывы и вспомогательные блоки.',
+        sectionsDescription: 'FAQ, контакты, отзывы и вспомогательные блоки.',
         gallery: 'Галерея работ',
         galleryDescription: 'Как показывать примеры работ.',
         reset: 'Сбросить всё',
         openPage: 'Открыть страницу',
-        workspacePreview: 'Предпросмотр кабинета',
+        workspacePreview: 'Превью кабинета',
         workspacePreviewDescription: 'Тёмная тема больше не окрашивает меню при смене акцента.',
-        pagePreview: 'Предпросмотр страницы',
+        pagePreview: 'Превью страницы',
         pagePreviewDescription: 'Быстрый просмотр публичной карточки.',
-        quickPresets: 'Готовые наборы',
+        quickPresets: 'Быстрые пресеты',
         quickPresetsDescription: 'Чтобы не гонять настройки по одной.',
         activeStack: 'Сейчас активно',
         activeStackDescription: 'Короткая сводка по текущей теме.',
@@ -519,20 +513,20 @@ export default function DashboardAppearancePage() {
         presetStudio: 'Студия',
         presetBalanced: 'Баланс',
         presetSoft: 'Мягко',
-        quickReset: 'Сбросить настройки',
+        quickReset: 'Вернуть дефолт',
         quickOpen: 'Открыть страницу',
         workspaceAction: 'Тёмный кабинет',
         publicAction: 'Мягкая страница',
       }
     : {
-        badge: locale === 'ru' ? 'Настройки / оформление' : 'Settings / interface',
+        badge: 'Settings / interface',
         title: 'Appearance',
         description: 'A calmer and more minimal page for theme, palette, and public page settings.',
         general: 'General settings',
         generalDescription: 'Core application interface settings.',
         app: 'Application appearance',
         appDescription: 'Accent color, quick recipes, and a live snapshot of the current interface state.',
-        publicPage: locale === 'ru' ? 'Публичная страница' : 'Public page',
+        publicPage: 'Public page',
         publicDescription: 'Master page and booking block styling.',
         theme: 'Theme',
         themeDescription: 'Choose light, dark, or system mode.',
@@ -634,7 +628,7 @@ export default function DashboardAppearancePage() {
   const cardOptions = useMemo<Array<Option<AppearanceSettings['cardStyle']>>>(() => [
     { value: 'flat', label: locale === 'ru' ? 'Плоские' : 'Flat' },
     { value: 'soft', label: locale === 'ru' ? 'Мягкие' : 'Soft' },
-    { value: 'glass', label: locale === 'ru' ? 'Лёгкое стекло' : 'Glass-lite' },
+    { value: 'glass', label: 'Glass-lite' },
   ], [locale]);
 
   const publicCoverOptions = useMemo<Array<Option<AppearanceSettings['publicCover']>>>(() => [
@@ -644,16 +638,16 @@ export default function DashboardAppearancePage() {
   ], [locale]);
 
   const publicButtonOptions = useMemo<Array<Option<AppearanceSettings['publicButtonStyle']>>>(() => [
-    { value: 'pill', label: locale === 'ru' ? 'Капсула' : 'Pill' },
-    { value: 'rounded', label: locale === 'ru' ? 'Скруглённая' : 'Rounded' },
-    { value: 'contrast', label: locale === 'ru' ? 'Контрастная' : 'Contrast' },
-  ], [locale]);
+    { value: 'pill', label: 'Pill' },
+    { value: 'rounded', label: 'Rounded' },
+    { value: 'contrast', label: 'Contrast' },
+  ], []);
 
   const publicCardOptions = useMemo<Array<Option<AppearanceSettings['publicCardStyle']>>>(() => [
-    { value: 'editorial', label: locale === 'ru' ? 'Редакционная' : 'Editorial' },
-    { value: 'soft', label: locale === 'ru' ? 'Мягкая' : 'Soft' },
-    { value: 'compact', label: locale === 'ru' ? 'Компактная' : 'Compact' },
-  ], [locale]);
+    { value: 'editorial', label: 'Editorial' },
+    { value: 'soft', label: 'Soft' },
+    { value: 'compact', label: 'Compact' },
+  ], []);
 
   const publicServicesOptions = useMemo<Array<Option<AppearanceSettings['publicServicesStyle']>>>(() => [
     { value: 'grid', label: locale === 'ru' ? 'Сетка' : 'Grid' },
@@ -663,33 +657,33 @@ export default function DashboardAppearancePage() {
 
   const publicBookingOptions = useMemo<Array<Option<AppearanceSettings['publicBookingStyle']>>>(() => [
     { value: 'panel', label: locale === 'ru' ? 'Панель' : 'Panel' },
-    { value: 'step', label: locale === 'ru' ? 'Шаги' : 'Step' },
-    { value: 'minimal', label: locale === 'ru' ? 'Минимальный' : 'Minimal' },
+    { value: 'step', label: 'Step' },
+    { value: 'minimal', label: 'Minimal' },
   ], [locale]);
 
   const heroOptions = useMemo<Array<Option<AppearanceSettings['publicHeroLayout']>>>(() => [
-    { value: 'split', label: locale === 'ru' ? 'Разделённый' : 'Split' },
-    { value: 'centered', label: locale === 'ru' ? 'По центру' : 'Centered' },
-    { value: 'compact', label: locale === 'ru' ? 'Компактный' : 'Compact' },
-  ], [locale]);
+    { value: 'split', label: 'Split' },
+    { value: 'centered', label: 'Centered' },
+    { value: 'compact', label: 'Compact' },
+  ], []);
 
   const surfaceOptions = useMemo<Array<Option<AppearanceSettings['publicSurface']>>>(() => [
-    { value: 'soft', label: locale === 'ru' ? 'Мягкая' : 'Soft' },
-    { value: 'contrast', label: locale === 'ru' ? 'Контрастная' : 'Contrast' },
-    { value: 'glass', label: locale === 'ru' ? 'Стекло' : 'Glass' },
-  ], [locale]);
+    { value: 'soft', label: 'Soft' },
+    { value: 'contrast', label: 'Contrast' },
+    { value: 'glass', label: 'Glass' },
+  ], []);
 
   const sectionOptions = useMemo<Array<Option<AppearanceSettings['publicSectionStyle']>>>(() => [
     { value: 'cards', label: locale === 'ru' ? 'Карточки' : 'Cards' },
     { value: 'dividers', label: locale === 'ru' ? 'Разделители' : 'Dividers' },
-    { value: 'minimal', label: locale === 'ru' ? 'Минимально' : 'Minimal' },
+    { value: 'minimal', label: 'Minimal' },
   ], [locale]);
 
   const galleryOptions = useMemo<Array<Option<AppearanceSettings['publicGalleryStyle']>>>(() => [
-    { value: 'grid', label: locale === 'ru' ? 'Сетка' : 'Grid' },
-    { value: 'editorial', label: locale === 'ru' ? 'Редакционная' : 'Editorial' },
-    { value: 'compact', label: locale === 'ru' ? 'Компактная' : 'Compact' },
-  ], [locale]);
+    { value: 'grid', label: 'Grid' },
+    { value: 'editorial', label: 'Editorial' },
+    { value: 'compact', label: 'Compact' },
+  ], []);
 
   const optionMaps = {
     platformWidth: Object.fromEntries(platformWidthOptions.map((option) => [option.value, option.label])),
@@ -891,7 +885,7 @@ export default function DashboardAppearancePage() {
 
           <div className="space-y-5">
             <SectionCard title={labels.workspacePreview} description={labels.workspacePreviewDescription}>
-              <WorkspacePreview settings={settings} displayTheme={displayTheme} locale={locale} />
+              <WorkspacePreview settings={settings} displayTheme={displayTheme} />
             </SectionCard>
 
             <SectionCard title={labels.pagePreview} description={labels.pagePreviewDescription}>

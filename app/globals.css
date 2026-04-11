@@ -2026,3 +2026,68 @@
   }
 
   
+
+@media (max-width: 767px) {
+  html,
+  body {
+    overscroll-behavior-y: contain;
+  }
+
+  .workspace-main-shell {
+    min-height: calc(100svh - 64px);
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .workspace-page {
+    max-width: 100vw;
+    padding-inline: 10px;
+    padding-block: 12px;
+  }
+
+  .workspace-page-wide {
+    max-width: 100vw;
+  }
+
+  .centered-workspace {
+    padding-inline: 10px;
+  }
+
+  .workspace-card,
+  .workspace-soft-panel {
+    border-radius: 18px;
+    box-shadow: none;
+  }
+
+  .workspace-pill {
+    min-height: 28px;
+    padding-inline: 10px;
+    font-size: 11px;
+  }
+
+  .workspace-input {
+    min-height: 42px;
+    font-size: 14px;
+  }
+
+  .centered-workspace {
+    max-width: 100vw;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+}
+
+
+@media (max-width: 767px) {
+  .mobile-native-scroll {
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mobile-native-card {
+    border-radius: 18px;
+    box-shadow: none;
+  }
+}

@@ -30,7 +30,6 @@ export default function DashboardPage() {
   const { hasHydrated, ownedProfile, bookings, dataset, locale, demoMode } = useOwnedWorkspaceData();
   const [metricView, setMetricView] = useState<MetricView>('revenue');
   const [analyticsView, setAnalyticsView] = useState<MetricView>('bookings');
-  const [activityDays, setActivityDays] = useState<7 | 14 | 30>(30);
 
   const chartData = useMemo(() => {
     if (!dataset) return [];
@@ -51,15 +50,6 @@ export default function DashboardPage() {
   );
 
   if (!hasHydrated) return null;
-
-  const activityChartData = useMemo(
-    () => chartData.slice(-activityDays),
-    [activityDays, chartData],
-  );
-  const activitySlice = useMemo(
-    () => (dataset ? dataset.daily.slice(-activityDays) : []),
-    [activityDays, dataset],
-  );
 
   if (!ownedProfile || !dataset) {
     return (
@@ -119,11 +109,11 @@ export default function DashboardPage() {
     <WorkspaceShell>
       <div className="workspace-page space-y-5">
         <DashboardHeader
-          badge={locale === 'ru' ? 'Аналитика / статистика' : 'Analytics / statistics'}
+          badge={locale === 'ru' ? 'Analytics / statistics' : 'Analytics / statistics'}
           title={locale === 'ru' ? 'Статистика мастера' : 'Master analytics'}
           description={
             locale === 'ru'
-              ? 'Ключевые показатели, динамика записей, журнал бронирований и понятные срезы по услугам и каналам в одном экране.'
+              ? 'Глубокий аналитический экран с 30-дневной динамикой, ключевыми KPI, крупными графиками и зрелой таблицей по услугам и источникам.'
               : 'A deeper analytics screen with a 30-day dynamic, key KPIs, larger charts, and a mature table for services and sources.'
           }
           actions={
@@ -156,29 +146,18 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        <BookingsList
-          title={locale === 'ru' ? 'Журнал бронирований' : 'Booking journal'}
-          description={
-            locale === 'ru'
-              ? 'Все заявки, статусы и примечания собраны в плотной таблице без визуального шума.'
-              : 'All requests, statuses, and notes sit in one dense table.'
-          }
-          bookings={bookings}
-          pageSize={5}
-        />
-
         {demoMode ? (
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
             <section className="workspace-card rounded-[22px] p-4 md:p-5">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="outline" className="bg-card/78">
                   <Sparkles className="size-3.5" />
-                  {locale === 'ru' ? 'Что видно в аналитике' : 'Analytics highlights'}
+                  {locale === 'ru' ? 'Demo analytics' : 'Demo analytics'}
                 </Badge>
                 <div className="text-[12px] text-muted-foreground">
                   {locale === 'ru'
-                    ? 'Короткие подсказки помогают быстро увидеть загрузку, каналы роста и сильные окна для записи.'
-                    : 'Quick highlights show workload, growth channels, and the strongest booking windows.'}
+                    ? 'Ниже — готовые моковые подсказки, чтобы клиент быстро понял ценность аналитики.'
+                    : 'Below are ready-made mock cues so the client quickly understands the analytics value.'}
                 </div>
               </div>
 
@@ -195,7 +174,7 @@ export default function DashboardPage() {
 
             <section className="workspace-card rounded-[22px] p-4">
               <div className="text-[14px] font-semibold text-foreground">
-                {locale === 'ru' ? 'Ключевые сигналы' : 'Key signals'}
+                {locale === 'ru' ? 'Лента demo-сигналов' : 'Demo signal feed'}
               </div>
               <div className="mt-3 space-y-2">
                 {demoFeed.map((item, index) => (
@@ -209,55 +188,37 @@ export default function DashboardPage() {
         ) : null}
 
         <SectionCard
-          title={locale === 'ru' ? 'Активность по дням' : 'Activity by day'}
+          title={locale === 'ru' ? 'Активность за 30 дней' : '30-day activity'}
           description={
             locale === 'ru'
-              ? `Выберите период и посмотрите динамику просмотров, записей, подтверждений и дохода за последние ${activityDays} дн.`
-              : `Choose a period and view visits, bookings, confirmations, and revenue for the last ${activityDays} days.`
+              ? 'Вместо годовой heatmap — понятная динамика по дням: просмотры страницы, заявки, подтверждения и доход.'
+              : 'Instead of a yearly heatmap, a clearer day-by-day view of page visits, requests, confirmations, and revenue.'
           }
           actions={
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex flex-wrap gap-2">
-                {[7, 14, 30].map((days) => (
-                  <Button
-                    key={days}
-                    type="button"
-                    variant={activityDays === days ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setActivityDays(days as 7 | 14 | 30)}
-                  >
-                    {locale === 'ru' ? `${days} дн.` : `${days} days`}
-                  </Button>
-                ))}
-              </div>
-
-              <div className="mx-1 hidden h-6 w-px bg-border sm:block" />
-
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { value: 'revenue', label: locale === 'ru' ? 'Доход' : 'Revenue' },
-                  { value: 'bookings', label: locale === 'ru' ? 'Записи' : 'Bookings' },
-                  { value: 'visitors', label: locale === 'ru' ? 'Посетители' : 'Visitors' },
-                  { value: 'conversion', label: locale === 'ru' ? 'Конверсия' : 'Conversion' },
-                ].map((item) => (
-                  <Button
-                    key={item.value}
-                    type="button"
-                    variant={metricView === item.value ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setMetricView(item.value as MetricView)}
-                  >
-                    {item.label}
-                  </Button>
-                ))}
-              </div>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { value: 'revenue', label: locale === 'ru' ? 'Доход' : 'Revenue' },
+                { value: 'bookings', label: locale === 'ru' ? 'Записи' : 'Bookings' },
+                { value: 'visitors', label: locale === 'ru' ? 'Посетители' : 'Visitors' },
+                { value: 'conversion', label: locale === 'ru' ? 'Конверсия' : 'Conversion' },
+              ].map((item) => (
+                <Button
+                  key={item.value}
+                  type="button"
+                  variant={metricView === item.value ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setMetricView(item.value as MetricView)}
+                >
+                  {item.label}
+                </Button>
+              ))}
             </div>
           }
         >
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_360px]">
             <div className="rounded-[18px] border border-border bg-accent/20 p-3">
               <ChartContainer config={metricConfig} className="h-[320px] w-full">
-                <AreaChart data={activityChartData}>
+                <AreaChart data={chartData}>
                   <defs>
                     <linearGradient id="metricArea" x1="0" x2="0" y1="0" y2="1">
                       <stop offset="5%" stopColor="var(--color-revenue)" stopOpacity={0.24} />
@@ -286,10 +247,10 @@ export default function DashboardPage() {
 
             <div className="grid gap-3">
               {[
-                { label: locale === 'ru' ? `Заявки за ${activityDays} дн.` : `Requests in ${activityDays} days`, value: activitySlice.reduce((total, item) => total + item.requests, 0) },
-                { label: locale === 'ru' ? `Подтверждено за ${activityDays} дн.` : `Confirmed in ${activityDays} days`, value: activitySlice.reduce((total, item) => total + item.confirmed, 0) },
-                { label: locale === 'ru' ? `Доход за ${activityDays} дн.` : `Revenue in ${activityDays} days`, value: formatCurrency(activitySlice.reduce((total, item) => total + item.revenue, 0), locale) },
-                { label: locale === 'ru' ? `Новые клиенты за ${activityDays} дн.` : `New clients in ${activityDays} days`, value: activitySlice.reduce((total, item) => total + item.newClients, 0) },
+                { label: locale === 'ru' ? 'Заявки за неделю' : 'Requests this week', value: dataset.daily.slice(-7).reduce((total, item) => total + item.requests, 0) },
+                { label: locale === 'ru' ? 'Подтверждения за неделю' : 'Confirmed this week', value: dataset.daily.slice(-7).reduce((total, item) => total + item.confirmed, 0) },
+                { label: locale === 'ru' ? 'Доход за неделю' : 'Revenue this week', value: formatCurrency(dataset.daily.slice(-7).reduce((total, item) => total + item.revenue, 0), locale) },
+                { label: locale === 'ru' ? 'Новые клиенты' : 'New clients', value: dataset.daily.slice(-7).reduce((total, item) => total + item.newClients, 0) },
               ].map((item) => (
                 <div key={item.label} className="rounded-[16px] border border-border bg-accent/30 p-4">
                   <div className="text-[11px] text-muted-foreground">{item.label}</div>
@@ -313,7 +274,7 @@ export default function DashboardPage() {
         </SectionCard>
 
         <SectionCard
-          title={locale === 'ru' ? 'Подробная аналитика' : 'Expanded analytics'}
+          title={locale === 'ru' ? 'Большая аналитика по мастерскому потоку' : 'Expanded analytics for the master flow'}
           description={
             locale === 'ru'
               ? 'Верхний фильтр периода, переключатели метрик, крупный график и таблицы по услугам и каналам — зрелая секция в духе LobeHub, но полностью под записи клиентов.'
@@ -476,6 +437,15 @@ export default function DashboardPage() {
           </div>
         </SectionCard>
 
+        <BookingsList
+          title={locale === 'ru' ? 'Журнал бронирований' : 'Booking journal'}
+          description={
+            locale === 'ru'
+              ? 'Все заявки, статусы и примечания собраны в плотной таблице без визуального шума.'
+              : 'All requests, statuses, and notes sit in one dense table.'
+          }
+          bookings={bookings}
+        />
       </div>
     </WorkspaceShell>
   );

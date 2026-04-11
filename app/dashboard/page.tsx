@@ -162,8 +162,8 @@ export default function DashboardPage() {
     <WorkspaceShell>
       <div className="workspace-page workspace-page-wide space-y-5">
         <DashboardHeader
-          badge={locale === 'ru' ? 'Главная / обзор' : 'Overview / dashboard'}
-          title={locale === 'ru' ? 'Кабинет мастера' : 'Master dashboard'}
+          badge={locale === 'ru' ? 'Overview / dashboard' : 'Overview / dashboard'}
+          title={locale === 'ru' ? 'Dashboard мастера' : 'Master dashboard'}
           description={
             locale === 'ru'
               ? 'Ближайшие записи, доход, конверсия, быстрые действия и состояние публичной страницы в одном обзорном экране.'

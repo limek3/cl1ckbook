@@ -56,7 +56,7 @@ export default function ClientsPage() {
     <WorkspaceShell>
       <div className="workspace-page space-y-5">
         <DashboardHeader
-          badge={locale === 'ru' ? 'Клиенты / база' : 'Settings / clients'}
+          badge="Settings / clients"
           title={locale === 'ru' ? 'Клиенты' : 'Clients'}
           description={
             locale === 'ru'

@@ -1,14 +1,13 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
-import { Suspense } from 'react';
 import Script from 'next/script';
 import './globals.css';
 import { Providers } from '@/components/app/providers';
 import { buildAppearancePreferenceScript } from '@/lib/appearance';
 
 export const metadata: Metadata = {
-  title: 'КликБук — платформа для записи клиентов',
-  description: 'Профиль мастера, страница записи, чаты и аналитика в одной платформе КликБук.',
+  title: 'КликБук — платформа для онлайн-записи',
+  description: 'Публичная страница, онлайн-запись, чаты и аналитика в одном кабинете КликБук.',
   generator: 'КликБук',
 };
 
@@ -23,9 +22,11 @@ export const viewport: Viewport = {
 
 const shellPreferenceScript = `
   try {
-    const collapsed = window.localStorage.getItem('sloty-shell-collapsed');
+    const collapsed = window.localStorage.getItem('klikbuk-shell-collapsed') ?? window.localStorage.getItem('sloty-shell-collapsed');
+    document.documentElement.dataset.klikbukSidebar = collapsed === 'true' ? 'collapsed' : 'expanded';
     document.documentElement.dataset.slotySidebar = collapsed === 'true' ? 'collapsed' : 'expanded';
   } catch (error) {
+    document.documentElement.dataset.klikbukSidebar = 'expanded';
     document.documentElement.dataset.slotySidebar = 'expanded';
   }
 `;
@@ -46,9 +47,7 @@ export default function RootLayout({
         <Script id="sloty-shell-preferences" strategy="beforeInteractive">
           {shellPreferenceScript}
         </Script>
-        <Suspense fallback={null}>
-          <Providers>{children}</Providers>
-        </Suspense>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

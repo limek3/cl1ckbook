@@ -39,7 +39,7 @@ export default function SourcesPage() {
     <WorkspaceShell>
       <div className="workspace-page space-y-5">
         <DashboardHeader
-          badge={locale === 'ru' ? 'Аналитика / источники' : 'Analytics / sources'}
+          badge="Analytics / sources"
           title={locale === 'ru' ? 'Источники и каналы' : 'Sources and channels'}
           description={
             locale === 'ru'

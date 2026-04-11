@@ -244,8 +244,8 @@ function PreviewPanel({
 }) {
   const readinessText = completionPercent >= 90 ? labels.ready : labels.needs;
   const contacts = [
-    profile.phone ? (locale === 'ru' ? 'Телефон' : 'Phone') : null,
-    profile.telegram ? (locale === 'ru' ? 'Телеграм' : 'Telegram') : null,
+    profile.phone ? 'Phone' : null,
+    profile.telegram ? 'Telegram' : null,
     profile.whatsapp ? 'MAX' : null,
   ].filter(Boolean) as string[];
 
@@ -466,7 +466,7 @@ export function MasterProfileForm({
         servicesAdd: 'Добавить',
         servicesEmpty: 'Пока ни одна услуга не выбрана.',
         phone: 'Телефон',
-        telegram: 'Телеграм',
+        telegram: 'Telegram',
         whatsapp: 'MAX',
         save: mode === 'create' ? 'Создать профиль' : 'Сохранить профиль',
         preview: 'Открыть страницу',

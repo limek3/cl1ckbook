@@ -121,7 +121,7 @@ export default function ServicesPage() {
         editorTitle: 'Редактор услуг',
         editorDescription: 'Перетаскивайте карточки, меняйте поля, скрывайте из публичной страницы и быстро собирайте порядок показа.',
         previewTitle: 'Как это видит клиент',
-        previewDescription: 'Справа остаётся спокойный клиентский предпросмотр только для видимых услуг.',
+        previewDescription: 'Справа остаётся тихий клиентский preview только для видимых услуг.',
         add: 'Добавить услугу',
         duplicate: 'Дублировать',
         delete: 'Удалить',
@@ -237,7 +237,7 @@ export default function ServicesPage() {
     <WorkspaceShell>
       <div className="workspace-page workspace-page-wide space-y-5">
         <DashboardHeader
-          badge={locale === 'ru' ? 'Настройки / услуги' : 'Settings / services'}
+          badge="Settings / services"
           title={labels.title}
           description={labels.description}
           actions={

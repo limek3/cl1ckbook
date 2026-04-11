@@ -52,6 +52,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useLocale } from '@/lib/locale-context';
 import { BrandLogo } from '@/components/brand/brand-logo';
+import { useMobile } from '@/hooks/use-mobile';
 
 type Locale = 'ru' | 'en';
 type SlideId = 'service' | 'flow' | 'public' | 'workspace' | 'audience' | 'final';
@@ -202,7 +203,7 @@ function getSlides(locale: Locale): SlideMeta[] {
       id: 'service',
       eyebrow: 'One service for the master',
       title:
-        'КликБук helps you manage bookings, client communication, and your workday in one place.',
+        'KlikBuk helps you manage bookings, client communication, and your workday in one place.',
       description:
         'The public page, online booking, messages, and workspace are combined into one clear product.',
       accent: 'emerald',
@@ -236,16 +237,16 @@ function getSlides(locale: Locale): SlideMeta[] {
     },
     {
       id: 'audience',
-      eyebrow: 'КликБук plans',
+      eyebrow: 'KlikBuk plans',
       title:
-        'КликБук fits solo professionals, beauty specialists, and small studios.',
+        'KlikBuk fits solo professionals, beauty specialists, and small studios.',
       description:
         'Pick the right plan and launch online booking without a long setup.',
       accent: 'emerald',
     },
     {
       id: 'final',
-      eyebrow: 'Sign in to КликБук',
+      eyebrow: 'Sign in to KlikBuk',
       title:
         'Create an account or sign in to start taking bookings online.',
       description:
@@ -328,7 +329,7 @@ function StatCard({
   hint: string;
 }) {
   return (
-    <Panel className="p-4">
+    <Panel className="p-3.5 md:p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="metric-label">{label}</div>
@@ -469,7 +470,7 @@ function SlideTopActions({
   locale: Locale;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="hidden flex-wrap items-center gap-2 md:flex">
       <MiniButton icon={BarChart3}>
         {locale === 'ru' ? 'Статистика' : 'Analytics'}
       </MiniButton>
@@ -517,7 +518,7 @@ function PreviewProfileCard({
 
       <div className="mt-4 flex flex-wrap gap-2">
         {tags.map((item) => (
-          <div key={item} className="chip-muted">
+          <div key={item} className="hidden chip-muted sm:inline-flex">
             {item}
           </div>
         ))}
@@ -703,14 +704,14 @@ function DashboardPreview({
 
               <div className="mt-5 grid gap-3 md:grid-cols-3">
                 <FieldCard label={t.status} value={t.connected} />
-                <FieldCard label={t.slug} value="sloty.app/m/boris" />
+                <FieldCard label={t.slug} value="klikbuk.rf/m/alina" />
                 <FieldCard label={t.publicMode} value={t.publicModeValue} />
               </div>
 
               <div className="mt-3 flex flex-wrap gap-2">
                 <div className="workspace-input flex min-w-[260px] flex-1 items-center gap-2 px-3 text-[12px] text-muted-foreground">
                   <Link2 className="h-4 w-4 shrink-0" />
-                  <span className="truncate">https://sloty.app/m/boris</span>
+                  <span className="truncate">https://klikbuk.rf/m/alina</span>
                 </div>
 
                 <Button
@@ -886,7 +887,7 @@ function PublicPagePreview({
   accent: Accent;
 }) {
   return (
-    <Panel className="p-4">
+    <Panel className="p-3.5 md:p-4">
       <div className="rounded-[calc(var(--radius-lg))] border border-border/90 bg-card p-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-start gap-3">
@@ -1284,7 +1285,7 @@ function AudienceScene({
 
         <Panel className="p-4">
           <SectionTitle
-            title={locale === 'ru' ? 'Почему выбирают КликБук' : 'Why people choose КликБук'}
+            title={locale === 'ru' ? 'Почему выбирают КликБук' : 'Why people choose KlikBuk'}
             description={
               locale === 'ru'
                 ? 'Быстрый запуск страницы мастера, онлайн-запись и рабочий кабинет в одном сервисе.'
@@ -1294,7 +1295,7 @@ function AudienceScene({
           <div className="text-[13px] leading-7 text-muted-foreground">
             {locale === 'ru'
               ? 'КликБук помогает быстрее начать принимать записи, поддерживать связь с клиентами и держать рабочий день под контролем.'
-              : 'КликБук helps professionals start taking bookings faster, stay connected with clients, and keep the workday under control.'}
+              : 'KlikBuk helps professionals start taking bookings faster, stay connected with clients, and keep the workday under control.'}
           </div>
         </Panel>
       </div>
@@ -1444,13 +1445,13 @@ function AuthScene({
       };
 
   return (
-    <div className="relative flex h-full min-h-0 items-center justify-center overflow-auto px-4 py-6 md:px-6">
+    <div className="relative flex h-full min-h-0 items-start justify-center overflow-auto px-3 py-4 md:px-6 md:py-6">
       <div className="w-full max-w-[420px]">
-        <div className="overflow-hidden rounded-[30px] border border-border/80 bg-card shadow-[var(--shadow-card)]">
-          <div className="border-b border-border/80 bg-card px-6 py-5">
+        <div className="overflow-hidden rounded-[24px] border border-border/80 bg-card shadow-[var(--shadow-card)] md:rounded-[30px]">
+          <div className="border-b border-border/80 bg-card px-4 py-4 md:px-6 md:py-5">
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
-                <BrandLogo className="w-[74px] sm:w-[84px]" />
+                <BrandLogo className="w-[64px] sm:w-[84px]" />
                 <div className="min-w-0">
                   <div className="mt-0.5 text-[12px] text-muted-foreground">{copy.subtitle}</div>
                 </div>
@@ -1462,7 +1463,7 @@ function AuthScene({
             </div>
           </div>
 
-          <div className="space-y-4 px-6 pb-6 pt-5">
+          <div className="space-y-4 px-4 pb-4 pt-4 md:px-6 md:pb-6 md:pt-5">
             <div className="grid grid-cols-2 gap-1.5 rounded-[18px] border border-border/80 bg-background p-1.5">
               {(['login', 'register'] as AuthMode[]).map((item) => {
                 const active = mode === item;
@@ -1493,16 +1494,16 @@ function AuthScene({
             <div className="rounded-[22px] border border-border/80 bg-background p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">{copy.socialTitle}</div>
-                <div className="text-[11px] text-muted-foreground">Google · Telegram · MAX</div>
+                <div className="text-[11px] text-muted-foreground">Google · Телеграм · MAX</div>
               </div>
-              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+              <div className="mt-3 grid gap-2">
                 <AuthSocialButton icon={Chrome}>{copy.google}</AuthSocialButton>
                 <AuthSocialButton icon={Send}>{copy.telegram}</AuthSocialButton>
                 <AuthSocialButton icon={MessageCircleMore}>{copy.max}</AuthSocialButton>
               </div>
             </div>
 
-            <div className="rounded-[24px] border border-border/80 bg-background p-5">
+            <div className="rounded-[20px] border border-border/80 bg-background p-4 md:rounded-[24px] md:p-5">
               <AnimatePresence mode="wait" initial={false}>
                 {mode === 'login' ? (
                   <motion.div
@@ -1514,7 +1515,7 @@ function AuthScene({
                     className="space-y-4"
                   >
                     <div>
-                      <div className="text-[28px] font-semibold tracking-[-0.05em] text-foreground">{copy.loginTitle}</div>
+                      <div className="text-[22px] font-semibold tracking-[-0.05em] text-foreground md:text-[28px]">{copy.loginTitle}</div>
                       <div className="mt-2 text-[14px] leading-7 text-muted-foreground">{copy.loginDescription}</div>
                     </div>
 
@@ -1522,7 +1523,7 @@ function AuthScene({
                       <AuthInput
                         label={copy.email}
                         type="email"
-                        placeholder="anna@sloty.app"
+                        placeholder="hello@klikbuk.rf"
                         autoComplete="email"
                         icon={Mail}
                       />
@@ -1564,7 +1565,7 @@ function AuthScene({
                     className="space-y-4"
                   >
                     <div>
-                      <div className="text-[28px] font-semibold tracking-[-0.05em] text-foreground">{copy.registerTitle}</div>
+                      <div className="text-[22px] font-semibold tracking-[-0.05em] text-foreground md:text-[28px]">{copy.registerTitle}</div>
                       <div className="mt-2 text-[14px] leading-7 text-muted-foreground">{copy.registerDescription}</div>
                     </div>
 
@@ -1578,7 +1579,7 @@ function AuthScene({
                       <AuthInput
                         label={copy.email}
                         type="email"
-                        placeholder="anna@sloty.app"
+                        placeholder="hello@klikbuk.rf"
                         autoComplete="email"
                         icon={Mail}
                       />
@@ -1644,11 +1645,13 @@ function SlideFrame({
   locale,
   index,
   total,
+  isMobile,
 }: {
   slide: SlideMeta;
   locale: Locale;
   index: number;
   total: number;
+  isMobile: boolean;
 }) {
   if (slide.id === 'final') {
     return (
@@ -1663,7 +1666,7 @@ function SlideFrame({
   return (
     <div
       className={cn(
-        'workspace-card relative flex h-full min-h-0 flex-col overflow-hidden border p-5 md:p-6 xl:p-7',
+        'workspace-card relative flex h-full min-h-0 flex-col overflow-hidden border p-3 md:p-6 xl:p-7',
         ACCENT_FRAME_CLASS[slide.accent],
       )}
     >
@@ -1675,28 +1678,28 @@ function SlideFrame({
         <div className="subtle-grid absolute inset-0 [mask-image:linear-gradient(180deg,black,transparent_70%)]" />
       </div>
 
-      <div className="relative z-10 mb-5 flex flex-wrap items-start justify-between gap-4 border-b pb-5 quiet-divider">
+      <div className={cn('relative z-10 flex flex-wrap items-start justify-between gap-3 border-b quiet-divider', isMobile ? 'mb-3 pb-3' : 'mb-5 pb-5 md:gap-4')}>
         <div className="min-w-0 max-w-[920px]">
           <EyebrowBadge accent={slide.accent}>{slide.eyebrow}</EyebrowBadge>
 
-          <h1 className="mt-4 text-[34px] font-semibold tracking-[-0.065em] text-foreground md:text-[50px] xl:text-[58px]">
+          <h1 className={cn('font-semibold leading-[1.02] tracking-[-0.065em] text-foreground', isMobile ? 'mt-2 text-[clamp(1.7rem,10vw,2.3rem)]' : 'mt-4 text-[50px] xl:text-[58px]')}>
             {slide.title}
           </h1>
 
-          <p className="mt-4 max-w-[780px] text-[14px] leading-7 text-muted-foreground md:text-[15px]">
+          <p className={cn('max-w-[780px] text-muted-foreground', isMobile ? 'mt-2 line-clamp-3 text-[12px] leading-5' : 'mt-4 text-[15px] leading-7')}>
             {slide.description}
           </p>
         </div>
 
         <div className="flex flex-col items-end gap-3">
-          <SlideTopActions locale={locale} />
-          <div className="chip-muted">
+          {!isMobile ? <SlideTopActions locale={locale} /> : null}
+          <div className={cn('chip-muted', isMobile ? 'inline-flex text-[10px]' : 'hidden sm:inline-flex')}>
             {String(index + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
           </div>
         </div>
       </div>
 
-      <div className="scrollbar-thin relative z-10 min-h-0 flex-1 overflow-auto pr-1">
+      <div className="scrollbar-thin relative z-10 min-h-0 flex-1 overflow-auto md:pr-1">
         <SceneBody slide={slide} locale={locale} />
       </div>
     </div>
@@ -1713,7 +1716,7 @@ function SlideDots({
   onGoTo: (index: number) => void;
 }) {
   return (
-    <div className="absolute bottom-5 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-border/90 bg-card px-3 py-2 shadow-[var(--shadow-soft)]">
+    <div className="flex items-center gap-1.5 rounded-full border border-border/90 bg-card/96 px-2.5 py-1.5 shadow-[var(--shadow-soft)] md:absolute md:bottom-5 md:left-1/2 md:z-20 md:-translate-x-1/2 md:gap-2 md:px-3 md:py-2">
       {slides.map((slide, index) => {
         const active = index === activeIndex;
 
@@ -1727,7 +1730,7 @@ function SlideDots({
           >
             <span
               className={cn(
-                'block h-2 rounded-full transition-all duration-[var(--motion-base)]',
+                'block h-1.5 rounded-full transition-all duration-[var(--motion-base)] md:h-2',
                 active ? cn('w-7', ACCENT_CLASS[slide.accent].dot) : 'w-2 bg-border',
               )}
             />
@@ -1784,6 +1787,7 @@ function PreviewLandingPage() {
   const { locale } = useLocale();
   const currentLocale: Locale = locale === 'ru' ? 'ru' : 'en';
   const reduceMotion = useReducedMotion();
+  const isMobile = useMobile();
 
   const slides = useMemo(() => getSlides(currentLocale), [currentLocale]);
 
@@ -1817,6 +1821,8 @@ function PreviewLandingPage() {
   const activeSlide = slides[activeIndex];
 
   useEffect(() => {
+    if (isMobile) return;
+
     const htmlOverflow = document.documentElement.style.overflow;
     const bodyOverflow = document.body.style.overflow;
 
@@ -1827,9 +1833,11 @@ function PreviewLandingPage() {
       document.documentElement.style.overflow = htmlOverflow;
       document.body.style.overflow = bodyOverflow;
     };
-  }, []);
+  }, [isMobile]);
 
   useEffect(() => {
+    if (isMobile) return;
+
     const onWheel = (event: WheelEvent) => {
       if (lockRef.current) return;
       if (Math.abs(event.deltaY) < 28) return;
@@ -1894,7 +1902,7 @@ function PreviewLandingPage() {
       window.removeEventListener('touchstart', onTouchStart);
       window.removeEventListener('touchend', onTouchEnd);
     };
-  }, [goNext, goPrev]);
+  }, [goNext, goPrev, isMobile]);
 
   const sceneVariants = useMemo(
     () => createSceneVariants(direction, Boolean(reduceMotion)),
@@ -1902,12 +1910,12 @@ function PreviewLandingPage() {
   );
 
   return (
-    <div className="h-[100svh] overflow-hidden bg-background text-foreground">
+    <div className="min-h-[100svh] bg-background text-foreground">
       <SiteHeader />
 
-      <main className="workspace-page workspace-page-wide relative flex h-[calc(100svh-64px)] min-h-0 flex-col overflow-hidden bg-background !pt-0 pb-8">
-        <div className="relative flex h-full min-h-0 flex-col">
-          <div className="mb-3 flex items-center justify-end gap-2">
+      <main className={cn("workspace-page workspace-page-wide relative flex min-h-0 flex-col bg-background !pt-0", isMobile ? "min-h-[calc(100svh-64px)] overflow-y-auto pb-[calc(72px+env(safe-area-inset-bottom))]" : "h-[calc(100svh-64px)] overflow-hidden pb-8")}>
+        <div className={cn("relative flex min-h-0 flex-col", isMobile ? "h-auto" : "h-full")}>
+          <div className="mb-3 hidden items-center justify-end gap-2 md:flex">
             <button
               type="button"
               onClick={goPrev}
@@ -1927,7 +1935,7 @@ function PreviewLandingPage() {
             </button>
           </div>
 
-          <div className="relative min-h-0 flex-1 overflow-hidden">
+          <div className={cn("relative min-h-0 flex-1", isMobile ? "overflow-visible" : "overflow-hidden")}>
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={activeSlide.id}
@@ -1935,18 +1943,19 @@ function PreviewLandingPage() {
                 initial="initial"
                 animate="animate"
                 exit="exit"
-                className="absolute inset-0"
+                className={cn(isMobile ? "relative" : "absolute inset-0")}
               >
                 <SlideFrame
                   slide={activeSlide}
                   locale={currentLocale}
                   index={activeIndex}
                   total={slides.length}
+                  isMobile={isMobile}
                 />
               </motion.div>
             </AnimatePresence>
 
-            <SlideDots slides={slides} activeIndex={activeIndex} onGoTo={goTo} />
+            <div className={cn(isMobile ? "sticky bottom-3 mt-3 flex justify-center" : "")}><SlideDots slides={slides} activeIndex={activeIndex} onGoTo={goTo} /></div>
           </div>
         </div>
       </main>

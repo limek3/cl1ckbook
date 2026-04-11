@@ -73,7 +73,7 @@ export default function NotificationsPage() {
   const channelMeta = useMemo<Record<ChannelKey, { title: string; description: string; icon: typeof Send }>>(
     () => ({
       telegram: {
-        title: locale === 'ru' ? 'Телеграм' : 'Telegram',
+        title: 'Telegram',
         description:
           locale === 'ru'
             ? 'Новые заявки, переносы и важные ответы мастера.'
@@ -146,7 +146,7 @@ export default function NotificationsPage() {
         ? '@master.telegram'
         : channel === 'max'
           ? '@master.max'
-          : 'master@klikbuk.app';
+          : 'master@sloty.app';
 
     setLastTest(
       locale === 'ru'
@@ -180,17 +180,17 @@ export default function NotificationsPage() {
     <WorkspaceShell>
       <div className="workspace-page space-y-5">
         <DashboardHeader
-          badge={locale === 'ru' ? 'Настройки / уведомления' : 'Settings / notifications'}
+          badge="Settings / notifications"
           title={locale === 'ru' ? 'Уведомления' : 'Notifications'}
           description={
             locale === 'ru'
-              ? 'Настройте, какие события уходят в Телеграм, MAX и email: новые заявки, напоминания, переносы и недельные сводки.'
+              ? 'Настройте, какие события уходят в Telegram, MAX и email: новые заявки, напоминания, переносы и недельные сводки.'
               : 'Configure which events go to Telegram, MAX, and email: new requests, reminders, reschedules, and weekly digests.'
           }
           actions={
             <>
               <Button variant="outline" className="workspace-button-secondary h-9" onClick={() => sendTest('telegram')}>
-                {locale === 'ru' ? 'Тест в Телеграм' : 'Test Telegram'}
+                {locale === 'ru' ? 'Тест в Telegram' : 'Test Telegram'}
               </Button>
               <Button className="workspace-button-primary h-9" onClick={() => sendTest('max')}>
                 {locale === 'ru' ? 'Тест в MAX' : 'Test MAX'}
@@ -396,12 +396,12 @@ export default function NotificationsPage() {
                 <div className="mt-2 text-[12px] leading-6 text-muted-foreground">
                   {lastTest ||
                     (locale === 'ru'
-                      ? 'Отправьте тест в Телеграм, MAX или email и проверьте, что маршрутизация работает как нужно.'
+                      ? 'Отправьте тест в Telegram, MAX или email и проверьте, что маршрутизация работает как нужно.'
                       : 'Send a test to Telegram, MAX, or email to verify the routing.')}
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Button variant="outline" className="h-8 px-3 text-[12px]" onClick={() => sendTest('telegram')}>
-                    {locale === 'ru' ? 'Телеграм' : 'Telegram'}
+                    Telegram
                   </Button>
                   <Button variant="outline" className="h-8 px-3 text-[12px]" onClick={() => sendTest('max')}>
                     MAX
