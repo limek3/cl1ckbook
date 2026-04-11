@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -10,7 +9,6 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { useApp } from '@/lib/app-context';
 import {
   APPEARANCE_STORAGE_KEY,
@@ -36,17 +34,65 @@ function applyAppearance(settings: AppearanceSettings) {
   applyAppearanceToElement(document.documentElement, settings);
 }
 
+function readDashboardDemoFlag() {
+  if (typeof window === 'undefined') return false;
+  return isDashboardDemoEnabled(new URLSearchParams(window.location.search));
+}
+
 export { defaultAppearanceSettings };
 export type { AppearanceSettings };
 
 export function AppearanceProvider({ children }: { children: ReactNode }) {
   const { hasHydrated, workspaceId, workspaceData, updateWorkspaceSection } = useApp();
-  const searchParams = useSearchParams();
-  const demoMode = isDashboardDemoEnabled(searchParams);
-  const storageKey = demoMode ? getDashboardDemoStorageKey('appearance') : APPEARANCE_STORAGE_KEY;
+  const [demoMode, setDemoMode] = useState(false);
   const [settings, setSettings] = useState<AppearanceSettings>(defaultAppearanceSettings);
   const lastSavedRef = useRef<string>('');
   const syncedWorkspaceRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const syncDemoMode = () => {
+      setDemoMode(readDashboardDemoFlag());
+    };
+
+    syncDemoMode();
+    window.addEventListener('popstate', syncDemoMode);
+
+    return () => {
+      window.removeEventListener('popstate', syncDemoMode);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleQueryChange = () => {
+      setDemoMode(readDashboardDemoFlag());
+    };
+
+    const originalPushState = window.history.pushState;
+    const originalReplaceState = window.history.replaceState;
+
+    window.history.pushState = function pushStatePatched(...args) {
+      const result = originalPushState.apply(this, args);
+      handleQueryChange();
+      return result;
+    };
+
+    window.history.replaceState = function replaceStatePatched(...args) {
+      const result = originalReplaceState.apply(this, args);
+      handleQueryChange();
+      return result;
+    };
+
+    return () => {
+      window.history.pushState = originalPushState;
+      window.history.replaceState = originalReplaceState;
+    };
+  }, []);
+
+  const storageKey = demoMode ? getDashboardDemoStorageKey('appearance') : APPEARANCE_STORAGE_KEY;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -67,7 +113,9 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (demoMode || !hasHydrated) return;
 
-    const remoteSettings = normalizeAppearanceSettings((workspaceData.appearance as Partial<AppearanceSettings> | null | undefined) ?? null);
+    const remoteSettings = normalizeAppearanceSettings(
+      (workspaceData.appearance as Partial<AppearanceSettings> | null | undefined) ?? null,
+    );
     if (!workspaceId) return;
     if (syncedWorkspaceRef.current === workspaceId && lastSavedRef.current) return;
 
@@ -114,7 +162,9 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     const handleStorage = (event: StorageEvent) => {
       if (event.key !== storageKey) return;
       const fallback = demoMode ? getDashboardDemoAppearance() : defaultAppearanceSettings;
-      const next = normalizeAppearanceSettings(event.newValue ? (JSON.parse(event.newValue) as Partial<AppearanceSettings>) : fallback);
+      const next = normalizeAppearanceSettings(
+        event.newValue ? (JSON.parse(event.newValue) as Partial<AppearanceSettings>) : fallback,
+      );
       setSettings(next);
       applyAppearance(next);
     };
