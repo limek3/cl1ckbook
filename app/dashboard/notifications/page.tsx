@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/select';
 import type { NotificationInsight } from '@/lib/master-workspace';
 import { cn } from '@/lib/utils';
+import { useMobile } from '@/hooks/use-mobile';
 
 type ChannelKey = 'telegram' | 'max' | 'email';
 type TimingKey = 'instant' | 'day-before' | 'two-hours' | 'weekly';
@@ -43,6 +44,7 @@ const CHANNEL_ORDER: ChannelKey[] = ['telegram', 'max', 'email'];
 
 export default function NotificationsPage() {
   const { hasHydrated, ownedProfile, dataset, locale } = useOwnedWorkspaceData();
+  const isMobile = useMobile();
 
   const initialItems = useMemo<NotificationViewItem[]>(
     () =>
@@ -160,7 +162,7 @@ export default function NotificationsPage() {
   if (!ownedProfile || !dataset) {
     return (
       <WorkspaceShell>
-        <div className="workspace-page">
+        <div className="workspace-page dashboard-mobile-notifications space-y-4 md:space-y-5">
           <div className="workspace-card rounded-[18px] p-8 text-center">
             <div className="text-[18px] font-semibold text-foreground">
               {locale === 'ru' ? 'Сначала настройте профиль мастера' : 'Create the master profile first'}
@@ -178,28 +180,32 @@ export default function NotificationsPage() {
 
   return (
     <WorkspaceShell>
-      <div className="workspace-page space-y-5">
+      <div className="workspace-page dashboard-mobile-notifications space-y-4 md:space-y-5">
         <DashboardHeader
           badge={locale === 'ru' ? 'Настройки / уведомления' : 'Settings / notifications'}
           title={locale === 'ru' ? 'Уведомления' : 'Notifications'}
           description={
-            locale === 'ru'
-              ? 'Настройте, какие события уходят в Телеграм, MAX и email: новые заявки, напоминания, переносы и недельные сводки.'
-              : 'Configure which events go to Telegram, MAX, and email: new requests, reminders, reschedules, and weekly digests.'
+            isMobile
+              ? locale === 'ru'
+                ? 'Заявки, напоминания и каналы.'
+                : 'New requests, reminders, and channel tests.'
+              : locale === 'ru'
+                ? 'Настройте, какие события уходят в Телеграм, MAX и email: новые заявки, напоминания, переносы и недельные сводки.'
+                : 'Configure which events go to Telegram, MAX, and email: new requests, reminders, reschedules, and weekly digests.'
           }
           actions={
             <>
               <Button variant="outline" className="workspace-button-secondary h-9" onClick={() => sendTest('telegram')}>
-                {locale === 'ru' ? 'Тест в Телеграм' : 'Test Telegram'}
+                {isMobile ? (locale === 'ru' ? 'Телеграм' : 'Telegram') : locale === 'ru' ? 'Тест в Телеграм' : 'Test Telegram'}
               </Button>
               <Button className="workspace-button-primary h-9" onClick={() => sendTest('max')}>
-                {locale === 'ru' ? 'Тест в MAX' : 'Test MAX'}
+                {isMobile ? 'MAX' : locale === 'ru' ? 'Тест в MAX' : 'Test MAX'}
               </Button>
             </>
           }
         />
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <MetricCard label={locale === 'ru' ? 'Всего сценариев' : 'Scenarios'} value={String(items.length)} icon={Bell} />
           <MetricCard label={locale === 'ru' ? 'Активные' : 'Enabled'} value={String(activeCount)} icon={Smartphone} />
           <MetricCard label={locale === 'ru' ? 'Критические' : 'Critical'} value={String(criticalCount)} icon={CircleAlert} />
@@ -210,7 +216,7 @@ export default function NotificationsPage() {
           title={locale === 'ru' ? 'Каналы доставки' : 'Delivery channels'}
           description={
             locale === 'ru'
-              ? 'Управляйте каналами целиком: включайте, выключайте и проверяйте доставку тестовым сообщением.'
+              ? 'Включение каналов и тест отправки.'
               : 'Manage channels globally: enable, disable, and verify delivery with test sends.'
           }
         >
@@ -260,7 +266,7 @@ export default function NotificationsPage() {
           title={locale === 'ru' ? 'Сценарии уведомлений' : 'Notification flows'}
           description={
             locale === 'ru'
-              ? 'Соберите рабочую схему: кто получает уведомление, по какому каналу и когда оно уходит.'
+              ? 'Какие уведомления и когда уходят.'
               : 'Build your workflow: who gets the notification, which channel it uses, and when it is delivered.'
           }
           actions={

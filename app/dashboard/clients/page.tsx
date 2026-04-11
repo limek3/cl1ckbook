@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -54,13 +55,13 @@ export default function ClientsPage() {
 
   return (
     <WorkspaceShell>
-      <div className="workspace-page space-y-5">
+      <div className="workspace-page workspace-page-clients space-y-5">
         <DashboardHeader
           badge={locale === 'ru' ? 'Клиенты / база' : 'Settings / clients'}
           title={locale === 'ru' ? 'Клиенты' : 'Clients'}
           description={
             locale === 'ru'
-              ? 'Список клиентов, история визитов, частота посещений, средний чек и заметки о поведении клиента.'
+              ? 'Клиенты, визиты, заметки и средний чек.'
               : 'Client list, visit history, frequency, average check, and notes.'
           }
         />
@@ -76,55 +77,103 @@ export default function ClientsPage() {
           title={locale === 'ru' ? 'База клиентов' : 'Client base'}
           description={
             locale === 'ru'
-              ? 'Сегменты: новые, постоянные и спящие. Используйте поиск по имени, телефону, услуге или заметке.'
+              ? 'Поиск по имени, телефону, услуге и заметке.'
               : 'Segments: new, regular, and sleeping. Search by name, phone, service, or note.'
           }
           actions={
-            <div className="relative">
+            <div className="relative w-full md:w-auto">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={locale === 'ru' ? 'Поиск клиента' : 'Search client'} className="w-[220px] pl-9" />
+              <Input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={locale === 'ru' ? 'Поиск клиента' : 'Search client'}
+                className="w-full md:w-[220px] pl-9"
+              />
             </div>
           }
         >
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{locale === 'ru' ? 'Клиент' : 'Client'}</TableHead>
-                <TableHead>{locale === 'ru' ? 'Сегмент' : 'Segment'}</TableHead>
-                <TableHead>{locale === 'ru' ? 'Визиты' : 'Visits'}</TableHead>
-                <TableHead>{locale === 'ru' ? 'Средний чек' : 'Average check'}</TableHead>
-                <TableHead>{locale === 'ru' ? 'Источник' : 'Source'}</TableHead>
-                <TableHead>{locale === 'ru' ? 'Заметка' : 'Note'}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {clients.map((client) => (
-                <TableRow key={client.id}>
-                  <TableCell>
-                    <div className="font-medium text-foreground">{client.name}</div>
-                    <div className="mt-1 text-[12px] text-muted-foreground">{client.phone}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline">{segmentBadge(client.segment)}</Badge>
-                      {client.favorite ? <Heart className="size-4 text-primary" /> : null}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-foreground">{client.visits}</div>
-                    <div className="mt-1 text-[12px] text-muted-foreground">
-                      {locale === 'ru' ? 'Последний визит' : 'Last visit'}: {client.lastVisit}
-                    </div>
-                  </TableCell>
-                  <TableCell>{formatCurrency(client.averageCheck, locale)}</TableCell>
-                  <TableCell>{client.source}</TableCell>
-                  <TableCell className="max-w-[280px]">
-                    <div className="line-clamp-2 text-[12px] leading-5 text-muted-foreground">{client.note}</div>
-                  </TableCell>
+          <div className="grid gap-2.5 md:hidden">
+            {clients.map((client) => (
+              <div key={client.id} className="rounded-[16px] border border-border bg-card/94 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-[13px] font-semibold text-foreground">{client.name}</div>
+                    <div className="mt-0.5 text-[11px] text-muted-foreground">{client.phone}</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{segmentBadge(client.segment)}</Badge>
+                    {client.favorite ? <Heart className="size-4 text-primary" /> : null}
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-[14px] border border-border/80 bg-accent/18 px-3 py-2.5">
+                  <div className="text-[11px] font-medium text-foreground">{client.service}</div>
+                  <div className="mt-1 text-[10.5px] text-muted-foreground">
+                    {locale === 'ru' ? 'Последний визит' : 'Last visit'}: {client.lastVisit}
+                  </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div className="rounded-[12px] border border-border/80 bg-background/76 px-3 py-2">
+                    <div className="text-[10px] text-muted-foreground">{locale === 'ru' ? 'Визиты' : 'Visits'}</div>
+                    <div className="mt-1 text-[12px] font-medium text-foreground">{client.visits}</div>
+                  </div>
+                  <div className="rounded-[12px] border border-border/80 bg-background/76 px-3 py-2">
+                    <div className="text-[10px] text-muted-foreground">{locale === 'ru' ? 'Средний чек' : 'Average check'}</div>
+                    <div className="mt-1 text-[12px] font-medium text-foreground">{formatCurrency(client.averageCheck, locale)}</div>
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-[12px] border border-border/80 bg-background/76 px-3 py-2">
+                  <div className="text-[10px] text-muted-foreground">{locale === 'ru' ? 'Источник' : 'Source'}</div>
+                  <div className="mt-1 text-[11px] font-medium text-foreground">{client.source}</div>
+                  <div className="mt-2 text-[10.5px] leading-4.5 text-muted-foreground">{client.note}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{locale === 'ru' ? 'Клиент' : 'Client'}</TableHead>
+                  <TableHead>{locale === 'ru' ? 'Сегмент' : 'Segment'}</TableHead>
+                  <TableHead>{locale === 'ru' ? 'Визиты' : 'Visits'}</TableHead>
+                  <TableHead>{locale === 'ru' ? 'Средний чек' : 'Average check'}</TableHead>
+                  <TableHead>{locale === 'ru' ? 'Источник' : 'Source'}</TableHead>
+                  <TableHead>{locale === 'ru' ? 'Заметка' : 'Note'}</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {clients.map((client) => (
+                  <TableRow key={client.id}>
+                    <TableCell>
+                      <div className="font-medium text-foreground">{client.name}</div>
+                      <div className="mt-1 text-[12px] text-muted-foreground">{client.phone}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">{segmentBadge(client.segment)}</Badge>
+                        {client.favorite ? <Heart className="size-4 text-primary" /> : null}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-foreground">{client.visits}</div>
+                      <div className="mt-1 text-[12px] text-muted-foreground">
+                        {locale === 'ru' ? 'Последний визит' : 'Last visit'}: {client.lastVisit}
+                      </div>
+                    </TableCell>
+                    <TableCell>{formatCurrency(client.averageCheck, locale)}</TableCell>
+                    <TableCell>{client.source}</TableCell>
+                    <TableCell className="max-w-[280px]">
+                      <div className="line-clamp-2 text-[12px] leading-5 text-muted-foreground">{client.note}</div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </SectionCard>
       </div>
     </WorkspaceShell>

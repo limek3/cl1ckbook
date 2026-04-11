@@ -24,6 +24,7 @@ import { useApp } from '@/lib/app-context';
 import { useLocale } from '@/lib/locale-context';
 import { accentPalette, accentToneValues } from '@/lib/appearance-palette';
 import { cn } from '@/lib/utils';
+import { useMobile } from '@/hooks/use-mobile';
 
 type ThemeOption = 'light' | 'dark' | 'system';
 
@@ -48,13 +49,13 @@ function SettingRow({
   return (
     <div
       className={cn(
-        'grid gap-3 py-3.5 lg:grid-cols-[minmax(0,180px)_1fr] lg:items-center',
+        'settings-row grid gap-3 py-3.5 lg:grid-cols-[minmax(0,180px)_1fr] lg:items-center',
         !noBorder && 'border-b border-border/80',
       )}
     >
       <div>
-        <div className="text-[13px] font-semibold text-foreground">{label}</div>
-        {description ? <div className="mt-1 text-[11px] leading-5 text-muted-foreground">{description}</div> : null}
+        <div className="settings-label text-[13px] font-semibold text-foreground">{label}</div>
+        {description ? <div className="settings-caption mt-1 text-[11px] leading-5 text-muted-foreground">{description}</div> : null}
       </div>
       <div className="min-w-0">{children}</div>
     </div>
@@ -112,7 +113,7 @@ function SegmentedControl<T extends string>({
               aria-pressed={active}
             >
               {option.icon}
-              <span className="truncate">{option.label}</span>
+              <span className="truncate"><span className="min-w-0 break-words">{option.label}</span></span>
             </button>
           );
         })}
@@ -152,7 +153,7 @@ function ThemeCards({
   ];
 
   return (
-    <div className="grid gap-2 md:grid-cols-3">
+    <div className="appearance-theme-grid grid grid-cols-3 gap-2">
       {options.map((option) => {
         const active = option.value === value;
         const isDarkPreview = option.previewTheme === 'dark';
@@ -163,7 +164,7 @@ function ThemeCards({
             type="button"
             onClick={() => onChange(option.value)}
             className={cn(
-              'rounded-[16px] border p-2.5 text-left transition-[background-color,border-color,box-shadow] duration-200',
+              'appearance-theme-option min-w-0 rounded-[16px] border p-2.5 text-left transition-[background-color,border-color,box-shadow] duration-200',
               active
                 ? 'border-border bg-accent/34 shadow-[0_1px_0_rgba(255,255,255,0.03)_inset]'
                 : 'border-border/80 bg-card/80 hover:bg-accent/18',
@@ -190,9 +191,9 @@ function ThemeCards({
               </div>
             </div>
 
-            <div className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground">
+            <div className="appearance-theme-option-label mt-2 flex min-w-0 items-center gap-1.5 text-[12px] font-medium leading-tight text-foreground">
               {option.icon}
-              {option.label}
+              <span className="min-w-0 break-words">{option.label}</span>
             </div>
           </button>
         );
@@ -278,7 +279,7 @@ function NeutralTonePicker({
                       : '#a1a1aa',
               }}
             />
-            {option.label}
+            <span className="min-w-0 break-words">{option.label}</span>
           </button>
         );
       })}
@@ -443,6 +444,7 @@ export default function DashboardAppearancePage() {
   const { settings, setSetting, setSettingsBatch, resetSettings } = useAppearance();
   const { locale } = useLocale();
   const { ownedProfile } = useApp();
+  const isMobile = useMobile();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -457,65 +459,65 @@ export default function DashboardAppearancePage() {
     ? {
         badge: 'Настройки / интерфейс',
         title: 'Внешний вид',
-        description: 'Более спокойная и минималистичная настройка темы, палитры и публичной страницы.',
+        description: 'Тема, акцент и стиль страницы.',
         general: 'Общие настройки',
         generalDescription: 'Базовые параметры интерфейса приложения.',
         app: 'Внешний вид приложения',
-        appDescription: 'Акцент темы, быстрые сценарии и живая сводка по текущему состоянию интерфейса.',
+        appDescription: 'Тема, акцент и текущее состояние.',
         publicPage: 'Публичная страница',
-        publicDescription: 'Стиль страницы мастера и блока записи.',
+        publicDescription: 'Стиль страницы и записи.',
         theme: 'Тема',
-        themeDescription: 'Выберите светлый, тёмный или системный режим.',
+        themeDescription: 'Светлая, тёмная или системная тема.',
         platformWidth: 'Ширина платформы',
-        platformWidthDescription: 'Насколько широко раскрывается рабочее пространство.',
+        platformWidthDescription: 'Ширина кабинета.',
         sidebarDensity: 'Боковое меню',
-        sidebarDensityDescription: 'Плотность меню и расстояния между группами.',
+        sidebarDensityDescription: 'Плотность меню.',
         topbarDensity: 'Верхняя панель',
-        topbarDensityDescription: 'Высота и воздух в верхней полосе.',
+        topbarDensityDescription: 'Высота верхней полосы.',
         motion: 'Анимация отклика',
-        motionDescription: 'Наведение, выпадающие списки и другие переходы.',
+        motionDescription: 'Анимации интерфейса.',
         density: 'Плотность',
-        densityDescription: 'Высота контролов и расстояния между элементами.',
+        densityDescription: 'Плотность интерфейса.',
         radius: 'Радиус',
-        radiusDescription: 'Насколько мягкие углы у карточек и контролов.',
+        radiusDescription: 'Радиус карточек и контролов.',
         cards: 'Карточки',
         cardsDescription: 'Характер поверхностей на фоне холста.',
         accent: 'Цвет темы',
-        accentDescription: 'Меняет кнопки, акценты и активные состояния.',
+        accentDescription: 'Акцентный цвет.',
         neutral: 'Нейтральный цвет',
         neutralDescription: 'База для фона и карточек.',
         cover: 'Обложка',
-        coverDescription: 'Первое впечатление от публичной страницы.',
+        coverDescription: 'Обложка страницы.',
         publicAccent: 'Акцент страницы',
-        publicAccentDescription: 'Главный цвет кнопки записи и акцентных блоков.',
+        publicAccentDescription: 'Цвет записи и акцентов.',
         publicButton: 'Кнопка записи',
-        publicButtonDescription: 'Форма основной кнопки записи.',
+        publicButtonDescription: 'Форма кнопки записи.',
         publicCard: 'Карточка мастера',
-        publicCardDescription: 'Подача главного блока мастера.',
+        publicCardDescription: 'Стиль главного блока.',
         services: 'Услуги',
-        servicesDescription: 'Как показывать список услуг.',
+        servicesDescription: 'Вид списка услуг.',
         booking: 'Блок записи',
-        bookingDescription: 'Насколько заметен сценарий записи.',
+        bookingDescription: 'Выделение записи.',
         hero: 'Верхний блок',
-        heroDescription: 'Расположение верхних блоков.',
+        heroDescription: 'Структура верхнего блока.',
         surface: 'Характер секций',
         surfaceDescription: 'Общее ощущение вторичных секций.',
         sections: 'Вторичные секции',
-        sectionsDescription: 'Вопросы, контакты, отзывы и вспомогательные блоки.',
+        sectionsDescription: 'Контакты, отзывы и секции.',
         gallery: 'Галерея работ',
-        galleryDescription: 'Как показывать примеры работ.',
+        galleryDescription: 'Показ работ.',
         reset: 'Сбросить всё',
         openPage: 'Открыть страницу',
         workspacePreview: 'Предпросмотр кабинета',
-        workspacePreviewDescription: 'Тёмная тема больше не окрашивает меню при смене акцента.',
+        workspacePreviewDescription: 'Предпросмотр кабинета.',
         pagePreview: 'Предпросмотр страницы',
-        pagePreviewDescription: 'Быстрый просмотр публичной карточки.',
+        pagePreviewDescription: 'Предпросмотр страницы.',
         quickPresets: 'Готовые наборы',
-        quickPresetsDescription: 'Чтобы не гонять настройки по одной.',
+        quickPresetsDescription: 'Быстрые пресеты.',
         activeStack: 'Сейчас активно',
-        activeStackDescription: 'Короткая сводка по текущей теме.',
+        activeStackDescription: 'Активные настройки.',
         quickAccess: 'Быстрый доступ',
-        quickAccessDescription: 'Основные вещи без прокрутки вниз.',
+        quickAccessDescription: 'Главные настройки без прокрутки.',
         presetStudio: 'Студия',
         presetBalanced: 'Баланс',
         presetSoft: 'Мягко',
@@ -763,11 +765,11 @@ export default function DashboardAppearancePage() {
 
   return (
     <WorkspaceShell>
-      <div className="workspace-page workspace-page-wide space-y-5">
+      <div className="workspace-page workspace-page-wide dashboard-mobile-appearance space-y-4 md:space-y-5">
         <DashboardHeader
           badge={labels.badge}
           title={labels.title}
-          description={labels.description}
+          description={isMobile ? (locale === 'ru' ? 'Тема, плотность, акцент и пресеты.' : 'Theme, density, accent, presets.') : labels.description}
           actions={(
             <>
               <Button type="button" variant="outline" onClick={resetSettings} className="shadow-none">

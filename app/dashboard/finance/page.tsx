@@ -9,16 +9,18 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import { useOwnedWorkspaceData } from '@/hooks/use-owned-workspace-data';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/master-workspace';
+import { useMobile } from '@/hooks/use-mobile';
 
 export default function FinancePage() {
   const { hasHydrated, ownedProfile, dataset, locale } = useOwnedWorkspaceData();
+  const isMobile = useMobile();
 
   if (!hasHydrated) return null;
 
   if (!ownedProfile || !dataset) {
     return (
       <WorkspaceShell>
-        <div className="workspace-page">
+        <div className="workspace-page dashboard-mobile-finance space-y-4 md:space-y-5">
           <div className="workspace-card rounded-[18px] p-8 text-center">
             <div className="text-[18px] font-semibold text-foreground">
               {locale === 'ru' ? 'Сначала настройте профиль мастера' : 'Create the master profile first'}
@@ -41,14 +43,18 @@ export default function FinancePage() {
 
   return (
     <WorkspaceShell>
-      <div className="workspace-page space-y-5">
+      <div className="workspace-page dashboard-mobile-finance space-y-4 md:space-y-5">
         <DashboardHeader
           badge={locale === 'ru' ? 'Аналитика / финансы' : 'Analytics / finance'}
           title={locale === 'ru' ? 'Доход и финансы' : 'Revenue and finance'}
           description={
-            locale === 'ru'
-              ? 'Доход по дням, оплаченные записи, средний чек, потери на отменах и экспорт.'
-              : 'Revenue by day, paid bookings, average check, lost revenue from cancellations, and export.'
+            isMobile
+              ? locale === 'ru'
+                ? 'Доход, средний чек и выручка.'
+                : 'Revenue, average check, and a quick financial snapshot.'
+              : locale === 'ru'
+                ? 'Доход по дням, оплаченные записи, средний чек, потери на отменах и экспорт.'
+                : 'Revenue by day, paid bookings, average check, lost revenue from cancellations, and export.'
           }
           actions={
             <Button size="sm">
@@ -58,7 +64,7 @@ export default function FinancePage() {
           }
         />
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <MetricCard label={locale === 'ru' ? 'Доход за день' : 'Revenue today'} value={formatCurrency(dayRevenue, locale)} icon={Wallet} />
           <MetricCard label={locale === 'ru' ? 'Доход за неделю' : 'Revenue this week'} value={formatCurrency(weekRevenue, locale)} icon={TrendingUp} />
           <MetricCard label={locale === 'ru' ? 'Доход за месяц' : 'Revenue this month'} value={formatCurrency(monthRevenue, locale)} icon={Receipt} />
@@ -70,12 +76,12 @@ export default function FinancePage() {
             title={locale === 'ru' ? 'Динамика дохода' : 'Revenue dynamic'}
             description={
               locale === 'ru'
-                ? 'Подтверждённые и завершённые визиты, свёрнутые в 30-дневный график.'
+                ? 'Доход за 30 дней.'
                 : 'Confirmed and completed visits collapsed into a 30-day curve.'
             }
           >
             <div className="rounded-[18px] border border-border bg-accent/20 p-3">
-              <ChartContainer config={{ revenue: { label: 'Revenue', color: 'var(--chart-1)' } }} className="h-[320px] w-full">
+              <ChartContainer config={{ revenue: { label: 'Revenue', color: 'var(--chart-1)' } }} className={isMobile ? "h-[190px] w-full" : "h-[320px] w-full"}>
                 <AreaChart data={dataset.daily}>
                   <defs>
                     <linearGradient id="financeArea" x1="0" x2="0" y1="0" y2="1">
@@ -97,7 +103,7 @@ export default function FinancePage() {
             title={locale === 'ru' ? 'Финансовый срез' : 'Financial snapshot'}
             description={
               locale === 'ru'
-                ? 'Ключевые цифры по оплатам и услугам.'
+                ? 'Оплаты, средний чек и услуги.'
                 : 'Key numbers for payments and services.'
             }
           >

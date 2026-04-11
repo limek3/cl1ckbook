@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { ChevronLeft, Globe2, LayoutDashboard } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
@@ -12,6 +13,8 @@ import { BrandLogo } from '@/components/brand/brand-logo';
 
 interface SiteHeaderProps {
   compact?: boolean;
+  mobileMetaLabel?: string;
+  mobileActions?: Array<{ href: string; label: string; icon?: ReactNode }>;
 }
 
 export function SiteHeader({ compact = false }: SiteHeaderProps) {
@@ -43,8 +46,12 @@ export function SiteHeader({ compact = false }: SiteHeaderProps) {
         publicPage: 'Page',
       };
 
+  const actionButtonHref = isPublicRoute ? '/dashboard' : publicHref;
+  const actionButtonLabel = isPublicRoute ? labels.dashboard : labels.publicPage;
+  const actionButtonIcon = isPublicRoute ? <LayoutDashboard className="size-4" /> : <Globe2 className="size-4 text-primary" />;
+
   return (
-    <header className="sticky top-0 z-40 border-b border-border/70 bg-background/88 backdrop-blur-2xl">
+    <header className="site-mobile-header sticky top-0 z-40 border-b border-border/70">
       <div className="centered-workspace flex items-center justify-between gap-3 px-3 py-[var(--topbar-padding-y)] sm:px-4 md:px-6 xl:px-8">
         <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
           <Link href={brandHref} className="flex min-w-0 items-center gap-2.5 sm:gap-3">
@@ -85,6 +92,11 @@ export function SiteHeader({ compact = false }: SiteHeaderProps) {
             <Link href="/dashboard">
               <LayoutDashboard className="size-4" />
               {labels.dashboard}
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="icon-sm" className="site-mobile-header-action size-8 rounded-full shadow-none md:hidden">
+            <Link href={actionButtonHref} aria-label={actionButtonLabel}>
+              {actionButtonIcon}
             </Link>
           </Button>
           <LanguageToggle compact minimal />

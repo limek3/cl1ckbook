@@ -23,6 +23,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/u
 import { useOwnedWorkspaceData } from '@/hooks/use-owned-workspace-data';
 import type { Booking } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { useMobile } from '@/hooks/use-mobile';
 
 type TimelineStage = 'next' | 'queue' | 'done' | 'new';
 type TimelinePeriod = 'morning' | 'day' | 'evening';
@@ -162,6 +163,7 @@ function buildDayInsight(items: TimelineItem[], locale: 'ru' | 'en'): DayInsight
 
 export default function DashboardTodayPage() {
   const { hasHydrated, ownedProfile, bookings, locale, demoMode } = useOwnedWorkspaceData();
+  const isMobile = useMobile();
   const [selectedFilter, setSelectedFilter] = useState<TimelineFilter>('all');
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const timelineScrollAreaRef = useRef<HTMLDivElement | null>(null);
@@ -201,24 +203,24 @@ export default function DashboardTodayPage() {
         badge: 'Сегодня / лента дня',
         title: 'Записи на сегодня',
         description: demoMode
-          ? 'Готовое расписание на день: записи, статусы и быстрые переходы собраны в одном экране.'
-          : 'Лента рабочего дня с ближайшими визитами, статусами и быстрыми переходами в чат или звонок.',
+          ? 'Записи, статусы и контакты на день.'
+          : 'Записи, статусы и контакты на день.',
         emptyTitle: 'Сначала настройте профиль мастера',
         emptyAction: 'Создать профиль',
         heroBadge: demoMode ? 'Демо-режим' : 'Рабочий день',
-        heroTitle: demoMode ? 'Расписание на день в КликБук' : 'Все записи на день в одной ленте',
+        heroTitle: demoMode ? 'Записи на день' : 'Записи на день',
         heroDescription: demoMode
-          ? 'Клиент сразу видит ритм дня, загруженность и как быстро можно перейти к нужной записи.'
-          : 'Следите за очередью, не теряйте новые заявки и быстро переходите в чат с клиентом.',
+          ? 'Главные записи и очередь на день.'
+          : 'Главные записи и очередь на день.',
         timelineTitle: 'Таймлайн дня',
-        timelineDescription: 'Горизонтальная лента с обзором дня, выбором периода и быстрыми действиями по каждому визиту.',
+        timelineDescription: 'Лента записей по времени.',
         timelineHint: 'Прокручивается плавно — карточки привязываются по шагам.',
         callClient: 'Позвонить',
         openChat: 'Открыть чат',
         noBookingsTitle: 'На сегодня записей нет',
         noBookingsText: demoMode
-          ? 'В демо-режиме здесь показаны готовые примеры записей на день.'
-          : 'Когда клиенты начнут бронировать реальные слоты, здесь появится живая лента рабочего дня.',
+          ? 'Пока записей нет.'
+          : 'Пока записей нет.',
         openAvailability: 'Открыть график',
         openServices: 'Проверить услуги',
         metrics: {
@@ -247,33 +249,33 @@ export default function DashboardTodayPage() {
         completion: 'Прогресс дня',
         liveDay: 'Сводка дня',
         liveDayText: demoMode
-          ? 'В демо-режиме показан пример заполненного рабочего дня с разными записями.'
-          : 'Каждая карточка показывает статус, заметку и быстрые действия по клиенту.',
+          ? 'Карточки записей на день.'
+          : 'Карточки записей на день.',
         quickActionsTitle: 'Быстрые действия',
-        quickActionsText: 'Самые частые переходы для рабочего дня.',
+        quickActionsText: 'Нужные действия на день.',
       }
     : {
         badge: 'Сегодня / лента дня',
         title: 'Today bookings',
         description: demoMode
-          ? 'A ready demo day with mock bookings, statuses, and quick actions that mirrors a live workspace.'
-          : 'A calm workday timeline with upcoming visits, queue visibility, and fast contact actions.',
+          ? 'Bookings, statuses, and contacts for the day.'
+          : 'Bookings, statuses, and contacts for the day.',
         emptyTitle: 'Create the master profile first',
         emptyAction: 'Create profile',
         heroBadge: demoMode ? 'Demo mode' : 'Workday',
-        heroTitle: demoMode ? 'A loaded day inside ClickBook' : 'The whole day in one timeline',
+        heroTitle: demoMode ? 'Bookings for the day' : 'Bookings for the day',
         heroDescription: demoMode
-          ? 'Clients instantly understand the pace of the day, workload, and how fast you can jump into a booking.'
-          : 'Track the queue, keep new requests visible, and jump into the chat when needed.',
+          ? 'Main bookings and queue for the day.'
+          : 'Main bookings and queue for the day.',
         timelineTitle: 'Day timeline',
-        timelineDescription: 'A horizontal booking flow with period filters, smooth scrolling, and quick actions on every visit.',
+        timelineDescription: 'Timeline of bookings by time.',
         timelineHint: 'Smooth horizontal scroll with snap-to-card behavior.',
         callClient: 'Call',
         openChat: 'Open chat',
         noBookingsTitle: 'No bookings for today yet',
         noBookingsText: demoMode
-          ? 'Demo mode should show example bookings here. Make sure demo mode is enabled.'
-          : 'Once clients start booking real slots, this screen will show the live workday timeline.',
+          ? 'No bookings yet.'
+          : 'No bookings yet.',
         openAvailability: 'Open availability',
         openServices: 'Review services',
         metrics: {
@@ -302,10 +304,10 @@ export default function DashboardTodayPage() {
         completion: 'Day progress',
         liveDay: 'Live day flow',
         liveDayText: demoMode
-          ? 'Demo mode is filled with examples so clients can instantly understand the workload.'
-          : 'Each booking shows status, note, and quick jumps into chat or call.',
+          ? 'Booking cards for the day.'
+          : 'Booking cards for the day.',
         quickActionsTitle: 'Quick actions',
-        quickActionsText: 'Most common jumps for the workday.',
+        quickActionsText: 'Main actions for the day.',
       };
 
   const metrics = {
@@ -314,6 +316,7 @@ export default function DashboardTodayPage() {
     newRequests: todayItems.filter((item) => item.stage === 'new').length,
     done: todayItems.filter((item) => item.stage === 'done').length,
   };
+  const activeItem = filteredItems.find((item) => item.id === activeItemId) ?? filteredItems[0] ?? null;
 
   function scrollTimeline(direction: 'left' | 'right') {
     const viewport = timelineScrollAreaRef.current?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]');
@@ -354,7 +357,7 @@ export default function DashboardTodayPage() {
 
   return (
     <WorkspaceShell>
-      <div className="workspace-page workspace-page-wide space-y-5">
+      <div className="workspace-page workspace-page-wide workspace-page-today space-y-5">
         <DashboardHeader
           badge={labels.badge}
           title={labels.title}
@@ -405,6 +408,122 @@ export default function DashboardTodayPage() {
               </Button>
             </div>
           </Empty>
+        ) : isMobile ? (
+          <SectionCard
+            title={labels.timelineTitle}
+            description={labels.liveDayText}
+            actions={<span className="workspace-pill">{labels.timelineHint}</span>}
+          >
+            <div className="grid gap-3">
+              <div className="grid gap-2 sm:grid-cols-3">
+                <div className="rounded-[14px] border border-border/80 bg-accent/24 px-3 py-2.5">
+                  <div className="text-[9px] uppercase tracking-[0.12em] text-muted-foreground">{labels.nextUp}</div>
+                  <div className="mt-1 text-[12px] font-semibold text-foreground">
+                    {dayInsight.nextUp ? `${dayInsight.nextUp.time} · ${dayInsight.nextUp.clientName}` : '—'}
+                  </div>
+                </div>
+                <div className="rounded-[14px] border border-border/80 bg-accent/24 px-3 py-2.5">
+                  <div className="text-[9px] uppercase tracking-[0.12em] text-muted-foreground">{labels.freeWindow}</div>
+                  <div className="mt-1 text-[12px] font-semibold text-foreground">{dayInsight.freeWindowLabel}</div>
+                </div>
+                <div className="rounded-[14px] border border-border/80 bg-accent/24 px-3 py-2.5">
+                  <div className="text-[9px] uppercase tracking-[0.12em] text-muted-foreground">{labels.completion}</div>
+                  <div className="mt-1 text-[12px] font-semibold text-foreground">{dayInsight.completionLabel}</div>
+                </div>
+              </div>
+
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {(['all', 'morning', 'day', 'evening'] as TimelineFilter[]).map((filterKey) => {
+                  const isActive = selectedFilter === filterKey;
+                  const count = filterKey === 'all'
+                    ? todayItems.length
+                    : todayItems.filter((item) => item.period === filterKey).length;
+
+                  return (
+                    <button
+                      key={filterKey}
+                      type="button"
+                      onClick={() => setSelectedFilter(filterKey)}
+                      className={cn(
+                        'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10.5px] font-medium transition',
+                        isActive
+                          ? 'border-border bg-accent/55 text-foreground'
+                          : 'border-border bg-background/55 text-muted-foreground',
+                      )}
+                    >
+                      <span>{labels.filters[filterKey]}</span>
+                      <span className={cn('rounded-full px-1.5 py-0.5 text-[9px]', isActive ? 'bg-card text-foreground' : 'bg-accent text-foreground/80')}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {activeItem ? (
+                <div className="rounded-[16px] border border-border/80 bg-card/78 px-3 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <div className="text-[16px] font-semibold text-foreground">{activeItem.time}</div>
+                        <span className="chip-muted">{labels.stages[activeItem.stage]}</span>
+                      </div>
+                      <div className="mt-1 text-[13px] font-semibold text-foreground">{activeItem.clientName}</div>
+                      <div className="mt-0.5 text-[11px] text-muted-foreground">{activeItem.service}</div>
+                    </div>
+                    <div className="text-right text-[10px] text-muted-foreground">{activeItem.durationLabel}</div>
+                  </div>
+
+                  {activeItem.note ? (
+                    <div className="mt-2 rounded-[12px] border border-border/70 bg-background/68 px-3 py-2 text-[10.5px] text-muted-foreground">
+                      {activeItem.note}
+                    </div>
+                  ) : null}
+
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <Button asChild variant="outline" size="sm" className="h-8 rounded-[12px]">
+                      <Link href={`tel:${activeItem.phone}`}>
+                        <PhoneCall className="size-3.5" />
+                        {labels.callClient}
+                      </Link>
+                    </Button>
+                    <Button asChild size="sm" className="h-8 rounded-[12px]">
+                      <Link href="/dashboard/chats">
+                        <MessageCircleMore className="size-3.5" />
+                        {labels.openChat}
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="space-y-2">
+                {filteredItems.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setActiveItemId(item.id)}
+                    className={cn(
+                      'w-full rounded-[16px] border px-3 py-2.5 text-left transition',
+                      item.id === activeItemId ? 'border-primary/24 bg-primary/8' : 'border-border/80 bg-card/72',
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <div className="text-[13px] font-semibold text-foreground">{item.time}</div>
+                          <span className="chip-muted">{labels.stages[item.stage]}</span>
+                        </div>
+                        <div className="mt-1 truncate text-[12px] font-medium text-foreground">{item.clientName}</div>
+                        <div className="mt-0.5 truncate text-[10.5px] text-muted-foreground">{item.service}</div>
+                      </div>
+                      <div className="text-[9.5px] text-muted-foreground">{item.durationLabel}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </SectionCard>
         ) : (
           <SectionCard
             title={labels.timelineTitle}

@@ -18,13 +18,13 @@ export default function DashboardProfilePage() {
   if (!ownedProfile) {
     return (
       <WorkspaceShell>
-        <div className="workspace-page workspace-page-wide space-y-5">
+        <div className="workspace-page workspace-page-wide workspace-page-profile space-y-5">
           <DashboardHeader
             badge={locale === 'ru' ? 'Настройки / профиль' : 'Settings / profile'}
             title={locale === 'ru' ? 'Профиль мастера' : 'Master profile'}
             description={
               locale === 'ru'
-                ? 'Сначала создайте профиль мастера, чтобы открыть редактирование, страницу записи и рабочие разделы.'
+                ? 'Создайте профиль мастера.'
                 : 'The profile no longer falls back to mock data. Create the real master workspace first.'
             }
           />
@@ -46,13 +46,13 @@ export default function DashboardProfilePage() {
 
   return (
     <WorkspaceShell>
-      <div className="workspace-page workspace-page-wide space-y-5">
+      <div className="workspace-page workspace-page-wide workspace-page-profile space-y-5">
         <DashboardHeader
           badge={locale === 'ru' ? 'Настройки / профиль' : 'Settings / profile'}
           title={locale === 'ru' ? 'Профиль и страница мастера' : 'Profile and public page'}
           description={
             locale === 'ru'
-              ? 'Редактируйте данные, сразу проверяйте карточку мастера и держите публичную страницу в готовом к записи состоянии.'
+              ? 'Данные мастера и публичная страница.'
               : 'Edit the core details, validate the master card instantly, and keep the public page ready for bookings.'
           }
         />

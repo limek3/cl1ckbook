@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { useMobile } from '@/hooks/use-mobile';
 
 function arrayMove<T>(items: T[], from: number, to: number) {
   if (from === to || from < 0 || to < 0 || from >= items.length || to >= items.length) {
@@ -60,6 +61,7 @@ function createDay(locale: 'ru' | 'en', index: number): AvailabilityDayInsight {
 
 export default function AvailabilityPage() {
   const { hasHydrated, ownedProfile, dataset, locale } = useOwnedWorkspaceData();
+  const isMobile = useMobile();
   const [days, setDays, storageReady] = useWorkspaceSection<AvailabilityDayInsight[]>('availability', dataset?.availability ?? []);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null);
@@ -104,11 +106,11 @@ export default function AvailabilityPage() {
   const labels = locale === 'ru'
     ? {
         title: 'Расписание и доступность',
-        description: 'Теперь график тоже редактируемый: можно переставлять дни, менять статус, слоты и перерывы.',
+        description: 'Рабочие дни, слоты и перерывы.',
         editorTitle: 'Редактор недели',
-        editorDescription: 'Карточки можно перетаскивать, быстро менять и держать расписание живым.',
+        editorDescription: 'Редактирование дней и слотов.',
         helperTitle: 'Быстрые заготовки',
-        helperDescription: 'Сразу подставляют понятный шаблон дня.',
+        helperDescription: 'Шаблоны рабочего дня.',
         add: 'Добавить день / спецдату',
         workday: 'Рабочий день',
         short: 'Короткий день',
@@ -176,7 +178,7 @@ export default function AvailabilityPage() {
 
   return (
     <WorkspaceShell>
-      <div className="workspace-page workspace-page-wide space-y-5">
+      <div className="workspace-page workspace-page-wide workspace-page-availability space-y-5">
         <DashboardHeader
           badge={locale === 'ru' ? 'Настройки / график' : 'Settings / availability'}
           title={labels.title}
@@ -201,7 +203,7 @@ export default function AvailabilityPage() {
         </div>
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_286px]">
-          <div className="space-y-5 xl:order-1">
+          <div className={cn("space-y-5", isMobile ? "order-2" : "xl:order-1")}>
             {selectedDay ? (
               <SectionCard
                 title={selectedDay.label}
@@ -263,7 +265,7 @@ export default function AvailabilityPage() {
               </SectionCard>
             ) : null}
 
-            <SectionCard title={labels.editorTitle} description={locale === 'ru' ? 'Неделя показана как компактная лента с понятными интервалами.' : 'The week is displayed as a compact strip with clear intervals.'} className="p-4">
+            <SectionCard title={labels.editorTitle} description={locale === 'ru' ? 'Неделя и интервалы.' : 'The week is displayed as a compact strip with clear intervals.'} className="p-4">
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {days.map((day) => (
                   <div key={day.id} className="rounded-[16px] border border-border/80 bg-card/80 p-3.5">
@@ -297,7 +299,7 @@ export default function AvailabilityPage() {
             </SectionCard>
           </div>
 
-          <SectionCard title={labels.helperTitle} description={labels.helperDescription} className="xl:sticky xl:top-4 xl:self-start xl:order-2 p-4">
+          <SectionCard title={labels.helperTitle} description={labels.helperDescription} className={cn("p-4", isMobile ? "order-1" : "xl:sticky xl:top-4 xl:self-start xl:order-2")}>
             <div className="max-h-[calc(100vh-9rem)] space-y-3 overflow-y-auto pr-1">
               <div className="grid gap-2">
                 {[

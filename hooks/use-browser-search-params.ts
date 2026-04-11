@@ -25,7 +25,11 @@ function patchHistoryMethod(method: 'pushState' | 'replaceState') {
 
   window.history[method] = function patchedHistoryMethod(this: History, ...args: Parameters<History[typeof method]>) {
     const result = original.apply(this, args);
-    window.dispatchEvent(new Event('klikbuk:searchchange'));
+
+    window.setTimeout(() => {
+      window.dispatchEvent(new Event('klikbuk:searchchange'));
+    }, 0);
+
     return result;
   };
 
@@ -39,9 +43,18 @@ export function useBrowserSearchParams() {
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    setSearch(getSearchString());
+    let frameId = 0;
 
-    const sync = () => setSearch(getSearchString());
+    const sync = () => {
+      window.cancelAnimationFrame(frameId);
+      frameId = window.requestAnimationFrame(() => {
+        const nextSearch = getSearchString();
+        setSearch((current) => (current === nextSearch ? current : nextSearch));
+      });
+    };
+
+    sync();
+
     const unpatchPush = patchHistoryMethod('pushState');
     const unpatchReplace = patchHistoryMethod('replaceState');
 
@@ -49,6 +62,7 @@ export function useBrowserSearchParams() {
     window.addEventListener('klikbuk:searchchange', sync);
 
     return () => {
+      window.cancelAnimationFrame(frameId);
       unpatchPush();
       unpatchReplace();
       window.removeEventListener('popstate', sync);

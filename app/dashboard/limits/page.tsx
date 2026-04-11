@@ -6,16 +6,18 @@ import { WorkspaceShell } from '@/components/shared/workspace-shell';
 import { DashboardHeader, MetricCard, SectionCard } from '@/components/dashboard/workspace-ui';
 import { useOwnedWorkspaceData } from '@/hooks/use-owned-workspace-data';
 import { Button } from '@/components/ui/button';
+import { useMobile } from '@/hooks/use-mobile';
 
 export default function LimitsPage() {
   const { hasHydrated, ownedProfile, dataset, locale } = useOwnedWorkspaceData();
+  const isMobile = useMobile();
 
   if (!hasHydrated) return null;
 
   if (!ownedProfile || !dataset) {
     return (
       <WorkspaceShell>
-        <div className="workspace-page">
+        <div className="workspace-page dashboard-mobile-limits space-y-4 md:space-y-5">
           <div className="workspace-card rounded-[18px] p-8 text-center">
             <div className="text-[18px] font-semibold text-foreground">
               {locale === 'ru' ? 'Сначала настройте профиль мастера' : 'Create the master profile first'}
@@ -33,18 +35,22 @@ export default function LimitsPage() {
 
   return (
     <WorkspaceShell>
-      <div className="workspace-page space-y-5">
+      <div className="workspace-page dashboard-mobile-limits space-y-4 md:space-y-5">
         <DashboardHeader
           badge="Billing / limits"
           title={locale === 'ru' ? 'Лимиты' : 'Limits'}
           description={
-            locale === 'ru'
-              ? 'Контроль ресурсов текущего плана: услуги, клиенты, напоминания, экспорт и запас по росту.'
-              : 'Control the current plan resources: services, clients, reminders, exports, and growth headroom.'
+            isMobile
+              ? locale === 'ru'
+                ? 'Использование тарифа.'
+                : 'Plan usage and where headroom is getting thin.'
+              : locale === 'ru'
+                ? 'Контроль ресурсов текущего плана: услуги, клиенты, напоминания, экспорт и запас по росту.'
+                : 'Control the current plan resources: services, clients, reminders, exports, and growth headroom.'
           }
         />
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <MetricCard label={locale === 'ru' ? 'Лимитов отслеживается' : 'Tracked limits'} value={String(dataset.limits.length)} icon={Gauge} />
           <MetricCard label={locale === 'ru' ? 'Почти заполнены' : 'Near limit'} value={String(dataset.limits.filter((item) => item.used / item.total > 0.65).length)} icon={Activity} />
           <MetricCard label={locale === 'ru' ? 'Текущий план' : 'Current plan'} value="Pro" icon={ShieldCheck} />
@@ -55,7 +61,7 @@ export default function LimitsPage() {
           title={locale === 'ru' ? 'Использование лимитов' : 'Limit usage'}
           description={
             locale === 'ru'
-              ? 'Каждый лимит отображается как ресурс с текущим использованием и безопасным запасом.'
+              ? 'Лимиты, расход и остаток.'
               : 'Each limit is shown as a resource with current usage and remaining headroom.'
           }
         >

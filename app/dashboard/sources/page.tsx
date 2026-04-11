@@ -10,16 +10,18 @@ import { useOwnedWorkspaceData } from '@/hooks/use-owned-workspace-data';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/master-workspace';
+import { useMobile } from '@/hooks/use-mobile';
 
 export default function SourcesPage() {
   const { hasHydrated, ownedProfile, dataset, locale } = useOwnedWorkspaceData();
+  const isMobile = useMobile();
 
   if (!hasHydrated) return null;
 
   if (!ownedProfile || !dataset) {
     return (
       <WorkspaceShell>
-        <div className="workspace-page">
+        <div className="workspace-page dashboard-mobile-sources space-y-4 md:space-y-5">
           <div className="workspace-card rounded-[18px] p-8 text-center">
             <div className="text-[18px] font-semibold text-foreground">
               {locale === 'ru' ? 'Сначала настройте профиль мастера' : 'Create the master profile first'}
@@ -37,18 +39,22 @@ export default function SourcesPage() {
 
   return (
     <WorkspaceShell>
-      <div className="workspace-page space-y-5">
+      <div className="workspace-page dashboard-mobile-sources space-y-4 md:space-y-5">
         <DashboardHeader
           badge={locale === 'ru' ? 'Аналитика / источники' : 'Analytics / sources'}
           title={locale === 'ru' ? 'Источники и каналы' : 'Sources and channels'}
           description={
-            locale === 'ru'
-              ? 'Где клиенты находят публичную страницу, какие каналы дают лучшую конверсию и в какие часы поток плотнее.'
-              : 'Where clients find the public page, which channels convert best, and when demand peaks.'
+            isMobile
+              ? locale === 'ru'
+                ? 'Каналы, часы и повторные клиенты.'
+                : 'Top channels, peak hours, and returning clients.'
+              : locale === 'ru'
+                ? 'Где клиенты находят публичную страницу, какие каналы дают лучшую конверсию и в какие часы поток плотнее.'
+                : 'Where clients find the public page, which channels convert best, and when demand peaks.'
           }
         />
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <MetricCard label={locale === 'ru' ? 'Источники' : 'Sources'} value={String(dataset.channels.length)} icon={Waypoints} />
           <MetricCard label={locale === 'ru' ? 'Лучший источник' : 'Top source'} value={dataset.channels[0]?.label ?? '—'} />
           <MetricCard label={locale === 'ru' ? 'Пиковый час' : 'Peak hour'} value={dataset.peakHours.sort((a, b) => b.bookings - a.bookings)[0]?.hour ?? '—'} icon={Clock3} />
@@ -60,12 +66,12 @@ export default function SourcesPage() {
             title={locale === 'ru' ? 'Рейтинг каналов' : 'Channel ranking'}
             description={
               locale === 'ru'
-                ? 'Сравнение переходов, записей и выручки по каналам.'
+                ? 'Переходы, записи и выручка.'
                 : 'Compare traffic, bookings, and revenue by channel.'
             }
           >
             <div className="rounded-[18px] border border-border bg-accent/20 p-3">
-              <ChartContainer config={{ bookings: { label: 'Bookings', color: 'var(--chart-2)' } }} className="h-[320px] w-full">
+              <ChartContainer config={{ bookings: { label: 'Bookings', color: 'var(--chart-2)' } }} className={isMobile ? "h-[190px] w-full" : "h-[320px] w-full"}>
                 <BarChart data={dataset.channels}>
                   <CartesianGrid vertical={false} strokeDasharray="3 3" />
                   <XAxis dataKey="label" tickLine={false} axisLine={false} />
@@ -95,12 +101,12 @@ export default function SourcesPage() {
             title={locale === 'ru' ? 'Пиковые часы и нагрузка' : 'Peak hours and load'}
             description={
               locale === 'ru'
-                ? 'Когда чаще всего приходит спрос и как распределяется неделя.'
+                ? 'Пиковые часы и загрузка недели.'
                 : 'When demand peaks and how the week distributes.'
             }
           >
             <div className="rounded-[18px] border border-border bg-accent/20 p-3">
-              <ChartContainer config={{ bookings: { label: 'Bookings', color: 'var(--chart-3)' } }} className="h-[220px] w-full">
+              <ChartContainer config={{ bookings: { label: 'Bookings', color: 'var(--chart-3)' } }} className={isMobile ? "h-[170px] w-full" : "h-[220px] w-full"}>
                 <LineChart data={dataset.peakHours}>
                   <CartesianGrid vertical={false} strokeDasharray="3 3" />
                   <XAxis dataKey="hour" tickLine={false} axisLine={false} />

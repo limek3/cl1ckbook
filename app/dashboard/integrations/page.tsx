@@ -6,17 +6,19 @@ import { WorkspaceShell } from '@/components/shared/workspace-shell';
 import { DashboardHeader, MetricCard, SectionCard } from '@/components/dashboard/workspace-ui';
 import { useOwnedWorkspaceData } from '@/hooks/use-owned-workspace-data';
 import { Badge } from '@/components/ui/badge';
+import { useMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 
 export default function IntegrationsPage() {
   const { hasHydrated, ownedProfile, dataset, locale } = useOwnedWorkspaceData();
+  const isMobile = useMobile();
 
   if (!hasHydrated) return null;
 
   if (!ownedProfile || !dataset) {
     return (
       <WorkspaceShell>
-        <div className="workspace-page">
+        <div className="workspace-page dashboard-mobile-integrations space-y-4 md:space-y-5">
           <div className="workspace-card rounded-[18px] p-8 text-center">
             <div className="text-[18px] font-semibold text-foreground">
               {locale === 'ru' ? 'Сначала настройте профиль мастера' : 'Create the master profile first'}
@@ -34,18 +36,22 @@ export default function IntegrationsPage() {
 
   return (
     <WorkspaceShell>
-      <div className="workspace-page space-y-5">
+      <div className="workspace-page dashboard-mobile-integrations space-y-4 md:space-y-5">
         <DashboardHeader
           badge={locale === 'ru' ? 'Настройки / интеграции' : 'Settings / integrations'}
           title={locale === 'ru' ? 'Интеграции' : 'Integrations'}
           description={
-            locale === 'ru'
-              ? 'Телеграм, MAX, Инстаграм, сайт, календарь и уведомления в одном разделе.'
-              : 'Telegram, MAX, Instagram, website, calendar, and notifications in one system block.'
+            isMobile
+              ? locale === 'ru'
+                ? 'Подключения и статусы.'
+                : 'Connections, statuses, and fast actions.'
+              : locale === 'ru'
+                ? 'Каналы связи и сервисы.'
+                : 'Telegram, MAX, Instagram, website, calendar, and notifications in one system block.'
           }
         />
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <MetricCard label={locale === 'ru' ? 'Подключено' : 'Connected'} value={String(dataset.integrations.filter((item) => item.status === 'connected').length)} icon={Sparkles} />
           <MetricCard label={locale === 'ru' ? 'Рекомендовано' : 'Recommended'} value={String(dataset.integrations.filter((item) => item.status === 'recommended').length)} icon={Link2} />
           <MetricCard label={locale === 'ru' ? 'Каналы связи' : 'Messaging channels'} value="2" icon={MessageCircle} />
@@ -56,7 +62,7 @@ export default function IntegrationsPage() {
           title={locale === 'ru' ? 'Подключения' : 'Connections'}
           description={
             locale === 'ru'
-              ? 'Статусы интеграций и короткий контекст, зачем каждая нужна мастеру.'
+              ? 'Подключённые сервисы и доступные действия.'
               : 'Integration status and why each one matters to the master.'
           }
         >

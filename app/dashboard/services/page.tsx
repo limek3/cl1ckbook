@@ -21,6 +21,7 @@ import { useWorkspaceSection } from '@/hooks/use-workspace-section';
 import { type ServiceInsight, formatCurrency } from '@/lib/master-workspace';
 import { getServiceSuggestions, getSuggestedCategory, getServiceCategoryOptions } from '@/lib/service-presets';
 import { cn } from '@/lib/utils';
+import { useMobile } from '@/hooks/use-mobile';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -68,6 +69,7 @@ function createService(
 
 export default function ServicesPage() {
   const { hasHydrated, ownedProfile, dataset, locale } = useOwnedWorkspaceData();
+  const isMobile = useMobile();
   const [services, setServices, storageReady] = useWorkspaceSection<ServiceInsight[]>('services', dataset?.services ?? []);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
@@ -117,11 +119,11 @@ export default function ServicesPage() {
   const labels = locale === 'ru'
     ? {
         title: 'Услуги',
-        description: 'Теперь услуги можно не только смотреть, но и реально менять: порядок, цену, длительность, видимость и статус.',
+        description: 'Услуги, цены и порядок показа.',
         editorTitle: 'Редактор услуг',
-        editorDescription: 'Перетаскивайте карточки, меняйте поля, скрывайте из публичной страницы и быстро собирайте порядок показа.',
+        editorDescription: 'Порядок, цена, длительность и видимость.',
         previewTitle: 'Как это видит клиент',
-        previewDescription: 'Справа остаётся спокойный клиентский предпросмотр только для видимых услуг.',
+        previewDescription: 'Предпросмотр видимых услуг.',
         add: 'Добавить услугу',
         duplicate: 'Дублировать',
         delete: 'Удалить',
@@ -140,9 +142,9 @@ export default function ServicesPage() {
         seasonal: 'Сезонная',
         draft: 'Черновик',
         visibleOnPage: 'Показывать на публичной странице',
-        dragHint: 'Карточки можно перетаскивать мышкой.',
+        dragHint: 'Карточки можно перетаскивать.',
         quickAddTitle: 'Быстро добавить услугу',
-        quickAddDescription: 'Выбирайте из готового списка или добавляйте своё название. Потом можно поправить цену и длительность.',
+        quickAddDescription: 'Готовый список или своя услуга. Цена и длительность редактируются.',
         quickAddPopular: 'Популярные варианты',
         quickAddCustom: 'Своя услуга',
         quickAddPlaceholder: 'Например: SPA-уход для рук',
@@ -235,7 +237,7 @@ export default function ServicesPage() {
 
   return (
     <WorkspaceShell>
-      <div className="workspace-page workspace-page-wide space-y-5">
+      <div className="workspace-page workspace-page-wide workspace-page-services space-y-5">
         <DashboardHeader
           badge={locale === 'ru' ? 'Настройки / услуги' : 'Settings / services'}
           title={labels.title}
@@ -260,11 +262,11 @@ export default function ServicesPage() {
         </div>
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_286px]">
-          <div className="space-y-5 xl:order-1">
+          <div className={cn("space-y-5", isMobile ? "order-2" : "xl:order-1")}>
             {selectedService ? (
               <SectionCard
                 title={selectedService.name}
-                description={locale === 'ru' ? 'Детальная настройка выбранной услуги.' : 'Detailed settings for the selected service.'}
+                description={locale === 'ru' ? 'Настройки услуги.' : 'Detailed settings for the selected service.'}
                 className="p-4"
                 actions={
                   <div className="flex flex-wrap gap-2">
@@ -404,7 +406,7 @@ export default function ServicesPage() {
           <SectionCard
             title={labels.editorTitle}
             description={`${labels.editorDescription} ${labels.dragHint}`}
-            className="xl:sticky xl:top-4 xl:self-start xl:order-2 p-4"
+            className={cn("p-4", isMobile ? "order-1" : "xl:sticky xl:top-4 xl:self-start xl:order-2")}
           >
             <div className="max-h-[calc(100vh-9rem)] space-y-3 overflow-y-auto pr-1">
               <div className="rounded-[16px] border border-border/80 bg-accent/18 p-3.5">

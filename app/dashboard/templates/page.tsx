@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { useMobile } from '@/hooks/use-mobile';
 
 const CHANNEL_OPTIONS = ['Telegram', 'MAX', 'Instagram DM', 'Push'] as const;
 type ChannelFilter = 'all' | (typeof CHANNEL_OPTIONS)[number];
@@ -103,6 +104,7 @@ function TemplateVariableChips({ variables }: { variables: string[] }) {
 
 export default function TemplatesPage() {
   const { hasHydrated, ownedProfile, dataset, locale } = useOwnedWorkspaceData();
+  const isMobile = useMobile();
   const [templates, setTemplates, storageReady] = useWorkspaceSection<MessageTemplateInsight[]>('templates', dataset?.templates ?? []);
   const [draft, setDraft] = useState<MessageTemplateInsight>(() => createTemplate(locale));
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -140,11 +142,11 @@ export default function TemplatesPage() {
   const labels = locale === 'ru'
     ? {
         title: 'Шаблоны сообщений',
-        description: 'Библиотека подтверждений, напоминаний и сообщений после визита с быстрым редактированием и удобным предпросмотром.',
+        description: 'Подтверждения, напоминания и follow-up.',
         baseTitle: 'Библиотека шаблонов',
-        baseDescription: 'Меньше шума, больше контроля: текст, переменные и предпросмотр в одной карточке.',
+        baseDescription: 'Текст, переменные и предпросмотр.',
         createTitle: 'Новый шаблон',
-        createDescription: 'Создайте готовый текст для подтверждений, напоминаний и сообщений после визита.',
+        createDescription: 'Новый шаблон сообщения.',
         add: 'Сохранить шаблон',
         remove: 'Удалить',
         copy: 'Копировать',
@@ -155,19 +157,19 @@ export default function TemplatesPage() {
         contentField: 'Текст сообщения',
         previewField: 'Предпросмотр',
         conversionField: 'Конверсия',
-        placeholdersHint: 'Переменные можно писать через запятую или с новой строки.',
+        placeholdersHint: 'Переменные через запятую или с новой строки.',
         searchPlaceholder: 'Поиск по названию, каналу или тексту',
         allChannels: 'Все каналы',
         empty: 'По текущим фильтрам шаблоны не найдены.',
         livePreview: 'Предпросмотр',
-        livePreviewDescription: 'Так сообщение будет выглядеть после подстановки переменных.',
+        livePreviewDescription: 'Сообщение после подстановки переменных.',
         quickHint: 'Совет',
-        quickHintText: 'Держите один короткий CTA в начале и ссылку ближе к концу — так сообщение читается быстрее.',
+        quickHintText: 'Один CTA и ссылка ближе к концу.',
         activeTemplates: 'Шаблоны',
         averageConversion: 'Средняя конверсия',
         variables: 'Переменные',
         channels: 'Активные каналы',
-        addHint: 'Новый шаблон появится наверху списка.',
+        addHint: 'Новый шаблон появится сверху.',
         counter: 'Совпадений',
       }
     : {
@@ -250,14 +252,14 @@ export default function TemplatesPage() {
 
   return (
     <WorkspaceShell>
-      <div className="workspace-page workspace-page-wide space-y-5">
+      <div className="workspace-page workspace-page-wide dashboard-mobile-templates space-y-4 md:space-y-5">
         <DashboardHeader
           badge={locale === 'ru' ? 'Настройки / шаблоны' : 'Settings / templates'}
           title={labels.title}
-          description={labels.description}
+          description={isMobile ? (locale === 'ru' ? 'Поиск, канал, текст и переменные.' : 'Search, channel, text, and variables.') : labels.description}
         />
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <MetricCard label={labels.activeTemplates} value={String(templates.length)} icon={MessageSquareText} />
           <MetricCard label={labels.averageConversion} value={averageConversion} icon={Copy} />
           <MetricCard label={labels.variables} value={String(variablesCount)} icon={Sparkles} />
@@ -283,7 +285,7 @@ export default function TemplatesPage() {
 
               <div className="flex flex-wrap items-center gap-2">
                 <Select value={channelFilter} onValueChange={(value) => setChannelFilter(value as ChannelFilter)}>
-                  <SelectTrigger className="w-[190px]">
+                  <SelectTrigger className={isMobile ? "w-full sm:w-[190px]" : "w-[190px]"}>
                     <Filter className="size-4 text-muted-foreground" />
                     <SelectValue />
                   </SelectTrigger>
@@ -316,7 +318,7 @@ export default function TemplatesPage() {
                         />
                         <div className="mt-3 flex flex-wrap items-center gap-2">
                           <Select value={template.channel} onValueChange={(value) => updateTemplate(template.id, { channel: value })}>
-                            <SelectTrigger className="h-9 w-[170px]">
+                            <SelectTrigger className={isMobile ? "h-8 w-[140px]" : "h-9 w-[170px]"}>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -350,7 +352,7 @@ export default function TemplatesPage() {
                         <Textarea
                           value={template.content}
                           onChange={(event) => updateTemplate(template.id, { content: event.target.value })}
-                          className="min-h-[172px] border-none bg-transparent px-0 py-0 text-[13px] leading-6 shadow-none"
+                          className={isMobile ? "min-h-[124px] border-none bg-transparent px-0 py-0 text-[12px] leading-5 shadow-none" : "min-h-[172px] border-none bg-transparent px-0 py-0 text-[13px] leading-6 shadow-none"}
                         />
                       </div>
 

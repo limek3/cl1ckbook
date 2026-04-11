@@ -23,11 +23,13 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import { useOwnedWorkspaceData } from '@/hooks/use-owned-workspace-data';
 import { getDashboardDemoAnalyticsFeed, getDashboardDemoAnalyticsHighlights } from '@/lib/demo-data';
 import { formatCurrency } from '@/lib/master-workspace';
+import { useMobile } from '@/hooks/use-mobile';
 
 type MetricView = 'revenue' | 'bookings' | 'visitors' | 'conversion';
 
 export default function DashboardPage() {
   const { hasHydrated, ownedProfile, bookings, dataset, locale, demoMode } = useOwnedWorkspaceData();
+  const isMobile = useMobile();
   const [metricView, setMetricView] = useState<MetricView>('revenue');
   const [analyticsView, setAnalyticsView] = useState<MetricView>('bookings');
   const [activityDays, setActivityDays] = useState<7 | 14 | 30>(30);
@@ -116,13 +118,13 @@ export default function DashboardPage() {
 
   return (
     <WorkspaceShell>
-      <div className="workspace-page space-y-5">
+      <div className="workspace-page workspace-page-stats space-y-5">
         <DashboardHeader
           badge={locale === 'ru' ? 'Аналитика / статистика' : 'Analytics / statistics'}
           title={locale === 'ru' ? 'Статистика мастера' : 'Master analytics'}
           description={
             locale === 'ru'
-              ? 'Ключевые показатели, динамика записей, журнал бронирований и понятные срезы по услугам и каналам в одном экране.'
+              ? 'Показатели, журнал записей и аналитика.'
               : 'A deeper analytics screen with a 30-day dynamic, key KPIs, larger charts, and a mature table for services and sources.'
           }
           actions={
@@ -143,7 +145,7 @@ export default function DashboardPage() {
           }
         />
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-2 xl:grid-cols-4">
           {kpis.map((item, index) => (
             <MetricCard
               key={item.label}
@@ -159,11 +161,11 @@ export default function DashboardPage() {
           title={locale === 'ru' ? 'Журнал бронирований' : 'Booking journal'}
           description={
             locale === 'ru'
-              ? 'Все заявки, статусы и примечания собраны в плотной таблице без визуального шума.'
+              ? 'Все заявки, статусы и примечания.'
               : 'All requests, statuses, and notes sit in one dense table.'
           }
           bookings={bookings}
-          pageSize={5}
+          pageSize={isMobile ? 4 : 5}
         />
 
         {demoMode ? (
@@ -176,7 +178,7 @@ export default function DashboardPage() {
                 </Badge>
                 <div className="text-[12px] text-muted-foreground">
                   {locale === 'ru'
-                    ? 'Короткие подсказки помогают быстро увидеть загрузку, каналы роста и сильные окна для записи.'
+                    ? 'Загрузка, каналы и сильные часы.'
                     : 'Quick highlights show workload, growth channels, and the strongest booking windows.'}
                 </div>
               </div>
@@ -211,7 +213,7 @@ export default function DashboardPage() {
           title={locale === 'ru' ? 'Активность по дням' : 'Activity by day'}
           description={
             locale === 'ru'
-              ? `Выберите период и посмотрите динамику просмотров, записей, подтверждений и дохода за последние ${activityDays} дн.`
+              ? `Динамика просмотров, записей, подтверждений и дохода за ${activityDays} дн.`
               : `Choose a period and view visits, bookings, confirmations, and revenue for the last ${activityDays} days.`
           }
           actions={
@@ -255,7 +257,7 @@ export default function DashboardPage() {
         >
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_360px]">
             <div className="rounded-[18px] border border-border bg-accent/20 p-3">
-              <ChartContainer config={metricConfig} className="h-[320px] w-full">
+              <ChartContainer config={metricConfig} className="h-[220px] w-full md:h-[320px]">
                 <AreaChart data={activityChartData}>
                   <defs>
                     <linearGradient id="metricArea" x1="0" x2="0" y1="0" y2="1">
@@ -315,7 +317,7 @@ export default function DashboardPage() {
           title={locale === 'ru' ? 'Подробная аналитика' : 'Expanded analytics'}
           description={
             locale === 'ru'
-              ? 'Верхний фильтр периода, переключатели метрик, крупный график и таблицы по услугам и каналам — зрелая секция в духе LobeHub, но полностью под записи клиентов.'
+              ? 'График, метрики и таблицы по услугам и каналам.'
               : 'A mature section with period filters, metric switches, a larger chart, and tables for services and sources.'
           }
           actions={

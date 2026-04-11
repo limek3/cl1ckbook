@@ -10,11 +10,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/master-workspace';
 import { cn } from '@/lib/utils';
+import { useMobile } from '@/hooks/use-mobile';
 
 type BillingCycle = 'monthly' | 'yearly';
 
 export default function SubscriptionPage() {
   const { hasHydrated, ownedProfile, dataset, locale } = useOwnedWorkspaceData();
+  const isMobile = useMobile();
   const [billing, setBilling] = useState<BillingCycle>('monthly');
 
   if (!hasHydrated) return null;
@@ -45,10 +47,10 @@ export default function SubscriptionPage() {
     ? {
         badge: 'Billing / subscription',
         title: 'Подписка и тарифы',
-        description: 'Выберите режим оплаты, следите за активным планом и держите лимиты под контролем.',
+        description: 'Тариф, оплата и лимиты.',
         heroBadge: 'Премиальный доступ',
         heroTitle: 'Управляйте тарифом без лишних шагов',
-        heroDescription: 'Текущий план, способ оплаты, выгода при годовой оплате и важные лимиты собраны в одном sticky-блоке.',
+        heroDescription: 'Текущий тариф и лимиты.',
         monthly: 'Ежемесячно',
         yearly: 'Годовая оплата',
         yearlyBadge: '−2 месяца',
@@ -64,10 +66,10 @@ export default function SubscriptionPage() {
         subscriptionStatus: 'Статус подписки',
         active: 'Активна',
         planShowcase: 'Линейка тарифов',
-        planShowcaseDesc: 'Тарифы под запись, аналитику, кастомизацию страницы и рост загрузки мастера.',
+        planShowcaseDesc: 'Тарифы для записи и роста.',
         currentPlanSection: 'Текущий план',
-        currentPlanDesc: 'Сводка по оплате, лимитам и выгодам текущего тарифа.',
-        limitsDesc: 'Использование текущего плана в реальном рабочем контексте.',
+        currentPlanDesc: 'Оплата, лимиты и выгода.',
+        limitsDesc: 'Текущее использование лимитов.',
         billingSaved: `Экономия ${formatCurrency(yearlySavings, locale)} в год`,
       }
     : {
@@ -104,14 +106,14 @@ export default function SubscriptionPage() {
 
   return (
     <WorkspaceShell>
-      <div className="workspace-page space-y-5">
+      <div className="workspace-page workspace-page-subscription space-y-5">
         <DashboardHeader
           badge={labels.badge}
           title={labels.title}
           description={labels.description}
         />
 
-        <div className="xl:sticky xl:top-4 xl:z-20">
+        <div className={cn(isMobile ? "" : "xl:sticky xl:top-4 xl:z-20")}>
           <section className="workspace-card hero-grid accent-gradient overflow-hidden rounded-[26px] p-4 md:p-5">
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_408px] xl:items-start">
               <div className="space-y-4">

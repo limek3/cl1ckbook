@@ -7,9 +7,11 @@ import { DashboardHeader, MetricCard, PublicPageHero, SectionCard } from '@/comp
 import { FakeQrCode } from '@/components/dashboard/qr-code';
 import { useOwnedWorkspaceData } from '@/hooks/use-owned-workspace-data';
 import { Button } from '@/components/ui/button';
+import { useMobile } from '@/hooks/use-mobile';
 
 export default function MarketingPage() {
   const { hasHydrated, ownedProfile, dataset, locale } = useOwnedWorkspaceData();
+  const isMobile = useMobile();
 
   if (!hasHydrated) return null;
 
@@ -36,20 +38,20 @@ export default function MarketingPage() {
 
   return (
     <WorkspaceShell>
-      <div className="workspace-page space-y-5">
+      <div className="workspace-page workspace-page-marketing space-y-5">
         <DashboardHeader
           badge={locale === 'ru' ? 'Настройки / продвижение' : 'Settings / marketing'}
           title={locale === 'ru' ? 'Маркетинг и продвижение' : 'Marketing and promotion'}
           description={
             locale === 'ru'
-              ? 'Публичная ссылка, QR-код, готовые материалы для отправки и статистика переходов.'
+              ? 'Ссылка, QR-код и каналы продвижения.'
               : 'Public link, QR code, client-ready materials, short copy, and click stats.'
           }
         />
 
-        <PublicPageHero profile={ownedProfile} alignTop sticky />
+        <PublicPageHero profile={ownedProfile} alignTop sticky={!isMobile} />
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard label={locale === 'ru' ? 'Переходы за 30 дней' : 'Link visits in 30 days'} value={String(dataset.totals.visitors)} />
           <MetricCard label={locale === 'ru' ? 'Записи с ссылки' : 'Bookings from link'} value={String(dataset.totals.confirmed)} />
           <MetricCard label={locale === 'ru' ? 'Конверсия' : 'Conversion'} value={`${dataset.totals.conversion}%`} />
@@ -61,7 +63,7 @@ export default function MarketingPage() {
             title={locale === 'ru' ? 'Материалы для отправки клиенту' : 'Materials to send to clients'}
             description={
               locale === 'ru'
-                ? 'Готовые тексты для MAX, Телеграм, био и реферальной рассылки.'
+                ? 'Тексты для MAX, Telegram и рассылок.'
                 : 'Ready-to-send copy for MAX, Telegram, bio, and referrals.'
             }
           >
@@ -111,7 +113,7 @@ export default function MarketingPage() {
               title={locale === 'ru' ? 'QR-код' : 'QR code'}
               description={
                 locale === 'ru'
-                  ? 'Поставьте на визитку, стойку или сторис.'
+                  ? 'Для визитки, стойки и соцсетей.'
                   : 'Use it on a card, desk, or social story.'
               }
             >
@@ -130,7 +132,7 @@ export default function MarketingPage() {
               title={locale === 'ru' ? 'Источники переходов' : 'Traffic sources'}
               description={
                 locale === 'ru'
-                  ? 'Где ссылка даёт лучшие переходы и заявки.'
+                  ? 'Переходы и заявки по каналам.'
                   : 'Where the public link performs best.'
               }
             >

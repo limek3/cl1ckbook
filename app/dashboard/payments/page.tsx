@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -36,13 +37,13 @@ export default function PaymentsPage() {
 
   return (
     <WorkspaceShell>
-      <div className="workspace-page space-y-5">
+      <div className="workspace-page workspace-page-payments space-y-5">
         <DashboardHeader
           badge="Billing / payments"
           title={locale === 'ru' ? 'Платежи' : 'Payments'}
           description={
             locale === 'ru'
-              ? 'История оплат, статусы, способы оплаты и прозрачный биллинг внутри продукта.'
+              ? 'История оплат и статусы.'
               : 'Payment history, statuses, payment methods, and transparent billing inside the product.'
           }
         />
@@ -58,34 +59,61 @@ export default function PaymentsPage() {
           title={locale === 'ru' ? 'История платежей' : 'Payment history'}
           description={
             locale === 'ru'
-              ? 'Полный список начислений, возвратов и связанных планов.'
+              ? 'Начисления, возвраты и тарифы.'
               : 'Full list of charges, refunds, and related plans.'
           }
         >
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{locale === 'ru' ? 'Дата' : 'Date'}</TableHead>
-                <TableHead>{locale === 'ru' ? 'План' : 'Plan'}</TableHead>
-                <TableHead>{locale === 'ru' ? 'Способ' : 'Method'}</TableHead>
-                <TableHead>{locale === 'ru' ? 'Статус' : 'Status'}</TableHead>
-                <TableHead>{locale === 'ru' ? 'Сумма' : 'Amount'}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {dataset.payments.map((payment) => (
-                <TableRow key={payment.id}>
-                  <TableCell>{payment.date}</TableCell>
-                  <TableCell>{payment.plan}</TableCell>
-                  <TableCell>{payment.method}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{payment.status}</Badge>
-                  </TableCell>
-                  <TableCell>{formatCurrency(payment.amount, locale)}</TableCell>
+          <div className="grid gap-2.5 md:hidden">
+            {dataset.payments.map((payment) => (
+              <div key={payment.id} className="rounded-[16px] border border-border bg-card/94 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-semibold text-foreground">{payment.plan}</div>
+                    <div className="mt-0.5 text-[11px] text-muted-foreground">{payment.date}</div>
+                  </div>
+                  <Badge variant="outline">{payment.status}</Badge>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div className="rounded-[12px] border border-border/80 bg-background/76 px-3 py-2">
+                    <div className="text-[10px] text-muted-foreground">{locale === 'ru' ? 'Способ' : 'Method'}</div>
+                    <div className="mt-1 text-[12px] font-medium text-foreground">{payment.method}</div>
+                  </div>
+                  <div className="rounded-[12px] border border-border/80 bg-background/76 px-3 py-2">
+                    <div className="text-[10px] text-muted-foreground">{locale === 'ru' ? 'Сумма' : 'Amount'}</div>
+                    <div className="mt-1 text-[12px] font-medium text-foreground">{formatCurrency(payment.amount, locale)}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{locale === 'ru' ? 'Дата' : 'Date'}</TableHead>
+                  <TableHead>{locale === 'ru' ? 'План' : 'Plan'}</TableHead>
+                  <TableHead>{locale === 'ru' ? 'Способ' : 'Method'}</TableHead>
+                  <TableHead>{locale === 'ru' ? 'Статус' : 'Status'}</TableHead>
+                  <TableHead>{locale === 'ru' ? 'Сумма' : 'Amount'}</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {dataset.payments.map((payment) => (
+                  <TableRow key={payment.id}>
+                    <TableCell>{payment.date}</TableCell>
+                    <TableCell>{payment.plan}</TableCell>
+                    <TableCell>{payment.method}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{payment.status}</Badge>
+                    </TableCell>
+                    <TableCell>{formatCurrency(payment.amount, locale)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </SectionCard>
       </div>
     </WorkspaceShell>
