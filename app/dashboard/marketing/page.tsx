@@ -32,17 +32,17 @@ export default function MarketingPage() {
     );
   }
 
-  const publicUrl = `https://sloty.app/m/${ownedProfile.slug}`;
+  const publicUrl = `https://klikbuk.app/m/${ownedProfile.slug}`;
 
   return (
     <WorkspaceShell>
       <div className="workspace-page space-y-5">
         <DashboardHeader
-          badge="Settings / marketing"
+          badge={locale === 'ru' ? 'Настройки / продвижение' : 'Settings / marketing'}
           title={locale === 'ru' ? 'Маркетинг и продвижение' : 'Marketing and promotion'}
           description={
             locale === 'ru'
-              ? 'Публичная ссылка, QR-код, материалы для отправки клиенту, короткое описание и статистика переходов.'
+              ? 'Публичная ссылка, QR-код, готовые материалы для отправки и статистика переходов.'
               : 'Public link, QR code, client-ready materials, short copy, and click stats.'
           }
         />
@@ -61,7 +61,7 @@ export default function MarketingPage() {
             title={locale === 'ru' ? 'Материалы для отправки клиенту' : 'Materials to send to clients'}
             description={
               locale === 'ru'
-                ? 'Готовые тексты для MAX, Telegram, bio и реферальной рассылки.'
+                ? 'Готовые тексты для MAX, Телеграм, био и реферальной рассылки.'
                 : 'Ready-to-send copy for MAX, Telegram, bio, and referrals.'
             }
           >

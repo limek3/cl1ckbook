@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { AppProvider } from '@/lib/app-context';
@@ -15,9 +15,7 @@ export function Providers({ children }: { children: ReactNode }) {
         <AppProvider>
           <AppearanceProvider>
             {children}
-            <Suspense fallback={null}>
-              <TelegramContactWidget />
-            </Suspense>
+            <TelegramContactWidget />
             <Toaster richColors position="top-center" />
           </AppearanceProvider>
         </AppProvider>

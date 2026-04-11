@@ -43,7 +43,7 @@ export default function FinancePage() {
     <WorkspaceShell>
       <div className="workspace-page space-y-5">
         <DashboardHeader
-          badge="Analytics / finance"
+          badge={locale === 'ru' ? 'Аналитика / финансы' : 'Analytics / finance'}
           title={locale === 'ru' ? 'Доход и финансы' : 'Revenue and finance'}
           description={
             locale === 'ru'

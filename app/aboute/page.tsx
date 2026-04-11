@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
-export default function PreviewPage() {
+export default function AliasPage() {
   redirect('/about');
 }

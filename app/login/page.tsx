@@ -1,31 +1,54 @@
 'use client';
 
-import { useMemo, useState, type FormEvent } from 'react';
 import Link from 'next/link';
+import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { ArrowRight, Chrome, KeyRound, Mail, MessageCircleMore, Send, UserPlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, CheckCircle2, KeyRound, Mail, ShieldCheck, Sparkles } from 'lucide-react';
 import { BrandLogo } from '@/components/brand/brand-logo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { createClient } from '@/lib/supabase/client';
-import { useMobile } from '@/hooks/use-mobile';
 import { useBrowserSearchParams } from '@/hooks/use-browser-search-params';
+import { createClient } from '@/lib/supabase/client';
+import { cn } from '@/lib/utils';
 
 const authConfigured = Boolean(
   process.env.NEXT_PUBLIC_SUPABASE_URL &&
-    (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+  (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
 );
+
+type AuthView = 'login' | 'register';
+type LoginMode = 'password' | 'magic';
+
+function SocialButton({
+  icon,
+  label,
+}: {
+  icon: ReactNode;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      className="flex h-12 items-center justify-center gap-2 rounded-[18px] border border-border/80 bg-background/82 text-[14px] font-medium text-foreground transition hover:border-primary/18 hover:bg-accent/24"
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useBrowserSearchParams();
-  const isMobile = useMobile();
   const redirectTo = useMemo(() => searchParams.get('redirectTo') || '/dashboard', [searchParams]);
-  const [mode, setMode] = useState<'password' | 'magic'>('password');
+
+  const [view, setView] = useState<AuthView>('login');
+  const [mode, setMode] = useState<LoginMode>('password');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  const [remember, setRemember] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,19 +60,36 @@ export default function LoginPage() {
 
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
 
-      if (error) {
-        throw error;
+      if (view === 'register') {
+        const origin = window.location.origin;
+        const { error: signUpError } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: {
+            emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`,
+          },
+        });
+
+        if (signUpError) throw signUpError;
+        setMessage('Проверьте почту: мы отправили письмо для подтверждения входа.');
+      } else {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+
+        if (signInError) throw signInError;
+
+        if (remember) {
+          window.localStorage.setItem('klikbuk-last-login', email.trim());
+        }
+
+        router.replace(redirectTo);
+        router.refresh();
       }
-
-      router.replace(redirectTo);
-      router.refresh();
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Не удалось выполнить вход.');
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : 'Не удалось выполнить вход.');
     } finally {
       setBusy(false);
     }
@@ -64,88 +104,51 @@ export default function LoginPage() {
     try {
       const supabase = createClient();
       const origin = window.location.origin;
-      const { error } = await supabase.auth.signInWithOtp({
+      const { error: otpError } = await supabase.auth.signInWithOtp({
         email: email.trim(),
         options: {
           emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`,
         },
       });
 
-      if (error) {
-        throw error;
-      }
-
-      setMessage('Ссылка для входа отправлена на почту. Откройте письмо и продолжите вход.');
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Не удалось отправить ссылку.');
+      if (otpError) throw otpError;
+      setMessage('Письмо для входа отправлено. Откройте ссылку из письма, чтобы продолжить.');
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : 'Не удалось отправить ссылку.');
     } finally {
       setBusy(false);
     }
   };
 
-  const featureItems = [
-    {
-      title: 'Быстрый вход',
-      text: 'Откройте кабинет за пару секунд и сразу продолжайте рабочий день.',
-      icon: Sparkles,
-    },
-    {
-      title: 'Безопасная сессия',
-      text: 'Вход и доступ к данным защищены через авторизацию Supabase.',
-      icon: ShieldCheck,
-    },
-    {
-      title: 'Все в одном месте',
-      text: 'Записи, шаблоны, чаты и публичная страница доступны в одном кабинете.',
-      icon: CheckCircle2,
-    },
-  ];
+  const submitHandler = mode === 'password' ? submitPassword : submitMagicLink;
 
   if (!authConfigured) {
     return (
-      <main className="min-h-screen bg-background px-3 py-4 text-foreground md:px-4 md:py-8">
-        <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-[920px] items-center justify-center md:min-h-[calc(100vh-4rem)]">
-          <div className="grid w-full gap-4 rounded-[28px] border border-border bg-card/72 p-4 shadow-[var(--shadow-soft)] md:gap-5 md:rounded-[32px] md:p-6 lg:grid-cols-[1.05fr_420px] lg:p-8">
-            <div className="space-y-4">
-              <BrandLogo className={isMobile ? 'w-[76px]' : 'w-[92px]'} />
+      <main className="login-shell min-h-screen bg-background px-3 py-4 text-foreground sm:px-4 sm:py-8">
+        <div className="mx-auto flex min-h-[calc(100svh-2rem)] w-full max-w-[760px] items-center justify-center sm:min-h-[calc(100svh-4rem)]">
+          <div className="login-card w-full rounded-[28px] border border-border bg-card/82 p-4 shadow-[var(--shadow-card)] sm:p-6">
+            <div className="flex items-center gap-3 border-b border-border/70 pb-4">
+              <BrandLogo className="w-[72px] sm:w-[82px]" />
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background/80 px-3 py-1 text-[12px] text-muted-foreground">
-                  <Sparkles className="size-3.5" />
-                  КликБук
-                </div>
-                <div className="mt-4 text-[24px] font-semibold tracking-tight text-foreground md:text-[30px]">
-                  Вход пока не настроен
-                </div>
-                <div className="mt-3 max-w-[520px] text-[14px] leading-7 text-muted-foreground">
-                  Добавьте параметры Supabase в <code>.env.local</code>, затем перезапустите dev-сервер.
-                </div>
-              </div>
-
-              <div className="rounded-[22px] border border-border bg-background/70 p-4 md:p-5">
-                <div className="text-[13px] font-medium text-foreground">Что нужно заполнить</div>
-                <div className="mt-3 space-y-2 font-mono text-[12px] leading-6 text-muted-foreground">
-                  <div>NEXT_PUBLIC_SUPABASE_URL=...</div>
-                  <div>NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...</div>
-                  <div>SUPABASE_SERVICE_ROLE_KEY=...</div>
-                  <div>NEXT_PUBLIC_APP_URL=http://localhost:3000</div>
-                </div>
+                <div className="text-[15px] font-medium text-foreground">Кабинет мастера</div>
+                <div className="mt-1 text-[12px] text-muted-foreground">Авторизация ещё не настроена</div>
               </div>
             </div>
 
-            <div className="rounded-[24px] border border-dashed border-border bg-background/60 p-5 md:rounded-[28px] md:p-6">
-              <div className="inline-flex items-center gap-2 rounded-full border border-border bg-accent/40 px-3 py-1 text-[12px] text-muted-foreground">
-                <Sparkles className="size-3.5" />
-                Подключение авторизации
+            <div className="mt-5 rounded-[24px] border border-border bg-background/70 p-4">
+              <div className="text-[22px] font-semibold tracking-[-0.03em] text-foreground">Подключите Supabase Auth</div>
+              <p className="mt-3 text-[14px] leading-7 text-muted-foreground">
+                Добавьте публичные ключи в <code>.env.local</code>, затем перезапустите проект.
+              </p>
+              <div className="mt-4 space-y-2 rounded-[20px] border border-border/80 bg-card/60 p-4 font-mono text-[12px] leading-6 text-muted-foreground">
+                <div>NEXT_PUBLIC_SUPABASE_URL=...</div>
+                <div>NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...</div>
+                <div>SUPABASE_SERVICE_ROLE_KEY=...</div>
+                <div>NEXT_PUBLIC_APP_URL=http://localhost:3000</div>
               </div>
-              <div className="mt-4 text-[22px] font-semibold text-foreground">После настройки откроется форма входа</div>
-              <div className="mt-3 text-[14px] leading-7 text-muted-foreground">
-                Как только переменные будут добавлены, вы сможете входить по паролю или по ссылке из письма.
-              </div>
-              <div className="mt-6">
-                <Button asChild variant="outline">
-                  <Link href="/">Вернуться на сайт</Link>
-                </Button>
-              </div>
+              <Button asChild className="mt-5 w-full rounded-[18px]">
+                <Link href="/about">Открыть страницу о платформе</Link>
+              </Button>
             </div>
           </div>
         </div>
@@ -154,72 +157,103 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background px-3 py-4 text-foreground md:px-4 md:py-8">
-      <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-[980px] items-center justify-center md:min-h-[calc(100vh-4rem)]">
-        <div className="grid w-full gap-4 rounded-[28px] border border-border bg-card/72 p-4 shadow-[var(--shadow-soft)] md:gap-5 md:rounded-[32px] md:p-6 lg:grid-cols-[1.02fr_420px] lg:p-8">
-          <div className="space-y-5">
-            <BrandLogo className={isMobile ? 'w-[76px]' : 'w-[92px]'} />
-
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background/80 px-3 py-1 text-[12px] text-muted-foreground">
-                <Sparkles className="size-3.5" />
-                Кабинет КликБук
-              </div>
-              <div className="mt-4 text-[26px] font-semibold tracking-tight text-foreground md:text-[30px]">
-                Войдите в кабинет
-              </div>
-              <div className="mt-3 max-w-[520px] text-[14px] leading-7 text-muted-foreground">
-                Управляйте записями, сообщениями и публичной страницей в одном рабочем пространстве.
+    <main className="login-shell min-h-screen bg-background px-3 py-4 text-foreground sm:px-4 sm:py-8">
+      <div className="mx-auto flex min-h-[calc(100svh-2rem)] w-full max-w-[760px] items-center justify-center sm:min-h-[calc(100svh-4rem)]">
+        <div className="login-card w-full rounded-[30px] border border-border bg-card/82 p-4 shadow-[var(--shadow-card)] backdrop-blur-xl sm:p-6">
+          <div className="flex items-center justify-between gap-3 border-b border-border/70 pb-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <BrandLogo className="w-[74px] sm:w-[82px]" />
+              <div className="min-w-0">
+                <div className="truncate text-[15px] font-medium text-foreground">Кабинет мастера</div>
               </div>
             </div>
-
-            <div className={isMobile ? 'grid gap-2' : 'grid gap-3 sm:grid-cols-3'}>
-              {featureItems.map((item) => (
-                <div key={item.title} className="rounded-[20px] border border-border bg-background/70 p-4">
-                  <div className="inline-flex size-9 items-center justify-center rounded-[14px] border border-border bg-card/80 text-muted-foreground">
-                    <item.icon className="size-4" />
-                  </div>
-                  <div className="mt-3 text-[14px] font-medium text-foreground">{item.title}</div>
-                  <div className="mt-1 text-[12px] leading-5 text-muted-foreground">{item.text}</div>
-                </div>
-              ))}
+            <div className="rounded-full border border-border/80 bg-background/72 px-3 py-1.5 text-[12px] text-muted-foreground">
+              Вход
             </div>
           </div>
 
-          <div className="rounded-[24px] border border-border bg-background/72 p-4 md:rounded-[28px] md:p-5">
-            <div className="inline-flex rounded-full border border-border bg-card/80 p-1">
+          <div className="mt-4 rounded-[24px] border border-border/80 bg-background/65 p-2">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setView('login')}
+                className={cn(
+                  'flex h-12 items-center justify-center gap-2 rounded-[16px] text-[14px] font-medium transition',
+                  view === 'login' ? 'bg-foreground text-background shadow-[var(--shadow-soft)]' : 'text-muted-foreground hover:bg-card/70 hover:text-foreground',
+                )}
+              >
+                <ArrowRight className="size-4" />
+                Вход
+              </button>
+              <button
+                type="button"
+                onClick={() => setView('register')}
+                className={cn(
+                  'flex h-12 items-center justify-center gap-2 rounded-[16px] text-[14px] font-medium transition',
+                  view === 'register' ? 'bg-foreground text-background shadow-[var(--shadow-soft)]' : 'text-muted-foreground hover:bg-card/70 hover:text-foreground',
+                )}
+              >
+                <UserPlus className="size-4" />
+                Регистрация
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-[24px] border border-border/80 bg-background/60 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-[12px] font-medium tracking-[0.28em] text-muted-foreground">
+                БЫСТРЫЙ ВХОД
+              </div>
+              <div className="text-[12px] text-muted-foreground">Google · Телеграм · MAX</div>
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              <SocialButton icon={<Chrome className="size-4" />} label="Google" />
+              <SocialButton icon={<Send className="size-4" />} label="Телеграм" />
+              <SocialButton icon={<MessageCircleMore className="size-4" />} label="MAX" />
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-[28px] border border-border/80 bg-[#0c0d11]/92 p-5 text-white sm:p-6">
+            <div className="text-[36px] font-semibold tracking-[-0.05em] leading-[1.02] text-white sm:text-[44px]">
+              {view === 'login' ? 'Войти в кабинет' : 'Создать кабинет'}
+            </div>
+            <p className="mt-4 max-w-[420px] text-[15px] leading-8 text-white/64">
+              {view === 'login'
+                ? 'Откройте кабинет и продолжайте рабочий день без лишних шагов.'
+                : 'Создайте аккаунт и откройте кабинет с записями, чатами и публичной страницей.'}
+            </p>
+
+            <div className="mt-5 inline-flex rounded-full border border-white/10 bg-white/[0.04] p-1">
               <button
                 type="button"
                 onClick={() => setMode('password')}
-                className={`rounded-full px-3.5 py-2 text-[12px] font-medium transition ${mode === 'password' ? 'bg-foreground text-background' : 'text-muted-foreground'}`}
+                className={cn(
+                  'rounded-full px-3 py-2 text-[12px] font-medium transition',
+                  mode === 'password' ? 'bg-white text-black' : 'text-white/60',
+                )}
               >
                 Пароль
               </button>
               <button
                 type="button"
                 onClick={() => setMode('magic')}
-                className={`rounded-full px-3.5 py-2 text-[12px] font-medium transition ${mode === 'magic' ? 'bg-foreground text-background' : 'text-muted-foreground'}`}
+                className={cn(
+                  'rounded-full px-3 py-2 text-[12px] font-medium transition',
+                  mode === 'magic' ? 'bg-white text-black' : 'text-white/60',
+                )}
               >
-                Ссылка на вход
+                Email-ссылка
               </button>
             </div>
 
-            <div className="mt-5">
-              <div className="text-[22px] font-semibold text-foreground">
-                {mode === 'password' ? 'Вход по email и паролю' : 'Вход по ссылке из письма'}
-              </div>
-              <div className="mt-2 text-[13px] leading-6 text-muted-foreground">
-                {mode === 'password'
-                  ? 'Используйте существующий аккаунт КликБук.'
-                  : 'Мы отправим письмо со ссылкой для безопасного входа в кабинет.'}
-              </div>
-            </div>
-
-            <form className="mt-6 space-y-4" onSubmit={mode === 'password' ? submitPassword : submitMagicLink}>
+            <form className="mt-5 space-y-4" onSubmit={submitHandler}>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-[11px] tracking-[0.22em] text-white/55">
+                  EMAIL
+                </Label>
                 <div className="relative">
-                  <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Mail className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-white/40" />
                   <Input
                     id="email"
                     type="email"
@@ -227,7 +261,7 @@ export default function LoginPage() {
                     required
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
-                    className="pl-9"
+                    className="h-14 rounded-[18px] border-white/8 bg-white/[0.03] pl-11 text-white placeholder:text-white/28"
                     placeholder="hello@klikbuk.rf"
                   />
                 </div>
@@ -235,50 +269,79 @@ export default function LoginPage() {
 
               {mode === 'password' ? (
                 <div className="space-y-2">
-                  <Label htmlFor="password">Пароль</Label>
+                  <Label htmlFor="password" className="text-[11px] tracking-[0.22em] text-white/55">
+                    ПАРОЛЬ
+                  </Label>
                   <div className="relative">
-                    <KeyRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <KeyRound className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-white/40" />
                     <Input
                       id="password"
                       type="password"
-                      autoComplete="current-password"
+                      autoComplete={view === 'login' ? 'current-password' : 'new-password'}
                       required
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
-                      className="pl-9"
+                      className="h-14 rounded-[18px] border-white/8 bg-white/[0.03] pl-11 text-white placeholder:text-white/28"
                       placeholder="••••••••"
                     />
                   </div>
                 </div>
               ) : null}
 
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setRemember((current) => !current)}
+                  className={cn(
+                    'inline-flex items-center gap-2 rounded-[14px] border px-3 py-2 text-[13px] transition',
+                    remember ? 'border-white/12 bg-white/[0.06] text-white' : 'border-white/8 bg-transparent text-white/58',
+                  )}
+                >
+                  <span className={cn('flex size-5 items-center justify-center rounded-[8px] border', remember ? 'border-white/20 bg-white text-black' : 'border-white/12 bg-transparent')} >
+                    ✓
+                  </span>
+                  Запомнить меня
+                </button>
+
+                <button type="button" className="text-[13px] text-white/64 transition hover:text-white">
+                  Восстановить доступ
+                </button>
+              </div>
+
               {error ? (
-                <div className="rounded-[18px] border border-red-500/30 bg-red-500/8 px-4 py-3 text-[12px] text-red-200">
+                <div className="rounded-[18px] border border-red-500/26 bg-red-500/10 px-4 py-3 text-[13px] text-red-100">
                   {error}
                 </div>
               ) : null}
 
               {message ? (
-                <div className="rounded-[18px] border border-primary/30 bg-primary/10 px-4 py-3 text-[12px] text-foreground">
+                <div className="rounded-[18px] border border-primary/24 bg-primary/12 px-4 py-3 text-[13px] text-white">
                   {message}
                 </div>
               ) : null}
 
-              <Button type="submit" className="w-full" disabled={busy || !email.trim() || (mode === 'password' && !password)}>
-                {mode === 'password' ? 'Войти' : 'Отправить ссылку'}
+              <Button
+                type="submit"
+                disabled={busy || !email.trim() || (mode === 'password' && !password.trim())}
+                className="mt-2 h-14 w-full rounded-[18px] bg-white text-black hover:bg-white/92"
+              >
+                {view === 'login'
+                  ? mode === 'password'
+                    ? 'Войти'
+                    : 'Отправить ссылку'
+                  : mode === 'password'
+                    ? 'Создать кабинет'
+                    : 'Получить ссылку'}
                 <ArrowRight className="size-4" />
               </Button>
             </form>
+          </div>
 
-            <div className="mt-4 text-[12px] leading-6 text-muted-foreground">
-              После входа откроется <span className="text-foreground">{redirectTo}</span>.
-            </div>
-
-            <div className="mt-6">
-              <Button asChild variant="outline" className="w-full shadow-none">
-                <Link href="/">Вернуться на сайт</Link>
-              </Button>
-            </div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 px-1 text-[12px] text-muted-foreground">
+            <div>После входа откроется {redirectTo}.</div>
+            <Link href="/about" className="transition hover:text-foreground">
+              О платформе
+            </Link>
           </div>
         </div>
       </div>

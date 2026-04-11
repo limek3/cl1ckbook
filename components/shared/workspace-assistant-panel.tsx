@@ -121,7 +121,7 @@ function getLocationAnswer(
   publicHref?: string,
 ) {
   if (locale === 'ru') {
-    return `Я принимаю${city ? ` в ${city}` : ''}. ${phone ? `Для быстрой связи можно написать или позвонить: ${phone}.` : ''} ${telegram ? `Telegram: ${telegram}.` : ''}\n\nВсе контакты и запись собраны на странице: ${publicHref}`;
+    return `Я принимаю${city ? ` в ${city}` : ''}. ${phone ? `Для быстрой связи можно написать или позвонить: ${phone}.` : ''} ${telegram ? `Телеграм: ${telegram}.` : ''}\n\nВсе контакты и запись собраны на странице: ${publicHref}`;
   }
 
   return `I work${city ? ` in ${city}` : ''}. ${phone ? `For quick confirmation you can call or message: ${phone}.` : ''} ${telegram ? `Telegram: ${telegram}.` : ''}\n\nAll contacts and booking are available here: ${publicHref}`;

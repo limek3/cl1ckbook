@@ -33,6 +33,16 @@ import { cn } from '@/lib/utils';
 const CHANNEL_OPTIONS = ['Telegram', 'MAX', 'Instagram DM', 'Push'] as const;
 type ChannelFilter = 'all' | (typeof CHANNEL_OPTIONS)[number];
 
+
+function channelDisplayLabel(channel: (typeof CHANNEL_OPTIONS)[number] | string, locale: 'ru' | 'en') {
+  if (locale !== 'ru') return channel;
+  if (channel === 'Telegram') return 'Телеграм';
+  if (channel === 'Instagram DM') return 'Сообщения Инстаграм';
+  if (channel === 'Push') return 'Пуш';
+  return channel;
+}
+
+
 function parseVariables(value: string) {
   return value
     .split(/\n|,/)
@@ -130,11 +140,11 @@ export default function TemplatesPage() {
   const labels = locale === 'ru'
     ? {
         title: 'Шаблоны сообщений',
-        description: 'Собранная библиотека подтверждений, напоминаний и follow-up сообщений с нормальной сеткой и быстрым редактированием.',
+        description: 'Библиотека подтверждений, напоминаний и сообщений после визита с быстрым редактированием и удобным предпросмотром.',
         baseTitle: 'Библиотека шаблонов',
-        baseDescription: 'Меньше шума, больше контроля: контент, переменные и превью в одной карточке.',
+        baseDescription: 'Меньше шума, больше контроля: текст, переменные и предпросмотр в одной карточке.',
         createTitle: 'Новый шаблон',
-        createDescription: 'Справа — быстрый конструктор, который сразу добавляет шаблон в общую библиотеку.',
+        createDescription: 'Создайте готовый текст для подтверждений, напоминаний и сообщений после визита.',
         add: 'Сохранить шаблон',
         remove: 'Удалить',
         copy: 'Копировать',
@@ -143,13 +153,13 @@ export default function TemplatesPage() {
         channelField: 'Канал',
         variablesField: 'Переменные',
         contentField: 'Текст сообщения',
-        previewField: 'Превью',
+        previewField: 'Предпросмотр',
         conversionField: 'Конверсия',
         placeholdersHint: 'Переменные можно писать через запятую или с новой строки.',
         searchPlaceholder: 'Поиск по названию, каналу или тексту',
         allChannels: 'Все каналы',
         empty: 'По текущим фильтрам шаблоны не найдены.',
-        livePreview: 'Живое превью',
+        livePreview: 'Предпросмотр',
         livePreviewDescription: 'Так сообщение будет выглядеть после подстановки переменных.',
         quickHint: 'Совет',
         quickHintText: 'Держите один короткий CTA в начале и ссылку ближе к концу — так сообщение читается быстрее.',
@@ -165,7 +175,7 @@ export default function TemplatesPage() {
         description: 'A cleaner library for confirmations, reminders, and follow-ups with faster editing.',
         baseTitle: 'Template library',
         baseDescription: 'Less clutter, more control: content, variables, and preview in one card.',
-        createTitle: 'New template',
+        createTitle: locale === 'ru' ? 'Новый шаблон' : 'New template',
         createDescription: 'A compact builder that adds the template straight into the shared library.',
         add: 'Save template',
         remove: 'Delete',
@@ -181,7 +191,7 @@ export default function TemplatesPage() {
         searchPlaceholder: 'Search by title, channel, or content',
         allChannels: 'All channels',
         empty: 'No templates match the current filters.',
-        livePreview: 'Live preview',
+        livePreview: locale === 'ru' ? 'Предпросмотр' : 'Live preview',
         livePreviewDescription: 'How the message will look once variables are replaced.',
         quickHint: 'Tip',
         quickHintText: 'Keep one short CTA near the top and place the link closer to the end for better readability.',
@@ -242,7 +252,7 @@ export default function TemplatesPage() {
     <WorkspaceShell>
       <div className="workspace-page workspace-page-wide space-y-5">
         <DashboardHeader
-          badge="Settings / templates"
+          badge={locale === 'ru' ? 'Настройки / шаблоны' : 'Settings / templates'}
           title={labels.title}
           description={labels.description}
         />
@@ -281,7 +291,7 @@ export default function TemplatesPage() {
                     <SelectItem value="all">{labels.allChannels}</SelectItem>
                     {CHANNEL_OPTIONS.map((channel) => (
                       <SelectItem key={channel} value={channel}>
-                        {channel}
+                        {channelDisplayLabel(channel, locale)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -312,7 +322,7 @@ export default function TemplatesPage() {
                             <SelectContent>
                               {CHANNEL_OPTIONS.map((channel) => (
                                 <SelectItem key={channel} value={channel}>
-                                  {channel}
+                                  {channelDisplayLabel(channel, locale)}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -327,7 +337,7 @@ export default function TemplatesPage() {
                             />
                           </div>
 
-                          <Badge variant="outline">{template.variables.length} vars</Badge>
+                          <Badge variant="outline">{template.variables.length} {locale === 'ru' ? 'перем.' : 'vars'}</Badge>
                         </div>
                       </div>
                     </div>
@@ -389,7 +399,7 @@ export default function TemplatesPage() {
                       </div>
 
                       <span className="text-[11px] text-muted-foreground">
-                        {template.channel} · {template.conversion}
+                        {channelDisplayLabel(template.channel, locale)} · {template.conversion}
                       </span>
                     </div>
                   </div>
@@ -427,7 +437,7 @@ export default function TemplatesPage() {
                 <SelectContent>
                   {CHANNEL_OPTIONS.map((channel) => (
                     <SelectItem key={channel} value={channel}>
-                      {channel}
+                      {channelDisplayLabel(channel, locale)}
                     </SelectItem>
                   ))}
                 </SelectContent>

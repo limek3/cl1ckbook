@@ -14,7 +14,7 @@ export default function CreateProfilePage() {
     <WorkspaceShell>
       <div className="workspace-page space-y-5">
         <DashboardHeader
-          badge={locale === 'ru' ? 'Settings / onboarding' : 'Settings / onboarding'}
+          badge={locale === 'ru' ? 'Настройки / запуск' : 'Settings / onboarding'}
           title={ownedProfile ? (locale === 'ru' ? 'Профиль мастера' : 'Master profile') : (locale === 'ru' ? 'Создание профиля мастера' : 'Create master profile')}
           description={
             locale === 'ru'

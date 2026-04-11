@@ -178,7 +178,7 @@ export default function AvailabilityPage() {
     <WorkspaceShell>
       <div className="workspace-page workspace-page-wide space-y-5">
         <DashboardHeader
-          badge="Settings / availability"
+          badge={locale === 'ru' ? 'Настройки / график' : 'Settings / availability'}
           title={labels.title}
           description={labels.description}
           actions={

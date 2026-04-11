@@ -36,11 +36,11 @@ export default function IntegrationsPage() {
     <WorkspaceShell>
       <div className="workspace-page space-y-5">
         <DashboardHeader
-          badge="Settings / integrations"
+          badge={locale === 'ru' ? 'Настройки / интеграции' : 'Settings / integrations'}
           title={locale === 'ru' ? 'Интеграции' : 'Integrations'}
           description={
             locale === 'ru'
-              ? 'Telegram, MAX, Instagram, сайт, календарь и уведомления в одном системном блоке.'
+              ? 'Телеграм, MAX, Инстаграм, сайт, календарь и уведомления в одном разделе.'
               : 'Telegram, MAX, Instagram, website, calendar, and notifications in one system block.'
           }
         />

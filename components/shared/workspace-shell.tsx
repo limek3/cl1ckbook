@@ -166,8 +166,8 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
         },
       }
     : {
-        shellTitle: 'Кабинет мастера',
-        shellSubtitle: 'Рабочие разделы',
+        shellTitle: 'Master workspace',
+        shellSubtitle: 'Work sections',
         navigation: {
           publicPage: 'Public page',
           overview: 'Overview',
@@ -184,7 +184,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
           collapseMenu: 'Collapse menu',
         },
         items: {
-          home: 'Главная',
+          home: 'Home',
           today: 'Today bookings',
           stats: 'Statistics',
           profile: 'Profile',
@@ -215,12 +215,12 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
 
   const navigationGroups = useMemo<NavigationGroup[]>(() => {
     const publicItems: NavigationItem[] = [
-      { href: publicHref, label: labels.items.publicPage, icon: Globe2, badge: demoMode ? 'demo' : ownedProfile ? 'live' : undefined, variant: 'preview' },
+      { href: publicHref, label: labels.items.publicPage, icon: Globe2, badge: demoMode ? (locale === 'ru' ? 'демо' : 'demo') : ownedProfile ? (locale === 'ru' ? 'сайт' : 'live') : undefined, variant: 'preview' },
       {
         href: demoToggleHref,
         label: labels.items.demoPage,
         icon: Sparkles,
-        badge: demoMode ? 'on' : 'demo',
+        badge: demoMode ? (locale === 'ru' ? 'вкл' : 'on') : (locale === 'ru' ? 'демо' : 'demo'),
         variant: 'preview',
         dashed: true,
         forceActive: demoMode,
@@ -235,7 +235,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
     ];
 
     const general: NavigationItem[] = [
-      { href: withDashboardDemoParam('/dashboard/chats', demoMode), label: labels.items.chats, icon: MessageCircleMore, badge: 'bot', variant: 'chat' },
+      { href: withDashboardDemoParam('/dashboard/chats', demoMode), label: labels.items.chats, icon: MessageCircleMore, badge: locale === 'ru' ? 'бот' : 'bot', variant: 'chat' },
       { href: withDashboardDemoParam(profileHref, demoMode), label: labels.items.profile, icon: SquarePen },
       { href: withDashboardDemoParam('/dashboard/appearance', demoMode), label: labels.items.appearance, icon: LayoutPanelTop },
       { href: withDashboardDemoParam('/dashboard/marketing', demoMode), label: labels.items.marketing, icon: Link2 },
@@ -509,20 +509,20 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
                               <div className="sidebar-public-hero-title">
                                 {demoMode
                                   ? locale === 'ru'
-                                    ? 'Демо уже открыто'
-                                    : 'Demo is already open'
+                                    ? 'Демо-режим включён'
+                                    : 'Demo mode is on'
                                   : locale === 'ru'
-                                    ? 'Откройте демо'
-                                    : 'Open demo'}
+                                    ? 'Откройте демо-режим'
+                                    : 'Open demo mode'}
                               </div>
                               <div className="sidebar-public-hero-text">
                                 {demoMode
                                   ? locale === 'ru'
-                                    ? 'Чаты, аналитика и страница записи доступны без рабочих данных.'
-                                    : 'Chats, analytics, and the booking page are available without live data.'
+                                    ? 'Откройте разделы и посмотрите, как выглядит платформа в работе.'
+                                    : 'Open the sections and explore how the platform looks in action.'
                                   : locale === 'ru'
-                                    ? 'Посмотрите платформу на готовых примерах без рабочих данных.'
-                                    : 'Preview the platform with ready-made examples and no live data.'}
+                                    ? 'Посмотрите чаты, аналитику и страницу записи на готовых примерах.'
+                                    : 'Explore chats, analytics, and the booking page with ready-made examples.'}
                               </div>
                             </div>
                             <div className="sidebar-public-hero-actions">
@@ -534,7 +534,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
                                 className={cn('sidebar-public-hero-toggle', !demoMode && 'sidebar-public-hero-toggle-attention')}
                               >
                                 <Sparkles className="size-3.5" />
-                                <span>{demoMode ? (locale === 'ru' ? 'Рабочий' : 'Live') : 'Demo'}</span>
+                                <span>{locale === 'ru' ? (demoMode ? 'Рабочий' : 'Демо') : demoMode ? 'Live' : 'Demo'}</span>
                               </Link>
                             </div>
                           </div>
@@ -696,7 +696,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
       >
         <div
           className={cn(
-            'panel-surface h-full w-[304px] max-w-[86vw] border-r border-border p-3 transition-transform',
+            'panel-surface h-full w-[286px] max-w-[84vw] border-r border-border px-2.5 py-3 transition-transform sm:w-[312px]',
             mobileOpen ? 'translate-x-0' : '-translate-x-full',
           )}
           onClick={(event) => event.stopPropagation()}
@@ -706,19 +706,19 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
       </div>
 
       <main className={cn('min-h-screen transition-[padding-left] duration-200', desktopMainPadding, className)}>
-        <div className="sticky top-0 z-30 flex h-[60px] items-center justify-between border-b border-border bg-background/94 px-3 backdrop-blur xl:hidden">
+        <div className="sticky top-0 z-30 flex h-[52px] items-center justify-between border-b border-border bg-background/92 px-3 backdrop-blur xl:hidden sm:h-14 sm:px-4">
           <div className="flex min-w-0 items-center gap-2.5">
-            <Button type="button" variant="ghost" size="icon-sm" onClick={() => setMobileOpen(true)}>
+            <Button type="button" variant="ghost" size="icon-sm" className="shrink-0" onClick={() => setMobileOpen(true)}>
               <Menu className="size-4" />
             </Button>
             <div className="min-w-0">
-              <div className="truncate text-[16px] font-semibold tracking-[-0.03em] text-foreground">{activeItem?.label || labels.items.home}</div>
-              <div className="truncate text-[11px] text-muted-foreground">{labels.shellSubtitle}</div>
+              <div className="truncate text-[12.5px] font-semibold text-foreground sm:text-[13px]">{activeItem?.label || labels.items.home}</div>
+              <div className="truncate text-[10.5px] text-muted-foreground sm:text-[11px]">{labels.shellSubtitle}</div>
             </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <LanguageToggle compact minimal className="min-w-[68px]" />
-            <ThemeToggle compact minimal className="min-w-[90px]" />
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <LanguageToggle compact />
+            <ThemeToggle compact />
             <Button asChild variant="ghost" size="icon-sm" className="text-muted-foreground">
               <Link href="/auth/signout" aria-label={locale === 'ru' ? 'Выйти' : 'Sign out'}>
                 <LogOut className="size-4" />

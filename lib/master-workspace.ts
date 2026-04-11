@@ -152,7 +152,7 @@ export interface WorkspaceDataset {
 }
 
 const SOURCE_LABELS: Record<Locale, string[]> = {
-  ru: ['Instagram', 'MAX', 'Telegram', 'Рекомендации', 'Сайт'],
+  ru: ['Инстаграм', 'MAX', 'Телеграм', 'Рекомендации', 'Сайт'],
   en: ['Instagram', 'MAX', 'Telegram', 'Referral', 'Website'],
 };
 
@@ -165,7 +165,7 @@ const NOTES: Record<Locale, string[]> = {
   ru: [
     'Любит утренние слоты и быстро подтверждает время.',
     'Чаще приходит перед выходными, ценит напоминания.',
-    'Просит мягкий follow-up после визита.',
+    'Хорошо реагирует на деликатное сообщение после визита.',
     'Обычно записывается повторно через 3–4 недели.',
     'Хорошо реагирует на сообщения с готовой ссылкой.',
   ],
@@ -429,7 +429,7 @@ function buildTemplates(locale: Locale): MessageTemplateInsight[] {
         {
           id: 'confirm',
           title: 'Подтверждение записи',
-          channel: 'MAX / Telegram',
+          channel: locale === 'ru' ? 'MAX / Телеграм' : 'MAX / Telegram',
           conversion: '74%',
           variables: ['{{имя}}', '{{дата}}', '{{время}}', '{{услуга}}'],
           content: 'Здравствуйте, {{имя}}! Подтверждаю вашу запись на {{услуга}} — {{дата}} в {{время}}. Если планы изменятся, напишите заранее.',
@@ -437,7 +437,7 @@ function buildTemplates(locale: Locale): MessageTemplateInsight[] {
         {
           id: 'reminder',
           title: 'Напоминание за день',
-          channel: 'Push / MAX',
+          channel: locale === 'ru' ? 'Пуш / MAX' : 'Push / MAX',
           conversion: '68%',
           variables: ['{{имя}}', '{{дата}}', '{{время}}'],
           content: 'Напоминаю о визите завтра, {{имя}}. Жду вас {{дата}} в {{время}}. Если понадобится сдвинуть время — дайте знать.',
@@ -445,14 +445,14 @@ function buildTemplates(locale: Locale): MessageTemplateInsight[] {
         {
           id: 'thanks',
           title: 'Спасибо после визита',
-          channel: 'Telegram',
+          channel: locale === 'ru' ? 'Телеграм' : 'Telegram',
           conversion: '42%',
           variables: ['{{имя}}', '{{ссылка}}'],
           content: 'Спасибо за визит, {{имя}}! Буду рада видеть вас снова. Сохраните ссылку {{ссылка}}, чтобы в следующий раз записаться быстрее.',
         },
         {
           id: 'return',
-          title: 'Мягкий reactivation',
+          title: 'Возврат клиента',
           channel: 'MAX',
           conversion: '31%',
           variables: ['{{имя}}', '{{ссылка}}'],
@@ -463,7 +463,7 @@ function buildTemplates(locale: Locale): MessageTemplateInsight[] {
         {
           id: 'confirm',
           title: 'Booking confirmation',
-          channel: 'MAX / Telegram',
+          channel: locale === 'ru' ? 'MAX / Телеграм' : 'MAX / Telegram',
           conversion: '74%',
           variables: ['{{name}}', '{{date}}', '{{time}}', '{{service}}'],
           content: 'Hi {{name}}! Your {{service}} booking is confirmed for {{date}} at {{time}}. If anything changes, just reply to this message.',
@@ -471,7 +471,7 @@ function buildTemplates(locale: Locale): MessageTemplateInsight[] {
         {
           id: 'reminder',
           title: 'Reminder message',
-          channel: 'Push / MAX',
+          channel: locale === 'ru' ? 'Пуш / MAX' : 'Push / MAX',
           conversion: '68%',
           variables: ['{{name}}', '{{date}}', '{{time}}'],
           content: 'A quick reminder about your appointment tomorrow, {{name}} — {{date}} at {{time}}. Let me know if you need to adjust the time.',
@@ -479,7 +479,7 @@ function buildTemplates(locale: Locale): MessageTemplateInsight[] {
         {
           id: 'thanks',
           title: 'Post-visit thank you',
-          channel: 'Telegram',
+          channel: locale === 'ru' ? 'Телеграм' : 'Telegram',
           conversion: '42%',
           variables: ['{{name}}', '{{link}}'],
           content: 'Thanks for coming, {{name}}. I would love to see you again. Save this link {{link}} to book faster next time.',
@@ -520,10 +520,10 @@ function buildAvailability(locale: Locale): AvailabilityDayInsight[] {
 function buildIntegrations(locale: Locale): IntegrationInsight[] {
   return locale === 'ru'
     ? [
-        { id: 'telegram', name: 'Telegram', description: 'Подтверждения и быстрые уведомления в личные сообщения.', status: 'connected', hint: 'Подключён и синхронизирует новые заявки.' },
+        { id: 'telegram', name: 'Телеграм', description: 'Подтверждения и быстрые уведомления в личные сообщения.', status: 'connected', hint: 'Подключён и синхронизирует новые заявки.' },
         { id: 'whatsapp', name: 'MAX', description: 'Отправка ссылки, напоминаний и статусов визита.', status: 'connected', hint: 'Активен для клиентских шаблонов.' },
-        { id: 'instagram', name: 'Instagram link', description: 'Ссылка в bio и метки переходов на публичную страницу.', status: 'recommended', hint: 'Высокий потенциал конверсии из профиля.' },
-        { id: 'calendar', name: 'Calendar', description: 'Экспорт подтверждённых визитов в рабочий календарь.', status: 'available', hint: 'Помогает избежать накладок по времени.' },
+        { id: 'instagram', name: 'Ссылка из Инстаграм', description: 'Ссылка в профиле и метки переходов на публичную страницу.', status: 'recommended', hint: 'Высокий потенциал конверсии из профиля.' },
+        { id: 'calendar', name: 'Календарь', description: 'Экспорт подтверждённых визитов в рабочий календарь.', status: 'available', hint: 'Помогает избежать накладок по времени.' },
         { id: 'site', name: 'Taplink / сайт', description: 'Встроить кнопку записи на ваш внешний сайт.', status: 'available', hint: 'Полезно для студий и команд.' },
       ]
     : [
@@ -538,9 +538,9 @@ function buildIntegrations(locale: Locale): IntegrationInsight[] {
 function buildNotifications(locale: Locale): NotificationInsight[] {
   return locale === 'ru'
     ? [
-        { id: 'new-request', title: 'Новая заявка', description: 'Уведомлять сразу после отправки формы в Telegram и кабинете.', channel: 'telegram', enabled: true, critical: true },
+        { id: 'new-request', title: 'Новая заявка', description: 'Уведомлять сразу после отправки формы в Телеграм и кабинете.', channel: 'telegram', enabled: true, critical: true },
         { id: 'visit-reminder', title: 'Напоминание клиенту', description: 'Отправка в MAX за день и за 2 часа до визита.', channel: 'max', enabled: true },
-        { id: 'cancellation', title: 'Отмена или перенос', description: 'Сразу сообщать об изменении записи в Telegram.', channel: 'telegram', enabled: true, critical: true },
+        { id: 'cancellation', title: 'Отмена или перенос', description: 'Сразу сообщать об изменении записи в Телеграм.', channel: 'telegram', enabled: true, critical: true },
         { id: 'schedule-change', title: 'Изменение графика', description: 'Отправлять себе сводку в MAX о блокировках и спецдатах.', channel: 'max', enabled: false },
         { id: 'weekly-digest', title: 'Недельная сводка', description: 'Доход, конверсия и загрузка по неделе.', channel: 'email', enabled: true },
       ]
@@ -598,7 +598,7 @@ function buildPlans(locale: Locale): SubscriptionPlan[] {
           description: 'Для студии и команды с приоритетной поддержкой.',
           monthly: 5990,
           yearly: 59990,
-          features: ['Команда и сотрудники', 'Премиум-аналитика', 'White-label блоки', 'Приоритетная поддержка', 'Расширенные лимиты'],
+          features: ['Команда и сотрудники', 'Премиум-аналитика', 'Брендированные блоки', 'Приоритетная поддержка', 'Расширенные лимиты'],
         },
       ]
     : [

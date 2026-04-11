@@ -20,11 +20,11 @@ export default function DashboardProfilePage() {
       <WorkspaceShell>
         <div className="workspace-page workspace-page-wide space-y-5">
           <DashboardHeader
-            badge={locale === 'ru' ? 'Settings / profile' : 'Settings / profile'}
+            badge={locale === 'ru' ? 'Настройки / профиль' : 'Settings / profile'}
             title={locale === 'ru' ? 'Профиль мастера' : 'Master profile'}
             description={
               locale === 'ru'
-                ? 'Профиль больше не заполняется mock-данными. Сначала создайте реальный workspace мастера.'
+                ? 'Сначала создайте профиль мастера, чтобы открыть редактирование, страницу записи и рабочие разделы.'
                 : 'The profile no longer falls back to mock data. Create the real master workspace first.'
             }
           />
@@ -48,7 +48,7 @@ export default function DashboardProfilePage() {
     <WorkspaceShell>
       <div className="workspace-page workspace-page-wide space-y-5">
         <DashboardHeader
-          badge={locale === 'ru' ? 'Settings / profile' : 'Settings / profile'}
+          badge={locale === 'ru' ? 'Настройки / профиль' : 'Settings / profile'}
           title={locale === 'ru' ? 'Профиль и страница мастера' : 'Profile and public page'}
           description={
             locale === 'ru'

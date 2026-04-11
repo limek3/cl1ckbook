@@ -1,64 +1,60 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { usePathname } from 'next/navigation';
 
-const LOCATION_CHANGE_EVENT = 'klikbuk:location-change';
+function getSearchString() {
+  if (typeof window === 'undefined') return '';
+  return window.location.search || '';
+}
 
-function ensureHistoryPatched() {
-  if (typeof window === 'undefined') return;
-  const marker = '__klikbukHistoryPatched__';
+function patchHistoryMethod(method: 'pushState' | 'replaceState') {
+  if (typeof window === 'undefined') return () => {};
 
-  if ((window as typeof window & { [key: string]: unknown })[marker]) {
-    return;
+  const historyRef = window.history as History & {
+    __klikbukPatchedPushState?: boolean;
+    __klikbukPatchedReplaceState?: boolean;
+  };
+  const flag = method === 'pushState' ? '__klikbukPatchedPushState' : '__klikbukPatchedReplaceState';
+
+  if (historyRef[flag]) {
+    return () => {};
   }
 
-  const originalPushState = window.history.pushState;
-  const originalReplaceState = window.history.replaceState;
+  historyRef[flag] = true;
+  const original = window.history[method];
 
-  const notify = () => {
-    window.dispatchEvent(new Event(LOCATION_CHANGE_EVENT));
-  };
-
-  window.history.pushState = function pushStatePatched(...args) {
-    const result = originalPushState.apply(this, args);
-    notify();
+  window.history[method] = function patchedHistoryMethod(this: History, ...args: Parameters<History[typeof method]>) {
+    const result = original.apply(this, args);
+    window.dispatchEvent(new Event('klikbuk:searchchange'));
     return result;
   };
 
-  window.history.replaceState = function replaceStatePatched(...args) {
-    const result = originalReplaceState.apply(this, args);
-    notify();
-    return result;
+  return () => {
+    window.history[method] = original;
+    historyRef[flag] = false;
   };
-
-  window.addEventListener('popstate', notify);
-
-  (window as typeof window & { [key: string]: unknown })[marker] = true;
 }
 
 export function useBrowserSearchParams() {
-  const pathname = usePathname();
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    setSearch(getSearchString());
 
-    ensureHistoryPatched();
+    const sync = () => setSearch(getSearchString());
+    const unpatchPush = patchHistoryMethod('pushState');
+    const unpatchReplace = patchHistoryMethod('replaceState');
 
-    const update = () => {
-      setSearch(window.location.search || '');
-    };
-
-    update();
-    window.addEventListener(LOCATION_CHANGE_EVENT, update);
-    window.addEventListener('popstate', update);
+    window.addEventListener('popstate', sync);
+    window.addEventListener('klikbuk:searchchange', sync);
 
     return () => {
-      window.removeEventListener(LOCATION_CHANGE_EVENT, update);
-      window.removeEventListener('popstate', update);
+      unpatchPush();
+      unpatchReplace();
+      window.removeEventListener('popstate', sync);
+      window.removeEventListener('klikbuk:searchchange', sync);
     };
-  }, [pathname]);
+  }, []);
 
   return useMemo(() => new URLSearchParams(search), [search]);
 }

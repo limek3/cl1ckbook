@@ -150,7 +150,7 @@ export function PublicPageHero({
         open: 'Открыть страницу',
       }
     : {
-        badge: 'Public page is active',
+        badge: locale === 'ru' ? 'Публичная страница активна' : 'Public page is active',
         title: 'Primary master link',
         description: 'See the page card, the live URL, and the fastest sharing actions in one polished hero block.',
         connected: 'Connected',

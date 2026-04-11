@@ -77,7 +77,7 @@ export async function POST(request: Request) {
           clientPhone: persistedBooking.clientPhone,
           channel: 'Telegram',
           segment: 'new',
-          source: 'Public page',
+          source: 'Публичная страница',
           nextVisit: persistedBooking.date,
           botConnected: true,
           unreadCount: 1,

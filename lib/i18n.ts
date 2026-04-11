@@ -18,7 +18,7 @@ export const messages = {
       dashboard: 'Заявки',
       createProfile: 'Профиль мастера',
       profileSettings: 'Редактирование профиля',
-      demoPage: 'Демо-страница',
+      demoPage: 'Демо-режим',
       system: 'Платформа',
       openMenu: 'Открыть меню',
       closeMenu: 'Свернуть меню',
@@ -81,7 +81,7 @@ export const messages = {
         },
         {
           title: 'Подключите каналы связи',
-          description: 'Телефон, MAX и Telegram всегда под рукой.',
+          description: 'Телефон, MAX и Телеграм всегда под рукой.',
         },
         {
           title: 'Используйте AI-помощника',
@@ -138,7 +138,7 @@ export const messages = {
         bio: 'Короткое описание',
         services: 'Услуги',
         phone: 'Телефон',
-        telegram: 'Telegram',
+        telegram: 'Телеграм',
         whatsapp: 'MAX',
         avatar: 'Фото мастера',
       },
@@ -276,7 +276,7 @@ export const messages = {
       english: 'EN',
     },
     home: {
-      badge: 'KlikBuk workspace',
+      badge: 'КликБук workspace',
       title: 'Manage bookings without messy chat threads',
       description:
         'The master profile, public booking page, and incoming requests live in one clean interface.',
@@ -297,7 +297,7 @@ export const messages = {
         profile: 'Help me build a master profile with services, description, and contacts.',
         link: 'Prepare a public client link and a short message for sharing.',
         dashboard: 'Show how to organize incoming requests and booking operations.',
-        system: 'Explain how to navigate and use KlikBuk faster.',
+        system: 'Explain how to navigate and use КликБук faster.',
       },
       aiBullets: {
         profile: ['Name and role', 'Services and bio', 'Contacts and link'],

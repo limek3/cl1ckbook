@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CalendarClock, Inbox, Search, SlidersHorizontal, X } from 'lucide-react';
 import type { Booking, BookingStatus } from '@/lib/types';
 import { useLocale } from '@/lib/locale-context';
@@ -23,6 +23,7 @@ interface BookingsListProps {
   description: string;
   bookings: Booking[];
   onStatusChange?: (bookingId: string, status: BookingStatus) => void;
+  pageSize?: number;
 }
 
 type SortMode = 'newest' | 'oldest' | 'visitSoon';
@@ -33,12 +34,13 @@ function compareVisitDate(a: Booking, b: Booking) {
   return aDate - bDate;
 }
 
-export function BookingsList({ title, description, bookings, onStatusChange }: BookingsListProps) {
+export function BookingsList({ title, description, bookings, onStatusChange, pageSize = 0 }: BookingsListProps) {
   const { locale } = useLocale();
   const statusOptions = useBookingStatusOptions();
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | BookingStatus>('all');
   const [sortMode, setSortMode] = useState<SortMode>('newest');
+  const [page, setPage] = useState(1);
 
   const labels = locale === 'ru'
     ? {
@@ -54,6 +56,7 @@ export function BookingsList({ title, description, bookings, onStatusChange }: B
         new: 'Новые',
         upcoming: 'Ближайшие',
         filtersHint: 'Фильтры и сортировка помогают быстро переключаться между новыми заявками, старыми обращениями и ближайшими визитами.',
+        page: 'Страница',
       }
     : {
         search: 'Search by client, phone, service or note',
@@ -68,6 +71,7 @@ export function BookingsList({ title, description, bookings, onStatusChange }: B
         new: 'New',
         upcoming: 'Upcoming',
         filtersHint: 'Filters let you jump between new requests, older bookings, and the nearest visits without leaving the table.',
+        page: 'Page',
       };
 
   const filteredBookings = useMemo(() => {
@@ -89,6 +93,25 @@ export function BookingsList({ title, description, bookings, onStatusChange }: B
 
     return [...result].sort(compareVisitDate);
   }, [bookings, query, sortMode, statusFilter]);
+
+  const totalPages = pageSize > 0 ? Math.max(1, Math.ceil(filteredBookings.length / pageSize)) : 1;
+  const currentPage = Math.min(page, totalPages);
+  const visibleBookings = useMemo(() => {
+    if (pageSize <= 0) return filteredBookings;
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredBookings.slice(startIndex, startIndex + pageSize);
+  }, [currentPage, filteredBookings, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, sortMode, statusFilter]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
 
   const upcomingCount = bookings.filter((booking) => new Date(`${booking.date}T${booking.time}`).getTime() >= Date.now()).length;
   const newCount = bookings.filter((booking) => booking.status === 'new').length;
@@ -176,6 +199,7 @@ export function BookingsList({ title, description, bookings, onStatusChange }: B
       </div>
 
       {filteredBookings.length > 0 ? (
+        <>
         <div className="mt-4">
           <Table>
             <TableHeader>
@@ -189,7 +213,7 @@ export function BookingsList({ title, description, bookings, onStatusChange }: B
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredBookings.map((booking) => (
+              {visibleBookings.map((booking) => (
                 <TableRow key={booking.id}>
                   <TableCell>
                     <div className="font-medium text-foreground">{booking.clientName}</div>
@@ -232,6 +256,31 @@ export function BookingsList({ title, description, bookings, onStatusChange }: B
             </TableBody>
           </Table>
         </div>
+
+        {totalPages > 1 ? (
+          <div className="mt-4 flex items-center justify-between gap-3 border-t border-border/70 pt-4">
+            <div className="text-[12px] text-muted-foreground">
+              {labels.page} {currentPage} / {totalPages}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => (
+                <button
+                  key={pageNumber}
+                  type="button"
+                  onClick={() => setPage(pageNumber)}
+                  className={
+                    pageNumber === currentPage
+                      ? 'inline-flex size-9 items-center justify-center rounded-[12px] border border-primary/28 bg-primary/12 text-[12px] font-semibold text-primary'
+                      : 'inline-flex size-9 items-center justify-center rounded-[12px] border border-border bg-background text-[12px] font-medium text-foreground transition hover:border-primary/20 hover:text-foreground'
+                  }
+                >
+                  {pageNumber}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        </>
       ) : (
         <div className="mt-4 rounded-[16px] border border-dashed border-border bg-accent/20 px-5 py-10 text-center">
           <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border border-border bg-card text-muted-foreground">
