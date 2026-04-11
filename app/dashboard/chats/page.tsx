@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
 import {
   ArrowRightLeft,
   Bot,
@@ -18,6 +17,7 @@ import {
 } from 'lucide-react';
 import { WorkspaceShell } from '@/components/shared/workspace-shell';
 import { useOwnedWorkspaceData } from '@/hooks/use-owned-workspace-data';
+import { useBrowserSearchParams } from '@/hooks/use-browser-search-params';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -195,7 +195,7 @@ function segmentBadgeLabel(segment: ChatThreadRecord['segment'], locale: 'ru' | 
 
 export default function DashboardChatsPage() {
   const { hasHydrated, ownedProfile, locale, dataset, demoMode: demoModeFromHook } = useOwnedWorkspaceData();
-  const searchParams = useSearchParams();
+  const searchParams = useBrowserSearchParams();
   const demoMode = demoModeFromHook || isDashboardDemoEnabled(searchParams);
   const demoStorageKey = getDashboardDemoStorageKey('chats');
   const isMobile = useMobile();

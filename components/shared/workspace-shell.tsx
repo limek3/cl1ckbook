@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import {
   BarChart3,
   Bell,
@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '@/lib/app-context';
 import { SLOTY_DEMO_SLUG } from '@/lib/demo-data';
+import { useBrowserSearchParams } from '@/hooks/use-browser-search-params';
 import { isDashboardDemoEnabled, toggleDashboardDemoHref, withDashboardDemoParam } from '@/lib/dashboard-demo';
 import { useLocale } from '@/lib/locale-context';
 import { cn } from '@/lib/utils';
@@ -95,7 +96,7 @@ function DemoToggleHint({ locale }: { locale: 'ru' | 'en' }) {
 
 export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const searchParams = useBrowserSearchParams();
   const demoMode = isDashboardDemoEnabled(searchParams);
   const { ownedProfile, getBookingsBySlug } = useApp();
   const { locale } = useLocale();

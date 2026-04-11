@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useBrowserSearchParams } from '@/hooks/use-browser-search-params';
 import { useApp } from '@/lib/app-context';
 import { getDashboardDemoSections, getDemoBookings, getDemoProfile, SLOTY_DEMO_SLUG } from '@/lib/demo-data';
 import { isDashboardDemoEnabled } from '@/lib/dashboard-demo';
@@ -11,7 +11,7 @@ import { buildWorkspaceDatasetFromStored } from '@/lib/workspace-store';
 export function useOwnedWorkspaceData() {
   const { ownedProfile, bookings, workspaceData, hasHydrated } = useApp();
   const { locale } = useLocale();
-  const searchParams = useSearchParams();
+  const searchParams = useBrowserSearchParams();
   const demoMode = isDashboardDemoEnabled(searchParams);
 
   const resolvedProfile = useMemo(() => {

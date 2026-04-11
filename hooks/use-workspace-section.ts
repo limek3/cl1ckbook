@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useBrowserSearchParams } from '@/hooks/use-browser-search-params';
 import { useApp } from '@/lib/app-context';
 import { getDashboardDemoStorageKey, isDashboardDemoEnabled } from '@/lib/dashboard-demo';
 
@@ -32,7 +32,7 @@ export function useWorkspaceSection<T>(
   fallbackValue: T,
 ): [T, Dispatch<SetStateAction<T>>, boolean] {
   const { hasHydrated, ownedProfile, workspaceData, updateWorkspaceSection } = useApp();
-  const searchParams = useSearchParams();
+  const searchParams = useBrowserSearchParams();
   const demoMode = isDashboardDemoEnabled(searchParams);
   const demoStorageKey = useMemo(() => getDashboardDemoStorageKey(`section:${key}`), [key]);
 

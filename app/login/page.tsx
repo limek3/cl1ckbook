@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type FormEvent } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { ArrowRight, CheckCircle2, KeyRound, Mail, ShieldCheck, Sparkles } from 'lucide-react';
 import { BrandLogo } from '@/components/brand/brand-logo';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { createClient } from '@/lib/supabase/client';
 import { useMobile } from '@/hooks/use-mobile';
+import { useBrowserSearchParams } from '@/hooks/use-browser-search-params';
 
 const authConfigured = Boolean(
   process.env.NEXT_PUBLIC_SUPABASE_URL &&
@@ -18,7 +19,7 @@ const authConfigured = Boolean(
 
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const searchParams = useBrowserSearchParams();
   const isMobile = useMobile();
   const redirectTo = useMemo(() => searchParams.get('redirectTo') || '/dashboard', [searchParams]);
   const [mode, setMode] = useState<'password' | 'magic'>('password');
