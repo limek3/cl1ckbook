@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import type { ReactNode } from 'react';
+import { Suspense, type ReactNode } from 'react';
 import Script from 'next/script';
 import './globals.css';
 import { Providers } from '@/components/app/providers';
@@ -47,7 +47,9 @@ export default function RootLayout({
         <Script id="sloty-shell-preferences" strategy="beforeInteractive">
           {shellPreferenceScript}
         </Script>
-        <Providers>{children}</Providers>
+        <Suspense fallback={null}>
+          <Providers>{children}</Providers>
+        </Suspense>
       </body>
     </html>
   );
