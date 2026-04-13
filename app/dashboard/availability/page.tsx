@@ -7,7 +7,6 @@ import {
   ArrowUp,
   CalendarRange,
   Clock3,
-  GripVertical,
   Lock,
   Plus,
   TimerReset,
@@ -20,7 +19,6 @@ import { useWorkspaceSection } from '@/hooks/use-workspace-section';
 import { type AvailabilityDayInsight } from '@/lib/master-workspace';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -28,6 +26,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { useMobile } from '@/hooks/use-mobile';
 
@@ -42,11 +54,37 @@ function arrayMove<T>(items: T[], from: number, to: number) {
   return next;
 }
 
-function parseLines(value: string) {
-  return value
-    .split(/\n|,/)
-    .map((item) => item.trim())
-    .filter(Boolean);
+const SLOT_PRESETS = [
+  { key: 'classic', slots: ['09:00–13:00', '14:00–19:00'] },
+  { key: 'late', slots: ['10:00–14:00', '15:00–20:00'] },
+  { key: 'compact', slots: ['11:00–17:00'] },
+  { key: 'short', slots: ['10:00–15:00'] },
+  { key: 'evening', slots: ['12:00–15:00', '16:00–21:00'] },
+] as const;
+
+const BREAK_PRESETS = [
+  { key: 'lunch', breaks: ['13:00–14:00'] },
+  { key: 'late-lunch', breaks: ['14:00–15:00'] },
+  { key: 'mini', breaks: ['14:00–14:30'] },
+  { key: 'midday', breaks: ['12:00–13:00'] },
+  { key: 'none', breaks: [] },
+] as const;
+
+function serializeIntervals(items: readonly string[]) {
+  return items.join('|');
+}
+
+function findPresetKey<T extends { key: string; slots?: readonly string[]; breaks?: readonly string[] }>(
+  items: readonly string[],
+  presets: readonly T[],
+  field: 'slots' | 'breaks',
+) {
+  return presets.find((preset) => serializeIntervals(preset[field] ?? []) === serializeIntervals(items))?.key ?? null;
+}
+
+function formatIntervals(items: readonly string[], locale: 'ru' | 'en', emptyLabel?: string) {
+  if (!items.length) return emptyLabel ?? (locale === 'ru' ? 'Нет интервалов' : 'No intervals');
+  return items.join(' · ');
 }
 
 function createDay(locale: 'ru' | 'en', index: number): AvailabilityDayInsight {
@@ -59,12 +97,253 @@ function createDay(locale: 'ru' | 'en', index: number): AvailabilityDayInsight {
   };
 }
 
+type AvailabilityEditorLabels = {
+  editorTitle: string;
+  editorDescription: string;
+  workday: string;
+  short: string;
+  dayOff: string;
+  slots: string;
+  breaks: string;
+  delete: string;
+  block1: string;
+  block2: string;
+  block3: string;
+  block4: string;
+  add: string;
+};
+
+function AvailabilityEditorPanel({
+  locale,
+  labels,
+  day,
+  selectedIndex,
+  totalDays,
+  isMobile,
+  onUpdate,
+  onMove,
+  onApplyPreset,
+  onDelete,
+}: {
+  locale: 'ru' | 'en';
+  labels: AvailabilityEditorLabels;
+  day: AvailabilityDayInsight;
+  selectedIndex: number;
+  totalDays: number;
+  isMobile: boolean;
+  onUpdate: (patch: Partial<AvailabilityDayInsight>) => void;
+  onMove: (direction: -1 | 1) => void;
+  onApplyPreset: (preset: 'dense' | 'short' | 'off' | 'evening') => void;
+  onDelete: () => void;
+}) {
+  const statusLabel = day.status === 'workday' ? labels.workday : day.status === 'short' ? labels.short : labels.dayOff;
+
+  return (
+    <div className={cn('workspace-editor-shell workspace-editor-shell-availability', isMobile && 'workspace-editor-shell-mobile')}>
+      {isMobile ? <div className="workspace-editor-sheet-handle" aria-hidden="true" /> : null}
+
+      <div className="workspace-editor-head workspace-editor-head-availability">
+        <div className="workspace-editor-kicker">{labels.editorTitle}</div>
+        <div className={cn('workspace-editor-head-row', isMobile && 'gap-3')}>
+          <div className="min-w-0 flex-1">
+            <div className="workspace-editor-headline">{day.label}</div>
+            <div className="workspace-editor-subtitle">{labels.editorDescription}</div>
+          </div>
+
+          <div className="workspace-editor-visibility">
+            <div className="workspace-editor-visibility-label">{locale === 'ru' ? 'Статус дня' : 'Day status'}</div>
+            <div className="mt-2">
+              <span className="workspace-editor-visibility-value">{statusLabel}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="workspace-editor-preview workspace-editor-preview-availability">
+          <div className="min-w-0">
+            <div className="workspace-editor-preview-title">{day.label}</div>
+            <div className="workspace-editor-preview-meta">
+              <span className="chip-muted text-[10px]">{statusLabel}</span>
+              <span className="chip-muted text-[10px]">
+                {locale === 'ru' ? `${day.slots.length} интервала` : `${day.slots.length} slots`}
+              </span>
+              <span className="chip-muted text-[10px]">
+                {locale === 'ru' ? `${day.breaks.length} перерыва` : `${day.breaks.length} breaks`}
+              </span>
+            </div>
+          </div>
+          <div className="workspace-editor-preview-side">{statusLabel}</div>
+        </div>
+      </div>
+
+      <div className="workspace-editor-scroll">
+        <div className={cn('workspace-editor-grid availability-editor-grid', !isMobile && 'md:grid-cols-2')}>
+          <div className="editor-field-card availability-editor-field availability-editor-field-name">
+            <div className="editor-field-label">{locale === 'ru' ? 'Название дня' : 'Day label'}</div>
+            <Input
+              value={day.label}
+              onChange={(event) => onUpdate({ label: event.target.value })}
+              placeholder={locale === 'ru' ? 'Название дня' : 'Day label'}
+              className="mt-2 h-10 bg-background/90"
+            />
+          </div>
+
+          <div className="editor-field-card availability-editor-field availability-editor-field-status">
+            <div className="editor-field-label">{locale === 'ru' ? 'Статус' : 'Status'}</div>
+            <Select value={day.status} onValueChange={(value) => onUpdate({ status: value as AvailabilityDayInsight['status'] })}>
+              <SelectTrigger className="mt-2 h-10 bg-background/90">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="workday">{labels.workday}</SelectItem>
+                <SelectItem value="short">{labels.short}</SelectItem>
+                <SelectItem value="day-off">{labels.dayOff}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="editor-field-card availability-editor-field availability-editor-field-slots">
+            <div className="editor-field-label">{labels.slots}</div>
+            <Select
+              value={findPresetKey(day.slots, SLOT_PRESETS, 'slots') ?? 'custom'}
+              onValueChange={(value) => {
+                const preset = SLOT_PRESETS.find((item) => item.key === value);
+                if (!preset) return;
+                onUpdate({ slots: [...preset.slots] });
+              }}
+            >
+              <SelectTrigger className="mt-2 h-10 bg-background/90">
+                <SelectValue placeholder={labels.slots} />
+              </SelectTrigger>
+              <SelectContent>
+                {!findPresetKey(day.slots, SLOT_PRESETS, 'slots') ? (
+                  <SelectItem value="custom">
+                    {formatIntervals(day.slots, locale)}
+                  </SelectItem>
+                ) : null}
+                {SLOT_PRESETS.map((preset) => (
+                  <SelectItem key={preset.key} value={preset.key}>
+                    {formatIntervals([...preset.slots], locale)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="availability-interval-summary">
+              {day.slots.length > 0 ? day.slots.map((slot) => (
+                <span key={`${day.id}-slot-${slot}`} className="chip-muted">
+                  {slot}
+                </span>
+              )) : <span className="chip-muted">{locale === 'ru' ? 'Нет интервалов' : 'No intervals'}</span>}
+            </div>
+            <div className="availability-interval-note">
+              {locale === 'ru' ? 'Выберите готовую сетку без ручного ввода.' : 'Pick a ready-made schedule instead of typing it manually.'}
+            </div>
+          </div>
+
+          <div className="editor-field-card availability-editor-field availability-editor-field-breaks">
+            <div className="editor-field-label">{labels.breaks}</div>
+            <Select
+              value={findPresetKey(day.breaks, BREAK_PRESETS, 'breaks') ?? 'custom'}
+              onValueChange={(value) => {
+                const preset = BREAK_PRESETS.find((item) => item.key === value);
+                if (!preset) return;
+                onUpdate({ breaks: [...preset.breaks] });
+              }}
+            >
+              <SelectTrigger className="mt-2 h-10 bg-background/90">
+                <SelectValue placeholder={labels.breaks} />
+              </SelectTrigger>
+              <SelectContent>
+                {!findPresetKey(day.breaks, BREAK_PRESETS, 'breaks') ? (
+                  <SelectItem value="custom">
+                    {formatIntervals(day.breaks, locale, locale === 'ru' ? 'Без перерыва' : 'No break')}
+                  </SelectItem>
+                ) : null}
+                {BREAK_PRESETS.map((preset) => (
+                  <SelectItem key={preset.key} value={preset.key}>
+                    {formatIntervals([...preset.breaks], locale, locale === 'ru' ? 'Без перерыва' : 'No break')}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="availability-interval-summary">
+              {day.breaks.length > 0 ? day.breaks.map((item) => (
+                <span key={`${day.id}-break-${item}`} className="chip-muted">
+                  {item}
+                </span>
+              )) : <span className="chip-muted">{locale === 'ru' ? 'Без перерыва' : 'No break'}</span>}
+            </div>
+            <div className="availability-interval-note">
+              {locale === 'ru' ? 'Перерыв тоже переключается одним списком.' : 'Breaks switch through one clean dropdown too.'}
+            </div>
+          </div>
+        </div>
+
+        <div className="workspace-editor-presets availability-editor-presets">
+          {[
+            { key: 'dense', label: labels.block1 },
+            { key: 'short', label: labels.block2 },
+            { key: 'off', label: labels.block3 },
+            { key: 'evening', label: labels.block4 },
+          ].map((preset) => (
+            <Button
+              key={preset.key}
+              type="button"
+              variant="outline"
+              className="availability-editor-preset-button h-10 justify-start rounded-[14px] px-3"
+              onClick={() => onApplyPreset(preset.key as 'dense' | 'short' | 'off' | 'evening')}
+            >
+              {preset.label}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      <div className="workspace-editor-footer workspace-editor-footer-availability">
+        <div className="workspace-editor-footer-group">
+          <Button
+            type="button"
+            size="icon-sm"
+            variant="outline"
+            onClick={() => onMove(-1)}
+            disabled={selectedIndex <= 0}
+            aria-label={locale === 'ru' ? 'Переместить вверх' : 'Move up'}
+          >
+            <ArrowUp className="size-4" />
+          </Button>
+          <Button
+            type="button"
+            size="icon-sm"
+            variant="outline"
+            onClick={() => onMove(1)}
+            disabled={selectedIndex === totalDays - 1}
+            aria-label={locale === 'ru' ? 'Переместить вниз' : 'Move down'}
+          >
+            <ArrowDown className="size-4" />
+          </Button>
+        </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="workspace-editor-delete-button"
+          onClick={onDelete}
+          disabled={totalDays === 1}
+        >
+          <Trash2 className="size-4" />
+          {labels.delete}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function AvailabilityPage() {
   const { hasHydrated, ownedProfile, dataset, locale } = useOwnedWorkspaceData();
   const isMobile = useMobile();
   const [days, setDays, storageReady] = useWorkspaceSection<AvailabilityDayInsight[]>('availability', dataset?.availability ?? []);
-  const [draggedId, setDraggedId] = useState<string | null>(null);
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null);
+  const [dayEditorOpen, setDayEditorOpen] = useState(false);
 
 
   useEffect(() => {
@@ -110,7 +389,7 @@ export default function AvailabilityPage() {
         editorTitle: 'Редактор недели',
         editorDescription: 'Редактирование дней и слотов.',
         helperTitle: 'Быстрые заготовки',
-        helperDescription: 'Шаблоны рабочего дня.',
+        helperDescription: 'Примените готовый шаблон к выбранному дню.',
         add: 'Добавить день / спецдату',
         workday: 'Рабочий день',
         short: 'Короткий день',
@@ -127,9 +406,9 @@ export default function AvailabilityPage() {
         title: 'Schedule and availability',
         description: 'The schedule is editable now: reorder days, change status, slots, and breaks.',
         editorTitle: 'Week editor',
-        editorDescription: 'Cards can be dragged, edited fast, and kept up to date.',
+        editorDescription: 'Change status, slots, breaks, and the day order in one place.',
         helperTitle: 'Quick presets',
-        helperDescription: 'Apply a ready-made day template instantly.',
+        helperDescription: 'Apply a ready-made template to the selected day.',
         add: 'Add day / special date',
         workday: 'Workday',
         short: 'Short day',
@@ -188,6 +467,7 @@ export default function AvailabilityPage() {
               const nextDay = createDay(locale, days.length);
               setDays((current) => [...current, nextDay]);
               setSelectedDayId(nextDay.id);
+              setDayEditorOpen(true);
             }}>
               <Plus className="size-4" />
               {labels.add}
@@ -195,82 +475,32 @@ export default function AvailabilityPage() {
           }
         />
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="dashboard-kpi-grid dashboard-mobile-stats-grid availability-mobile-stats-grid availability-mobile-kpi-grid grid grid-cols-2 gap-3">
           <MetricCard label={locale === 'ru' ? 'Рабочие дни' : 'Working days'} value={String(workdays)} icon={CalendarRange} />
           <MetricCard label={locale === 'ru' ? 'Короткие смены' : 'Short shifts'} value={String(shortDays)} icon={Clock3} />
           <MetricCard label={locale === 'ru' ? 'Выходные / off' : 'Off days'} value={String(dayOffCount)} icon={Lock} />
           <MetricCard label={locale === 'ru' ? 'Шаблон недели' : 'Week template'} value={locale === 'ru' ? 'Гибкий' : 'Flexible'} icon={TimerReset} />
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_286px]">
-          <div className={cn("space-y-5", isMobile ? "order-2" : "xl:order-1")}>
-            {selectedDay ? (
-              <SectionCard
-                title={selectedDay.label}
-                description={labels.editorDescription}
-                className="p-4"
-                actions={
-                  <div className="flex flex-wrap gap-2">
-                    <Button type="button" size="icon-sm" variant="outline" onClick={() => moveDay(selectedDay.id, -1)} disabled={selectedIndex <= 0}>
-                      <ArrowUp className="size-4" />
-                    </Button>
-                    <Button type="button" size="icon-sm" variant="outline" onClick={() => moveDay(selectedDay.id, 1)} disabled={selectedIndex === days.length - 1}>
-                      <ArrowDown className="size-4" />
-                    </Button>
-                    <Button type="button" size="icon-sm" variant="outline" onClick={() => setDays((current) => current.filter((item) => item.id !== selectedDay.id))} disabled={days.length === 1}>
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
-                }
-              >
-                <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_220px]">
-                  <Input
-                    value={selectedDay.label}
-                    onChange={(event) => updateDay(selectedDay.id, { label: event.target.value })}
-                    placeholder={locale === 'ru' ? 'Название дня' : 'Day label'}
-                    className="h-10"
-                  />
-                  <Select value={selectedDay.status} onValueChange={(value) => updateDay(selectedDay.id, { status: value as AvailabilityDayInsight['status'] })}>
-                    <SelectTrigger className="h-10">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="workday">{labels.workday}</SelectItem>
-                      <SelectItem value="short">{labels.short}</SelectItem>
-                      <SelectItem value="day-off">{labels.dayOff}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="mt-3 grid gap-3 xl:grid-cols-2">
-                  <div className="rounded-[16px] border border-border/80 bg-accent/24 p-3">
-                    <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">{labels.slots}</div>
-                    <Textarea
-                      value={selectedDay.slots.join('\n')}
-                      onChange={(event) => updateDay(selectedDay.id, { slots: parseLines(event.target.value) })}
-                      className="min-h-24 bg-background/85"
-                      placeholder="10:00–13:00&#10;14:00–18:00"
-                    />
-                  </div>
-                  <div className="rounded-[16px] border border-border/80 bg-accent/24 p-3">
-                    <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">{labels.breaks}</div>
-                    <Textarea
-                      value={selectedDay.breaks.join('\n')}
-                      onChange={(event) => updateDay(selectedDay.id, { breaks: parseLines(event.target.value) })}
-                      className="min-h-24 bg-background/85"
-                      placeholder="13:00–14:00"
-                    />
-                  </div>
-                </div>
-              </SectionCard>
-            ) : null}
-
-            <SectionCard title={labels.editorTitle} description={locale === 'ru' ? 'Неделя и интервалы.' : 'The week is displayed as a compact strip with clear intervals.'} className="p-4">
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="availability-mobile-layout grid gap-5 xl:grid-cols-[minmax(0,1fr)_286px]">
+          <div className="space-y-5">
+            <SectionCard title={labels.editorTitle} description={locale === 'ru' ? 'Нажмите на день и измените интервалы.' : 'Tap any day to edit the intervals.'} className="p-4">
+              <div className={cn("grid gap-3", isMobile ? "grid-cols-2" : "md:grid-cols-2 xl:grid-cols-3")}>
                 {days.map((day) => (
-                  <div key={day.id} className="rounded-[16px] border border-border/80 bg-card/80 p-3.5">
+                  <button
+                    key={day.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedDayId(day.id);
+                      setDayEditorOpen(true);
+                    }}
+                    className={cn(
+                      "selection-tone-card rounded-[16px] p-3.5 text-left",
+                    )}
+                    data-active={selectedDay?.id === day.id ? 'true' : 'false'}
+                  >
                     <div className="flex items-center justify-between gap-3">
-                      <div className="text-[14px] font-medium text-foreground">{day.label}</div>
+                      <div className="truncate text-[13px] font-medium text-foreground">{day.label}</div>
                       <span className="chip-muted">
                         {day.status === 'workday' ? labels.workday : day.status === 'short' ? labels.short : labels.dayOff}
                       </span>
@@ -279,7 +509,7 @@ export default function AvailabilityPage() {
                       <div>
                         <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{labels.slots}</div>
                         <div className="mt-1.5 flex flex-wrap gap-1.5">
-                          {day.slots.length > 0 ? day.slots.map((slot) => (
+                          {day.slots.length > 0 ? day.slots.slice(0, 2).map((slot) => (
                             <span key={`${day.id}-${slot}`} className="chip-muted">{slot}</span>
                           )) : <span className="text-[12px] text-muted-foreground">—</span>}
                         </div>
@@ -287,86 +517,176 @@ export default function AvailabilityPage() {
                       <div>
                         <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{labels.breaks}</div>
                         <div className="mt-1.5 flex flex-wrap gap-1.5">
-                          {day.breaks.length > 0 ? day.breaks.map((item) => (
+                          {day.breaks.length > 0 ? day.breaks.slice(0, 2).map((item) => (
                             <span key={`${day.id}-break-${item}`} className="chip-muted">{item}</span>
                           )) : <span className="text-[12px] text-muted-foreground">—</span>}
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </SectionCard>
           </div>
 
-          <SectionCard title={labels.helperTitle} description={labels.helperDescription} className={cn("p-4", isMobile ? "order-1" : "xl:sticky xl:top-4 xl:self-start xl:order-2")}>
-            <div className="max-h-[calc(100vh-9rem)] space-y-3 overflow-y-auto pr-1">
-              <div className="grid gap-2">
-                {[
-                  { key: 'dense', label: labels.block1 },
-                  { key: 'short', label: labels.block2 },
-                  { key: 'off', label: labels.block3 },
-                  { key: 'evening', label: labels.block4 },
-                ].map((preset) => (
-                  <Button
-                    key={preset.key}
-                    type="button"
-                    variant="outline"
-                    className="h-9 justify-start rounded-[14px] px-3 text-[12px]"
-                    onClick={() => selectedDay && applyPreset(selectedDay.id, preset.key as 'dense' | 'short' | 'off' | 'evening')}
-                  >
-                    {preset.label}
-                  </Button>
-                ))}
+          <SectionCard
+            title={labels.helperTitle}
+            description={labels.helperDescription}
+            className={cn("p-4", !isMobile && "xl:sticky xl:top-4 xl:self-start")}
+          >
+            <div className="availability-sidebar-stack">
+              <div className="availability-helper-summary rounded-[16px] border border-border/80 bg-accent/18 p-3.5">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  {locale === 'ru' ? 'Выбранный день' : 'Selected day'}
+                </div>
+                {selectedDay ? (
+                  <div className="mt-2 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-[14px] font-semibold text-foreground">{selectedDay.label}</div>
+                        <div className="mt-1 text-[12px] text-muted-foreground">
+                          {selectedDay.status === 'workday'
+                            ? labels.workday
+                            : selectedDay.status === 'short'
+                              ? labels.short
+                              : labels.dayOff}
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDayEditorOpen(true)}
+                      >
+                        {locale === 'ru' ? 'Изменить' : 'Edit'}
+                      </Button>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div>
+                        <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{labels.slots}</div>
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          {selectedDay.slots.length > 0
+                            ? selectedDay.slots.slice(0, 3).map((slot) => (
+                                <span key={`${selectedDay.id}-${slot}`} className="chip-muted">
+                                  {slot}
+                                </span>
+                              ))
+                            : <span className="text-[12px] text-muted-foreground">—</span>}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{labels.breaks}</div>
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          {selectedDay.breaks.length > 0
+                            ? selectedDay.breaks.slice(0, 2).map((item) => (
+                                <span key={`${selectedDay.id}-break-${item}`} className="chip-muted">
+                                  {item}
+                                </span>
+                              ))
+                            : <span className="text-[12px] text-muted-foreground">—</span>}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-2 text-[12px] text-muted-foreground">
+                    {locale === 'ru' ? 'Выберите день для быстрой настройки.' : 'Choose a day for quick presets.'}
+                  </div>
+                )}
               </div>
 
-              <div className="space-y-2">
-                {days.map((day, index) => {
-                  const active = selectedDay?.id === day.id;
-                  const statusLabel = day.status === 'workday'
-                    ? labels.workday
-                    : day.status === 'short'
-                      ? labels.short
-                      : labels.dayOff;
+              <div className="availability-quick-presets">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  {labels.helperTitle}
+                </div>
+                <div className="mt-1 text-[12px] leading-5 text-muted-foreground">
+                  {selectedDay
+                    ? locale === 'ru'
+                      ? 'Шаблон применяется к выбранному дню.'
+                      : 'The preset applies to the selected day.'
+                    : locale === 'ru'
+                      ? 'Сначала выберите день.'
+                      : 'Select a day first.'}
+                </div>
 
-                  return (
-                    <button
-                      key={day.id}
+                <div className="availability-quick-presets-grid">
+                  {[
+                    { key: 'dense', label: labels.block1 },
+                    { key: 'short', label: labels.block2 },
+                    { key: 'off', label: labels.block3 },
+                    { key: 'evening', label: labels.block4 },
+                  ].map((preset) => (
+                    <Button
+                      key={preset.key}
                       type="button"
-                      draggable
-                      onClick={() => setSelectedDayId(day.id)}
-                      onDragStart={() => setDraggedId(day.id)}
-                      onDragOver={(event) => event.preventDefault()}
-                      onDrop={() => {
-                        if (!draggedId || draggedId === day.id) return;
-                        setDays((current) => {
-                          const from = current.findIndex((item) => item.id === draggedId);
-                          const to = current.findIndex((item) => item.id === day.id);
-                          return arrayMove(current, from, to);
-                        });
-                        setDraggedId(null);
-                      }}
-                      onDragEnd={() => setDraggedId(null)}
-                      className={cn(
-                        'w-full rounded-[16px] border px-3.5 py-2.5 text-left transition',
-                        active ? 'border-primary/24 bg-primary/8 shadow-[var(--shadow-soft)]' : 'border-border/80 bg-card/74 hover:bg-accent/18',
-                        draggedId === day.id && 'border-primary/30 bg-primary/5',
-                      )}
+                      variant="outline"
+                      className="availability-quick-preset-button"
+                      onClick={() => selectedDay && applyPreset(selectedDay.id, preset.key as 'dense' | 'short' | 'off' | 'evening')}
+                      disabled={!selectedDay}
                     >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="truncate text-[13px] font-medium text-foreground">{index + 1}. {day.label}</div>
-                          <div className="mt-1 text-[11px] text-muted-foreground">{statusLabel}</div>
-                        </div>
-                        <GripVertical className="size-3.5 text-muted-foreground" />
-                      </div>
-                    </button>
-                  );
-                })}
+                      {preset.label}
+                    </Button>
+                  ))}
+                </div>
               </div>
             </div>
           </SectionCard>
         </div>
+
+        {isMobile ? (
+          <Sheet open={dayEditorOpen && !!selectedDay} onOpenChange={(open) => setDayEditorOpen(open)}>
+            {selectedDay ? (
+              <SheetContent side="bottom" className="availability-editor-sheet">
+                <SheetHeader className="sr-only">
+                  <SheetTitle>{selectedDay.label}</SheetTitle>
+                  <SheetDescription>{labels.editorDescription}</SheetDescription>
+                </SheetHeader>
+                <AvailabilityEditorPanel
+                  locale={locale}
+                  labels={labels}
+                  day={selectedDay}
+                  selectedIndex={selectedIndex}
+                  totalDays={days.length}
+                  isMobile
+                  onUpdate={(patch) => updateDay(selectedDay.id, patch)}
+                  onMove={(direction) => moveDay(selectedDay.id, direction)}
+                  onApplyPreset={(preset) => applyPreset(selectedDay.id, preset)}
+                  onDelete={() => {
+                    setDays((current) => current.filter((item) => item.id !== selectedDay.id));
+                    setDayEditorOpen(false);
+                  }}
+                />
+              </SheetContent>
+            ) : null}
+          </Sheet>
+        ) : (
+          <Dialog open={dayEditorOpen && !!selectedDay} onOpenChange={(open) => setDayEditorOpen(open)}>
+            {selectedDay ? (
+              <DialogContent className="availability-editor-dialog">
+                <DialogHeader className="sr-only">
+                  <DialogTitle>{selectedDay.label}</DialogTitle>
+                  <DialogDescription>{labels.editorDescription}</DialogDescription>
+                </DialogHeader>
+                <AvailabilityEditorPanel
+                  locale={locale}
+                  labels={labels}
+                  day={selectedDay}
+                  selectedIndex={selectedIndex}
+                  totalDays={days.length}
+                  isMobile={false}
+                  onUpdate={(patch) => updateDay(selectedDay.id, patch)}
+                  onMove={(direction) => moveDay(selectedDay.id, direction)}
+                  onApplyPreset={(preset) => applyPreset(selectedDay.id, preset)}
+                  onDelete={() => {
+                    setDays((current) => current.filter((item) => item.id !== selectedDay.id));
+                    setDayEditorOpen(false);
+                  }}
+                />
+              </DialogContent>
+            ) : null}
+          </Dialog>
+        )}
       </div>
     </WorkspaceShell>
   );

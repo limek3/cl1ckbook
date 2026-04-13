@@ -205,7 +205,7 @@ export default function NotificationsPage() {
           }
         />
 
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <div className="dashboard-kpi-grid grid grid-cols-2 gap-3">
           <MetricCard label={locale === 'ru' ? 'Всего сценариев' : 'Scenarios'} value={String(items.length)} icon={Bell} />
           <MetricCard label={locale === 'ru' ? 'Активные' : 'Enabled'} value={String(activeCount)} icon={Smartphone} />
           <MetricCard label={locale === 'ru' ? 'Критические' : 'Critical'} value={String(criticalCount)} icon={CircleAlert} />

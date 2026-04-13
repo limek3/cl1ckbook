@@ -51,7 +51,7 @@ export default function IntegrationsPage() {
           }
         />
 
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <div className="dashboard-kpi-grid grid grid-cols-2 gap-3">
           <MetricCard label={locale === 'ru' ? 'Подключено' : 'Connected'} value={String(dataset.integrations.filter((item) => item.status === 'connected').length)} icon={Sparkles} />
           <MetricCard label={locale === 'ru' ? 'Рекомендовано' : 'Recommended'} value={String(dataset.integrations.filter((item) => item.status === 'recommended').length)} icon={Link2} />
           <MetricCard label={locale === 'ru' ? 'Каналы связи' : 'Messaging channels'} value="2" icon={MessageCircle} />

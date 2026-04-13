@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { Copy, QrCode, Send, Share2 } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronDown, ChevronUp, Copy, QrCode, Send, Share2 } from 'lucide-react';
 import { WorkspaceShell } from '@/components/shared/workspace-shell';
 import { DashboardHeader, MetricCard, PublicPageHero, SectionCard } from '@/components/dashboard/workspace-ui';
 import { FakeQrCode } from '@/components/dashboard/qr-code';
@@ -12,6 +13,7 @@ import { useMobile } from '@/hooks/use-mobile';
 export default function MarketingPage() {
   const { hasHydrated, ownedProfile, dataset, locale } = useOwnedWorkspaceData();
   const isMobile = useMobile();
+  const [showQrCode, setShowQrCode] = useState(false);
 
   if (!hasHydrated) return null;
 
@@ -51,7 +53,34 @@ export default function MarketingPage() {
 
         <PublicPageHero profile={ownedProfile} alignTop sticky={!isMobile} />
 
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {isMobile ? (
+          <SectionCard
+            title={locale === 'ru' ? 'QR-код' : 'QR code'}
+            description={locale === 'ru' ? 'Откройте и скачайте код для визитки или сторис.' : 'Open and download the code for a business card or story.'}
+            actions={
+              <Button type="button" variant="outline" size="sm" onClick={() => setShowQrCode((current) => !current)}>
+                {showQrCode ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                {showQrCode ? (locale === 'ru' ? 'Скрыть' : 'Hide') : (locale === 'ru' ? 'Показать' : 'Show')}
+              </Button>
+            }
+          >
+            {showQrCode ? (
+              <div className="space-y-3">
+                <div className="flex justify-center">
+                  <FakeQrCode value={publicUrl} className="w-full max-w-[220px]" />
+                </div>
+                <div className="flex justify-center">
+                  <Button type="button" variant="outline" size="sm">
+                    <QrCode className="size-4" />
+                    {locale === 'ru' ? 'Скачать QR' : 'Download QR'}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </SectionCard>
+        ) : null}
+
+        <div className="dashboard-kpi-grid dashboard-mobile-stats-grid marketing-mobile-kpi-grid grid grid-cols-2 gap-3">
           <MetricCard label={locale === 'ru' ? 'Переходы за 30 дней' : 'Link visits in 30 days'} value={String(dataset.totals.visitors)} />
           <MetricCard label={locale === 'ru' ? 'Записи с ссылки' : 'Bookings from link'} value={String(dataset.totals.confirmed)} />
           <MetricCard label={locale === 'ru' ? 'Конверсия' : 'Conversion'} value={`${dataset.totals.conversion}%`} />
@@ -109,24 +138,26 @@ export default function MarketingPage() {
           </SectionCard>
 
           <div className="space-y-5">
-            <SectionCard
-              title={locale === 'ru' ? 'QR-код' : 'QR code'}
-              description={
-                locale === 'ru'
-                  ? 'Для визитки, стойки и соцсетей.'
-                  : 'Use it on a card, desk, or social story.'
-              }
-            >
-              <div className="flex justify-center">
-                <FakeQrCode value={publicUrl} className="w-full max-w-[260px]" />
-              </div>
-              <div className="mt-4 flex justify-center">
-                <Button type="button" variant="outline" size="sm">
-                  <QrCode className="size-4" />
-                  {locale === 'ru' ? 'Скачать QR' : 'Download QR'}
-                </Button>
-              </div>
-            </SectionCard>
+            {!isMobile ? (
+              <SectionCard
+                title={locale === 'ru' ? 'QR-код' : 'QR code'}
+                description={
+                  locale === 'ru'
+                    ? 'Для визитки, стойки и соцсетей.'
+                    : 'Use it on a card, desk, or social story.'
+                }
+              >
+                <div className="flex justify-center">
+                  <FakeQrCode value={publicUrl} className="w-full max-w-[260px]" />
+                </div>
+                <div className="mt-4 flex justify-center">
+                  <Button type="button" variant="outline" size="sm">
+                    <QrCode className="size-4" />
+                    {locale === 'ru' ? 'Скачать QR' : 'Download QR'}
+                  </Button>
+                </div>
+              </SectionCard>
+            ) : null}
 
             <SectionCard
               title={locale === 'ru' ? 'Источники переходов' : 'Traffic sources'}

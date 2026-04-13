@@ -250,7 +250,7 @@ export default function SubscriptionPage() {
           </section>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="dashboard-kpi-grid grid grid-cols-2 gap-3">
           <MetricCard label={labels.currentPlanLabel} value={currentPlan.name} icon={CreditCard} />
           <MetricCard label={labels.nextCharge} value="2026-05-01" icon={ShieldCheck} />
           <MetricCard label={labels.subscriptionStatus} value={labels.active} icon={Sparkles} />

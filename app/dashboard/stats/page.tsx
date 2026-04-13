@@ -13,15 +13,14 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Globe2, LayoutDashboard, Sparkles, SquarePen } from 'lucide-react';
+import { Globe2, LayoutDashboard, SquarePen } from 'lucide-react';
 import { WorkspaceShell } from '@/components/shared/workspace-shell';
-import { DashboardHeader, MetricCard, PublicPageHero, SectionCard } from '@/components/dashboard/workspace-ui';
+import { DashboardHeader, MetricCard, SectionCard } from '@/components/dashboard/workspace-ui';
 import { BookingsList } from '@/components/booking/bookings-list';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { useOwnedWorkspaceData } from '@/hooks/use-owned-workspace-data';
-import { getDashboardDemoAnalyticsFeed, getDashboardDemoAnalyticsHighlights } from '@/lib/demo-data';
 import { formatCurrency } from '@/lib/master-workspace';
 import { useMobile } from '@/hooks/use-mobile';
 
@@ -43,14 +42,6 @@ export default function DashboardPage() {
     }));
   }, [dataset]);
 
-  const demoHighlights = useMemo(
-    () => (demoMode ? getDashboardDemoAnalyticsHighlights(locale) : []),
-    [demoMode, locale],
-  );
-  const demoFeed = useMemo(
-    () => (demoMode ? getDashboardDemoAnalyticsFeed(locale) : []),
-    [demoMode, locale],
-  );
   const activityChartData = useMemo(
     () => chartData.slice(-activityDays),
     [activityDays, chartData],
@@ -116,6 +107,105 @@ export default function DashboardPage() {
     conversion: { label: locale === 'ru' ? 'Конверсия' : 'Conversion', color: 'var(--chart-4)' },
   };
 
+  if (isMobile) {
+    return (
+      <WorkspaceShell>
+        <div className="workspace-page workspace-page-stats dashboard-mobile-stats space-y-3">
+          <DashboardHeader
+            badge={locale === 'ru' ? 'Аналитика' : 'Analytics'}
+            title={locale === 'ru' ? 'Статистика' : 'Stats'}
+            description={locale === 'ru' ? 'Главные цифры.' : 'Core numbers.'}
+            actions={
+              <Button asChild size="sm" variant="outline">
+                <Link href={`/dashboard/finance`}>
+                  {locale === 'ru' ? 'Финансы' : 'Finance'}
+                </Link>
+              </Button>
+            }
+          />
+
+          <div className="dashboard-kpi-grid grid grid-cols-2 gap-2">
+            {kpis.slice(0, 4).map((item, index) => (
+              <MetricCard
+                key={item.label}
+                label={item.label}
+                value={item.value}
+                icon={[LayoutDashboard, Globe2, SquarePen, LayoutDashboard][index]}
+              />
+            ))}
+          </div>
+
+          <SectionCard
+            title={locale === 'ru' ? 'Динамика' : 'Activity'}
+            actions={
+              <div className="flex gap-1.5">
+                {[7, 30].map((days) => (
+                  <Button
+                    key={days}
+                    type="button"
+                    variant={activityDays === days ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setActivityDays(days as 7 | 30)}
+                  >
+                    {locale === 'ru' ? `${days} дн.` : `${days}d`}
+                  </Button>
+                ))}
+              </div>
+            }
+          >
+            <div className="rounded-[16px] border border-border bg-accent/20 p-2.5">
+              <ChartContainer config={metricConfig} className="h-[180px] w-full">
+                <AreaChart data={activityChartData}>
+                  <defs>
+                    <linearGradient id="metricAreaMobile" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="5%" stopColor="var(--color-revenue)" stopOpacity={0.24} />
+                      <stop offset="95%" stopColor="var(--color-revenue)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                  <XAxis dataKey="label" tickLine={false} axisLine={false} minTickGap={16} />
+                  <YAxis tickLine={false} axisLine={false} width={32} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Area type="monotone" dataKey="revenue" stroke="var(--color-revenue)" fill="url(#metricAreaMobile)" strokeWidth={2.1} />
+                </AreaChart>
+              </ChartContainer>
+            </div>
+
+            <div className="mt-2 space-y-2">
+              {activitySlice.slice(-3).reverse().map((item) => (
+                <div key={item.date} className="dashboard-mobile-list-row">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[11px] font-medium text-foreground">{item.label}</div>
+                    <div className="mt-0.5 text-[10px] text-muted-foreground">
+                      {item.requests} {locale === 'ru' ? 'запроса' : 'req'} · {item.confirmed} {locale === 'ru' ? 'подтв.' : 'conf.'}
+                    </div>
+                  </div>
+                  <div className="text-[11px] font-medium text-foreground">{formatCurrency(item.revenue, locale)}</div>
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+
+          <SectionCard title={locale === 'ru' ? 'Источники' : 'Sources'}>
+            <div className="space-y-2">
+              {topChannels.slice(0, 3).map((channel) => (
+                <div key={channel.id} className="dashboard-mobile-list-row">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[12px] font-medium text-foreground">{channel.label}</div>
+                    <div className="mt-0.5 text-[10px] text-muted-foreground">
+                      {channel.bookings} {locale === 'ru' ? 'записей' : 'bookings'}
+                    </div>
+                  </div>
+                  <div className="text-[11px] font-medium text-foreground">{channel.share}%</div>
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+        </div>
+      </WorkspaceShell>
+    );
+  }
+
   return (
     <WorkspaceShell>
       <div className="workspace-page workspace-page-stats space-y-5">
@@ -145,7 +235,7 @@ export default function DashboardPage() {
           }
         />
 
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="dashboard-kpi-grid grid grid-cols-2 gap-3">
           {kpis.map((item, index) => (
             <MetricCard
               key={item.label}
@@ -168,46 +258,6 @@ export default function DashboardPage() {
           pageSize={isMobile ? 4 : 5}
         />
 
-        {demoMode ? (
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-            <section className="workspace-card rounded-[22px] p-4 md:p-5">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className="bg-card/78">
-                  <Sparkles className="size-3.5" />
-                  {locale === 'ru' ? 'Что видно в аналитике' : 'Analytics highlights'}
-                </Badge>
-                <div className="text-[12px] text-muted-foreground">
-                  {locale === 'ru'
-                    ? 'Загрузка, каналы и сильные часы.'
-                    : 'Quick highlights show workload, growth channels, and the strongest booking windows.'}
-                </div>
-              </div>
-
-              <div className="mt-4 grid gap-3 md:grid-cols-3">
-                {demoHighlights.map((item) => (
-                  <div key={item.id} className="rounded-[18px] border border-border bg-accent/28 p-4">
-                    <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{item.label}</div>
-                    <div className="mt-2 text-[20px] font-semibold tracking-[-0.03em] text-foreground">{item.value}</div>
-                    <div className="mt-2 text-[12px] leading-5 text-muted-foreground">{item.detail}</div>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="workspace-card rounded-[22px] p-4">
-              <div className="text-[14px] font-semibold text-foreground">
-                {locale === 'ru' ? 'Ключевые сигналы' : 'Key signals'}
-              </div>
-              <div className="mt-3 space-y-2">
-                {demoFeed.map((item, index) => (
-                  <div key={`${item}-${index}`} className="rounded-[16px] border border-border bg-accent/24 px-3.5 py-3 text-[12px] leading-5 text-foreground">
-                    {item}
-                  </div>
-                ))}
-              </div>
-            </section>
-          </div>
-        ) : null}
 
         <SectionCard
           title={locale === 'ru' ? 'Активность по дням' : 'Activity by day'}

@@ -11,8 +11,6 @@ import {
   Clock3,
   MessageCircleMore,
   PhoneCall,
-  Sparkles,
-  SunMedium,
   Users2,
 } from 'lucide-react';
 import { WorkspaceShell } from '@/components/shared/workspace-shell';
@@ -380,18 +378,22 @@ export default function DashboardTodayPage() {
           }
         />
 
-        <SectionCard
-          title={labels.heroTitle}
-          description={labels.heroDescription}
-          actions={<span className="workspace-pill">{labels.heroBadge}</span>}
-        >
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <section className="today-kpi-strip">
+          <div className="today-kpi-strip-head">
+            <div className="today-kpi-strip-copy">
+              <div className="today-kpi-strip-title">{labels.heroTitle}</div>
+              <div className="today-kpi-strip-text">{labels.heroDescription}</div>
+            </div>
+            <span className="workspace-pill">{labels.heroBadge}</span>
+          </div>
+
+          <div className="today-kpi-grid dashboard-mobile-stats-grid today-mobile-kpi-grid">
             <MetricCard label={labels.metrics.total} value={String(metrics.total)} icon={CalendarClock} />
             <MetricCard label={labels.metrics.next} value={String(metrics.next)} icon={Clock3} />
             <MetricCard label={labels.metrics.newRequests} value={String(metrics.newRequests)} icon={Users2} />
             <MetricCard label={labels.metrics.done} value={String(metrics.done)} icon={CheckCircle2} />
           </div>
-        </SectionCard>
+        </section>
 
         {todayItems.length === 0 ? (
           <Empty className="rounded-[34px]">
@@ -410,56 +412,10 @@ export default function DashboardTodayPage() {
           </Empty>
         ) : isMobile ? (
           <SectionCard
-            title={labels.timelineTitle}
-            description={labels.liveDayText}
-            actions={<span className="workspace-pill">{labels.timelineHint}</span>}
+            title={locale === 'ru' ? 'День' : 'Day'}
+            actions={<span className="workspace-pill">{todayItems.length}</span>}
           >
-            <div className="grid gap-3">
-              <div className="grid gap-2 sm:grid-cols-3">
-                <div className="rounded-[14px] border border-border/80 bg-accent/24 px-3 py-2.5">
-                  <div className="text-[9px] uppercase tracking-[0.12em] text-muted-foreground">{labels.nextUp}</div>
-                  <div className="mt-1 text-[12px] font-semibold text-foreground">
-                    {dayInsight.nextUp ? `${dayInsight.nextUp.time} · ${dayInsight.nextUp.clientName}` : '—'}
-                  </div>
-                </div>
-                <div className="rounded-[14px] border border-border/80 bg-accent/24 px-3 py-2.5">
-                  <div className="text-[9px] uppercase tracking-[0.12em] text-muted-foreground">{labels.freeWindow}</div>
-                  <div className="mt-1 text-[12px] font-semibold text-foreground">{dayInsight.freeWindowLabel}</div>
-                </div>
-                <div className="rounded-[14px] border border-border/80 bg-accent/24 px-3 py-2.5">
-                  <div className="text-[9px] uppercase tracking-[0.12em] text-muted-foreground">{labels.completion}</div>
-                  <div className="mt-1 text-[12px] font-semibold text-foreground">{dayInsight.completionLabel}</div>
-                </div>
-              </div>
-
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {(['all', 'morning', 'day', 'evening'] as TimelineFilter[]).map((filterKey) => {
-                  const isActive = selectedFilter === filterKey;
-                  const count = filterKey === 'all'
-                    ? todayItems.length
-                    : todayItems.filter((item) => item.period === filterKey).length;
-
-                  return (
-                    <button
-                      key={filterKey}
-                      type="button"
-                      onClick={() => setSelectedFilter(filterKey)}
-                      className={cn(
-                        'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10.5px] font-medium transition',
-                        isActive
-                          ? 'border-border bg-accent/55 text-foreground'
-                          : 'border-border bg-background/55 text-muted-foreground',
-                      )}
-                    >
-                      <span>{labels.filters[filterKey]}</span>
-                      <span className={cn('rounded-full px-1.5 py-0.5 text-[9px]', isActive ? 'bg-card text-foreground' : 'bg-accent text-foreground/80')}>
-                        {count}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
+            <div className="grid gap-2.5">
               {activeItem ? (
                 <div className="rounded-[16px] border border-border/80 bg-card/78 px-3 py-3">
                   <div className="flex items-start justify-between gap-3">
@@ -473,12 +429,6 @@ export default function DashboardTodayPage() {
                     </div>
                     <div className="text-right text-[10px] text-muted-foreground">{activeItem.durationLabel}</div>
                   </div>
-
-                  {activeItem.note ? (
-                    <div className="mt-2 rounded-[12px] border border-border/70 bg-background/68 px-3 py-2 text-[10.5px] text-muted-foreground">
-                      {activeItem.note}
-                    </div>
-                  ) : null}
 
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     <Button asChild variant="outline" size="sm" className="h-8 rounded-[12px]">
@@ -496,6 +446,34 @@ export default function DashboardTodayPage() {
                   </div>
                 </div>
               ) : null}
+
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {(['all', 'morning', 'day', 'evening'] as TimelineFilter[]).map((filterKey) => {
+                  const filterActive = selectedFilter === filterKey;
+                  const count = filterKey === 'all'
+                    ? todayItems.length
+                    : todayItems.filter((item) => item.period === filterKey).length;
+
+                  return (
+                    <button
+                      key={filterKey}
+                      type="button"
+                      onClick={() => setSelectedFilter(filterKey)}
+                      className={cn(
+                        'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10.5px] font-medium transition',
+                        filterActive
+                          ? 'border-border bg-accent/55 text-foreground'
+                          : 'border-border bg-background/55 text-muted-foreground',
+                      )}
+                    >
+                      <span>{labels.filters[filterKey]}</span>
+                      <span className={cn('rounded-full px-1.5 py-0.5 text-[9px]', filterActive ? 'bg-card text-foreground' : 'bg-accent text-foreground/80')}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
 
               <div className="space-y-2">
                 {filteredItems.map((item) => (
@@ -770,29 +748,6 @@ export default function DashboardTodayPage() {
           </SectionCard>
         )}
 
-        <SectionCard title={labels.quickActionsTitle} description={labels.quickActionsText}>
-          <div className="grid gap-3 md:grid-cols-3">
-            {[
-              { href: '/dashboard/chats', label: locale === 'ru' ? 'Чаты' : 'Chats', icon: MessageCircleMore },
-              { href: '/dashboard/services', label: locale === 'ru' ? 'Услуги' : 'Services', icon: Sparkles },
-              { href: '/dashboard/availability', label: locale === 'ru' ? 'График' : 'Availability', icon: SunMedium },
-            ].map((item) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="workspace-card workspace-card-hover flex items-center gap-3 rounded-[20px] p-4"
-                >
-                  <div className="flex size-11 items-center justify-center rounded-[14px] border border-border bg-accent/55 text-muted-foreground">
-                    <Icon className="size-4.5" />
-                  </div>
-                  <div className="text-[14px] font-medium text-foreground">{item.label}</div>
-                </Link>
-              );
-            })}
-          </div>
-        </SectionCard>
       </div>
     </WorkspaceShell>
   );

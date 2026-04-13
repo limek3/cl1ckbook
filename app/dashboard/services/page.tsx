@@ -10,7 +10,6 @@ import {
   EyeOff,
   GripVertical,
   Package2,
-  PencilLine,
   Plus,
   Trash2,
 } from 'lucide-react';
@@ -22,17 +21,23 @@ import { type ServiceInsight, formatCurrency } from '@/lib/master-workspace';
 import { getServiceSuggestions, getSuggestedCategory, getServiceCategoryOptions } from '@/lib/service-presets';
 import { cn } from '@/lib/utils';
 import { useMobile } from '@/hooks/use-mobile';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 
 function arrayMove<T>(items: T[], from: number, to: number) {
   if (from === to || from < 0 || to < 0 || from >= items.length || to >= items.length) {
@@ -67,6 +72,182 @@ function createService(
   };
 }
 
+type ServiceEditorLabels = {
+  editorTitle: string;
+  editorDescription: string;
+  visible: string;
+  hidden: string;
+  price: string;
+  duration: string;
+  status: string;
+  active: string;
+  seasonal: string;
+  draft: string;
+  visibleOnPage: string;
+  duplicate: string;
+  delete: string;
+  moveUp: string;
+  moveDown: string;
+  name: string;
+  categoryCustom: string;
+};
+
+function ServiceEditorPanel({
+  locale,
+  labels,
+  service,
+  selectedIndex,
+  totalServices,
+  isMobile,
+  onUpdate,
+  onMove,
+  onDuplicate,
+  onDelete,
+}: {
+  locale: 'ru' | 'en';
+  labels: ServiceEditorLabels;
+  service: ServiceInsight;
+  selectedIndex: number;
+  totalServices: number;
+  isMobile: boolean;
+  onUpdate: (patch: Partial<ServiceInsight>) => void;
+  onMove: (direction: -1 | 1) => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+}) {
+  const previewName = service.name || (locale === 'ru' ? 'Название услуги' : 'Service name');
+  const previewCategory = service.category || labels.categoryCustom;
+
+  return (
+    <div className={cn('workspace-editor-shell workspace-editor-shell-service', isMobile && 'workspace-editor-shell-mobile')}>
+      {isMobile ? <div className="workspace-editor-sheet-handle" aria-hidden="true" /> : null}
+
+      <div className="workspace-editor-head workspace-editor-head-service">
+        <div className="workspace-editor-kicker">{labels.editorTitle}</div>
+        <div className={cn('workspace-editor-head-row', isMobile && 'gap-3')}>
+          <div className="min-w-0 flex-1">
+            <div className="workspace-editor-headline">{previewName}</div>
+            <div className="workspace-editor-subtitle">{labels.editorDescription}</div>
+          </div>
+
+          <div className="workspace-editor-visibility">
+            <div className="workspace-editor-visibility-label">{labels.visibleOnPage}</div>
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <span className="workspace-editor-visibility-value">
+                {service.visible ? labels.visible : labels.hidden}
+              </span>
+              <Switch checked={service.visible} onCheckedChange={(checked) => onUpdate({ visible: checked })} />
+            </div>
+          </div>
+        </div>
+
+        <div className="workspace-editor-preview workspace-editor-preview-service">
+          <div className="min-w-0">
+            <div className="workspace-editor-preview-title">{previewName}</div>
+            <div className="workspace-editor-preview-meta">
+              <span className="chip-muted text-[10px]">{formatCurrency(service.price, locale)}</span>
+              <span className="chip-muted text-[10px]">
+                {service.duration} {locale === 'ru' ? 'мин' : 'min'}
+              </span>
+              <span className="chip-muted text-[10px]">{previewCategory}</span>
+            </div>
+          </div>
+          <div className="workspace-editor-preview-side">{formatCurrency(service.price, locale)}</div>
+        </div>
+      </div>
+
+      <div className="workspace-editor-scroll">
+        <div className={cn('workspace-editor-grid service-editor-grid', !isMobile && 'md:grid-cols-2')}>
+          <div className="editor-field-card service-editor-field service-editor-field-name">
+            <div className="editor-field-label">{labels.name}</div>
+            <Input
+              list="service-name-options"
+              value={service.name}
+              onChange={(event) => onUpdate({ name: event.target.value })}
+              placeholder={labels.name}
+              className="mt-2 h-10 bg-background/90"
+            />
+          </div>
+
+          <div className="editor-field-card service-editor-field service-editor-field-category">
+            <div className="editor-field-label">{labels.categoryCustom}</div>
+            <Input
+              list="service-category-options"
+              value={service.category}
+              onChange={(event) => onUpdate({ category: event.target.value })}
+              placeholder={labels.categoryCustom}
+              className="mt-2 h-10 bg-background/90"
+            />
+          </div>
+
+          <div className="editor-field-card service-editor-field service-editor-field-price">
+            <div className="editor-field-label">{labels.price}</div>
+            <Input
+              type="number"
+              value={String(service.price)}
+              onChange={(event) => onUpdate({ price: Number(event.target.value) || 0 })}
+              placeholder={labels.price}
+              className="mt-2 h-10 bg-background/90"
+            />
+          </div>
+
+          <div className="editor-field-card service-editor-field service-editor-field-duration">
+            <div className="editor-field-label">{labels.duration}</div>
+            <Input
+              type="number"
+              value={String(service.duration)}
+              onChange={(event) => onUpdate({ duration: Number(event.target.value) || 0 })}
+              placeholder={labels.duration}
+              className="mt-2 h-10 bg-background/90"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="workspace-editor-footer workspace-editor-footer-service">
+        <div className="workspace-editor-footer-group">
+          <Button
+            type="button"
+            size="icon-sm"
+            variant="outline"
+            onClick={() => onMove(-1)}
+            disabled={selectedIndex <= 0}
+            aria-label={labels.moveUp}
+          >
+            <ArrowUp className="size-4" />
+          </Button>
+          <Button
+            type="button"
+            size="icon-sm"
+            variant="outline"
+            onClick={() => onMove(1)}
+            disabled={selectedIndex === totalServices - 1}
+            aria-label={labels.moveDown}
+          >
+            <ArrowDown className="size-4" />
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={onDuplicate}>
+            <Copy className="size-4" />
+            {labels.duplicate}
+          </Button>
+        </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="workspace-editor-delete-button"
+          onClick={onDelete}
+          disabled={totalServices === 1}
+        >
+          <Trash2 className="size-4" />
+          {labels.delete}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function ServicesPage() {
   const { hasHydrated, ownedProfile, dataset, locale } = useOwnedWorkspaceData();
   const isMobile = useMobile();
@@ -74,6 +255,7 @@ export default function ServicesPage() {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [customServiceName, setCustomServiceName] = useState('');
+  const [serviceEditorOpen, setServiceEditorOpen] = useState(false);
 
   useEffect(() => {
     if (!services.length) {
@@ -154,7 +336,7 @@ export default function ServicesPage() {
       }
     : {
         title: 'Services',
-        description: 'Services are now editable: order, price, duration, visibility, and status.',
+        description: 'Services are now editable: order, price, duration, and visibility.',
         editorTitle: 'Service editor',
         editorDescription: 'Drag cards, change fields, hide from the public page, and tune the display order.',
         previewTitle: 'How clients see it',
@@ -221,6 +403,7 @@ export default function ServicesPage() {
     const nextService = createService(locale, services.length, name, ownedProfile.profession);
     setServices((current) => [...current, nextService]);
     setSelectedServiceId(nextService.id);
+    setServiceEditorOpen(true);
   };
 
   const addCustomService = () => {
@@ -229,6 +412,7 @@ export default function ServicesPage() {
     const nextService = createService(locale, services.length, nextName, ownedProfile.profession);
     setServices((current) => [...current, nextService]);
     setSelectedServiceId(nextService.id);
+    setServiceEditorOpen(true);
     setCustomServiceName('');
   };
 
@@ -247,6 +431,7 @@ export default function ServicesPage() {
               const nextService = createService(locale, services.length, undefined, ownedProfile.profession);
               setServices((current) => [...current, nextService]);
               setSelectedServiceId(nextService.id);
+              setServiceEditorOpen(true);
             }}>
               <Plus className="size-4" />
               {labels.add}
@@ -254,7 +439,7 @@ export default function ServicesPage() {
           }
         />
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="dashboard-kpi-grid dashboard-mobile-stats-grid services-mobile-stats-grid services-mobile-kpi-grid grid grid-cols-2 gap-3">
           <MetricCard label={locale === 'ru' ? 'Всего услуг' : 'Total services'} value={String(services.length)} icon={Package2} />
           <MetricCard label={locale === 'ru' ? 'Видимые на странице' : 'Visible on page'} value={String(visibleCount)} icon={Eye} />
           <MetricCard label={locale === 'ru' ? 'Доход с услуг' : 'Service revenue'} value={formatCurrency(totalRevenue, locale)} />
@@ -262,140 +447,43 @@ export default function ServicesPage() {
         </div>
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_286px]">
-          <div className={cn("space-y-5", isMobile ? "order-2" : "xl:order-1")}>
-            {selectedService ? (
-              <SectionCard
-                title={selectedService.name}
-                description={locale === 'ru' ? 'Настройки услуги.' : 'Detailed settings for the selected service.'}
-                className="p-4"
-                actions={
-                  <div className="flex flex-wrap gap-2">
-                    <Button type="button" size="icon-sm" variant="outline" onClick={() => moveService(selectedService.id, -1)} disabled={selectedIndex <= 0}>
-                      <ArrowUp className="size-4" />
-                    </Button>
-                    <Button type="button" size="icon-sm" variant="outline" onClick={() => moveService(selectedService.id, 1)} disabled={selectedIndex === services.length - 1}>
-                      <ArrowDown className="size-4" />
-                    </Button>
-                    <Button type="button" size="icon-sm" variant="outline" onClick={() => duplicateService(selectedService)}>
-                      <Copy className="size-4" />
-                    </Button>
-                    <Button type="button" size="icon-sm" variant="outline" onClick={() => removeService(selectedService.id)} disabled={services.length === 1}>
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
-                }
-              >
-                <div className="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,0.78fr))]">
-                  <Input
-                    list="service-name-options"
-                    value={selectedService.name}
-                    onChange={(event) => updateService(selectedService.id, { name: event.target.value })}
-                    placeholder={labels.name}
-                    className="h-10"
-                  />
-                  <Input
-                    type="number"
-                    value={String(selectedService.price)}
-                    onChange={(event) => updateService(selectedService.id, { price: Number(event.target.value) || 0 })}
-                    placeholder={labels.price}
-                    className="h-10"
-                  />
-                  <Input
-                    type="number"
-                    value={String(selectedService.duration)}
-                    onChange={(event) => updateService(selectedService.id, { duration: Number(event.target.value) || 0 })}
-                    placeholder={labels.duration}
-                    className="h-10"
-                  />
-                  <Input
-                    list="service-category-options"
-                    value={selectedService.category}
-                    onChange={(event) => updateService(selectedService.id, { category: event.target.value })}
-                    placeholder={labels.categoryCustom}
-                    className="h-10"
-                  />
-                  <Select value={selectedService.status} onValueChange={(value) => updateService(selectedService.id, { status: value as ServiceInsight['status'] })}>
-                    <SelectTrigger className="h-10">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">{labels.active}</SelectItem>
-                      <SelectItem value="seasonal">{labels.seasonal}</SelectItem>
-                      <SelectItem value="draft">{labels.draft}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="mt-3 grid gap-2.5 md:grid-cols-4">
-                  <div className="rounded-[16px] border border-border/80 bg-accent/24 px-3 py-2.5">
-                    <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{labels.revenue}</div>
-                    <div className="mt-1 text-[14px] font-medium text-foreground">{formatCurrency(selectedService.revenue, locale)}</div>
-                  </div>
-                  <div className="rounded-[16px] border border-border/80 bg-accent/24 px-3 py-2.5">
-                    <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{labels.popularity}</div>
-                    <Input
-                      type="number"
-                      value={String(selectedService.popularity)}
-                      onChange={(event) => updateService(selectedService.id, { popularity: Number(event.target.value) || 0 })}
-                      className="mt-2 h-9 bg-background/85"
-                    />
-                  </div>
-                  <div className="rounded-[16px] border border-border/80 bg-accent/24 px-3 py-2.5">
-                    <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{labels.bookings}</div>
-                    <Input
-                      type="number"
-                      value={String(selectedService.bookings)}
-                      onChange={(event) => updateService(selectedService.id, { bookings: Number(event.target.value) || 0 })}
-                      className="mt-2 h-9 bg-background/85"
-                    />
-                  </div>
-                  <div className="rounded-[16px] border border-border/80 bg-accent/24 px-3 py-2.5">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{labels.visibleOnPage}</div>
-                      <Switch
-                        checked={selectedService.visible}
-                        onCheckedChange={(checked) => updateService(selectedService.id, { visible: checked })}
-                      />
-                    </div>
-                    <div className="mt-2 text-[13px] font-medium text-foreground">
-                      {selectedService.visible ? (
-                        <span className="inline-flex items-center gap-2">
-                          <Eye className="size-4 text-primary" />
-                          {labels.visible}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-2 text-muted-foreground">
-                          <EyeOff className="size-4" />
-                          {labels.hidden}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </SectionCard>
-            ) : null}
-
+          <div className="space-y-5">
             <SectionCard title={labels.previewTitle} description={labels.previewDescription} className="p-4">
               <div className="rounded-[18px] border border-border bg-background p-3.5">
                 <div className="text-[15px] font-semibold text-foreground">{ownedProfile.name}</div>
                 <div className="mt-1 text-[12px] text-muted-foreground">{ownedProfile.profession}</div>
-                <div className="mt-3 grid gap-2">
-                  {previewServices.length > 0 ? previewServices.map((service) => (
-                    <div key={service.id} className="rounded-[15px] border border-border bg-card px-3.5 py-2.5">
+                <div className={cn("mt-3 grid gap-2", isMobile ? "grid-cols-1" : "grid-cols-1")}>
+                  {services.length > 0 ? services.map((service) => (
+                    <button
+                      key={service.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedServiceId(service.id);
+                        setServiceEditorOpen(true);
+                      }}
+                      className="selection-tone-card w-full rounded-[15px] px-3.5 py-3 text-left"
+                      data-active={selectedService?.id === service.id ? 'true' : 'false'}
+                    >
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
                           <div className="truncate text-[13px] font-medium text-foreground">{service.name}</div>
-                          <div className="mt-1 text-[11px] text-muted-foreground">{service.duration} {locale === 'ru' ? 'минут' : 'minutes'}</div>
+                          <div className="mt-1 flex flex-wrap gap-1.5">
+                            <span className="chip-muted text-[10px]">{formatCurrency(service.price, locale)}</span>
+                            <span className="chip-muted text-[10px]">{service.duration} {locale === 'ru' ? 'мин' : 'min'}</span>
+                            <span className="chip-muted text-[10px]">{service.category}</span>
+                          </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-[13px] font-medium text-foreground">{formatCurrency(service.price, locale)}</div>
-                          <div className="mt-1 text-[11px] text-muted-foreground">{service.category}</div>
+                          <div className="text-[13px] font-semibold text-foreground">{formatCurrency(service.price, locale)}</div>
+                          <div className="mt-1 text-[10.5px] text-muted-foreground">
+                            {service.visible ? labels.visible : labels.hidden}
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    </button>
                   )) : (
                     <div className="rounded-[15px] border border-dashed border-border bg-card/70 px-4 py-8 text-center text-[13px] text-muted-foreground">
-                      {locale === 'ru' ? 'Нет услуг, видимых на публичной странице.' : 'No services are visible on the public page.'}
+                      {locale === 'ru' ? 'Добавьте первую услугу.' : 'Add the first service.'}
                     </div>
                   )}
                 </div>
@@ -406,9 +494,9 @@ export default function ServicesPage() {
           <SectionCard
             title={labels.editorTitle}
             description={`${labels.editorDescription} ${labels.dragHint}`}
-            className={cn("p-4", isMobile ? "order-1" : "xl:sticky xl:top-4 xl:self-start xl:order-2")}
+            className={cn("p-4", !isMobile && "xl:sticky xl:top-4 xl:self-start")}
           >
-            <div className="max-h-[calc(100vh-9rem)] space-y-3 overflow-y-auto pr-1">
+            <div className={cn("space-y-3 pr-1", !isMobile && "max-h-[calc(100vh-9rem)] overflow-y-auto")}>
               <div className="rounded-[16px] border border-border/80 bg-accent/18 p-3.5">
                 <div className="text-[14px] font-semibold text-foreground">{labels.quickAddTitle}</div>
                 <div className="mt-1 text-[12px] leading-5 text-muted-foreground">{labels.quickAddDescription}</div>
@@ -472,7 +560,10 @@ export default function ServicesPage() {
                       key={service.id}
                       type="button"
                       draggable
-                      onClick={() => setSelectedServiceId(service.id)}
+                      onClick={() => {
+                        setSelectedServiceId(service.id);
+                        setServiceEditorOpen(true);
+                      }}
                       onDragStart={() => setDraggedId(service.id)}
                       onDragOver={(event) => event.preventDefault()}
                       onDrop={() => {
@@ -486,10 +577,10 @@ export default function ServicesPage() {
                       }}
                       onDragEnd={() => setDraggedId(null)}
                       className={cn(
-                        'w-full rounded-[16px] border px-3.5 py-2.5 text-left transition',
-                        active ? 'border-primary/24 bg-primary/8 shadow-[var(--shadow-soft)]' : 'border-border/80 bg-card/74 hover:bg-accent/18',
+                        'selection-tone-card service-list-card w-full rounded-[16px] px-3.5 py-2.5 text-left',
                         draggedId === service.id && 'border-primary/30 bg-primary/5',
                       )}
+                      data-active={active ? 'true' : 'false'}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -514,6 +605,60 @@ export default function ServicesPage() {
             </div>
           </SectionCard>
         </div>
+
+        {isMobile ? (
+          <Sheet open={serviceEditorOpen && !!selectedService} onOpenChange={(open) => setServiceEditorOpen(open)}>
+            {selectedService ? (
+              <SheetContent side="bottom" className="service-editor-sheet">
+                <SheetHeader className="sr-only">
+                  <SheetTitle>{selectedService.name}</SheetTitle>
+                  <SheetDescription>{labels.editorDescription}</SheetDescription>
+                </SheetHeader>
+                <ServiceEditorPanel
+                  locale={locale}
+                  labels={labels}
+                  service={selectedService}
+                  selectedIndex={selectedIndex}
+                  totalServices={services.length}
+                  isMobile
+                  onUpdate={(patch) => updateService(selectedService.id, patch)}
+                  onMove={(direction) => moveService(selectedService.id, direction)}
+                  onDuplicate={() => duplicateService(selectedService)}
+                  onDelete={() => {
+                    removeService(selectedService.id);
+                    setServiceEditorOpen(false);
+                  }}
+                />
+              </SheetContent>
+            ) : null}
+          </Sheet>
+        ) : (
+          <Dialog open={serviceEditorOpen && !!selectedService} onOpenChange={(open) => setServiceEditorOpen(open)}>
+            {selectedService ? (
+              <DialogContent className="service-editor-dialog">
+                <DialogHeader className="sr-only">
+                  <DialogTitle>{selectedService.name}</DialogTitle>
+                  <DialogDescription>{labels.editorDescription}</DialogDescription>
+                </DialogHeader>
+                <ServiceEditorPanel
+                  locale={locale}
+                  labels={labels}
+                  service={selectedService}
+                  selectedIndex={selectedIndex}
+                  totalServices={services.length}
+                  isMobile={false}
+                  onUpdate={(patch) => updateService(selectedService.id, patch)}
+                  onMove={(direction) => moveService(selectedService.id, direction)}
+                  onDuplicate={() => duplicateService(selectedService)}
+                  onDelete={() => {
+                    removeService(selectedService.id);
+                    setServiceEditorOpen(false);
+                  }}
+                />
+              </DialogContent>
+            ) : null}
+          </Dialog>
+        )}
       </div>
     </WorkspaceShell>
   );

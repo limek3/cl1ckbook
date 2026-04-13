@@ -9,15 +9,15 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          'border border-transparent bg-primary text-primary-foreground shadow-[var(--shadow-soft)] hover:bg-primary-hover hover:shadow-[var(--shadow-card)]',
+          'border border-[color:var(--button-primary-border)] bg-[color:var(--button-primary-bg)] text-[color:var(--button-primary-text)] shadow-[var(--button-primary-shadow)] hover:bg-[color:var(--button-primary-hover)] hover:border-[color:var(--button-primary-border-hover)]',
         destructive:
-          'border border-transparent bg-destructive text-destructive-foreground shadow-[var(--shadow-soft)] hover:opacity-95',
+          'border border-[color:var(--button-danger-border)] bg-[color:var(--button-danger-bg)] text-[color:var(--button-danger-text)] shadow-[var(--button-primary-shadow)] hover:bg-[color:var(--button-danger-hover)] hover:border-[color:var(--button-danger-border-hover)]',
         outline:
-          'border border-border/90 bg-card text-foreground shadow-[var(--shadow-soft)] hover:border-primary/18 hover:bg-accent/72 hover:text-foreground',
+          'border border-[color:var(--button-outline-border)] bg-[color:var(--button-outline-bg)] text-[color:var(--button-outline-text)] shadow-[var(--button-outline-shadow)] hover:bg-[color:var(--button-outline-hover)] hover:border-[color:var(--button-outline-border-hover)]',
         secondary:
-          'border border-border/70 bg-secondary text-secondary-foreground shadow-none hover:bg-accent/80',
+          'border border-[color:var(--button-secondary-border)] bg-[color:var(--button-secondary-bg)] text-[color:var(--button-secondary-text)] shadow-[var(--button-outline-shadow)] hover:bg-[color:var(--button-secondary-hover)] hover:border-[color:var(--button-secondary-border-hover)]',
         ghost:
-          'border border-transparent text-muted-foreground shadow-none hover:bg-accent/72 hover:text-foreground',
+          'border border-transparent bg-transparent text-[color:var(--button-ghost-text)] shadow-none hover:bg-[color:var(--button-ghost-hover)] hover:text-[color:var(--button-outline-text)]',
         link:
           'h-auto rounded-none border-0 p-0 text-muted-foreground underline-offset-4 shadow-none hover:text-foreground hover:underline',
       },

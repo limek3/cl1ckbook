@@ -674,9 +674,10 @@ export default function DashboardChatsPage() {
   const handleApplyTransfer = () => {
     if (!activeThread || !transferDate) return;
     const nextVisit = `${transferDate} ${transferTime}`.trim();
+    const nextVisitIso = `${transferDate}T${transferTime || '12:30'}:00`;
 
     void applyLocalThreadPatch(activeThread.id, {
-      nextVisit: transferDate,
+      nextVisit: nextVisitIso,
       segment: 'active',
     });
 
@@ -707,6 +708,23 @@ export default function DashboardChatsPage() {
     ],
     [locale],
   );
+
+  useEffect(() => {
+    if (composerFlow !== 'reschedule' || transferDate) return;
+
+    const fallbackPreset = quickTransferPresets[0];
+    if (!fallbackPreset) return;
+
+    setTransferDate(fallbackPreset.date);
+    setTransferTime(fallbackPreset.time);
+  }, [composerFlow, quickTransferPresets, transferDate]);
+
+  useEffect(() => {
+    if (composerFlow !== 'reschedule' || !activeThread || !transferDate) return;
+
+    const nextVisit = `${transferDate}${transferTime ? ` ${transferTime}` : ''}`.trim();
+    setDraft(buildBotDraft('reschedule', activeThread, locale, nextVisit));
+  }, [activeThread, composerFlow, locale, transferDate, transferTime]);
 
   const assistantSlots = useMemo(() => {
     const nextDate = activeThread?.nextVisit ?? addDaysIso(1);
@@ -1114,67 +1132,104 @@ export default function DashboardChatsPage() {
           ))}
         </div>
 
-        <div className={cn('grid gap-2', mobile ? 'grid-cols-1' : 'md:grid-cols-[minmax(0,1fr)_168px_auto]')}>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                className={cn(
-                  'justify-between border-border bg-background/70 shadow-none',
-                  mobile ? 'h-10 rounded-[14px] px-3 text-[11px]' : 'h-11 rounded-[16px] px-4',
-                )}
-              >
-                <span className="inline-flex items-center gap-2">
-                  <CalendarDays className="size-4 text-muted-foreground" />
-                  {transferDate ? formatPickerDateLabel(transferDate, locale) : labels.date}
-                </span>
-                <span className="text-[10px] text-muted-foreground">{locale === 'ru' ? 'выбрать' : 'pick'}</span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto rounded-[18px] border-border/90 p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={transferDate ? new Date(`${transferDate}T00:00:00`) : undefined}
-                onSelect={(date) => {
-                  if (!date) return;
-                  const nextDate = toLocalIsoDate(date);
-                  setTransferDate(nextDate);
-                }}
-                initialFocus
+        {mobile ? (
+          <div className="grid gap-2">
+            <div className="rounded-[14px] border border-border bg-background/70 p-2.5">
+              <div className="mb-2 inline-flex items-center gap-2 text-[11px] text-foreground">
+                <CalendarDays className="size-4 shrink-0 text-muted-foreground" />
+                <span>{labels.date}</span>
+              </div>
+              <Input
+                type="date"
+                value={transferDate}
+                onChange={(event) => setTransferDate(event.target.value)}
+                className="h-10 rounded-[12px]"
               />
-            </PopoverContent>
-          </Popover>
+            </div>
 
-          <Select value={transferTime} onValueChange={setTransferTime}>
-            <SelectTrigger className={cn(
-              'w-full border-border bg-background/70 shadow-none',
-              mobile ? 'h-10 rounded-[14px] px-3 text-[11px]' : 'h-11 rounded-[16px] px-4 text-[12.5px]',
-            )}>
-              <span className="inline-flex items-center gap-2">
-                <Clock3 className="size-4" />
-                <SelectValue />
-              </span>
-            </SelectTrigger>
-            <SelectContent>
-              {TIME_OPTIONS.map((value) => (
-                <SelectItem key={value} value={value}>
-                  {value}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <div className="rounded-[14px] border border-border bg-background/70 p-2.5">
+              <div className="mb-2 inline-flex items-center gap-2 text-[11px] text-foreground">
+                <Clock3 className="size-4 shrink-0 text-muted-foreground" />
+                <span>{labels.time}</span>
+              </div>
+              <Input
+                type="time"
+                step="1800"
+                value={transferTime}
+                onChange={(event) => setTransferTime(event.target.value)}
+                className="h-10 rounded-[12px]"
+              />
+            </div>
 
-          <Button
-            type="button"
-            onClick={handleApplyTransfer}
-            disabled={!activeThread || !transferDate}
-            className={cn(mobile ? 'h-10 rounded-[14px] px-3 text-[11px]' : 'h-11 rounded-[16px] px-4')}
-          >
-            <CalendarClock className="size-4" />
-            {labels.applyTransfer}
-          </Button>
-        </div>
+            <Button
+              type="button"
+              onClick={handleApplyTransfer}
+              disabled={!activeThread || !transferDate}
+              className="h-10 rounded-[14px] px-3 text-[11px]"
+            >
+              <CalendarClock className="size-4" />
+              {labels.applyTransfer}
+            </Button>
+          </div>
+        ) : (
+          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_168px_auto]">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 justify-between rounded-[16px] border-border bg-background/70 px-4 shadow-none"
+                >
+                  <span className="inline-flex min-w-0 items-center gap-2">
+                    <CalendarDays className="size-4 shrink-0 text-muted-foreground" />
+                    <span className="truncate">{transferDate ? formatPickerDateLabel(transferDate, locale) : labels.date}</span>
+                  </span>
+                  <span className="shrink-0 text-[10px] text-muted-foreground">{locale === 'ru' ? 'выбрать' : 'pick'}</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto rounded-[18px] border-border/90 p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={transferDate ? new Date(`${transferDate}T00:00:00`) : undefined}
+                  onSelect={(date) => {
+                    if (!date) return;
+                    const nextDate = toLocalIsoDate(date);
+                    setTransferDate(nextDate);
+                  }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+
+            <Select value={transferTime} onValueChange={setTransferTime}>
+              <SelectTrigger className="h-11 w-full rounded-[16px] border-border bg-background/70 px-4 text-[12.5px] shadow-none">
+                <div className="flex w-full items-center justify-between gap-2">
+                  <span className="inline-flex min-w-0 items-center gap-2">
+                    <Clock3 className="size-4 shrink-0" />
+                    <span className="truncate">{transferTime || labels.time}</span>
+                  </span>
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                {TIME_OPTIONS.map((value) => (
+                  <SelectItem key={value} value={value}>
+                    {value}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Button
+              type="button"
+              onClick={handleApplyTransfer}
+              disabled={!activeThread || !transferDate}
+              className="h-11 rounded-[16px] px-4"
+            >
+              <CalendarClock className="size-4" />
+              {labels.applyTransfer}
+            </Button>
+          </div>
+        )}
       </div>
     );
   };
@@ -1185,9 +1240,12 @@ export default function DashboardChatsPage() {
         <div className={cn(mobile ? 'grid grid-cols-3 gap-1.5' : 'flex flex-wrap items-center gap-2')}>
           <Button
             type="button"
-            variant="outline"
+            variant={composerFlow === 'confirm' ? 'default' : 'outline'}
             size="sm"
-            className={cn(mobile && 'h-11 justify-center rounded-[14px] px-2.5 text-center text-[10px] leading-[1.05rem] whitespace-normal')}
+            className={cn(
+              mobile && 'h-11 justify-center rounded-[14px] px-2.5 text-center text-[10px] leading-[1.05rem] whitespace-normal',
+              composerFlow === 'confirm' && 'chat-flow-toggle-active',
+            )}
             disabled={!activeThread}
             onClick={() => handleApplyBotFlow('confirm')}
           >
@@ -1196,20 +1254,38 @@ export default function DashboardChatsPage() {
           </Button>
           <Button
             type="button"
-            variant="outline"
+            variant={composerFlow === 'reschedule' ? 'default' : 'outline'}
             size="sm"
-            className={cn(mobile && 'h-11 justify-center rounded-[14px] px-2.5 text-center text-[10px] leading-[1.05rem] whitespace-normal')}
+            className={cn(
+              mobile && 'h-11 justify-center rounded-[14px] px-2.5 text-center text-[10px] leading-[1.05rem] whitespace-normal',
+              composerFlow === 'reschedule' && 'chat-flow-toggle-active',
+            )}
             disabled={!activeThread}
-            onClick={() => setComposerFlow((current) => current === 'reschedule' ? null : 'reschedule')}
+            onClick={() => {
+              if (composerFlow === 'reschedule') {
+                setComposerFlow(null);
+                return;
+              }
+
+              const fallbackPreset = quickTransferPresets[0];
+              if (fallbackPreset) {
+                applyQuickTransfer(fallbackPreset.date, fallbackPreset.time);
+              } else {
+                setComposerFlow('reschedule');
+              }
+            }}
           >
             <ArrowRightLeft className="size-4" />
             {labels.reschedule}
           </Button>
           <Button
             type="button"
-            variant="outline"
+            variant={composerFlow === 'followup' ? 'default' : 'outline'}
             size="sm"
-            className={cn(mobile && 'h-11 justify-center rounded-[14px] px-2.5 text-center text-[10px] leading-[1.05rem] whitespace-normal')}
+            className={cn(
+              mobile && 'h-11 justify-center rounded-[14px] px-2.5 text-center text-[10px] leading-[1.05rem] whitespace-normal',
+              composerFlow === 'followup' && 'chat-flow-toggle-active',
+            )}
             disabled={!activeThread}
             onClick={() => handleApplyBotFlow('followup')}
           >
@@ -1219,6 +1295,24 @@ export default function DashboardChatsPage() {
         </div>
 
         {renderRescheduleBlock(mobile)}
+
+        {mobile && activeThread && templateOptions.length ? (
+          <div className="chat-mobile-template-strip">
+            {templateOptions.slice(0, 3).map((template) => (
+              <button
+                key={template.id}
+                type="button"
+                className={cn(
+                  'chat-mobile-template-chip',
+                  selectedTemplateId === template.id && 'chat-mobile-template-chip-active',
+                )}
+                onClick={() => handleTemplateChange(template.id)}
+              >
+                {template.title}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
         <div className={cn('grid gap-2.5', mobile ? 'grid-cols-1' : 'xl:grid-cols-[184px_minmax(0,1fr)]')}>
           {mobile ? null : (
@@ -1277,54 +1371,6 @@ export default function DashboardChatsPage() {
     return (
       <WorkspaceShell className="overflow-hidden">
         <div className="workspace-page workspace-page-chat workspace-page-chat-mobile flex min-h-[calc(100svh-94px)] w-full min-w-0 flex-col gap-2 overflow-hidden">
-          <section className="workspace-card chat-mobile-summary shrink-0 rounded-[16px] px-3 py-2.5">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <Badge variant="outline" className="h-5 rounded-full px-2 text-[8.5px]">
-                    <Sparkles className="size-3" />
-                    {labels.badge}
-                  </Badge>
-                  <Badge variant="outline" className="h-5 rounded-full px-2 text-[8.5px]">
-                    {demoMode ? labels.demo : labels.live}
-                  </Badge>
-                </div>
-                <h1 className="mt-1 text-[15px] font-semibold tracking-[-0.03em] text-foreground">{labels.title}</h1>
-                <p className="mt-0.5 line-clamp-1 text-[9.5px] leading-[1rem] text-muted-foreground">{labels.description}</p>
-              </div>
-
-              <Button
-                type="button"
-                variant={showCreatePanel ? 'default' : 'outline'}
-                size="sm"
-                className="h-8 shrink-0 rounded-full px-3"
-                onClick={() => setShowCreatePanel((current) => !current)}
-              >
-                <Plus className="size-3.5" />
-                {labels.create}
-              </Button>
-            </div>
-
-            <div className="mt-2 grid grid-cols-3 gap-1.5">
-              {[
-                { label: labels.total, value: threads.length },
-                { label: labels.selected, value: activeThread ? 1 : 0 },
-                { label: labels.unread, value: totalUnread },
-              ].map((item) => (
-                <div key={item.label} className="rounded-[12px] border border-border/80 bg-accent/16 px-2.5 py-1.5">
-                  <div className="truncate text-[8.5px] uppercase tracking-[0.14em] text-muted-foreground">{item.label}</div>
-                  <div className="mt-1 text-[14px] font-semibold text-foreground">{item.value}</div>
-                </div>
-              ))}
-            </div>
-
-            {error ? (
-              <div className="mt-2 rounded-[12px] border border-destructive/20 bg-destructive/8 px-2.5 py-2 text-[10px] text-destructive">
-                {error}
-              </div>
-            ) : null}
-          </section>
-
           <section className="workspace-card min-h-0 flex-1 overflow-hidden rounded-[16px] p-0">
             <div className="chat-mobile-list-toolbar border-b border-border bg-card px-2.5 py-2">
               <div className="flex items-center gap-2">
@@ -1339,7 +1385,7 @@ export default function DashboardChatsPage() {
                 </label>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant={showCreatePanel ? 'default' : 'outline'}
                   size="sm"
                   className="h-9 rounded-[12px] px-3"
                   onClick={() => setShowCreatePanel((current) => !current)}
@@ -1350,9 +1396,6 @@ export default function DashboardChatsPage() {
 
               {showCreatePanel ? (
                 <div className="workspace-soft-panel mt-2 grid gap-2 rounded-[12px] p-2.5">
-                  <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    {labels.createInline}
-                  </div>
                   <Input
                     value={newClientName}
                     onChange={(event) => setNewClientName(event.target.value)}
@@ -1370,7 +1413,6 @@ export default function DashboardChatsPage() {
                       {labels.cancel}
                     </Button>
                     <Button type="button" size="sm" className="h-8 rounded-[12px]" onClick={handleCreateThread}>
-                      <Plus className="size-3.5" />
                       {labels.create}
                     </Button>
                   </div>
@@ -1379,7 +1421,7 @@ export default function DashboardChatsPage() {
 
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <Select value={segmentFilter} onValueChange={(value) => setSegmentFilter(value as SegmentFilter)}>
-                  <SelectTrigger className="h-8 rounded-[12px] px-3 text-[10.5px]">
+                  <SelectTrigger className="h-9 w-full min-w-0 rounded-[12px] px-3 pr-4 text-[11px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1392,7 +1434,7 @@ export default function DashboardChatsPage() {
                 </Select>
 
                 <Select value={channelFilter} onValueChange={(value) => setChannelFilter(value as ChannelFilter)}>
-                  <SelectTrigger className="h-8 rounded-[12px] px-3 text-[10.5px]">
+                  <SelectTrigger className="h-9 w-full min-w-0 rounded-[12px] px-3 pr-4 text-[11px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1405,7 +1447,7 @@ export default function DashboardChatsPage() {
                 </Select>
 
                 <Select value={sortMode} onValueChange={(value) => setSortMode(value as SortMode)}>
-                  <SelectTrigger className="col-span-2 h-8 rounded-[12px] px-3 text-[10.5px]">
+                  <SelectTrigger className="col-span-2 h-9 w-full min-w-0 rounded-[12px] px-3 pr-4 text-[11px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1417,14 +1459,20 @@ export default function DashboardChatsPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {error ? (
+                <div className="mt-2 rounded-[12px] border border-destructive/20 bg-destructive/8 px-2.5 py-2 text-[10px] text-destructive">
+                  {error}
+                </div>
+              ) : null}
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+            <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2.5">
               {renderThreadList(true)}
             </div>
           </section>
 
-          {activeThread && mobileThreadOpen ? (
+          {mobileThreadOpen && activeThread ? (
             <div className="fixed inset-0 z-[70] bg-background">
               <div className="flex h-full flex-col pt-[env(safe-area-inset-top,0px)]">
                 <header className="chat-mobile-thread-header border-b border-border bg-card px-3 py-2">
@@ -1434,7 +1482,7 @@ export default function DashboardChatsPage() {
                         type="button"
                         variant="outline"
                         size="icon-sm"
-                        className="chat-mobile-back-button mt-0.5 size-9 shrink-0 rounded-[14px] border-primary/30 bg-primary/12 text-foreground shadow-none"
+                        className="chat-mobile-back-button mt-0.5 size-10 shrink-0 rounded-[14px]"
                         onClick={() => setMobileThreadOpen(false)}
                       >
                         <ChevronLeft className="size-4" />
@@ -1460,8 +1508,14 @@ export default function DashboardChatsPage() {
                     <div className="flex items-center gap-1">
                       <Button
                         type="button"
-                        variant="ghost"
+                        variant="outline"
                         size="icon-sm"
+                        className={cn(
+                          'chat-mobile-back-button chat-bot-toggle mt-0.5 size-10 shrink-0 rounded-[14px]',
+                          activeThread.botConnected
+                            ? 'chat-bot-toggle-active border-primary/30 bg-primary text-primary-foreground'
+                            : 'border-border/80 bg-transparent',
+                        )}
                         disabled={!activeThread}
                         onClick={() => {
                           void applyLocalThreadPatch(activeThread.id, {
@@ -1469,7 +1523,9 @@ export default function DashboardChatsPage() {
                           });
                         }}
                       >
-                        <Bot className="size-4" />
+                        <span className="chat-bot-toggle-glyph">
+                          <Bot className="size-4" />
+                        </span>
                       </Button>
                       <Button
                         type="button"
@@ -1492,10 +1548,9 @@ export default function DashboardChatsPage() {
 
                   <div className="mt-2 rounded-[12px] border border-border/80 bg-accent/16 px-2.5 py-2">
                     <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-{locale === 'ru' ? 'Ассистент' : 'Assistant'}
+                      {locale === 'ru' ? 'Ассистент' : 'Assistant'}
                     </div>
                     <div className="mt-1 text-[11px] font-semibold text-foreground">{assistantSummary.title}</div>
-                    <div className="mt-1 text-[9.5px] leading-[1rem] text-muted-foreground">{assistantSummary.detail}</div>
                   </div>
                 </header>
 
@@ -1693,8 +1748,9 @@ export default function DashboardChatsPage() {
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
                   <Button
                     type="button"
-                    variant="outline"
+                    variant={activeThread?.botConnected ? 'default' : 'outline'}
                     size="sm"
+                    className={cn('chat-bot-toggle', activeThread?.botConnected && 'chat-bot-toggle-active')}
                     disabled={!activeThread}
                     onClick={() => {
                       if (!activeThread) return;
@@ -1703,8 +1759,11 @@ export default function DashboardChatsPage() {
                       });
                     }}
                   >
-                    <Bot className="size-4" />
-                    {activeThread?.botConnected ? labels.botConnected : labels.botOff}
+                    <span className="chat-bot-toggle-glyph">
+                      <Bot className="size-4" />
+                    </span>
+                    <span>{activeThread?.botConnected ? labels.botConnected : labels.botOff}</span>
+                    <span className="chat-bot-toggle-dot" aria-hidden="true" />
                   </Button>
 
                   <Button

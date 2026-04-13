@@ -1,6 +1,6 @@
 import { accentToneValues, type AccentTone } from '@/lib/appearance-palette';
 
-export type NeutralTone = 'zinc' | 'slate' | 'stone';
+export type NeutralTone = 'zinc' | 'slate' | 'stone' | 'pearl' | 'sage' | 'sand';
 export type DensityMode = 'compact' | 'standard' | 'airy';
 export type RadiusMode = 'soft' | 'medium' | 'tight';
 export type MotionMode = 'off' | 'fast' | 'smooth';
@@ -66,7 +66,7 @@ export const defaultAppearanceSettings: AppearanceSettings = {
 
 const appearanceValueMap = {
   accentTone: accentToneValues,
-  neutralTone: ['zinc', 'slate', 'stone'],
+  neutralTone: ['zinc', 'slate', 'stone', 'pearl', 'sage', 'sand'],
   density: ['compact', 'standard', 'airy'],
   radius: ['soft', 'medium', 'tight'],
   motion: ['off', 'fast', 'smooth'],

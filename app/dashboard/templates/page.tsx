@@ -118,27 +118,6 @@ export default function TemplatesPage() {
     }
   }, [dataset, setTemplates, storageReady, templates.length]);
 
-  if (!hasHydrated) return null;
-
-  if (!ownedProfile || !dataset) {
-    return (
-      <WorkspaceShell>
-        <div className="workspace-page">
-          <div className="workspace-card rounded-[18px] p-8 text-center">
-            <div className="text-[18px] font-semibold text-foreground">
-              {locale === 'ru' ? 'Сначала настройте профиль мастера' : 'Create the master profile first'}
-            </div>
-            <div className="mt-4">
-              <Button asChild>
-                <Link href="/create-profile">{locale === 'ru' ? 'Создать профиль' : 'Create profile'}</Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </WorkspaceShell>
-    );
-  }
-
   const labels = locale === 'ru'
     ? {
         title: 'Шаблоны сообщений',
@@ -250,6 +229,27 @@ export default function TemplatesPage() {
   const variablesCount = new Set(templates.flatMap((item) => item.variables)).size;
   const channelsCount = new Set(templates.map((item) => item.channel)).size;
 
+  if (!hasHydrated) return null;
+
+  if (!ownedProfile || !dataset) {
+    return (
+      <WorkspaceShell>
+        <div className="workspace-page">
+          <div className="workspace-card rounded-[18px] p-8 text-center">
+            <div className="text-[18px] font-semibold text-foreground">
+              {locale === 'ru' ? 'Сначала настройте профиль мастера' : 'Create the master profile first'}
+            </div>
+            <div className="mt-4">
+              <Button asChild>
+                <Link href="/create-profile">{locale === 'ru' ? 'Создать профиль' : 'Create profile'}</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </WorkspaceShell>
+    );
+  }
+
   return (
     <WorkspaceShell>
       <div className="workspace-page workspace-page-wide dashboard-mobile-templates space-y-4 md:space-y-5">
@@ -259,7 +259,7 @@ export default function TemplatesPage() {
           description={isMobile ? (locale === 'ru' ? 'Поиск, канал, текст и переменные.' : 'Search, channel, text, and variables.') : labels.description}
         />
 
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <div className="dashboard-kpi-grid grid grid-cols-2 gap-3">
           <MetricCard label={labels.activeTemplates} value={String(templates.length)} icon={MessageSquareText} />
           <MetricCard label={labels.averageConversion} value={averageConversion} icon={Copy} />
           <MetricCard label={labels.variables} value={String(variablesCount)} icon={Sparkles} />
@@ -272,34 +272,36 @@ export default function TemplatesPage() {
             description={labels.baseDescription}
             actions={<HelpHint content={labels.placeholdersHint} />}
           >
-            <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="relative w-full max-w-[420px]">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <div className={cn("mb-4 gap-3", isMobile ? "grid" : "flex flex-col lg:flex-row lg:items-center lg:justify-between")}>
+              <div className={cn("workspace-inline-search", isMobile ? "w-full" : "w-full max-w-[420px]")}>
+                <Search className="workspace-inline-search-icon size-4" />
                 <Input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder={labels.searchPlaceholder}
-                  className="pl-9"
+                  className="workspace-input-with-leading-icon h-10 pr-3"
                 />
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <Select value={channelFilter} onValueChange={(value) => setChannelFilter(value as ChannelFilter)}>
-                  <SelectTrigger className={isMobile ? "w-full sm:w-[190px]" : "w-[190px]"}>
-                    <Filter className="size-4 text-muted-foreground" />
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{labels.allChannels}</SelectItem>
-                    {CHANNEL_OPTIONS.map((channel) => (
-                      <SelectItem key={channel} value={channel}>
-                        {channelDisplayLabel(channel, locale)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className={cn("items-center gap-2", isMobile ? "grid" : "flex flex-wrap")}>
+                <div className="workspace-inline-search workspace-inline-select w-full">
+                  <Filter className="workspace-inline-search-icon size-4" />
+                  <Select value={channelFilter} onValueChange={(value) => setChannelFilter(value as ChannelFilter)}>
+                    <SelectTrigger className={cn("workspace-trigger-with-leading-icon h-10 w-full pr-4", !isMobile && "sm:w-[190px]")}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{labels.allChannels}</SelectItem>
+                      {CHANNEL_OPTIONS.map((channel) => (
+                        <SelectItem key={channel} value={channel}>
+                          {channelDisplayLabel(channel, locale)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                <span className="workspace-pill">
+                <span className={cn("workspace-pill", isMobile && "justify-self-start")}>
                   {labels.counter}: {filteredTemplates.length}
                 </span>
               </div>

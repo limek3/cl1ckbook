@@ -376,7 +376,7 @@ export function PublicMasterPage({
         <div className="lg:hidden space-y-3">
           <section
             className={cn(
-              'rounded-[20px] border p-3.5',
+              'public-hero-panel rounded-[20px] border p-3.5',
               heroClass,
               surfaceClass,
               settings.publicCardStyle === 'editorial' && 'border-primary/20',
@@ -444,7 +444,7 @@ export function PublicMasterPage({
             ) : null}
           </section>
 
-          <section id="booking-form" className={cn(sectionClass, surfaceClass)}>
+          <section id="booking-form" className={cn('public-booking-panel', sectionClass, surfaceClass)}>
             <BookingForm profile={profile} embedded />
           </section>
 
@@ -589,7 +589,7 @@ export function PublicMasterPage({
           <div className="space-y-5">
             <section
               className={cn(
-                'rounded-[22px] border p-5 md:p-6',
+                'public-hero-panel rounded-[22px] border p-5 md:p-6',
                 heroClass,
                 surfaceClass,
                 settings.publicCardStyle === 'editorial' && 'border-primary/20',
@@ -809,7 +809,7 @@ export function PublicMasterPage({
           </div>
 
           <div className={cn('xl:sticky xl:top-[84px] xl:self-start xl:max-h-[calc(100vh-112px)] xl:overflow-y-auto', settings.publicBookingStyle === 'step' && '2xl:top-[96px]')}>
-            <section className={cn(sectionClass, surfaceClass)}>
+            <section className={cn('public-booking-panel', sectionClass, surfaceClass)}>
               <BookingForm profile={profile} embedded />
             </section>
           </div>

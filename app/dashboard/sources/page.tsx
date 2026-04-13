@@ -54,7 +54,7 @@ export default function SourcesPage() {
           }
         />
 
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <div className="dashboard-kpi-grid grid grid-cols-2 gap-3">
           <MetricCard label={locale === 'ru' ? 'Источники' : 'Sources'} value={String(dataset.channels.length)} icon={Waypoints} />
           <MetricCard label={locale === 'ru' ? 'Лучший источник' : 'Top source'} value={dataset.channels[0]?.label ?? '—'} />
           <MetricCard label={locale === 'ru' ? 'Пиковый час' : 'Peak hour'} value={dataset.peakHours.sort((a, b) => b.bookings - a.bookings)[0]?.hour ?? '—'} icon={Clock3} />

@@ -50,7 +50,7 @@ export default function LimitsPage() {
           }
         />
 
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <div className="dashboard-kpi-grid grid grid-cols-2 gap-3">
           <MetricCard label={locale === 'ru' ? 'Лимитов отслеживается' : 'Tracked limits'} value={String(dataset.limits.length)} icon={Gauge} />
           <MetricCard label={locale === 'ru' ? 'Почти заполнены' : 'Near limit'} value={String(dataset.limits.filter((item) => item.used / item.total > 0.65).length)} icon={Activity} />
           <MetricCard label={locale === 'ru' ? 'Текущий план' : 'Current plan'} value="Pro" icon={ShieldCheck} />

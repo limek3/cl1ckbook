@@ -106,10 +106,10 @@ export default function DashboardPage() {
   );
 
   const quickActions = [
-    { href: '/dashboard/chats', label: locale === 'ru' ? 'Открыть чаты' : 'Open chats', icon: MessageCircleMore },
-    { href: '/dashboard/services', label: locale === 'ru' ? 'Настроить услуги' : 'Edit services', icon: Package2 },
-    { href: '/dashboard/appearance', label: locale === 'ru' ? 'Внешний вид' : 'Appearance', icon: Sparkles },
-    { href: '/dashboard/profile', label: locale === 'ru' ? 'Профиль мастера' : 'Master profile', icon: SquarePen },
+    { href: '/dashboard/chats', label: locale === 'ru' ? (isMobile ? 'Чаты' : 'Открыть чаты') : (isMobile ? 'Chats' : 'Open chats'), icon: MessageCircleMore },
+    { href: '/dashboard/services', label: locale === 'ru' ? (isMobile ? 'Услуги' : 'Настроить услуги') : (isMobile ? 'Services' : 'Edit services'), icon: Package2 },
+    { href: '/dashboard/appearance', label: locale === 'ru' ? (isMobile ? 'Оформление' : 'Внешний вид') : 'Appearance', icon: Sparkles },
+    { href: '/dashboard/profile', label: locale === 'ru' ? (isMobile ? 'Профиль' : 'Профиль мастера') : (isMobile ? 'Profile' : 'Master profile'), icon: SquarePen },
   ];
 
   if (!hasHydrated) return null;
@@ -220,180 +220,122 @@ export default function DashboardPage() {
   if (isMobile) {
     return (
       <WorkspaceShell>
-        <div className="workspace-page workspace-page-overview dashboard-mobile-home space-y-3.5">
+        <div className="workspace-page workspace-page-overview dashboard-mobile-home space-y-3">
           <DashboardHeader
-            badge={locale === 'ru' ? 'Рабочий обзор' : 'Workspace overview'}
+            badge={locale === 'ru' ? 'Сегодня' : 'Today'}
             title={locale === 'ru' ? 'Главная' : 'Home'}
-            description={
-              locale === 'ru'
-                ? 'Главное по дню и неделе.'
-                : 'Nearest work, weekly pulse, and fast actions.'
-            }
+            description={locale === 'ru' ? 'Главное по дню.' : 'The essentials for today.'}
             actions={
-              <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                <Button asChild size="sm" variant="outline">
-                  <Link href="/dashboard/today">
-                    <CalendarClock className="size-4" />
-                    {locale === 'ru' ? 'Сегодня' : 'Today'}
-                  </Link>
-                </Button>
-                <Button asChild size="sm">
-                  <Link href={`/m/${ownedProfile.slug}`}>
-                    <Globe2 className="size-4" />
-                    {locale === 'ru' ? 'Страница' : 'Page'}
-                  </Link>
-                </Button>
-              </div>
+              <Button asChild size="sm">
+                <Link href="/dashboard/today">
+                  <CalendarClock className="size-4" />
+                  {locale === 'ru' ? 'Открыть день' : 'Open day'}
+                </Link>
+              </Button>
             }
           />
 
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="dashboard-kpi-grid grid grid-cols-2 gap-3">
             {metrics.map((metric) => (
               <MetricCard key={metric.label} {...metric} />
             ))}
           </div>
 
           <SectionCard
-            title={locale === 'ru' ? 'Ближайшие записи' : 'Upcoming bookings'}
-            description={
-              locale === 'ru'
-                ? 'Следующий визит и короткая очередь.'
-                : 'Next visit first, then a short compact queue.'
-            }
+            title={locale === 'ru' ? 'Следующая запись' : 'Next booking'}
             actions={
               <Button asChild size="sm" variant="ghost">
                 <Link href="/dashboard/today">
-                  {locale === 'ru' ? 'Все записи' : 'All bookings'}
+                  {locale === 'ru' ? 'Все' : 'All'}
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
             }
             className="dashboard-mobile-card"
           >
-            {primaryBooking ? (
-              <div className="dashboard-mobile-booking-feature">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="dashboard-mobile-kicker">
-                      {locale === 'ru' ? 'Следующий визит' : 'Next visit'}
+            <div className="dashboard-next-booking">
+              {primaryBooking ? (
+                <>
+                  <div className="dashboard-next-booking-main">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="dashboard-mobile-kicker">
+                          {locale === 'ru' ? 'Сейчас важнее всего' : 'Focus now'}
+                        </div>
+                        <div className="mt-1 truncate text-[16px] font-semibold tracking-[-0.03em] text-foreground">
+                          {primaryBooking.clientName}
+                        </div>
+                        <div className="mt-1 text-[11px] leading-5 text-muted-foreground">{primaryBooking.service}</div>
+                      </div>
+                      <span className="workspace-pill whitespace-nowrap">{bookingStatusLabel(primaryBooking.status)}</span>
                     </div>
-                    <div className="truncate text-[15px] font-semibold tracking-[-0.03em] text-foreground">
-                      {primaryBooking.clientName}
-                    </div>
-                    <div className="mt-1 text-[11px] leading-5 text-muted-foreground">
-                      {primaryBooking.service}
+
+                    <div className="dashboard-next-booking-grid">
+                      <div className="dashboard-next-booking-chip">
+                        <div className="dashboard-next-booking-chip-label">{locale === 'ru' ? 'Слот' : 'Slot'}</div>
+                        <div className="dashboard-next-booking-chip-value">{formatBookingSlot(primaryBooking.date, primaryBooking.time)}</div>
+                      </div>
+                      <div className="dashboard-next-booking-chip">
+                        <div className="dashboard-next-booking-chip-label">{locale === 'ru' ? 'Контакт' : 'Contact'}</div>
+                        <div className="dashboard-next-booking-chip-value">{primaryBooking.clientPhone}</div>
+                      </div>
                     </div>
                   </div>
-                  <span className="workspace-pill whitespace-nowrap">
-                    {bookingStatusLabel(primaryBooking.status)}
-                  </span>
+
+                  {secondaryBookings.length ? (
+                    <div className="dashboard-next-booking-queue">
+                      <div className="dashboard-mobile-booking-queue-title">
+                        {locale === 'ru' ? 'Дальше по очереди' : 'Coming next'}
+                      </div>
+                      <div className="dashboard-next-booking-queue-list">
+                        {secondaryBookings.slice(0, 2).map((booking) => (
+                          <div key={booking.id} className="dashboard-next-booking-queue-item">
+                            <div className="min-w-0">
+                              <div className="truncate text-[12px] font-medium text-foreground">{booking.clientName}</div>
+                              <div className="mt-0.5 truncate text-[10.5px] text-muted-foreground">{booking.service}</div>
+                            </div>
+                            <div className="dashboard-next-booking-queue-time">
+                              <strong>{booking.time}</strong>
+                              <span>{bookingStatusLabel(booking.status)}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <div className="rounded-[14px] border border-dashed border-border/80 bg-accent/18 px-3 py-3 text-[11px] leading-5 text-muted-foreground">
+                  {locale === 'ru' ? 'Записей пока нет.' : 'No bookings yet.'}
                 </div>
-
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <div className="dashboard-mobile-meta-chip">
-                    {formatBookingSlot(primaryBooking.date, primaryBooking.time)}
-                  </div>
-                  <div className="dashboard-mobile-meta-chip">
-                    {primaryBooking.clientPhone}
-                  </div>
-                </div>
-
-                {primaryBooking.comment ? (
-                  <div className="mt-2 text-[11px] leading-5 text-muted-foreground line-clamp-2">
-                    {primaryBooking.comment}
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              <div className="rounded-[14px] border border-dashed border-border/80 bg-accent/18 px-3 py-3 text-[11px] leading-5 text-muted-foreground">
-                {locale === 'ru'
-                  ? 'Пока нет записей. Можно открыть страницу и принять первую заявку.'
-                  : 'No bookings yet. Open the page and collect the first request.'}
-              </div>
-            )}
-
-            {secondaryBookings.length ? (
-              <div className="mt-2.5 space-y-2">
-                {secondaryBookings.map((booking) => (
-                  <div
-                    key={booking.id}
-                    className="dashboard-mobile-list-row"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[12px] font-medium text-foreground">
-                        {booking.clientName}
-                      </div>
-                      <div className="mt-0.5 truncate text-[10.5px] text-muted-foreground">
-                        {booking.service}
-                      </div>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <div className="text-[11px] font-medium text-foreground">
-                        {booking.time}
-                      </div>
-                      <div className="mt-0.5 text-[10px] text-muted-foreground">
-                        {formatBookingSlot(booking.date, booking.time).split(' · ')[0]}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-
-            <div className="mt-2.5 grid grid-cols-2 gap-2">
-              <Button asChild size="sm" variant="outline">
-                <Link href="/dashboard/chats">
-                  <MessageCircleMore className="size-4" />
-                  {locale === 'ru' ? 'Чаты' : 'Chats'}
-                </Link>
-              </Button>
-              <Button asChild size="sm" variant="outline">
-                <Link href="/dashboard/clients">
-                  <Users2 className="size-4" />
-                  {locale === 'ru' ? 'Клиенты' : 'Clients'}
-                </Link>
-              </Button>
+              )}
             </div>
           </SectionCard>
 
           <SectionCard
-            title={locale === 'ru' ? 'Динамика недели' : 'Week pulse'}
-            description={
-              locale === 'ru'
-                ? 'Короткая картина недели.'
-                : 'A lighter weekly snapshot without a heavy analytics panel.'
-            }
+            title={locale === 'ru' ? 'Неделя' : 'Week'}
             actions={
-              <div className="dashboard-mobile-trend-switch">
-                {trendMetricOptions.map((item) => (
-                  <Button
-                    key={item.value}
-                    type="button"
-                    variant={trendMetric === item.value ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setTrendMetric(item.value)}
-                  >
-                    {item.label}
-                  </Button>
-                ))}
-              </div>
+              <Button asChild size="sm" variant="ghost">
+                <Link href="/dashboard/stats">
+                  {locale === 'ru' ? 'Статистика' : 'Stats'}
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
             }
             className="dashboard-mobile-card"
           >
-            <div className="grid grid-cols-3 gap-2">
+            <div className="dashboard-overview-kpi-grid grid grid-cols-3 gap-2">
               {compactTrendMetrics.map((item) => (
                 <div key={item.label} className="dashboard-mobile-trend-card">
                   <div className="text-[10px] text-muted-foreground">{item.label}</div>
-                  <div className="mt-1 truncate text-[13px] font-semibold tracking-[-0.03em] text-foreground">
-                    {item.value}
-                  </div>
+                  <div className="mt-1 truncate text-[13px] font-semibold tracking-[-0.03em] text-foreground">{item.value}</div>
                   <div className="mt-1 truncate text-[10px] text-muted-foreground">{item.hint}</div>
                 </div>
               ))}
             </div>
 
-            <div className="dashboard-mobile-chart-shell mt-2.5">
-              <ChartContainer config={chartConfig} className="h-[176px] w-full">
+            <div className="dashboard-mobile-chart-shell mt-2">
+              <ChartContainer config={chartConfig} className="h-[154px] w-full">
                 {trendMetric === 'revenue' ? (
                   <AreaChart data={weekTrendData}>
                     <defs>
@@ -409,7 +351,6 @@ export default function DashboardPage() {
                     <Area type="monotone" dataKey="revenue" stroke="var(--color-revenue)" fill="url(#dashboardWeekRevenueMobile)" strokeWidth={2.1} />
                   </AreaChart>
                 ) : null}
-
                 {trendMetric === 'requests' ? (
                   <BarChart data={weekTrendData}>
                     <CartesianGrid vertical={false} strokeDasharray="3 3" />
@@ -419,7 +360,6 @@ export default function DashboardPage() {
                     <Bar dataKey="requests" fill="var(--color-requests)" radius={[8, 8, 4, 4]} maxBarSize={20} />
                   </BarChart>
                 ) : null}
-
                 {trendMetric === 'visitors' ? (
                   <LineChart data={weekTrendData}>
                     <CartesianGrid vertical={false} strokeDasharray="3 3" />
@@ -432,131 +372,17 @@ export default function DashboardPage() {
               </ChartContainer>
             </div>
 
-            <div className="mt-2.5 space-y-2">
-              {compactWeekRows.map((item) => (
-                <div key={item.date} className="dashboard-mobile-list-row">
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[11px] font-medium text-foreground">{item.label}</div>
-                    <div className="mt-0.5 text-[10px] text-muted-foreground">
-                      {item.requests} {locale === 'ru' ? 'запр.' : 'req'} · {item.visitors} {locale === 'ru' ? 'виз.' : 'vis'}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-[11px] font-medium text-foreground">{formatCurrency(item.revenue, locale)}</div>
-                    <div className="mt-0.5 text-[10px] text-muted-foreground">
-                      {item.confirmed} {locale === 'ru' ? 'подтв.' : 'conf.'}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </SectionCard>
-
-          <div className="grid grid-cols-2 gap-2.5">
-            {quickActions.map((item) => {
-              const Icon = item.icon;
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="dashboard-mobile-action-card"
+            <div className="dashboard-mobile-trend-switch mt-2">
+              {trendMetricOptions.map((item) => (
+                <Button
+                  key={item.value}
+                  type="button"
+                  variant={trendMetric === item.value ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setTrendMetric(item.value)}
                 >
-                  <div className="flex size-8 items-center justify-center rounded-[12px] border border-border/80 bg-accent/28 text-muted-foreground">
-                    <Icon className="size-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="truncate text-[11px] font-medium text-foreground">{item.label}</div>
-                    <div className="mt-0.5 text-[10px] text-muted-foreground">
-                      {item.href.includes('appearance')
-                        ? locale === 'ru' ? 'Оформление' : 'Look & feel'
-                        : item.href.includes('services')
-                          ? locale === 'ru' ? 'Прайс и длительность' : 'Price and duration'
-                          : item.href.includes('profile')
-                            ? locale === 'ru' ? 'Контакты и био' : 'Contacts and bio'
-                            : locale === 'ru' ? 'Работа с заявками' : 'Message flow'}
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-
-          <SectionCard
-            title={locale === 'ru' ? 'Страница и конверсия' : 'Page and conversion'}
-            description={
-              locale === 'ru'
-                ? 'Страница, конверсия и заявки.'
-                : 'Public page health without a large hero block.'
-            }
-            className="dashboard-mobile-card"
-          >
-            <div className="space-y-2">
-              {[
-                { label: locale === 'ru' ? 'Публичная страница' : 'Public page', value: locale === 'ru' ? 'Активна' : 'Active' },
-                { label: locale === 'ru' ? 'Конверсия' : 'Conversion', value: `${dataset.totals.conversion}%` },
-                { label: locale === 'ru' ? 'Новые клиенты' : 'New clients', value: String(dataset.totals.newClients) },
-                { label: locale === 'ru' ? 'Лучший источник' : 'Top source', value: topSource },
-              ].map((item) => (
-                <div key={item.label} className="dashboard-mobile-list-row">
-                  <span className="text-[10.5px] text-muted-foreground">{item.label}</span>
-                  <span className="max-w-[55%] truncate text-right text-[11px] font-medium text-foreground">{item.value}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-2.5 grid grid-cols-2 gap-2">
-              <Button asChild size="sm" variant="outline">
-                <Link href={`/m/${ownedProfile.slug}`}>
-                  <Globe2 className="size-4" />
-                  {locale === 'ru' ? 'Открыть' : 'Open'}
-                </Link>
-              </Button>
-              <Button asChild size="sm" variant="outline">
-                <Link href="/dashboard/appearance">
-                  <Sparkles className="size-4" />
-                  {locale === 'ru' ? 'Стиль' : 'Style'}
-                </Link>
-              </Button>
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            title={locale === 'ru' ? 'Услуги и клиенты' : 'Services and clients'}
-            description={
-              locale === 'ru'
-                ? 'Услуги и важные клиенты.'
-                : 'Fast view of what sells and who needs attention.'
-            }
-            className="dashboard-mobile-card"
-          >
-            <div className="space-y-2">
-              {topServices.slice(0, 3).map((service, index) => (
-                <div key={service.id} className="dashboard-mobile-list-row">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[11px] font-medium text-foreground">
-                      #{index + 1} · {service.name}
-                    </div>
-                    <div className="mt-0.5 text-[10px] text-muted-foreground">
-                      {service.bookings} {locale === 'ru' ? 'записей' : 'bookings'}
-                    </div>
-                  </div>
-                  <div className="text-right text-[11px] font-medium text-foreground">
-                    {formatCurrency(service.revenue, locale)}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-2.5 space-y-2">
-              {favoriteClients.slice(0, 3).map((client) => (
-                <div key={client.id} className="dashboard-mobile-list-row">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[11px] font-medium text-foreground">{client.name}</div>
-                    <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{client.note}</div>
-                  </div>
-                  <span className="workspace-pill whitespace-nowrap">{client.segment}</span>
-                </div>
+                  {item.label}
+                </Button>
               ))}
             </div>
           </SectionCard>
@@ -564,7 +390,6 @@ export default function DashboardPage() {
       </WorkspaceShell>
     );
   }
-
 
   return (
     <WorkspaceShell>
@@ -605,7 +430,7 @@ export default function DashboardPage() {
           <PublicPageHero profile={ownedProfile} alignTop />
         </div>
 
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="dashboard-kpi-grid grid grid-cols-2 gap-3">
           {metrics.map((metric) => (
             <MetricCard key={metric.label} {...metric} />
           ))}

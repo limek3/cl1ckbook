@@ -26,12 +26,19 @@ export function DashboardHeader({
   const isMobile = useMobile();
 
   return (
-    <div className="dashboard-header border-b border-border pb-3 md:pb-4" data-mobile-compact={isMobile ? 'true' : 'false'}>
-      {badge ? <div className="chip-muted max-w-full truncate">{badge}</div> : null}
-      <div className="mt-2 flex flex-col gap-2.5 lg:flex-row lg:items-end lg:justify-between">
+    <div
+      className={cn(
+        'dashboard-header border-b border-border pb-3 md:pb-4',
+        isMobile && 'dashboard-header-mobile sticky top-[calc(52px+env(safe-area-inset-top,0px))] z-20 -mx-[var(--space-page-x)] bg-background px-[var(--space-page-x)] pt-2 pb-2',
+      )}
+      data-mobile-compact={isMobile ? 'true' : 'false'}
+    >
+      {!isMobile && badge ? <div className="chip-muted max-w-full truncate">{badge}</div> : null}
+      <div className={cn('mt-2 flex flex-col gap-2.5 lg:flex-row lg:items-end lg:justify-between', isMobile && 'mt-0 gap-2')}>
         <div className="min-w-0">
+          {isMobile && badge ? <div className="page-kicker">{badge}</div> : null}
           <h1 className="page-title leading-none">{title}</h1>
-          <p className={cn('page-subtitle', isMobile && 'line-clamp-2 max-w-[44rem]')}>{description}</p>
+          {!isMobile ? <p className="page-subtitle">{description}</p> : null}
         </div>
         {actions ? <div className="dashboard-header-actions flex flex-wrap items-center gap-2">{actions}</div> : null}
       </div>
@@ -53,36 +60,50 @@ export function MetricCard({
   icon?: LucideIcon;
 }) {
   const isMobile = useMobile();
+  const compactValue = value.trim().length >= 8;
 
   return (
     <div
       className={cn(
-        'workspace-metric-card workspace-card rounded-[16px] p-3',
+        'dashboard-kpi-card workspace-metric-card workspace-card rounded-[20px] p-4 md:p-[1.05rem]',
         isMobile && 'workspace-metric-card-mobile',
       )}
     >
-      <div className={cn('flex items-start justify-between gap-3', isMobile && 'items-center gap-2.5')}>
-        <div className="min-w-0 flex-1">
-          <div className="metric-label">{label}</div>
-          <div className={cn('mt-1 metric-value truncate', isMobile && 'mt-1 text-[18px]')}>{value}</div>
+      <div className="flex h-full flex-col gap-3.5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="metric-label dashboard-kpi-card-label">{label}</div>
+          </div>
+          {Icon ? (
+            <div
+              className={cn(
+                'dashboard-kpi-card-icon flex size-10 shrink-0 items-center justify-center rounded-[14px] border border-border/80 bg-accent/58 text-muted-foreground',
+                isMobile && 'size-9 rounded-[13px]',
+              )}
+            >
+              <Icon className="size-4" />
+            </div>
+          ) : null}
         </div>
-        {Icon ? (
+
+        <div className="mt-auto min-w-0">
           <div
             className={cn(
-              'flex size-8 shrink-0 items-center justify-center rounded-[12px] border border-border bg-accent/60 text-muted-foreground md:size-9',
-              isMobile && 'size-8 rounded-[11px]',
+              'metric-value dashboard-kpi-card-value',
+              compactValue && 'dashboard-kpi-card-value-compact',
+              isMobile && 'text-[18px]',
             )}
           >
-            <Icon className="size-4" />
+            {value}
           </div>
-        ) : null}
-      </div>
-      {hint || delta ? (
-        <div className={cn('mt-2 flex flex-wrap items-center gap-2 text-[11px] md:text-[12px]', isMobile && 'mt-1.5 gap-1.5')}>
-          {delta ? <span className="workspace-pill">{delta}</span> : null}
-          {hint ? <span className="text-muted-foreground">{hint}</span> : null}
+          {hint || delta ? (
+            <div className={cn('mt-2 flex flex-wrap items-center gap-2 text-[11px] md:text-[12px]', isMobile && 'mt-1.5 gap-1.5')}>
+              {delta ? <span className="workspace-pill">{delta}</span> : null}
+              {hint ? <span className="text-muted-foreground">{hint}</span> : null}
+            </div>
+          ) : null}
         </div>
-      ) : null}
+      </div>
     </div>
   );
 }
@@ -105,7 +126,7 @@ export function SectionCard({
   return (
     <section
       className={cn(
-        'workspace-section-card workspace-card rounded-[18px] p-3.5 md:p-4',
+        'workspace-section-card workspace-card rounded-[20px] p-4 md:p-[1.05rem]',
         isMobile && 'workspace-section-card-mobile',
         className,
       )}
@@ -115,8 +136,8 @@ export function SectionCard({
           <div className={cn('text-[14px] font-semibold tracking-[-0.02em] text-foreground md:text-[16px]', isMobile && 'text-[13.5px]')}>
             {title}
           </div>
-          {description ? (
-            <p className={cn('mt-1 text-[11.5px] leading-5 text-muted-foreground md:text-[12.5px] md:leading-[1.45rem]', isMobile && 'line-clamp-2 text-[11px] leading-[1.2rem]')}>
+          {description && !isMobile ? (
+            <p className="mt-1 text-[11.5px] leading-5 text-muted-foreground md:text-[12.5px] md:leading-[1.45rem]">
               {description}
             </p>
           ) : null}

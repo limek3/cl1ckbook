@@ -64,7 +64,7 @@ export default function FinancePage() {
           }
         />
 
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <div className="dashboard-kpi-grid grid grid-cols-2 gap-3">
           <MetricCard label={locale === 'ru' ? 'Доход за день' : 'Revenue today'} value={formatCurrency(dayRevenue, locale)} icon={Wallet} />
           <MetricCard label={locale === 'ru' ? 'Доход за неделю' : 'Revenue this week'} value={formatCurrency(weekRevenue, locale)} icon={TrendingUp} />
           <MetricCard label={locale === 'ru' ? 'Доход за месяц' : 'Revenue this month'} value={formatCurrency(monthRevenue, locale)} icon={Receipt} />

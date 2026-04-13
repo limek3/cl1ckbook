@@ -12,9 +12,12 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatCurrency } from '@/lib/master-workspace';
 import { useMemo, useState } from 'react';
+import { useMobile } from '@/hooks/use-mobile';
+import { cn } from '@/lib/utils';
 
 export default function ClientsPage() {
   const { hasHydrated, ownedProfile, dataset, locale } = useOwnedWorkspaceData();
+  const isMobile = useMobile();
   const [query, setQuery] = useState('');
 
   const clients = useMemo(() => {
@@ -66,7 +69,7 @@ export default function ClientsPage() {
           }
         />
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="dashboard-kpi-grid dashboard-mobile-stats-grid clients-mobile-kpi-grid grid grid-cols-2 gap-3">
           <MetricCard label={locale === 'ru' ? 'Всего клиентов' : 'Total clients'} value={String(dataset.clients.length)} icon={Users2} />
           <MetricCard label={locale === 'ru' ? 'Постоянные' : 'Regular'} value={String(dataset.clients.filter((item) => item.segment === 'regular').length)} />
           <MetricCard label={locale === 'ru' ? 'Избранные' : 'Favorites'} value={String(dataset.clients.filter((item) => item.favorite).length)} icon={Heart} />
@@ -81,13 +84,13 @@ export default function ClientsPage() {
               : 'Segments: new, regular, and sleeping. Search by name, phone, service, or note.'
           }
           actions={
-            <div className="relative w-full md:w-auto">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <div className={cn("workspace-inline-search", isMobile ? "w-full" : "w-full md:w-auto")}>
+              <Search className="workspace-inline-search-icon size-4" />
               <Input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={locale === 'ru' ? 'Поиск клиента' : 'Search client'}
-                className="w-full md:w-[220px] pl-9"
+                className={cn("workspace-input-with-leading-icon h-10 w-full pr-3", !isMobile && "md:w-[220px]")}
               />
             </div>
           }

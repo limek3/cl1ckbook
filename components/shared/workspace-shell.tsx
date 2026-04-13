@@ -792,17 +792,17 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
                             <div className="sidebar-public-hero-text">
                               {demoMode
                                 ? locale === 'ru'
-                                  ? 'Разделы, чаты и запись уже заполнены готовыми примерами.'
-                                  : 'Sections, chats, and bookings already contain ready-made examples.'
+                                  ? 'Разделы, чаты и запись уже заполнены.'
+                                  : 'Sections, chats, and bookings are already filled.'
                                 : locale === 'ru'
-                                  ? 'Откройте примеры рабочего кабинета.'
-                                  : 'Open ready-made workspace examples.'}
+                                  ? 'Включите примеры кабинета.'
+                                  : 'Turn on workspace examples.'}
                             </div>
                           </div>
                           <div className="sidebar-public-hero-actions">
                             <Link href={demoToggleHref} className={cn('sidebar-public-hero-toggle', !demoMode && 'sidebar-public-hero-toggle-attention')}>
                               <Sparkles className="size-3.5" />
-                              <span>{locale === 'ru' ? (demoMode ? 'Рабочий' : 'Демо') : demoMode ? 'Live' : 'Demo'}</span>
+                              <span>{locale === 'ru' ? (demoMode ? 'Рабочий' : 'Включить') : demoMode ? 'Live' : 'Enable'}</span>
                             </Link>
                           </div>
                         </div>
@@ -1000,11 +1000,11 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
                 className={cn('workspace-mobile-tab', active && 'workspace-mobile-tab-active')}
                 aria-current={active ? 'page' : undefined}
               >
-                <span className="relative inline-flex">
-                  <Icon className="size-4" />
+                <span className="workspace-mobile-tab-icon relative">
+                  <Icon className="size-[16px]" />
                   {item.badge ? <span className="workspace-mobile-tab-dot">{item.badge}</span> : null}
                 </span>
-                <span>{item.shortLabel}</span>
+                <span className="workspace-mobile-tab-label">{item.shortLabel}</span>
               </Link>
             );
           })}
@@ -1015,8 +1015,10 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
             onClick={() => setMobileOpen(true)}
             aria-label={labels.primaryNav.more}
           >
-            <Menu className="size-4" />
-            <span>{labels.primaryNav.more}</span>
+            <span className="workspace-mobile-tab-icon">
+              <Menu className="size-[16px]" />
+            </span>
+            <span className="workspace-mobile-tab-label">{labels.primaryNav.more}</span>
           </button>
         </div>
       </nav>
