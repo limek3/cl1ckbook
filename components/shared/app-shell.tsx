@@ -18,7 +18,7 @@ export function Container({
   children: ReactNode;
   className?: string;
 }) {
-  return <div className={cn('mx-auto w-full max-w-[2080px] px-4 sm:px-6 xl:px-8 2xl:px-10', className)}>{children}</div>;
+  return <div className={cn('mx-auto w-full max-w-[1360px] px-4 sm:px-6 lg:px-8', className)}>{children}</div>;
 }
 
 export function Section({
@@ -28,5 +28,5 @@ export function Section({
   children: ReactNode;
   className?: string;
 }) {
-  return <section className={cn('py-8 sm:py-12', className)}>{children}</section>;
+  return <section className={cn('py-8 sm:py-10', className)}>{children}</section>;
 }
