@@ -4,30 +4,29 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[14px] text-[13px] font-medium tracking-[-0.01em] transition-[background-color,border-color,color,opacity,transform,box-shadow] duration-150 outline-none disabled:pointer-events-none disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-ring active:translate-y-px [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[12px] border text-[13px] font-medium tracking-[-0.01em] transition-[background-color,border-color,color,opacity] duration-150 outline-none disabled:pointer-events-none disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-ring/70 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
   {
     variants: {
       variant: {
         default:
-          'border border-[color:var(--button-primary-border)] bg-[color:var(--button-primary-bg)] text-[color:var(--button-primary-text)] shadow-[var(--button-primary-shadow)] hover:bg-[color:var(--button-primary-hover)] hover:border-[color:var(--button-primary-border-hover)]',
+          'border-primary/28 bg-primary text-primary-foreground hover:border-primary/40 hover:bg-[color:var(--primary-hover)]',
         destructive:
-          'border border-[color:var(--button-danger-border)] bg-[color:var(--button-danger-bg)] text-[color:var(--button-danger-text)] shadow-[var(--button-primary-shadow)] hover:bg-[color:var(--button-danger-hover)] hover:border-[color:var(--button-danger-border-hover)]',
+          'border-destructive/25 bg-destructive text-destructive-foreground hover:border-destructive/35 hover:bg-destructive/90',
         outline:
-          'border border-[color:var(--button-outline-border)] bg-[color:var(--button-outline-bg)] text-[color:var(--button-outline-text)] shadow-[var(--button-outline-shadow)] hover:bg-[color:var(--button-outline-hover)] hover:border-[color:var(--button-outline-border-hover)]',
+          'border-border bg-card text-foreground hover:bg-accent/55',
         secondary:
-          'border border-[color:var(--button-secondary-border)] bg-[color:var(--button-secondary-bg)] text-[color:var(--button-secondary-text)] shadow-[var(--button-outline-shadow)] hover:bg-[color:var(--button-secondary-hover)] hover:border-[color:var(--button-secondary-border-hover)]',
+          'border-border bg-secondary text-secondary-foreground hover:bg-accent/60',
         ghost:
-          'border border-transparent bg-transparent text-[color:var(--button-ghost-text)] shadow-none hover:bg-[color:var(--button-ghost-hover)] hover:text-[color:var(--button-outline-text)]',
-        link:
-          'h-auto rounded-none border-0 p-0 text-muted-foreground underline-offset-4 shadow-none hover:text-foreground hover:underline',
+          'border-transparent bg-transparent text-muted-foreground hover:border-border/70 hover:bg-accent/48 hover:text-foreground',
+        link: 'h-auto rounded-none border-0 p-0 text-muted-foreground underline-offset-4 hover:text-foreground hover:underline',
       },
       size: {
         default: 'h-10 px-4',
-        sm: 'h-8 rounded-[12px] px-3 text-[12px]',
+        sm: 'h-8 rounded-[10px] px-3 text-[12px]',
         lg: 'h-11 px-5',
-        icon: 'size-10 rounded-[14px]',
-        'icon-sm': 'size-8 rounded-[12px]',
-        'icon-lg': 'size-11 rounded-[16px]',
+        icon: 'size-10 rounded-[12px] p-0',
+        'icon-sm': 'size-8 rounded-[10px] p-0',
+        'icon-lg': 'size-11 rounded-[14px] p-0',
       },
     },
     defaultVariants: {

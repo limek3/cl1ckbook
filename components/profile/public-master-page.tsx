@@ -92,14 +92,14 @@ function ContactCard({
 
 function buildSectionClass(settings: AppearanceSettings) {
   if (settings.publicSectionStyle === 'minimal') {
-    return 'rounded-[18px] border border-border/60 bg-transparent p-3.5 md:p-5 shadow-none';
+    return 'rounded-[14px] border border-border/75 bg-transparent p-4 md:p-6 shadow-none';
   }
 
   if (settings.publicSectionStyle === 'dividers') {
-    return 'rounded-[18px] border border-border bg-card/78 p-3.5 md:p-5 shadow-[var(--shadow-soft)]';
+    return 'rounded-[14px] border border-border/80 bg-card/75 p-4 md:p-6 shadow-none';
   }
 
-  return 'workspace-card rounded-[18px] p-3.5 md:p-5';
+  return 'workspace-card rounded-[14px] p-4 md:p-6';
 }
 
 export function PublicMasterPage({
@@ -253,11 +253,7 @@ export function PublicMasterPage({
   const works = profile.workGallery ?? [];
   const rating = profile.rating ?? 4.9;
 
-  const heroClass = settings.publicCover === 'minimal'
-    ? 'bg-card/84'
-    : settings.publicCover === 'portrait'
-      ? 'hero-grid accent-gradient'
-      : 'accent-gradient hero-grid';
+  const heroClass = 'bg-card/84';
 
   const heroLayoutClass = settings.publicHeroLayout === 'centered'
     ? 'flex flex-col items-center text-center'

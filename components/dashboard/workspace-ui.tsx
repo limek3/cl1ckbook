@@ -28,7 +28,7 @@ export function DashboardHeader({
   return (
     <div
       className={cn(
-        'dashboard-header border-b border-border pb-3 md:pb-4',
+        'dashboard-header border-b border-border/80 pb-4 md:pb-5',
         isMobile && 'dashboard-header-mobile sticky top-[calc(52px+env(safe-area-inset-top,0px))] z-20 -mx-[var(--space-page-x)] bg-background px-[var(--space-page-x)] pt-2 pb-2',
       )}
       data-mobile-compact={isMobile ? 'true' : 'false'}
@@ -65,7 +65,7 @@ export function MetricCard({
   return (
     <div
       className={cn(
-        'dashboard-kpi-card workspace-metric-card workspace-card rounded-[20px] p-4 md:p-[1.05rem]',
+        'dashboard-kpi-card workspace-metric-card workspace-card rounded-[14px] p-4 md:p-5',
         isMobile && 'workspace-metric-card-mobile',
       )}
     >
@@ -126,7 +126,7 @@ export function SectionCard({
   return (
     <section
       className={cn(
-        'workspace-section-card workspace-card rounded-[20px] p-4 md:p-[1.05rem]',
+        'workspace-section-card workspace-card rounded-[14px] p-4 md:p-5',
         isMobile && 'workspace-section-card-mobile',
         className,
       )}
@@ -216,7 +216,7 @@ export function PublicPageHero({
     return (
       <section
         className={cn(
-          'workspace-card accent-gradient overflow-hidden rounded-[18px] p-3',
+          'workspace-card overflow-hidden rounded-[14px] p-3',
           alignTop && 'mt-0',
         )}
       >
