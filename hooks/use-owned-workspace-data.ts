@@ -1,9 +1,16 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useBrowserSearchParams } from '@/hooks/use-browser-search-params';
 import { useApp } from '@/lib/app-context';
-import { getDashboardDemoSections, getDemoBookings, getDemoProfile, SLOTY_DEMO_SLUG } from '@/lib/demo-data';
+import {
+  DEMO_PROFILE_STORAGE_KEY,
+  DEMO_PROFILE_UPDATED_EVENT,
+  getDashboardDemoSections,
+  getDemoBookings,
+  getDemoProfile,
+  SLOTY_DEMO_SLUG,
+} from '@/lib/demo-data';
 import { isDashboardDemoEnabled } from '@/lib/dashboard-demo';
 import { useLocale } from '@/lib/locale-context';
 import { buildWorkspaceDatasetFromStored } from '@/lib/workspace-store';
@@ -13,11 +20,29 @@ export function useOwnedWorkspaceData() {
   const { locale } = useLocale();
   const searchParams = useBrowserSearchParams();
   const demoMode = isDashboardDemoEnabled(searchParams);
+  const [demoRevision, setDemoRevision] = useState(0);
+
+  useEffect(() => {
+    if (!demoMode || typeof window === 'undefined') return;
+
+    const bump = () => setDemoRevision((current) => current + 1);
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === DEMO_PROFILE_STORAGE_KEY) bump();
+    };
+
+    window.addEventListener(DEMO_PROFILE_UPDATED_EVENT, bump);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener(DEMO_PROFILE_UPDATED_EVENT, bump);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, [demoMode]);
 
   const resolvedProfile = useMemo(() => {
     if (!demoMode) return ownedProfile;
     return getDemoProfile(SLOTY_DEMO_SLUG);
-  }, [demoMode, ownedProfile]);
+  }, [demoMode, demoRevision, ownedProfile]);
 
   const resolvedBookings = useMemo(() => {
     if (!demoMode) return bookings;

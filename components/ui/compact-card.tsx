@@ -18,8 +18,8 @@ export function CompactCard({ children, onClick, className, hover = true }: Comp
     <Component
       onClick={onClick}
       className={cn(
-        'w-full rounded-lg border border-border/70 bg-card p-3 text-left shadow-premium-sm',
-        hover && onClick && 'transition-all hover:-translate-y-[0.5px] hover:shadow-premium',
+        'w-full rounded-[16px] border border-border/70 bg-card p-3 text-left shadow-none',
+        hover && onClick && 'transition-[background,border-color,box-shadow] hover:border-border hover:bg-surface-secondary',
         className
       )}
     >
@@ -63,7 +63,7 @@ export function CompactListItem({
     <button
       onClick={onClick}
       className={cn(
-        'group flex w-full items-center gap-2.5 rounded-md border border-border/70 bg-card p-3 text-left transition hover:bg-surface-secondary',
+        'group flex w-full items-center gap-2.5 rounded-[16px] border border-border/70 bg-card p-3 text-left transition-[background,border-color,box-shadow] hover:border-border hover:bg-surface-secondary',
         className
       )}
     >
@@ -115,7 +115,7 @@ export function QuickActionCard({
     <button
       onClick={onClick}
       className={cn(
-        'group w-full overflow-hidden rounded-md border border-border/70 bg-card p-3 text-left shadow-premium-sm transition hover:-translate-y-[0.5px] hover:shadow-premium',
+        'group w-full overflow-hidden rounded-[16px] border border-border/70 bg-card p-3 text-left shadow-none transition-[background,border-color,box-shadow] hover:border-border hover:bg-surface-secondary',
         className
       )}
     >
@@ -165,7 +165,7 @@ export function SectionHeader({ title, icon, action, className }: SectionHeaderP
       {action && (
         <button
           onClick={action.onClick}
-          className="inline-flex items-center gap-0.5 rounded-full border border-border/70 bg-card px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition hover:bg-surface-secondary hover:text-foreground"
+          className="inline-flex items-center gap-1 rounded-[13px] border px-2.5 py-1 text-[11px] font-medium transition-[background,border-color,color,transform] active:scale-[0.98] cb-menu-button-quiet"
         >
           {action.label}
           <ChevronRight className="h-2.5 w-2.5" />
@@ -201,7 +201,7 @@ export function EmptyState({ icon, title, description, action }: EmptyStateProps
       {action && (
         <button
           onClick={action.onClick}
-          className="mt-3 rounded-md bg-primary px-4 py-2 text-[12px] font-semibold text-primary-foreground shadow-primary-glow transition hover:bg-primary-hover"
+          className="mt-3 rounded-[15px] border px-4 py-2 text-[12px] font-medium transition-[background,border-color,color,transform] active:scale-[0.98] cb-neutral-primary"
         >
           {action.label}
         </button>

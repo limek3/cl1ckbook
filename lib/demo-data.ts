@@ -4,6 +4,8 @@ import type { WorkspaceSections } from '@/lib/workspace-store';
 import type { Booking, MasterProfile } from '@/lib/types';
 
 export const SLOTY_DEMO_SLUG = 'klikbuk-demo';
+export const DEMO_PROFILE_STORAGE_KEY = 'sloty-demo:profile';
+export const DEMO_PROFILE_UPDATED_EVENT = 'sloty-demo:profile-updated';
 
 function daysFromToday(offset: number) {
   const date = new Date();
@@ -119,6 +121,145 @@ export const demoProfile: MasterProfile = {
   ],
   createdAt: new Date('2025-01-15T09:30:00.000Z').toISOString(),
 };
+
+const demoProfileEn: MasterProfile = {
+  ...demoProfile,
+  name: 'Alina Morozova',
+  profession: 'Nail care specialist',
+  city: 'Amsterdam',
+  bio: 'Manicure, pedicure, and nail strengthening with a calm service flow. Services, reviews, contacts, and booking are clear before the client writes.',
+  services: [
+    'Gel polish manicure',
+    'Gel strengthening',
+    'Smart pedicure',
+    'Removal + new design',
+    'Express care',
+  ],
+  phone: '+31 6 4444 2211',
+  whatsapp: '+31644442211',
+  responseTime: 'Replies within 10 minutes',
+  experienceLabel: '7 years of experience',
+  priceHint: 'from €45',
+  reviews: [
+    {
+      id: 'demo-review-1',
+      author: 'Maria',
+      rating: 5,
+      text: 'Very neat, calm, and organized. I liked that booking and reminders were clear from the start.',
+      dateLabel: '2 weeks ago',
+      service: 'Gel polish manicure',
+    },
+    {
+      id: 'demo-review-2',
+      author: 'Svetlana',
+      rating: 5,
+      text: 'It was easy to book, and the services and available time were clear right away.',
+      dateLabel: '1 month ago',
+      service: 'Smart pedicure',
+    },
+    {
+      id: 'demo-review-3',
+      author: 'Elena',
+      rating: 5,
+      text: 'The page feels clean and professional. Services, reviews, and booking are easy to understand.',
+      dateLabel: '6 days ago',
+      service: 'Gel strengthening',
+    },
+  ],
+  workGallery: [
+    {
+      id: 'demo-work-1',
+      title: 'Milky rose',
+      image: buildArtworkDataUri('Milky rose', 'Clean shape and soft shine', '#f9bcc7', '#a855f7'),
+      note: 'Soft everyday design',
+    },
+    {
+      id: 'demo-work-2',
+      title: 'Glossy nude',
+      image: buildArtworkDataUri('Glossy nude', 'Minimal salon set', '#f3d0b6', '#fb7185'),
+      note: 'Most popular first-visit choice',
+    },
+    {
+      id: 'demo-work-3',
+      title: 'Deep espresso',
+      image: buildArtworkDataUri('Deep espresso', 'Warm contrast tone', '#7c3f29', '#111827'),
+      note: 'Warm seasonal accent',
+    },
+    {
+      id: 'demo-work-4',
+      title: 'Soft chrome',
+      image: buildArtworkDataUri('Soft chrome', 'Light chrome texture', '#dbeafe', '#6366f1'),
+      note: 'For evening appointments',
+    },
+  ],
+};
+
+const demoBookingEn: Record<string, Pick<Booking, 'clientName' | 'service' | 'comment'>> = {
+  'demo-booking-1': {
+    clientName: 'Maria',
+    service: 'Gel polish manicure',
+    comment: 'First visit, prefers a calm shade and short square shape.',
+  },
+  'demo-booking-2': {
+    clientName: 'Olga',
+    service: 'Removal + strengthening',
+    comment: 'Asked to move 15 minutes later if a slot opens.',
+  },
+  'demo-booking-3': {
+    clientName: 'Elena',
+    service: 'Extensions + design',
+    comment: 'Usually brings a design reference and arrives early.',
+  },
+  'demo-booking-4': {
+    clientName: 'Ksenia',
+    service: 'Smart pedicure',
+    comment: 'Needs a receipt and a short reminder one hour before the visit.',
+  },
+  'demo-booking-5': {
+    clientName: 'Alina',
+    service: 'Gel correction',
+    comment: 'Regular client; suggest the next slot right after the visit.',
+  },
+  'demo-booking-6': {
+    clientName: 'Svetlana',
+    service: 'Express manicure',
+    comment: 'If an earlier slot opens, Telegram is convenient.',
+  },
+  'demo-booking-7': {
+    clientName: 'Natalia',
+    service: 'Gel strengthening',
+    comment: 'Evening visit; send a soft reminder in advance.',
+  },
+  'demo-booking-8': {
+    clientName: 'Marina',
+    service: 'Gel polish manicure',
+    comment: 'Ready to confirm in chat after the morning reminder.',
+  },
+  'demo-booking-9': {
+    clientName: 'Irina',
+    service: 'Smart pedicure',
+    comment: 'After the visit, send a short message with the next available slot.',
+  },
+  'demo-booking-10': {
+    clientName: 'Daria',
+    service: 'Gel strengthening',
+    comment: 'Completed visit from history for analytics.',
+  },
+};
+
+function localizeDemoProfile(locale: 'ru' | 'en') {
+  return locale === 'ru' ? demoProfile : demoProfileEn;
+}
+
+function localizeDemoBookings(locale: 'ru' | 'en') {
+  if (locale === 'ru') return demoBookings;
+
+  return demoBookings.map((booking) => ({
+    ...booking,
+    ...(demoBookingEn[booking.id] ?? {}),
+  }));
+}
+
 
 export const demoBookings: Booking[] = [
   {
@@ -243,12 +384,64 @@ export const demoBookings: Booking[] = [
   },
 ];
 
-export function getDemoProfile(slug: string) {
-  return slug === SLOTY_DEMO_SLUG ? demoProfile : null;
+function normalizeDemoProfile(value: Partial<MasterProfile> | null | undefined): MasterProfile | null {
+  if (!value) return null;
+
+  return {
+    ...demoProfile,
+    ...value,
+    id: value.id || demoProfile.id,
+    slug: SLOTY_DEMO_SLUG,
+    name: value.name || demoProfile.name,
+    profession: value.profession || demoProfile.profession,
+    city: value.city || demoProfile.city,
+    bio: value.bio || demoProfile.bio,
+    services: Array.isArray(value.services) && value.services.length > 0 ? value.services : demoProfile.services,
+    workGallery: Array.isArray(value.workGallery) ? value.workGallery : demoProfile.workGallery,
+    reviews: Array.isArray(value.reviews) ? value.reviews : demoProfile.reviews,
+    rating: typeof value.rating === 'number' ? value.rating : demoProfile.rating,
+    reviewCount: typeof value.reviewCount === 'number' ? value.reviewCount : value.reviews?.length ?? demoProfile.reviewCount,
+    createdAt: value.createdAt || demoProfile.createdAt,
+  };
 }
 
-export function getDemoBookings(slug: string) {
-  return slug === SLOTY_DEMO_SLUG ? demoBookings : [];
+export function readStoredDemoProfile() {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const raw = window.localStorage.getItem(DEMO_PROFILE_STORAGE_KEY);
+    return raw ? normalizeDemoProfile(JSON.parse(raw) as Partial<MasterProfile>) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveStoredDemoProfile(profile: MasterProfile) {
+  if (typeof window === 'undefined') return;
+
+  try {
+    const normalized = normalizeDemoProfile(profile) ?? demoProfile;
+    window.localStorage.setItem(DEMO_PROFILE_STORAGE_KEY, JSON.stringify(normalized));
+    window.dispatchEvent(new CustomEvent(DEMO_PROFILE_UPDATED_EVENT, { detail: normalized }));
+  } catch {}
+}
+
+export function resetStoredDemoProfile() {
+  if (typeof window === 'undefined') return;
+
+  try {
+    window.localStorage.removeItem(DEMO_PROFILE_STORAGE_KEY);
+    window.dispatchEvent(new CustomEvent(DEMO_PROFILE_UPDATED_EVENT, { detail: demoProfile }));
+  } catch {}
+}
+
+export function getDemoProfile(slug: string, locale: 'ru' | 'en' = 'ru') {
+  if (slug !== SLOTY_DEMO_SLUG) return null;
+  return readStoredDemoProfile() ?? localizeDemoProfile(locale);
+}
+
+export function getDemoBookings(slug: string, locale: 'ru' | 'en' = 'ru') {
+  return slug === SLOTY_DEMO_SLUG ? localizeDemoBookings(locale) : [];
 }
 
 
@@ -282,7 +475,7 @@ export function getDashboardDemoChatThreads(locale: 'ru' | 'en'): ChatThreadReco
     {
       id: 'demo-thread-1',
       workspaceId: 'demo-workspace',
-      clientName: 'Мария',
+      clientName: locale === 'ru' ? 'Мария' : 'Maria',
       clientPhone: '+7 999 100-00-11',
       channel: 'Telegram',
       segment: 'new',
@@ -315,7 +508,7 @@ export function getDashboardDemoChatThreads(locale: 'ru' | 'en'): ChatThreadReco
           author: 'system',
           body: locale === 'ru'
             ? 'КликБук бот подготовил мягкий перенос на 12:30.'
-            : 'КликБук bot prepared a soft reschedule for 12:30.',
+            : 'ClickBook bot prepared a soft reschedule for 12:30.',
           viaBot: true,
           deliveryState: 'queued',
           createdAt: new Date(`${firstVisit}T09:02:00.000Z`).toISOString(),
@@ -336,7 +529,7 @@ export function getDashboardDemoChatThreads(locale: 'ru' | 'en'): ChatThreadReco
     {
       id: 'demo-thread-2',
       workspaceId: 'demo-workspace',
-      clientName: 'Светлана',
+      clientName: locale === 'ru' ? 'Светлана' : 'Svetlana',
       clientPhone: '+7 999 200-00-22',
       channel: 'MAX',
       segment: 'active',
@@ -379,7 +572,7 @@ export function getDashboardDemoChatThreads(locale: 'ru' | 'en'): ChatThreadReco
     {
       id: 'demo-thread-3',
       workspaceId: 'demo-workspace',
-      clientName: 'Елена',
+      clientName: locale === 'ru' ? 'Елена' : 'Elena',
       clientPhone: '+7 999 300-00-33',
       channel: 'Telegram',
       segment: 'followup',

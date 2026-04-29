@@ -1,341 +1,514 @@
 'use client';
 
-import Link from 'next/link';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  type CSSProperties,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { useTheme } from 'next-themes';
 import {
-  Brush,
-  Globe2,
-  LayoutTemplate,
+  Check,
+  Eye,
   MonitorSmartphone,
   MoonStar,
-  Palette,
-  PanelsTopLeft,
   RotateCcw,
-  SunMedium,
-  WandSparkles,
+  Sparkles,
 } from 'lucide-react';
-import { WorkspaceShell } from '@/components/shared/workspace-shell';
-import { DashboardHeader, SectionCard } from '@/components/dashboard/workspace-ui';
-import { Button } from '@/components/ui/button';
-import { useAppearance, type AppearanceSettings } from '@/lib/appearance-context';
-import { useApp } from '@/lib/app-context';
-import { useLocale } from '@/lib/locale-context';
-import { accentPalette, accentToneValues } from '@/lib/appearance-palette';
-import { cn } from '@/lib/utils';
-import { useMobile } from '@/hooks/use-mobile';
 
-type ThemeOption = 'light' | 'dark' | 'system';
+import { WorkspaceShell } from '@/components/shared/workspace-shell';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from '@/components/ui/select';
+import { useAppearance, type AppearanceSettings } from '@/lib/appearance-context';
+import {
+  accentPalette,
+  accentToneValues,
+  type AccentTone,
+} from '@/lib/appearance-palette';
+import { useLocale } from '@/lib/locale-context';
+import { cn } from '@/lib/utils';
+import {
+  menuContentClass,
+  menuItemCheckSlotClass,
+  menuItemClass,
+  menuItemInnerClass,
+  menuItemLabelClass,
+  menuItemLeftClass,
+  menuTriggerClass,
+} from '@/lib/menu-styles';
+
+type ThemeMode = 'light' | 'dark';
 
 type Option<T extends string> = {
   value: T;
   label: string;
-  description?: string;
-  icon?: ReactNode;
+  description: string;
 };
 
-function SettingRow({
-  label,
-  description,
+function toneLabel(locale: 'ru' | 'en', tone: string) {
+  const ru: Record<string, string> = {
+    emerald: 'Изумруд',
+    violet: 'Фиолет',
+    sky: 'Небо',
+    rose: 'Роза',
+    amber: 'Янтарь',
+    cyan: 'Циан',
+    indigo: 'Индиго',
+    peach: 'Персик',
+    teal: 'Бирюза',
+    cobalt: 'Кобальт',
+    ruby: 'Рубин',
+    lime: 'Лайм',
+  };
+
+  const en: Record<string, string> = {
+    emerald: 'Emerald',
+    violet: 'Violet',
+    sky: 'Sky',
+    rose: 'Rose',
+    amber: 'Amber',
+    cyan: 'Cyan',
+    indigo: 'Indigo',
+    peach: 'Peach',
+    teal: 'Teal',
+    cobalt: 'Cobalt',
+    ruby: 'Ruby',
+    lime: 'Lime',
+  };
+
+  return (locale === 'ru' ? ru : en)[tone] ?? tone;
+}
+
+function settingValueLabel(locale: 'ru' | 'en', value: string) {
+  const ru: Record<string, string> = {
+    light: 'Светлая',
+    dark: 'Тёмная',
+    system: 'Системная',
+
+    focused: 'Фокус',
+    balanced: 'Баланс',
+    wide: 'Шире',
+
+    compact: 'Компакт',
+    standard: 'Стандарт',
+    airy: 'Свободно',
+
+    tight: 'Строго',
+    medium: 'Баланс',
+    soft: 'Мягко',
+
+    flat: 'Плоско',
+    glass: 'Стекло',
+
+    calm: 'Спокойно',
+    clear: 'Чище',
+    contrast: 'Контраст',
+
+    capsule: 'Капсула',
+    line: 'Линия',
+    solid: 'Плотно',
+
+    off: 'Без',
+    fast: 'Быстро',
+    smooth: 'Плавно',
+
+    roomy: 'Воздух',
+
+    gradient: 'Градиент',
+    portrait: 'Портрет',
+    minimal: 'Минимал',
+
+    split: 'Сплит',
+    centered: 'Центр',
+
+    side: 'Слева',
+    top: 'Сверху',
+    hidden: 'Скрыто',
+
+    cards: 'Карточки',
+    strip: 'Полоса',
+
+    sticky: 'Закрепить',
+    inline: 'Внутри',
+    quiet: 'Тихо',
+
+    pill: 'Капсула',
+    rounded: 'Скруглённая',
+
+    editorial: 'Редакция',
+    chips: 'Чипы',
+    stacked: 'Список',
+
+    panel: 'Панель',
+    step: 'Шаги',
+
+    dividers: 'Линии',
+    grid: 'Сетка',
+  };
+
+  const en: Record<string, string> = {
+    light: 'Light',
+    dark: 'Dark',
+    system: 'System',
+
+    focused: 'Focused',
+    balanced: 'Balanced',
+    wide: 'Wide',
+
+    compact: 'Compact',
+    standard: 'Standard',
+    airy: 'Airy',
+
+    tight: 'Tight',
+    medium: 'Balanced',
+    soft: 'Soft',
+
+    flat: 'Flat',
+    glass: 'Glass',
+
+    calm: 'Calm',
+    clear: 'Clear',
+    contrast: 'Contrast',
+
+    capsule: 'Capsule',
+    line: 'Line',
+    solid: 'Solid',
+
+    off: 'Off',
+    fast: 'Fast',
+    smooth: 'Smooth',
+
+    roomy: 'Roomy',
+
+    gradient: 'Gradient',
+    portrait: 'Portrait',
+    minimal: 'Minimal',
+
+    split: 'Split',
+    centered: 'Centered',
+
+    side: 'Side',
+    top: 'Top',
+    hidden: 'Hidden',
+
+    cards: 'Cards',
+    strip: 'Strip',
+
+    sticky: 'Sticky',
+    inline: 'Inline',
+    quiet: 'Quiet',
+
+    pill: 'Pill',
+    rounded: 'Rounded',
+
+    editorial: 'Editorial',
+    chips: 'Chips',
+    stacked: 'Stacked',
+
+    panel: 'Panel',
+    step: 'Steps',
+
+    dividers: 'Dividers',
+    grid: 'Grid',
+  };
+
+  return (locale === 'ru' ? ru : en)[value] ?? value;
+}
+
+function pageBg(light: boolean) {
+  return light ? 'bg-[#f4f4f2]' : 'bg-[#090909]';
+}
+
+function pageText(light: boolean) {
+  return light ? 'text-[#0e0e0e]' : 'text-white';
+}
+
+function mutedText(light: boolean) {
+  return light ? 'text-black/48' : 'text-white/42';
+}
+
+function faintText(light: boolean) {
+  return light ? 'text-black/32' : 'text-white/26';
+}
+
+function borderTone(light: boolean) {
+  return light ? 'border-black/[0.08]' : 'border-white/[0.08]';
+}
+
+function divideTone(light: boolean) {
+  return light ? 'divide-black/[0.08]' : 'divide-white/[0.08]';
+}
+
+function cardTone(light: boolean) {
+  return light
+    ? 'border-black/[0.08] bg-[#fbfbfa]'
+    : 'border-white/[0.08] bg-[#101010]';
+}
+
+function insetTone(light: boolean) {
+  return light
+    ? 'border-black/[0.07] bg-black/[0.025]'
+    : 'border-white/[0.07] bg-white/[0.035]';
+}
+
+function buttonBase(light: boolean, active = false) {
+  return cn(
+    'inline-flex h-8 items-center justify-center gap-2 rounded-[9px] border px-3 text-[12px] font-medium shadow-none transition-[background,border-color,color,opacity,transform] duration-150 active:scale-[0.985]',
+    active
+      ? light
+        ? 'cb-neutral-primary cb-neutral-primary-light hover:opacity-[0.98]'
+        : 'cb-neutral-primary cb-neutral-primary-dark hover:opacity-[0.98]'
+      : light
+        ? 'border-black/[0.08] bg-white text-black/58 hover:border-black/[0.14] hover:bg-black/[0.035] hover:text-black'
+        : 'border-white/[0.08] bg-white/[0.04] text-white/55 hover:border-white/[0.14] hover:bg-white/[0.07] hover:text-white',
+  );
+}
+
+function selectTriggerClass(light: boolean) {
+  return menuTriggerClass(light);
+}
+
+function selectContentClass(light: boolean) {
+  return menuContentClass(light);
+}
+
+function selectItemClass(light: boolean, active = false) {
+  return menuItemClass(light, active);
+}
+
+function accentPillStyle(color: string, light: boolean): CSSProperties {
+  return {
+    background: light
+      ? `color-mix(in srgb, ${color} 10%, #ffffff)`
+      : `color-mix(in srgb, ${color} 18%, #141414)`,
+    borderColor: light
+      ? `color-mix(in srgb, ${color} 24%, rgba(0,0,0,0.1))`
+      : `color-mix(in srgb, ${color} 30%, rgba(255,255,255,0.1))`,
+    color: light
+      ? `color-mix(in srgb, ${color} 72%, #101010)`
+      : `color-mix(in srgb, ${color} 20%, #ffffff)`,
+  };
+}
+
+function Card({
   children,
-  noBorder = false,
+  light,
+  className,
 }: {
-  label: string;
-  description?: string;
   children: ReactNode;
-  noBorder?: boolean;
+  light: boolean;
+  className?: string;
+}) {
+  return (
+    <section className={cn('rounded-[11px] border', cardTone(light), className)}>
+      {children}
+    </section>
+  );
+}
+
+function CardTitle({
+  title,
+  description,
+  light,
+  right,
+}: {
+  title: string;
+  description?: string;
+  light: boolean;
+  right?: ReactNode;
 }) {
   return (
     <div
       className={cn(
-        'settings-row grid gap-3 py-3.5 lg:grid-cols-[minmax(0,180px)_1fr] lg:items-center',
-        !noBorder && 'border-b border-border/80',
+        'flex min-h-[54px] items-center justify-between gap-4 border-b px-4 py-3',
+        borderTone(light),
       )}
     >
-      <div>
-        <div className="settings-label text-[13px] font-semibold text-foreground">{label}</div>
-        {description ? <div className="settings-caption mt-1 text-[11px] leading-5 text-muted-foreground">{description}</div> : null}
+      <div className="min-w-0">
+        <h2
+          className={cn(
+            'truncate text-[13px] font-semibold tracking-[-0.018em]',
+            pageText(light),
+          )}
+        >
+          {title}
+        </h2>
+
+        {description ? (
+          <p className={cn('mt-1 truncate text-[11px]', mutedText(light))}>
+            {description}
+          </p>
+        ) : null}
       </div>
+
+      {right ? <div className="shrink-0">{right}</div> : null}
+    </div>
+  );
+}
+
+function Panel({
+  children,
+  light,
+  className,
+}: {
+  children: ReactNode;
+  light: boolean;
+  className?: string;
+}) {
+  return (
+    <div className={cn('rounded-[10px] border', insetTone(light), className)}>
+      {children}
+    </div>
+  );
+}
+
+function MicroLabel({
+  children,
+  light,
+  active,
+  accentColor,
+  className,
+}: {
+  children: ReactNode;
+  light: boolean;
+  active?: boolean;
+  accentColor?: string;
+  className?: string;
+}) {
+  return (
+    <span
+      style={active && accentColor ? accentPillStyle(accentColor, light) : undefined}
+      className={cn(
+        'inline-flex h-7 items-center gap-1.5 rounded-[9px] border px-2.5 text-[10.5px] font-medium',
+        !active &&
+          (light
+            ? 'border-black/[0.08] bg-white text-black/50'
+            : 'border-white/[0.08] bg-white/[0.04] text-white/42'),
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+function ActionButton({
+  children,
+  light,
+  active,
+  onClick,
+  className,
+}: {
+  children: ReactNode;
+  light: boolean;
+  active?: boolean;
+  onClick?: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(buttonBase(light, active), className)}
+    >
+      {children}
+    </button>
+  );
+}
+
+function SettingRow({
+  title,
+  description,
+  light,
+  children,
+}: {
+  title: string;
+  description?: string;
+  light: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div className="grid gap-3 py-3 first:pt-0 last:pb-0 md:grid-cols-[190px_minmax(0,1fr)] md:items-center">
+      <div className="min-w-0">
+        <div className={cn('text-[12px] font-semibold tracking-[-0.018em]', pageText(light))}>
+          {title}
+        </div>
+
+        {description ? (
+          <div className={cn('mt-1 text-[11px] leading-4', mutedText(light))}>
+            {description}
+          </div>
+        ) : null}
+      </div>
+
       <div className="min-w-0">{children}</div>
     </div>
   );
 }
 
-function SegmentedControl<T extends string>({
+function SegmentControl<T extends string>({
   value,
   options,
   onChange,
-  className,
+  light,
+  accentColor,
 }: {
   value: T;
-  options: Option<T>[];
+  options: Array<Option<T>>;
   onChange: (value: T) => void;
-  className?: string;
+  light: boolean;
+  accentColor: string;
 }) {
-  const activeIndex = Math.max(
-    0,
-    options.findIndex((option) => option.value === value),
-  );
-
   return (
     <div
       className={cn(
-        'appearance-segment-shell relative isolate w-full max-w-[380px] rounded-[12px] border p-1 shadow-none',
-        className,
+        'grid min-h-9 w-full overflow-hidden rounded-[10px] border',
+        light ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.045]',
       )}
+      style={{
+        gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))`,
+      }}
     >
-      <span
-        aria-hidden="true"
-        className="appearance-segment-indicator pointer-events-none absolute inset-y-1 left-1 rounded-[9px] border transition-transform duration-300 ease-out"
-        style={{
-          width: `calc((100% - 8px) / ${options.length})`,
-          transform: `translateX(calc(${activeIndex} * 100%))`,
-        }}
-      />
-
-      <div
-        className="relative z-10 grid w-full"
-        style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
-      >
-        {options.map((option) => {
-          const active = option.value === value;
-
-          return (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => onChange(option.value)}
-              className={cn(
-                'appearance-segment-button inline-flex h-7 items-center justify-center gap-1.5 rounded-[9px] px-2 text-[11px] font-medium transition-colors duration-200',
-              )}
-              aria-pressed={active}
-              data-active={active ? 'true' : 'false'}
-            >
-              {option.icon}
-              <span className="truncate"><span className="min-w-0 break-words">{option.label}</span></span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function ThemeCards({
-  value,
-  locale,
-  onChange,
-}: {
-  value: ThemeOption;
-  locale: 'ru' | 'en';
-  onChange: (value: ThemeOption) => void;
-}) {
-  const options: Array<Option<ThemeOption>> = [
-    {
-      value: 'light',
-      label: locale === 'ru' ? 'Светлая' : 'Light',
-      icon: <SunMedium className="size-3.5" />,
-    },
-    {
-      value: 'dark',
-      label: locale === 'ru' ? 'Тёмная' : 'Dark',
-      icon: <MoonStar className="size-3.5" />,
-    },
-    {
-      value: 'system',
-      label: locale === 'ru' ? 'Авто' : 'Auto',
-      icon: <MonitorSmartphone className="size-3.5" />,
-    },
-  ];
-
-  return <SegmentedControl value={value} options={options} onChange={onChange} className="max-w-[360px]" />;
-}
-
-function ThemeLookCards({
-  locale,
-  activeKey,
-  onApply,
-}: {
-  locale: 'ru' | 'en';
-  activeKey: string | null;
-  onApply: (key: string) => void;
-}) {
-  const options = [
-    {
-      key: 'graphite',
-      label: locale === 'ru' ? 'Графит' : 'Graphite',
-      preview: 'dark' as const,
-      accent: 'cobalt' as const,
-      neutral: 'zinc' as const,
-    },
-    {
-      key: 'velvet',
-      label: locale === 'ru' ? 'Вельвет' : 'Velvet',
-      preview: 'dark' as const,
-      accent: 'violet' as const,
-      neutral: 'pearl' as const,
-    },
-    {
-      key: 'mist',
-      label: locale === 'ru' ? 'Туман' : 'Mist',
-      preview: 'light' as const,
-      accent: 'sky' as const,
-      neutral: 'slate' as const,
-    },
-    {
-      key: 'linen',
-      label: locale === 'ru' ? 'Лён' : 'Linen',
-      preview: 'light' as const,
-      accent: 'amber' as const,
-      neutral: 'sand' as const,
-    },
-    {
-      key: 'sage',
-      label: locale === 'ru' ? 'Шалфей' : 'Sage',
-      preview: 'light' as const,
-      accent: 'teal' as const,
-      neutral: 'sage' as const,
-    },
-    {
-      key: 'rose',
-      label: locale === 'ru' ? 'Пудра' : 'Powder',
-      preview: 'light' as const,
-      accent: 'rose' as const,
-      neutral: 'pearl' as const,
-    },
-  ];
-
-  return (
-    <div className="space-y-2.5">
-      <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-        {locale === 'ru' ? 'Цветовые темы' : 'Color themes'}
-      </div>
-      <div className="appearance-look-grid">
-        {options.map((option) => {
-          const active = option.key === activeKey;
-          const accent = accentPalette[option.accent];
-
-          return (
-            <button
-              key={option.key}
-              type="button"
-              onClick={() => onApply(option.key)}
-              className="appearance-look-card text-left"
-              data-active={active ? 'true' : 'false'}
-              data-preview={option.preview}
-            >
-              <div className="appearance-look-card-preview">
-                <span className="appearance-look-card-topbar" />
-                <div className="appearance-look-card-body">
-                  <span className="appearance-look-card-side" />
-                  <span className="appearance-look-card-line" />
-                  <span className="appearance-look-card-line appearance-look-card-line-short" />
-                </div>
-                <span className="appearance-look-card-accent" style={{ background: accent.solid }} />
-              </div>
-              <div className="mt-2 flex items-center justify-between gap-2">
-                <span className="text-[11px] font-semibold text-foreground">{option.label}</span>
-                <span className="inline-flex items-center gap-1">
-                  <span className="size-2 rounded-full ring-1 ring-black/5" style={{ background: accent.solid }} />
-                </span>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function AccentPalettePicker({
-  value,
-  onChange,
-}: {
-  value: AppearanceSettings['accentTone'];
-  onChange: (value: AppearanceSettings['accentTone']) => void;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      {accentToneValues.map((tone) => {
-        const active = tone === value;
-        const palette = accentPalette[tone];
-
-        return (
-          <button
-            key={tone}
-            type="button"
-            onClick={() => onChange(tone)}
-            className={cn(
-              'appearance-chip-button relative flex size-[22px] items-center justify-center rounded-full border transition-transform duration-150 hover:scale-[1.04]',
-              active
-                ? 'border-white/80 shadow-[0_0_0_2px_color-mix(in_srgb,var(--foreground)_12%,transparent)]'
-                : 'border-transparent',
-            )}
-            style={{ background: palette.solid }}
-            aria-label={tone}
-            title={tone}
-          >
-            {active ? <span className="size-1.5 rounded-full bg-white/90" /> : null}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function NeutralTonePicker({
-  value,
-  locale,
-  onChange,
-}: {
-  value: AppearanceSettings['neutralTone'];
-  locale: 'ru' | 'en';
-  onChange: (value: AppearanceSettings['neutralTone']) => void;
-}) {
-  const options: Array<Option<AppearanceSettings['neutralTone']>> = [
-    { value: 'zinc', label: locale === 'ru' ? 'Цинк' : 'Zinc' },
-    { value: 'slate', label: locale === 'ru' ? 'Сланец' : 'Slate' },
-    { value: 'stone', label: locale === 'ru' ? 'Камень' : 'Stone' },
-    { value: 'pearl', label: locale === 'ru' ? 'Жемчуг' : 'Pearl' },
-    { value: 'sage', label: locale === 'ru' ? 'Шалфей' : 'Sage' },
-    { value: 'sand', label: locale === 'ru' ? 'Песок' : 'Sand' },
-  ];
-
-  return (
-    <div className="inline-flex flex-wrap items-center gap-2">
-      {options.map((option) => {
+      {options.map((option, index) => {
         const active = option.value === value;
 
         return (
           <button
             key={option.value}
             type="button"
+            title={option.description}
             onClick={() => onChange(option.value)}
             className={cn(
-              'inline-flex h-7 items-center gap-2 rounded-full border px-3 text-[11px] font-medium transition',
+              'group relative flex h-9 min-w-0 items-center justify-center border-r px-2 text-[10.5px] font-semibold tracking-[-0.015em] transition-colors duration-150 last:border-r-0 active:scale-[0.985]',
+              light ? 'border-black/[0.07]' : 'border-white/[0.07]',
               active
-                ? 'border-border bg-background text-foreground shadow-none'
-                : 'border-border/80 bg-card/80 text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+                ? light
+                  ? 'text-black'
+                  : 'text-white'
+                : light
+                  ? 'text-black/40 hover:bg-black/[0.018] hover:text-black/70'
+                  : 'text-white/36 hover:bg-white/[0.035] hover:text-white/70',
+              index === options.length - 1 && 'border-r-0',
             )}
           >
+            <span className="truncate">{option.label}</span>
+
             <span
-              className="size-2.5 rounded-full border border-black/10"
-              style={{
-                background:
-                  option.value === 'sand'
-                    ? '#d2b89b'
-                    : option.value === 'sage'
-                      ? '#9db39f'
-                      : option.value === 'pearl'
-                        ? '#b6a8cf'
-                        : option.value === 'stone'
-                          ? '#b4a494'
-                          : option.value === 'slate'
-                            ? '#94a3b8'
-                            : '#a1a1aa',
-              }}
+              style={active ? { background: accentColor } : undefined}
+              className={cn(
+                'absolute bottom-1 left-1/2 size-1 -translate-x-1/2 rounded-full transition-all duration-150',
+                active
+                  ? 'opacity-100'
+                  : light
+                    ? 'bg-black/0 opacity-0 group-hover:bg-black/18 group-hover:opacity-100'
+                    : 'bg-white/0 opacity-0 group-hover:bg-white/18 group-hover:opacity-100',
+              )}
             />
-            <span className="min-w-0 break-words">{option.label}</span>
           </button>
         );
       })}
@@ -343,1054 +516,1416 @@ function NeutralTonePicker({
   );
 }
 
-function CompactPanel({
+function ColorSelect({
+  value,
+  onChange,
+  locale,
+  light,
+}: {
+  value: AccentTone;
+  onChange: (value: AccentTone) => void;
+  locale: 'ru' | 'en';
+  light: boolean;
+}) {
+  const current = accentPalette[value];
+
+  return (
+    <Select value={value} onValueChange={(next) => onChange(next as AccentTone)}>
+      <SelectTrigger className={selectTriggerClass(light)}>
+        <span className="flex min-w-0 items-center gap-2">
+          <span
+            className="size-3 shrink-0 rounded-full border border-white/30"
+            style={{ background: current.gradient }}
+          />
+
+          <span className="truncate">{toneLabel(locale, value)}</span>
+        </span>
+      </SelectTrigger>
+
+      <SelectContent className={selectContentClass(light)}>
+        {accentToneValues.map((tone) => {
+          const meta = accentPalette[tone];
+          const active = value === tone;
+
+          return (
+            <SelectItem
+              key={tone}
+              value={tone}
+              className={cn(
+                selectItemClass(light, active),
+                'pl-2 pr-3 [&>[data-ref-select-indicator]]:hidden',
+              )}
+            >
+              <div className={menuItemInnerClass()}>
+                <span className={menuItemLeftClass()}>
+                  <span
+                    className="size-3.5 shrink-0 rounded-full border border-white/30"
+                    style={{ background: meta.gradient }}
+                  />
+
+                  <span className={menuItemLabelClass()}>
+                    {toneLabel(locale, tone)}
+                  </span>
+                </span>
+
+                <span className={menuItemCheckSlotClass()}>
+                  {active ? (
+                    <Check className="size-3.5" style={{ color: meta.solid }} />
+                  ) : null}
+                </span>
+              </div>
+            </SelectItem>
+          );
+        })}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function PresetCard({
   title,
   description,
-  children,
+  light,
+  onClick,
 }: {
   title: string;
-  description?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="rounded-[14px] border border-border/80 bg-background/44 p-3">
-      <div className="text-[12px] font-semibold text-foreground">{title}</div>
-      {description ? <div className="mt-1 text-[10.5px] leading-5 text-muted-foreground">{description}</div> : null}
-      <div className="mt-3">{children}</div>
-    </div>
-  );
-}
-
-function SummaryBadge({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[12px] border border-border/80 bg-card/72 px-3 py-2">
-      <div className="text-[10px] text-muted-foreground">{label}</div>
-      <div className="mt-1 text-[11px] font-medium text-foreground">{value}</div>
-    </div>
-  );
-}
-
-function AppearancePresetCard({
-  label,
-  description,
-  accent,
-  publicAccent,
-  onApply,
-}: {
-  label: string;
   description: string;
-  accent: AppearanceSettings['accentTone'];
-  publicAccent: AppearanceSettings['publicAccent'];
-  onApply: () => void;
+  light: boolean;
+  onClick: () => void;
 }) {
   return (
     <button
       type="button"
-      onClick={onApply}
-      className="appearance-preset-card group text-left"
+      onClick={onClick}
+      className={cn(
+        'min-h-[62px] rounded-[10px] border p-3 text-left transition active:scale-[0.99]',
+        light
+          ? 'border-black/[0.08] bg-black/[0.025] hover:border-black/[0.13] hover:bg-white'
+          : 'border-white/[0.08] bg-white/[0.035] hover:border-white/[0.13] hover:bg-white/[0.055]',
+      )}
     >
-      <span
-        aria-hidden="true"
-        className="appearance-preset-card-glow"
-        style={{
-          background: `linear-gradient(135deg, ${accentPalette[accent].soft}, ${accentPalette[publicAccent].soft})`,
-        }}
-      />
-      <div className="appearance-preset-card-preview">
-        <span className="appearance-preset-card-preview-top" />
-        <div className="appearance-preset-card-preview-body">
-          <span className="appearance-preset-card-preview-accent" style={{ background: accentPalette[accent].solid }} />
-          <span className="appearance-preset-card-preview-line" />
-          <span className="appearance-preset-card-preview-line appearance-preset-card-preview-line-short" />
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className={cn('truncate text-[12.5px] font-semibold', pageText(light))}>
+            {title}
+          </div>
+
+          <div className={cn('mt-1 line-clamp-1 text-[10.5px] leading-4', mutedText(light))}>
+            {description}
+          </div>
         </div>
-      </div>
-      <div className="appearance-preset-card-head">
-        <div className="appearance-preset-card-title">{label}</div>
-        <div className="appearance-preset-card-swatches">
-          <span style={{ background: accentPalette[accent].solid }} />
-          <span style={{ background: accentPalette[publicAccent].solid }} />
-        </div>
-      </div>
-      <div className="appearance-preset-card-description">{description}</div>
-      <div className="appearance-preset-card-foot">
-        <span>{accent}</span>
-        <span>{publicAccent}</span>
+
+        <Sparkles className={cn('size-3.5 shrink-0', faintText(light))} />
       </div>
     </button>
   );
 }
 
-function WorkspacePreview({
-  settings,
-  displayTheme,
-  locale,
+function PreviewMetric({
+  label,
+  value,
+  light,
 }: {
-  settings: AppearanceSettings;
-  displayTheme: 'light' | 'dark';
-  locale: 'ru' | 'en';
+  label: string;
+  value: string;
+  light: boolean;
 }) {
-  const isDark = displayTheme === 'dark';
-  const accent = accentPalette[settings.accentTone];
-
   return (
-    <div className={cn('rounded-[20px] border p-3.5', isDark ? 'border-white/8 bg-[#07090c]' : 'border-black/8 bg-[#f5f6f8]')}>
-      <div className={cn('rounded-[16px] border p-3', isDark ? 'border-white/8 bg-[#0b0e13]' : 'border-black/8 bg-white')}>
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className={cn('text-[11px] font-semibold', isDark ? 'text-white/92' : 'text-black/88')}>
-              {locale === 'ru' ? 'Кабинет' : 'Dashboard'}
-            </div>
-            <div className={cn('text-[10px]', isDark ? 'text-white/46' : 'text-black/46')}>
-              {locale === 'ru' ? 'Предпросмотр' : 'Preview'}
-            </div>
-          </div>
-          <span className="rounded-full px-2 py-1 text-[9px] font-medium text-white" style={{ background: accent.solid }}>
-            {settings.accentTone}
-          </span>
-        </div>
+    <div
+      className={cn(
+        'min-w-0 rounded-[9px] border px-3 py-2',
+        light ? 'border-black/[0.07] bg-white/72' : 'border-white/[0.07] bg-white/[0.045]',
+      )}
+    >
+      <div className={cn('truncate text-[9.5px] font-medium', mutedText(light))}>
+        {label}
+      </div>
 
-        <div className="mt-3 grid gap-2 grid-cols-3">
-          {[42, 58, 34].map((width, index) => (
-            <div
-              key={`${width}-${index}`}
-              className={cn('h-8 rounded-[10px]', isDark ? 'bg-white/6' : 'bg-black/[0.05]')}
-              style={index === 0 ? { background: accent.soft } : undefined}
-            />
-          ))}
-        </div>
-
-        <div className="mt-3 grid grid-cols-[74px_1fr] gap-3">
-          <div className={cn('rounded-[12px] border p-2', isDark ? 'border-white/8 bg-white/[0.03]' : 'border-black/8 bg-black/[0.02]')}>
-            <div className="space-y-2">
-              {[1, 2, 3].map((item) => (
-                <div
-                  key={item}
-                  className={cn('h-7 rounded-[9px]', item === 2 ? '' : isDark ? 'bg-white/6' : 'bg-black/[0.05]')}
-                  style={item === 2 ? { background: accent.soft } : undefined}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className={cn('rounded-[12px] border p-3', isDark ? 'border-white/8 bg-white/[0.03]' : 'border-black/8 bg-black/[0.02]')}>
-            <div className="flex h-16 items-end gap-2">
-              {[22, 38, 30, 52, 28, 44].map((height, index) => (
-                <div
-                  key={`${height}-${index}`}
-                  className="flex-1 rounded-full"
-                  style={{
-                    height: Math.max(16, Math.round(height * 0.72)),
-                    background: index % 2 === 0 ? accent.solid : isDark ? 'rgba(255,255,255,0.1)' : 'rgba(13,16,22,0.08)',
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
+      <div
+        className={cn(
+          'mt-1 truncate text-[14px] font-semibold leading-none tracking-[-0.045em]',
+          pageText(light),
+        )}
+      >
+        {value}
       </div>
     </div>
   );
 }
 
-function PublicPreview({
+function CompactPreview({
   settings,
+  light,
   locale,
 }: {
   settings: AppearanceSettings;
+  light: boolean;
   locale: 'ru' | 'en';
 }) {
-  const accent = accentPalette[settings.publicAccent];
+  const accent = accentPalette[settings.accentTone].solid;
+  const publicAccent = accentPalette[settings.publicAccent].solid;
+
+  const previewCopy =
+    locale === 'ru'
+      ? {
+          dashboard: 'Кабинет',
+          dashboardHint: 'Рабочий экран мастера',
+          bookings: 'Записи',
+          clients: 'Клиенты',
+          revenue: 'Доход',
+          today: 'Сегодня',
+          requests: 'Заявки',
+          traffic: 'Трафик',
+          public: 'Публичная',
+          publicHint: 'Страница клиента',
+          master: 'Алина Морозова',
+          service: 'Маникюр и педикюр',
+          book: 'Записаться',
+          nav: 'Навигация',
+          metrics: 'Метрики',
+          cta: 'CTA',
+        }
+      : {
+          dashboard: 'Dashboard',
+          dashboardHint: 'Specialist workspace',
+          bookings: 'Bookings',
+          clients: 'Clients',
+          revenue: 'Revenue',
+          today: 'Today',
+          requests: 'Requests',
+          traffic: 'Traffic',
+          public: 'Public',
+          publicHint: 'Client page',
+          master: 'Alina Morozova',
+          service: 'Manicure and pedicure',
+          book: 'Book',
+          nav: 'Navigation',
+          metrics: 'Metrics',
+          cta: 'CTA',
+        };
 
   return (
-    <div className="rounded-[20px] border border-border/80 bg-card/88 p-3.5">
-      <div className="rounded-[16px] p-3.5" style={{ background: accent.gradient }}>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-[12px] font-semibold text-white">Anna Petrova</div>
-            <div className="text-[10px] text-white/70">
-              {locale === 'ru' ? 'Страница мастера' : 'Master page'}
+    <div className="grid gap-3 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+      <Panel light={light} className="overflow-hidden p-0">
+        <div
+          className={cn(
+            'flex items-center justify-between border-b px-3.5 py-3',
+            borderTone(light),
+          )}
+        >
+          <div className="min-w-0">
+            <div className={cn('text-[12.5px] font-semibold', pageText(light))}>
+              {previewCopy.dashboard}
+            </div>
+
+            <div className={cn('mt-0.5 truncate text-[10.5px]', mutedText(light))}>
+              {previewCopy.dashboardHint} · {settingValueLabel(locale, settings.platformWidth)}
             </div>
           </div>
-          <span className="rounded-full border border-white/18 bg-white/12 px-2 py-1 text-[9px] font-medium text-white">
-            {settings.publicAccent}
-          </span>
+
+          <span
+            className="size-2 rounded-full"
+            style={{
+              background: accent,
+              boxShadow: `0 0 0 3px color-mix(in srgb, ${accent} 14%, transparent)`,
+            }}
+          />
         </div>
 
-        <div className="mt-3 rounded-[16px] border border-white/18 bg-white/90 p-3.5 text-black/80 shadow-[0_20px_40px_rgba(0,0,0,0.12)]">
-          <div className="grid grid-cols-2 gap-2">
-            {[locale === 'ru' ? 'Маникюр' : 'Manicure', locale === 'ru' ? 'Окрашивание' : 'Color', locale === 'ru' ? 'Уход' : 'Care', locale === 'ru' ? 'Укладка' : 'Styling'].map((item) => (
-              <div key={item} className="rounded-[11px] border border-black/8 bg-white px-3 py-2 text-[9.5px]">
-                {item}
+        <div className="p-3.5">
+          <div
+            className={cn(
+              'mb-3 grid overflow-hidden rounded-[10px] border',
+              light ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.045]',
+            )}
+            style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}
+          >
+            {[previewCopy.today, previewCopy.requests, previewCopy.traffic].map((item, index) => (
+              <div
+                key={item}
+                className={cn(
+                  'relative flex h-8 items-center justify-center border-r px-2 text-[10.5px] font-semibold last:border-r-0',
+                  light ? 'border-black/[0.07]' : 'border-white/[0.07]',
+                  index === 0 ? pageText(light) : mutedText(light),
+                )}
+              >
+                <span className="truncate">{item}</span>
+
+                {index === 0 ? (
+                  <span
+                    className="absolute bottom-1 left-1/2 size-1 -translate-x-1/2 rounded-full"
+                    style={{ background: accent }}
+                  />
+                ) : null}
               </div>
             ))}
           </div>
 
-          <button
-            type="button"
-            className={cn(
-              'mt-3 w-full px-4 py-2 text-[10px] font-semibold text-white',
-              settings.publicButtonStyle === 'pill'
-                ? 'rounded-full'
-                : settings.publicButtonStyle === 'rounded'
-                  ? 'rounded-[14px]'
-                  : 'rounded-[11px]',
-            )}
-            style={{ background: settings.publicButtonStyle === 'contrast' ? '#0d1016' : accent.solid }}
-          >
-            {locale === 'ru' ? 'Открыть запись' : 'Open booking'}
-          </button>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <PreviewMetric label={previewCopy.bookings} value="12" light={light} />
+            <PreviewMetric label={previewCopy.clients} value="84" light={light} />
+            <PreviewMetric label={previewCopy.revenue} value="128k" light={light} />
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            <MicroLabel light={light}>{settingValueLabel(locale, settings.density)}</MicroLabel>
+            <MicroLabel light={light}>{settingValueLabel(locale, settings.cardStyle)}</MicroLabel>
+            <MicroLabel light={light}>{settingValueLabel(locale, settings.dashboardControlStyle)}</MicroLabel>
+          </div>
         </div>
-      </div>
+      </Panel>
+
+      <Panel light={light} className="overflow-hidden p-0">
+        <div
+          className={cn(
+            'border-b px-3.5 py-3',
+            borderTone(light),
+          )}
+          style={{
+            background:
+              settings.publicCover === 'minimal'
+                ? undefined
+                : settings.publicCover === 'portrait'
+                  ? `radial-gradient(circle at 16% 18%, color-mix(in srgb, ${publicAccent} 22%, transparent), transparent 58%)`
+                  : `linear-gradient(135deg, color-mix(in srgb, ${publicAccent} 20%, transparent), transparent 72%)`,
+          }}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className={cn('text-[10px] uppercase tracking-[0.14em]', faintText(light))}>
+                {previewCopy.public}
+              </div>
+
+              <div
+                className={cn(
+                  'mt-1 truncate text-[17px] font-semibold tracking-[-0.055em]',
+                  pageText(light),
+                )}
+              >
+                {previewCopy.master}
+              </div>
+
+              <div className={cn('mt-0.5 truncate text-[10.5px]', mutedText(light))}>
+                {previewCopy.service} · {settingValueLabel(locale, settings.publicHeroLayout)}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className={cn(
+                'h-8 shrink-0 border px-3 text-[11px] font-semibold',
+                settings.publicButtonStyle === 'contrast'
+                  ? light
+                    ? 'bg-black text-white'
+                    : 'bg-white text-black'
+                  : light
+                    ? 'border-black/[0.08] bg-white/78 text-black'
+                    : 'border-white/[0.08] bg-white/[0.055] text-white',
+                settings.publicButtonStyle === 'pill' && 'rounded-full',
+                settings.publicButtonStyle === 'rounded' && 'rounded-[12px]',
+                settings.publicButtonStyle === 'contrast' && 'rounded-[9px]',
+              )}
+              style={
+                settings.publicButtonStyle !== 'contrast'
+                  ? {
+                      borderColor: `color-mix(in srgb, ${publicAccent} 30%, transparent)`,
+                    }
+                  : undefined
+              }
+            >
+              {previewCopy.book}
+            </button>
+          </div>
+        </div>
+
+        <div className="grid gap-2 p-3.5 sm:grid-cols-3">
+          <PreviewMetric
+            label={previewCopy.nav}
+            value={settingValueLabel(locale, settings.publicNavigationStyle)}
+            light={light}
+          />
+
+          <PreviewMetric
+            label={previewCopy.metrics}
+            value={settingValueLabel(locale, settings.publicStatsStyle)}
+            light={light}
+          />
+
+          <PreviewMetric
+            label={previewCopy.cta}
+            value={settingValueLabel(locale, settings.publicCtaMode)}
+            light={light}
+          />
+        </div>
+      </Panel>
     </div>
   );
 }
 
 export default function DashboardAppearancePage() {
-  const { theme, resolvedTheme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme, theme } = useTheme();
   const { settings, setSetting, setSettingsBatch, resetSettings } = useAppearance();
   const { locale } = useLocale();
-  const { ownedProfile } = useApp();
-  const isMobile = useMobile();
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => setMounted(true), []);
 
-  const currentTheme = (mounted ? theme || 'system' : 'system') as ThemeOption;
-  const displayTheme = mounted ? (resolvedTheme === 'light' ? 'light' : 'dark') : 'dark';
-  const publicHref = ownedProfile ? `/m/${ownedProfile.slug}` : '/create-profile';
+  const currentTheme: ThemeMode = mounted && resolvedTheme === 'light' ? 'light' : 'dark';
+  const isLight = currentTheme === 'light';
+  const accentColor = accentPalette[settings.accentTone].solid;
+  const publicAccentColor = accentPalette[settings.publicAccent].solid;
 
-  const labels = locale === 'ru'
-    ? {
-        badge: 'Настройки / интерфейс',
-        title: 'Внешний вид',
-        description: 'Тема, акцент и стиль страницы.',
-        general: 'Общие настройки',
-        generalDescription: 'Базовые параметры интерфейса приложения.',
-        app: 'Внешний вид приложения',
-        appDescription: 'Тема, акцент и текущее состояние.',
-        publicPage: 'Публичная страница',
-        publicDescription: 'Стиль страницы и записи.',
-        theme: 'Тема',
-        themeDescription: 'Светлая, тёмная или системная тема.',
-        platformWidth: 'Ширина платформы',
-        platformWidthDescription: 'Ширина кабинета.',
-        sidebarDensity: 'Боковое меню',
-        sidebarDensityDescription: 'Плотность меню.',
-        topbarDensity: 'Верхняя панель',
-        topbarDensityDescription: 'Высота верхней полосы.',
-        motion: 'Анимация отклика',
-        motionDescription: 'Анимации интерфейса.',
-        density: 'Плотность',
-        densityDescription: 'Плотность интерфейса.',
-        radius: 'Радиус',
-        radiusDescription: 'Радиус карточек и контролов.',
-        cards: 'Карточки',
-        cardsDescription: 'Характер поверхностей на фоне холста.',
-        accent: 'Цвет темы',
-        accentDescription: 'Акцентный цвет.',
-        neutral: 'Нейтральный цвет',
-        neutralDescription: 'База для фона и карточек.',
-        cover: 'Обложка',
-        coverDescription: 'Обложка страницы.',
-        publicAccent: 'Акцент страницы',
-        publicAccentDescription: 'Цвет записи и акцентов.',
-        publicButton: 'Кнопка записи',
-        publicButtonDescription: 'Форма кнопки записи.',
-        publicCard: 'Карточка мастера',
-        publicCardDescription: 'Стиль главного блока.',
-        services: 'Услуги',
-        servicesDescription: 'Вид списка услуг.',
-        booking: 'Блок записи',
-        bookingDescription: 'Выделение записи.',
-        hero: 'Верхний блок',
-        heroDescription: 'Структура верхнего блока.',
-        surface: 'Характер секций',
-        surfaceDescription: 'Общее ощущение вторичных секций.',
-        sections: 'Вторичные секции',
-        sectionsDescription: 'Контакты, отзывы и секции.',
-        gallery: 'Галерея работ',
-        galleryDescription: 'Показ работ.',
-        reset: 'Сбросить всё',
-        openPage: 'Открыть страницу',
-        workspacePreview: 'Предпросмотр кабинета',
-        workspacePreviewDescription: 'Предпросмотр кабинета.',
-        pagePreview: 'Предпросмотр страницы',
-        pagePreviewDescription: 'Предпросмотр страницы.',
-        quickPresets: 'Готовые наборы',
-        quickPresetsDescription: '10 аккуратных наборов для кабинета и публичной страницы.',
-        activeStack: 'Сейчас активно',
-        activeStackDescription: 'Активные настройки.',
-        quickAccess: 'Быстрый доступ',
-        quickAccessDescription: 'Цвет, нейтральная база и быстрые действия.',
-        presetStudio: 'Студия',
-        presetBalanced: 'Баланс',
-        presetSoft: 'Мягко',
-        quickReset: 'Сбросить',
-        quickOpen: 'Открыть страницу',
-        workspaceAction: 'Фокус-кабинет',
-        publicAction: 'Мягкая страница',
-      }
-    : {
-        badge: locale === 'ru' ? 'Настройки / оформление' : 'Settings / interface',
-        title: 'Appearance',
-        description: 'A calmer and more minimal page for theme, palette, and public page settings.',
-        general: 'General settings',
-        generalDescription: 'Core application interface settings.',
-        app: 'Application appearance',
-        appDescription: 'Accent color, quick recipes, and a live snapshot of the current interface state.',
-        publicPage: locale === 'ru' ? 'Публичная страница' : 'Public page',
-        publicDescription: 'Master page and booking block styling.',
-        theme: 'Theme',
-        themeDescription: 'Choose light, dark, or system mode.',
-        platformWidth: 'Platform width',
-        platformWidthDescription: 'How wide the workspace canvas opens up.',
-        sidebarDensity: 'Sidebar rhythm',
-        sidebarDensityDescription: 'Density of menu links and spacing between groups.',
-        topbarDensity: 'Top bar',
-        topbarDensityDescription: 'Height and breathing room in the top controls row.',
-        motion: 'Response animation',
-        motionDescription: 'Hover, dropdown, and other transitions.',
-        density: 'Density',
-        densityDescription: 'Control height and spacing rhythm.',
-        radius: 'Radius',
-        radiusDescription: 'How soft card and control corners feel.',
-        cards: 'Cards',
-        cardsDescription: 'Surface character on the canvas.',
-        accent: 'Theme color',
-        accentDescription: 'Changes buttons, accents, and active states.',
-        neutral: 'Neutral tone',
-        neutralDescription: 'Base for canvas and cards.',
-        cover: 'Cover',
-        coverDescription: 'First impression of the public page.',
-        publicAccent: 'Page accent',
-        publicAccentDescription: 'Main color for booking CTA and highlight blocks.',
-        publicButton: 'Booking button',
-        publicButtonDescription: 'Shape of the primary CTA.',
-        publicCard: 'Master card',
-        publicCardDescription: 'Presentation of the main hero block.',
-        services: 'Services',
-        servicesDescription: 'How to present the service list.',
-        booking: 'Booking block',
-        bookingDescription: 'How prominent the booking scenario feels.',
-        hero: 'Hero layout',
-        heroDescription: 'Top section composition.',
-        surface: 'Surface mood',
-        surfaceDescription: 'Overall feeling of secondary sections.',
-        sections: 'Secondary sections',
-        sectionsDescription: 'FAQ, contacts, reviews, and support blocks.',
-        gallery: 'Work gallery',
-        galleryDescription: 'How portfolio images are displayed.',
-        reset: 'Reset all',
-        openPage: 'Open page',
-        workspacePreview: 'Workspace preview',
-        workspacePreviewDescription: 'Dark mode no longer tints menu surfaces when the accent changes.',
-        pagePreview: 'Page preview',
-        pagePreviewDescription: 'Quick look at the public card.',
-        quickPresets: 'Quick presets',
-        quickPresetsDescription: '10 curated combinations for the workspace and public page.',
-        activeStack: 'Current stack',
-        activeStackDescription: 'Small snapshot of active choices.',
-        quickAccess: 'Quick access',
-        quickAccessDescription: 'Palette, neutrals, and a few fast actions.',
-        presetStudio: 'Studio',
-        presetBalanced: 'Balanced',
-        presetSoft: 'Soft',
-        quickReset: 'Reset',
-        quickOpen: 'Open page',
-        workspaceAction: 'Focus workspace',
-        publicAction: 'Soft page',
-      };
+  const copy =
+    locale === 'ru'
+      ? {
+          title: 'Внешний вид',
+          description:
+            'Компактная настройка кабинета и публичной страницы: цвета, плотность, hero, услуги, CTA и форма записи.',
+          reset: 'Сбросить',
+          presets: 'Готовые стили',
+          presetsHint: 'Быстро применить цельный набор настроек.',
+          preview: 'Превью',
+          previewHint: 'Короткая проверка влияния настроек.',
+          theme: 'Тема',
+          cabinet: 'Кабинет',
+          cabinetHint: 'Рабочие страницы мастера: ширина, плотность, карточки и переключатели.',
+          public: 'Публичная страница',
+          publicHint: 'Страница клиента: hero, услуги, CTA, навигация и секции.',
+          colorCabinet: 'Цвет кабинета',
+          colorPublic: 'Цвет публичной страницы',
+          layout: 'Макет',
+          cards: 'Карточки',
+          controls: 'Переключатели',
+          navigation: 'Навигация',
+          publicStructure: 'Структура',
+          publicVisual: 'Визуал',
+          bookingServices: 'Запись и услуги',
+          secondarySections: 'Вторичные секции',
+          summary: 'Итог',
+        }
+      : {
+          title: 'Appearance',
+          description:
+            'Compact setup for dashboard and public page: colors, density, hero, services, CTA, and booking form.',
+          reset: 'Reset',
+          presets: 'Style presets',
+          presetsHint: 'Apply a coherent set of settings quickly.',
+          preview: 'Preview',
+          previewHint: 'Quick check of how settings affect UI.',
+          theme: 'Theme',
+          cabinet: 'Dashboard',
+          cabinetHint: 'Specialist workspace: width, density, cards, and controls.',
+          public: 'Public page',
+          publicHint: 'Client page: hero, services, CTA, navigation, and sections.',
+          colorCabinet: 'Dashboard color',
+          colorPublic: 'Public page color',
+          layout: 'Layout',
+          cards: 'Cards',
+          controls: 'Controls',
+          navigation: 'Navigation',
+          publicStructure: 'Structure',
+          publicVisual: 'Visual',
+          bookingServices: 'Booking and services',
+          secondarySections: 'Secondary sections',
+          summary: 'Summary',
+        };
 
-  const motionOptions = useMemo<Array<Option<AppearanceSettings['motion']>>>(() => [
-    { value: 'off', label: locale === 'ru' ? 'Отключено' : 'Off' },
-    { value: 'fast', label: locale === 'ru' ? 'Быстро' : 'Fast' },
-    { value: 'smooth', label: locale === 'ru' ? 'Плавно' : 'Smooth' },
-  ], [locale]);
+  const themeOptions: Array<Option<'light' | 'dark' | 'system'>> =
+    locale === 'ru'
+      ? [
+          { value: 'light', label: 'Светлая', description: 'Чистый рабочий фон.' },
+          { value: 'dark', label: 'Тёмная', description: 'Графитовый кабинет.' },
+          { value: 'system', label: 'Системная', description: 'Как в браузере.' },
+        ]
+      : [
+          { value: 'light', label: 'Light', description: 'Clean workspace.' },
+          { value: 'dark', label: 'Dark', description: 'Graphite workspace.' },
+          { value: 'system', label: 'System', description: 'Follows browser.' },
+        ];
 
-  const densityOptions = useMemo<Array<Option<AppearanceSettings['density']>>>(() => [
-    { value: 'compact', label: locale === 'ru' ? 'Компактно' : 'Compact' },
-    { value: 'standard', label: locale === 'ru' ? 'Стандартно' : 'Standard' },
-    { value: 'airy', label: locale === 'ru' ? 'Свободно' : 'Airy' },
-  ], [locale]);
+  const platformOptions: Array<Option<AppearanceSettings['platformWidth']>> =
+    locale === 'ru'
+      ? [
+          { value: 'focused', label: 'Фокус', description: 'Уже и плотнее.' },
+          { value: 'balanced', label: 'Баланс', description: 'Стандартная ширина.' },
+          { value: 'wide', label: 'Шире', description: 'Больше места для таблиц.' },
+        ]
+      : [
+          { value: 'focused', label: 'Focused', description: 'Narrower and denser.' },
+          { value: 'balanced', label: 'Balanced', description: 'Reference width.' },
+          { value: 'wide', label: 'Wide', description: 'More table space.' },
+        ];
 
-  const platformWidthOptions = useMemo<Array<Option<AppearanceSettings['platformWidth']>>>(() => [
-    { value: 'focused', label: locale === 'ru' ? 'Фокус' : 'Focused' },
-    { value: 'balanced', label: locale === 'ru' ? 'Баланс' : 'Balanced' },
-    { value: 'wide', label: locale === 'ru' ? 'Широко' : 'Wide' },
-  ], [locale]);
+  const densityOptions: Array<Option<AppearanceSettings['density']>> =
+    locale === 'ru'
+      ? [
+          { value: 'compact', label: 'Плотно', description: 'Меньше вертикальных отступов.' },
+          { value: 'standard', label: 'Спокойно', description: 'Баланс плотности.' },
+          { value: 'airy', label: 'Свободно', description: 'Больше воздуха.' },
+        ]
+      : [
+          { value: 'compact', label: 'Compact', description: 'Less spacing.' },
+          { value: 'standard', label: 'Standard', description: 'Balanced density.' },
+          { value: 'airy', label: 'Airy', description: 'More breathing room.' },
+        ];
 
-  const sidebarDensityOptions = useMemo<Array<Option<AppearanceSettings['sidebarDensity']>>>(() => [
-    { value: 'tight', label: locale === 'ru' ? 'Плотно' : 'Tight' },
-    { value: 'balanced', label: locale === 'ru' ? 'Спокойно' : 'Balanced' },
-    { value: 'roomy', label: locale === 'ru' ? 'Свободно' : 'Roomy' },
-  ], [locale]);
+  const radiusOptions: Array<Option<AppearanceSettings['radius']>> =
+    locale === 'ru'
+      ? [
+          { value: 'tight', label: 'Строго', description: 'Меньше скругления.' },
+          { value: 'medium', label: 'Баланс', description: 'Текущий референс.' },
+          { value: 'soft', label: 'Мягко', description: 'Более округлые карточки.' },
+        ]
+      : [
+          { value: 'tight', label: 'Tight', description: 'Smaller radius.' },
+          { value: 'medium', label: 'Balanced', description: 'Reference radius.' },
+          { value: 'soft', label: 'Soft', description: 'Rounder cards.' },
+        ];
 
-  const topbarDensityOptions = useMemo<Array<Option<AppearanceSettings['topbarDensity']>>>(() => [
-    { value: 'tight', label: locale === 'ru' ? 'Компактно' : 'Compact' },
-    { value: 'balanced', label: locale === 'ru' ? 'Баланс' : 'Balanced' },
-    { value: 'roomy', label: locale === 'ru' ? 'Воздух' : 'Airy' },
-  ], [locale]);
+  const cardOptions: Array<Option<AppearanceSettings['cardStyle']>> =
+    locale === 'ru'
+      ? [
+          { value: 'flat', label: 'Плоско', description: 'Максимально строго.' },
+          { value: 'soft', label: 'Мягко', description: 'Спокойные панели.' },
+          { value: 'glass', label: 'Стекло', description: 'Полупрозрачные карточки.' },
+        ]
+      : [
+          { value: 'flat', label: 'Flat', description: 'Strict and minimal.' },
+          { value: 'soft', label: 'Soft', description: 'Calm panels.' },
+          { value: 'glass', label: 'Glass', description: 'Translucent cards.' },
+        ];
 
-  const radiusOptions = useMemo<Array<Option<AppearanceSettings['radius']>>>(() => [
-    { value: 'tight', label: locale === 'ru' ? 'Плотно' : 'Tight' },
-    { value: 'medium', label: locale === 'ru' ? 'Средне' : 'Medium' },
-    { value: 'soft', label: locale === 'ru' ? 'Мягкий' : 'Soft' },
-  ], [locale]);
+  const navDensityOptions: Array<Option<AppearanceSettings['sidebarDensity']>> =
+    locale === 'ru'
+      ? [
+          { value: 'tight', label: 'Плотно', description: 'Компактная навигация.' },
+          { value: 'balanced', label: 'Баланс', description: 'Стандартный размер.' },
+          { value: 'roomy', label: 'Воздух', description: 'Больше места.' },
+        ]
+      : [
+          { value: 'tight', label: 'Tight', description: 'Compact navigation.' },
+          { value: 'balanced', label: 'Balanced', description: 'Standard size.' },
+          { value: 'roomy', label: 'Roomy', description: 'More spacing.' },
+        ];
 
-  const cardOptions = useMemo<Array<Option<AppearanceSettings['cardStyle']>>>(() => [
-    { value: 'flat', label: locale === 'ru' ? 'Плоско' : 'Flat' },
-    { value: 'soft', label: locale === 'ru' ? 'Мягко' : 'Soft' },
-    { value: 'glass', label: locale === 'ru' ? 'Стекло' : 'Glass' },
-  ], [locale]);
+  const motionOptions: Array<Option<AppearanceSettings['motion']>> =
+    locale === 'ru'
+      ? [
+          { value: 'off', label: 'Без', description: 'Минимум анимаций.' },
+          { value: 'fast', label: 'Быстро', description: 'Короткие переходы.' },
+          { value: 'smooth', label: 'Плавно', description: 'Мягкое движение.' },
+        ]
+      : [
+          { value: 'off', label: 'Off', description: 'Minimal animations.' },
+          { value: 'fast', label: 'Fast', description: 'Short transitions.' },
+          { value: 'smooth', label: 'Smooth', description: 'Soft motion.' },
+        ];
 
-  const publicCoverOptions = useMemo<Array<Option<AppearanceSettings['publicCover']>>>(() => [
-    { value: 'gradient', label: locale === 'ru' ? 'Градиент' : 'Gradient' },
-    { value: 'portrait', label: locale === 'ru' ? 'Портрет' : 'Portrait' },
-    { value: 'minimal', label: locale === 'ru' ? 'Минимально' : 'Minimal' },
-  ], [locale]);
+  const mobileScaleOptions: Array<Option<AppearanceSettings['mobileFontScale']>> =
+    locale === 'ru'
+      ? [
+          { value: 'compact', label: 'Компакт', description: 'Меньше шрифт на мобильных.' },
+          { value: 'standard', label: 'Стандарт', description: 'Крупнее текст на мобильных.' },
+        ]
+      : [
+          { value: 'compact', label: 'Compact', description: 'Smaller mobile text.' },
+          { value: 'standard', label: 'Standard', description: 'Larger mobile text.' },
+        ];
 
-  const publicButtonOptions = useMemo<Array<Option<AppearanceSettings['publicButtonStyle']>>>(() => [
-    { value: 'pill', label: locale === 'ru' ? 'Капсула' : 'Pill' },
-    { value: 'rounded', label: locale === 'ru' ? 'Скруглённая' : 'Rounded' },
-    { value: 'contrast', label: locale === 'ru' ? 'Контрастная' : 'Contrast' },
-  ], [locale]);
+  const dashboardSurfaceOptions: Array<Option<AppearanceSettings['dashboardSurface']>> =
+    locale === 'ru'
+      ? [
+          { value: 'calm', label: 'Спокойно', description: 'Базовый фон и карточки.' },
+          { value: 'clear', label: 'Чище', description: 'Светлее панели.' },
+          { value: 'contrast', label: 'Контраст', description: 'Больше разделения блоков.' },
+        ]
+      : [
+          { value: 'calm', label: 'Calm', description: 'Default background.' },
+          { value: 'clear', label: 'Clear', description: 'Cleaner panels.' },
+          { value: 'contrast', label: 'Contrast', description: 'More separation.' },
+        ];
 
-  const publicCardOptions = useMemo<Array<Option<AppearanceSettings['publicCardStyle']>>>(() => [
-    { value: 'editorial', label: locale === 'ru' ? 'Редакционная' : 'Editorial' },
-    { value: 'soft', label: locale === 'ru' ? 'Мягкая' : 'Soft' },
-    { value: 'compact', label: locale === 'ru' ? 'Компактная' : 'Compact' },
-  ], [locale]);
+  const dashboardControlOptions: Array<Option<AppearanceSettings['dashboardControlStyle']>> =
+    locale === 'ru'
+      ? [
+          { value: 'capsule', label: 'Капсула', description: 'Переключатели как в референсе.' },
+          { value: 'line', label: 'Линия', description: 'Тонкий активный индикатор.' },
+          { value: 'solid', label: 'Плотно', description: 'Заметные активные кнопки.' },
+        ]
+      : [
+          { value: 'capsule', label: 'Capsule', description: 'Reference segmented controls.' },
+          { value: 'line', label: 'Line', description: 'Thin active indicator.' },
+          { value: 'solid', label: 'Solid', description: 'More visible active buttons.' },
+        ];
 
-  const publicServicesOptions = useMemo<Array<Option<AppearanceSettings['publicServicesStyle']>>>(() => [
-    { value: 'grid', label: locale === 'ru' ? 'Сетка' : 'Grid' },
-    { value: 'chips', label: locale === 'ru' ? 'Чипы' : 'Chips' },
-    { value: 'stacked', label: locale === 'ru' ? 'Список' : 'Stacked' },
-  ], [locale]);
+  const publicCoverOptions: Array<Option<AppearanceSettings['publicCover']>> =
+    locale === 'ru'
+      ? [
+          { value: 'gradient', label: 'Градиент', description: 'Акцентная обложка.' },
+          { value: 'portrait', label: 'Портрет', description: 'Больше внимания мастеру.' },
+          { value: 'minimal', label: 'Минимал', description: 'Почти без декора.' },
+        ]
+      : [
+          { value: 'gradient', label: 'Gradient', description: 'Accent cover.' },
+          { value: 'portrait', label: 'Portrait', description: 'Focus on the master.' },
+          { value: 'minimal', label: 'Minimal', description: 'Almost no decor.' },
+        ];
 
-  const publicBookingOptions = useMemo<Array<Option<AppearanceSettings['publicBookingStyle']>>>(() => [
-    { value: 'panel', label: locale === 'ru' ? 'Панель' : 'Panel' },
-    { value: 'step', label: locale === 'ru' ? 'Шаги' : 'Step' },
-    { value: 'minimal', label: locale === 'ru' ? 'Минимальный' : 'Minimal' },
-  ], [locale]);
+  const publicHeroOptions: Array<Option<AppearanceSettings['publicHeroLayout']>> =
+    locale === 'ru'
+      ? [
+          { value: 'split', label: 'Сплит', description: 'Карточка + боковая запись.' },
+          { value: 'centered', label: 'Центр', description: 'Hero по центру.' },
+          { value: 'compact', label: 'Компакт', description: 'Меньше высота первого блока.' },
+        ]
+      : [
+          { value: 'split', label: 'Split', description: 'Card plus booking side.' },
+          { value: 'centered', label: 'Centered', description: 'Centered hero.' },
+          { value: 'compact', label: 'Compact', description: 'Shorter first block.' },
+        ];
 
-  const heroOptions = useMemo<Array<Option<AppearanceSettings['publicHeroLayout']>>>(() => [
-    { value: 'split', label: locale === 'ru' ? 'Разделённый' : 'Split' },
-    { value: 'centered', label: locale === 'ru' ? 'По центру' : 'Centered' },
-    { value: 'compact', label: locale === 'ru' ? 'Компактный' : 'Compact' },
-  ], [locale]);
+  const publicNavigationOptions: Array<Option<AppearanceSettings['publicNavigationStyle']>> =
+    locale === 'ru'
+      ? [
+          { value: 'side', label: 'Слева', description: 'Паспорт и навигация сбоку.' },
+          { value: 'top', label: 'Сверху', description: 'Компактная навигация над hero.' },
+          { value: 'hidden', label: 'Скрыть', description: 'Оставить только контент.' },
+        ]
+      : [
+          { value: 'side', label: 'Side', description: 'Passport and navigation in rail.' },
+          { value: 'top', label: 'Top', description: 'Navigation above hero.' },
+          { value: 'hidden', label: 'Hidden', description: 'Content only.' },
+        ];
 
-  const surfaceOptions = useMemo<Array<Option<AppearanceSettings['publicSurface']>>>(() => [
-    { value: 'soft', label: locale === 'ru' ? 'Мягкая' : 'Soft' },
-    { value: 'contrast', label: locale === 'ru' ? 'Контрастная' : 'Contrast' },
-    { value: 'glass', label: locale === 'ru' ? 'Стекло' : 'Glass' },
-  ], [locale]);
+  const publicStatsOptions: Array<Option<AppearanceSettings['publicStatsStyle']>> =
+    locale === 'ru'
+      ? [
+          { value: 'cards', label: 'Карточки', description: 'Факты в отдельных плитках.' },
+          { value: 'strip', label: 'Полоса', description: 'Компактная строка под hero.' },
+          { value: 'hidden', label: 'Скрыть', description: 'Убрать метрики из hero.' },
+        ]
+      : [
+          { value: 'cards', label: 'Cards', description: 'Facts in tiles.' },
+          { value: 'strip', label: 'Strip', description: 'Compact row below hero.' },
+          { value: 'hidden', label: 'Hidden', description: 'Remove hero stats.' },
+        ];
 
-  const sectionOptions = useMemo<Array<Option<AppearanceSettings['publicSectionStyle']>>>(() => [
-    { value: 'cards', label: locale === 'ru' ? 'Карточки' : 'Cards' },
-    { value: 'dividers', label: locale === 'ru' ? 'Разделители' : 'Dividers' },
-    { value: 'minimal', label: locale === 'ru' ? 'Минимально' : 'Minimal' },
-  ], [locale]);
+  const publicCtaOptions: Array<Option<AppearanceSettings['publicCtaMode']>> =
+    locale === 'ru'
+      ? [
+          { value: 'sticky', label: 'Закрепить', description: 'Кнопка снизу на мобильном.' },
+          { value: 'inline', label: 'Внутри', description: 'CTA внутри страницы.' },
+          { value: 'quiet', label: 'Тихо', description: 'Минимальный CTA.' },
+        ]
+      : [
+          { value: 'sticky', label: 'Sticky', description: 'Fixed mobile button.' },
+          { value: 'inline', label: 'Inline', description: 'CTA inside page.' },
+          { value: 'quiet', label: 'Quiet', description: 'Minimal CTA.' },
+        ];
 
-  const galleryOptions = useMemo<Array<Option<AppearanceSettings['publicGalleryStyle']>>>(() => [
-    { value: 'grid', label: locale === 'ru' ? 'Сетка' : 'Grid' },
-    { value: 'editorial', label: locale === 'ru' ? 'Редакционная' : 'Editorial' },
-    { value: 'compact', label: locale === 'ru' ? 'Компактная' : 'Compact' },
-  ], [locale]);
+  const publicButtonOptions: Array<Option<AppearanceSettings['publicButtonStyle']>> =
+    locale === 'ru'
+      ? [
+          { value: 'pill', label: 'Капсула', description: 'Мягкая CTA-кнопка.' },
+          { value: 'rounded', label: 'Скруглённая', description: 'Спокойная кнопка.' },
+          { value: 'contrast', label: 'Контраст', description: 'Сильная главная кнопка.' },
+        ]
+      : [
+          { value: 'pill', label: 'Pill', description: 'Soft CTA.' },
+          { value: 'rounded', label: 'Rounded', description: 'Calm button.' },
+          { value: 'contrast', label: 'Contrast', description: 'Strong CTA.' },
+        ];
 
+  const publicCardOptions: Array<Option<AppearanceSettings['publicCardStyle']>> =
+    locale === 'ru'
+      ? [
+          { value: 'editorial', label: 'Редакция', description: 'Больше выразительности.' },
+          { value: 'soft', label: 'Мягкая', description: 'Базовый аккуратный вид.' },
+          { value: 'compact', label: 'Компакт', description: 'Плотнее секции.' },
+        ]
+      : [
+          { value: 'editorial', label: 'Editorial', description: 'More expressive.' },
+          { value: 'soft', label: 'Soft', description: 'Default clean style.' },
+          { value: 'compact', label: 'Compact', description: 'Denser sections.' },
+        ];
 
-  const themeLookActiveKey = useMemo(() => {
-    if (currentTheme === 'dark' && settings.accentTone === 'cobalt' && settings.neutralTone === 'zinc') return 'graphite';
-    if (currentTheme === 'dark' && settings.accentTone === 'violet' && settings.neutralTone === 'pearl') return 'velvet';
-    if (currentTheme === 'light' && settings.accentTone === 'sky' && settings.neutralTone === 'slate') return 'mist';
-    if (currentTheme === 'light' && settings.accentTone === 'amber' && settings.neutralTone === 'sand') return 'linen';
-    if (currentTheme === 'light' && settings.accentTone === 'teal' && settings.neutralTone === 'sage') return 'sage';
-    if (currentTheme === 'light' && settings.accentTone === 'rose' && settings.neutralTone === 'pearl') return 'rose';
-    return null;
-  }, [currentTheme, settings.accentTone, settings.neutralTone]);
+  const publicServicesOptions: Array<Option<AppearanceSettings['publicServicesStyle']>> =
+    locale === 'ru'
+      ? [
+          { value: 'grid', label: 'Сетка', description: 'Услуги в две колонки.' },
+          { value: 'chips', label: 'Чипы', description: 'Короткие плитки.' },
+          { value: 'stacked', label: 'Список', description: 'Одна колонка.' },
+        ]
+      : [
+          { value: 'grid', label: 'Grid', description: 'Two-column services.' },
+          { value: 'chips', label: 'Chips', description: 'Short tiles.' },
+          { value: 'stacked', label: 'Stacked', description: 'Single column.' },
+        ];
 
-  const applyThemeLook = (key: string) => {
-    if (key === 'graphite') {
-      setTheme('dark');
-      setSettingsBatch({ accentTone: 'cobalt', publicAccent: 'cobalt', neutralTone: 'zinc', cardStyle: 'flat' });
-      return;
-    }
-    if (key === 'velvet') {
-      setTheme('dark');
-      setSettingsBatch({ accentTone: 'violet', publicAccent: 'rose', neutralTone: 'pearl', cardStyle: 'soft' });
-      return;
-    }
-    if (key === 'mist') {
-      setTheme('light');
-      setSettingsBatch({ accentTone: 'sky', publicAccent: 'emerald', neutralTone: 'slate', cardStyle: 'soft' });
-      return;
-    }
-    if (key === 'linen') {
-      setTheme('light');
-      setSettingsBatch({ accentTone: 'amber', publicAccent: 'peach', neutralTone: 'sand', cardStyle: 'soft' });
-      return;
-    }
-    if (key === 'sage') {
-      setTheme('light');
-      setSettingsBatch({ accentTone: 'teal', publicAccent: 'emerald', neutralTone: 'sage', cardStyle: 'soft' });
-      return;
-    }
-    if (key === 'rose') {
-      setTheme('light');
-      setSettingsBatch({ accentTone: 'rose', publicAccent: 'peach', neutralTone: 'pearl', cardStyle: 'soft' });
-    }
-  };
+  const publicBookingOptions: Array<Option<AppearanceSettings['publicBookingStyle']>> =
+    locale === 'ru'
+      ? [
+          { value: 'panel', label: 'Панель', description: 'Заметная запись справа.' },
+          { value: 'step', label: 'Шаги', description: 'Сценарий как процесс.' },
+          { value: 'minimal', label: 'Минимал', description: 'Тихий блок записи.' },
+        ]
+      : [
+          { value: 'panel', label: 'Panel', description: 'Visible side booking.' },
+          { value: 'step', label: 'Steps', description: 'Process-like flow.' },
+          { value: 'minimal', label: 'Minimal', description: 'Quiet booking block.' },
+        ];
 
-  const optionMaps = {
-    platformWidth: Object.fromEntries(platformWidthOptions.map((option) => [option.value, option.label])),
-    sidebarDensity: Object.fromEntries(sidebarDensityOptions.map((option) => [option.value, option.label])),
-    topbarDensity: Object.fromEntries(topbarDensityOptions.map((option) => [option.value, option.label])),
-    motion: Object.fromEntries(motionOptions.map((option) => [option.value, option.label])),
-    density: Object.fromEntries(densityOptions.map((option) => [option.value, option.label])),
-    radius: Object.fromEntries(radiusOptions.map((option) => [option.value, option.label])),
-    cardStyle: Object.fromEntries(cardOptions.map((option) => [option.value, option.label])),
-  } as const;
+  const publicSurfaceOptions: Array<Option<AppearanceSettings['publicSurface']>> =
+    locale === 'ru'
+      ? [
+          { value: 'soft', label: 'Мягко', description: 'Спокойная поверхность.' },
+          { value: 'contrast', label: 'Контраст', description: 'Больше глубины.' },
+          { value: 'glass', label: 'Стекло', description: 'Полупрозрачные блоки.' },
+        ]
+      : [
+          { value: 'soft', label: 'Soft', description: 'Calm surface.' },
+          { value: 'contrast', label: 'Contrast', description: 'More depth.' },
+          { value: 'glass', label: 'Glass', description: 'Translucent blocks.' },
+        ];
 
-  const workspacePresets = [
-    {
-      key: 'graphite',
-      label: locale === 'ru' ? 'Графит' : 'Graphite',
-      description: locale === 'ru' ? 'Тёмный, собранный, без лишнего шума.' : 'Dark, tight, and clean.',
-      accent: 'cobalt' as const,
-      publicAccent: 'cobalt' as const,
-      apply: () => {
-        setTheme('dark');
-        setSettingsBatch({
-          accentTone: 'cobalt',
-          publicAccent: 'cobalt',
-          neutralTone: 'zinc',
-          motion: 'fast',
-          density: 'compact',
-          platformWidth: 'focused',
-          sidebarDensity: 'tight',
-          topbarDensity: 'tight',
-          radius: 'medium',
-          cardStyle: 'flat',
-          publicSurface: 'contrast',
-          publicSectionStyle: 'dividers',
-        });
+  const publicSectionOptions: Array<Option<AppearanceSettings['publicSectionStyle']>> =
+    locale === 'ru'
+      ? [
+          { value: 'cards', label: 'Карточки', description: 'Секции в рамках.' },
+          { value: 'minimal', label: 'Минимал', description: 'Меньше рамок.' },
+          { value: 'dividers', label: 'Линии', description: 'Разделители вместо карточек.' },
+        ]
+      : [
+          { value: 'cards', label: 'Cards', description: 'Section frames.' },
+          { value: 'minimal', label: 'Minimal', description: 'Fewer borders.' },
+          { value: 'dividers', label: 'Dividers', description: 'Lines instead of cards.' },
+        ];
+
+  const publicGalleryOptions: Array<Option<AppearanceSettings['publicGalleryStyle']>> =
+    locale === 'ru'
+      ? [
+          { value: 'grid', label: 'Сетка', description: 'Ровные карточки работ.' },
+          { value: 'editorial', label: 'Редакция', description: 'Разные размеры работ.' },
+          { value: 'compact', label: 'Компакт', description: 'Плотная галерея.' },
+        ]
+      : [
+          { value: 'grid', label: 'Grid', description: 'Even work cards.' },
+          { value: 'editorial', label: 'Editorial', description: 'Mixed work sizes.' },
+          { value: 'compact', label: 'Compact', description: 'Dense gallery.' },
+        ];
+
+  const presets = useMemo(
+    () => [
+      {
+        key: 'studio',
+        title: locale === 'ru' ? 'Студия' : 'Studio',
+        description:
+          locale === 'ru'
+            ? 'Строгий кабинет + чистая публичная.'
+            : 'Strict dashboard plus clean public page.',
+        apply: () => {
+          setTheme('dark');
+          setSettingsBatch({
+            accentTone: 'cobalt',
+            publicAccent: 'cobalt',
+            density: 'compact',
+            radius: 'medium',
+            motion: 'fast',
+            cardStyle: 'soft',
+            dashboardSurface: 'calm',
+            dashboardControlStyle: 'capsule',
+            platformWidth: 'balanced',
+            sidebarDensity: 'balanced',
+            topbarDensity: 'balanced',
+            publicCover: 'gradient',
+            publicButtonStyle: 'pill',
+            publicCardStyle: 'soft',
+            publicServicesStyle: 'grid',
+            publicBookingStyle: 'panel',
+            publicHeroLayout: 'split',
+            publicSurface: 'soft',
+            publicSectionStyle: 'cards',
+            publicGalleryStyle: 'grid',
+            publicNavigationStyle: 'side',
+            publicStatsStyle: 'cards',
+            publicCtaMode: 'sticky',
+          });
+        },
       },
-    },
-    {
-      key: 'velvet',
-      label: locale === 'ru' ? 'Вельвет' : 'Velvet',
-      description: locale === 'ru' ? 'Глубокая тёмная база и мягкий фиолет.' : 'Deep dark base with a soft violet accent.',
-      accent: 'violet' as const,
-      publicAccent: 'rose' as const,
-      apply: () => {
-        setTheme('dark');
-        setSettingsBatch({
-          accentTone: 'violet',
-          publicAccent: 'rose',
-          neutralTone: 'zinc',
-          motion: 'smooth',
-          density: 'standard',
-          platformWidth: 'balanced',
-          sidebarDensity: 'balanced',
-          topbarDensity: 'balanced',
-          radius: 'soft',
-          cardStyle: 'soft',
-          publicButtonStyle: 'pill',
-          publicSurface: 'soft',
-          publicSectionStyle: 'cards',
-        });
+      {
+        key: 'minimal',
+        title: locale === 'ru' ? 'Минимал' : 'Minimal',
+        description:
+          locale === 'ru'
+            ? 'Меньше фона, рамок и декора.'
+            : 'Less background, borders, and decor.',
+        apply: () => {
+          setTheme('light');
+          setSettingsBatch({
+            accentTone: 'cobalt',
+            publicAccent: 'cobalt',
+            density: 'compact',
+            radius: 'tight',
+            motion: 'fast',
+            cardStyle: 'flat',
+            dashboardSurface: 'clear',
+            dashboardControlStyle: 'line',
+            platformWidth: 'focused',
+            sidebarDensity: 'tight',
+            topbarDensity: 'tight',
+            publicCover: 'minimal',
+            publicButtonStyle: 'rounded',
+            publicCardStyle: 'compact',
+            publicServicesStyle: 'stacked',
+            publicBookingStyle: 'minimal',
+            publicHeroLayout: 'compact',
+            publicSurface: 'soft',
+            publicSectionStyle: 'dividers',
+            publicGalleryStyle: 'compact',
+            publicNavigationStyle: 'hidden',
+            publicStatsStyle: 'hidden',
+            publicCtaMode: 'inline',
+          });
+        },
       },
-    },
-    {
-      key: 'mist',
-      label: locale === 'ru' ? 'Туман' : 'Mist',
-      description: locale === 'ru' ? 'Светлая база с холодным небесным акцентом.' : 'Light base with a cool sky accent.',
-      accent: 'sky' as const,
-      publicAccent: 'emerald' as const,
-      apply: () => {
-        setTheme('light');
-        setSettingsBatch({
-          accentTone: 'sky',
-          publicAccent: 'emerald',
-          neutralTone: 'slate',
-          motion: 'smooth',
-          density: 'standard',
-          platformWidth: 'wide',
-          sidebarDensity: 'balanced',
-          topbarDensity: 'roomy',
-          radius: 'soft',
-          cardStyle: 'soft',
-          publicHeroLayout: 'centered',
-          publicButtonStyle: 'pill',
-          publicSectionStyle: 'cards',
-        });
+      {
+        key: 'premium',
+        title: locale === 'ru' ? 'Премиум' : 'Premium',
+        description:
+          locale === 'ru'
+            ? 'Мягкие карточки и выразительная страница.'
+            : 'Soft cards and expressive public page.',
+        apply: () => {
+          setTheme('dark');
+          setSettingsBatch({
+            accentTone: 'violet',
+            publicAccent: 'rose',
+            density: 'standard',
+            radius: 'soft',
+            motion: 'smooth',
+            cardStyle: 'glass',
+            dashboardSurface: 'contrast',
+            dashboardControlStyle: 'solid',
+            platformWidth: 'balanced',
+            sidebarDensity: 'balanced',
+            topbarDensity: 'balanced',
+            publicCover: 'portrait',
+            publicButtonStyle: 'pill',
+            publicCardStyle: 'editorial',
+            publicServicesStyle: 'grid',
+            publicBookingStyle: 'panel',
+            publicHeroLayout: 'centered',
+            publicSurface: 'glass',
+            publicSectionStyle: 'cards',
+            publicGalleryStyle: 'editorial',
+            publicNavigationStyle: 'top',
+            publicStatsStyle: 'strip',
+            publicCtaMode: 'sticky',
+          });
+        },
       },
-    },
-    {
-      key: 'linen',
-      label: locale === 'ru' ? 'Лён' : 'Linen',
-      description: locale === 'ru' ? 'Светлый, спокойный и чуть теплее.' : 'Light, calm, and slightly warmer.',
-      accent: 'amber' as const,
-      publicAccent: 'peach' as const,
-      apply: () => {
-        setTheme('light');
-        setSettingsBatch({
-          accentTone: 'amber',
-          publicAccent: 'peach',
-          neutralTone: 'stone',
-          motion: 'smooth',
-          density: 'airy',
-          platformWidth: 'wide',
-          sidebarDensity: 'roomy',
-          topbarDensity: 'roomy',
-          radius: 'soft',
-          cardStyle: 'soft',
-          publicHeroLayout: 'centered',
-          publicButtonStyle: 'rounded',
-          publicSurface: 'soft',
-        });
+      {
+        key: 'soft',
+        title: locale === 'ru' ? 'Пудра' : 'Powder',
+        description:
+          locale === 'ru' ? 'Светлая мягкая подача.' : 'Soft light presentation.',
+        apply: () => {
+          setTheme('light');
+          setSettingsBatch({
+            accentTone: 'rose',
+            publicAccent: 'peach',
+            density: 'standard',
+            radius: 'soft',
+            motion: 'smooth',
+            cardStyle: 'soft',
+            dashboardSurface: 'calm',
+            dashboardControlStyle: 'capsule',
+            platformWidth: 'balanced',
+            sidebarDensity: 'balanced',
+            topbarDensity: 'roomy',
+            publicCover: 'gradient',
+            publicButtonStyle: 'pill',
+            publicCardStyle: 'soft',
+            publicServicesStyle: 'chips',
+            publicBookingStyle: 'step',
+            publicHeroLayout: 'centered',
+            publicSurface: 'soft',
+            publicSectionStyle: 'cards',
+            publicGalleryStyle: 'grid',
+            publicNavigationStyle: 'top',
+            publicStatsStyle: 'strip',
+            publicCtaMode: 'sticky',
+          });
+        },
       },
-    },
-    {
-      key: 'mint',
-      label: locale === 'ru' ? 'Мята' : 'Mint',
-      description: locale === 'ru' ? 'Чистый зелёный набор для светлой страницы.' : 'Fresh green set for a lighter public page.',
-      accent: 'emerald' as const,
-      publicAccent: 'teal' as const,
-      apply: () => {
-        setTheme('light');
-        setSettingsBatch({
-          accentTone: 'emerald',
-          publicAccent: 'teal',
-          neutralTone: 'stone',
-          motion: 'fast',
-          density: 'standard',
-          platformWidth: 'balanced',
-          sidebarDensity: 'balanced',
-          topbarDensity: 'balanced',
-          radius: 'medium',
-          cardStyle: 'soft',
-          publicButtonStyle: 'pill',
-          publicCover: 'gradient',
-          publicSectionStyle: 'cards',
-        });
+      {
+        key: 'noir',
+        title: locale === 'ru' ? 'Нуар' : 'Noir',
+        description:
+          locale === 'ru' ? 'Контрастная тёмная сборка.' : 'High-contrast dark setup.',
+        apply: () => {
+          setTheme('dark');
+          setSettingsBatch({
+            accentTone: 'ruby',
+            publicAccent: 'amber',
+            density: 'compact',
+            radius: 'tight',
+            motion: 'fast',
+            cardStyle: 'flat',
+            dashboardSurface: 'contrast',
+            dashboardControlStyle: 'line',
+            platformWidth: 'focused',
+            sidebarDensity: 'tight',
+            topbarDensity: 'tight',
+            publicCover: 'minimal',
+            publicButtonStyle: 'contrast',
+            publicCardStyle: 'compact',
+            publicServicesStyle: 'stacked',
+            publicBookingStyle: 'minimal',
+            publicHeroLayout: 'compact',
+            publicSurface: 'contrast',
+            publicSectionStyle: 'dividers',
+            publicGalleryStyle: 'compact',
+            publicNavigationStyle: 'hidden',
+            publicStatsStyle: 'hidden',
+            publicCtaMode: 'inline',
+          });
+        },
       },
-    },
-    {
-      key: 'noir',
-      label: locale === 'ru' ? 'Нуар' : 'Noir',
-      description: locale === 'ru' ? 'Контрастный тёмный интерфейс с сухими карточками.' : 'Contrast dark UI with dry, clean cards.',
-      accent: 'ruby' as const,
-      publicAccent: 'amber' as const,
-      apply: () => {
-        setTheme('dark');
-        setSettingsBatch({
-          accentTone: 'ruby',
-          publicAccent: 'amber',
-          neutralTone: 'zinc',
-          motion: 'fast',
-          density: 'compact',
-          platformWidth: 'focused',
-          sidebarDensity: 'tight',
-          topbarDensity: 'tight',
-          radius: 'tight',
-          cardStyle: 'flat',
-          publicButtonStyle: 'contrast',
-          publicSurface: 'contrast',
-          publicSectionStyle: 'dividers',
-        });
+      {
+        key: 'fresh',
+        title: locale === 'ru' ? 'Свежий' : 'Fresh',
+        description:
+          locale === 'ru' ? 'Светлый зелёный акцент.' : 'Light green accent.',
+        apply: () => {
+          setTheme('light');
+          setSettingsBatch({
+            accentTone: 'emerald',
+            publicAccent: 'teal',
+            density: 'standard',
+            radius: 'medium',
+            motion: 'smooth',
+            cardStyle: 'soft',
+            dashboardSurface: 'clear',
+            dashboardControlStyle: 'capsule',
+            platformWidth: 'wide',
+            sidebarDensity: 'balanced',
+            topbarDensity: 'balanced',
+            publicCover: 'gradient',
+            publicButtonStyle: 'rounded',
+            publicCardStyle: 'soft',
+            publicServicesStyle: 'grid',
+            publicBookingStyle: 'panel',
+            publicHeroLayout: 'split',
+            publicSurface: 'soft',
+            publicSectionStyle: 'cards',
+            publicGalleryStyle: 'editorial',
+            publicNavigationStyle: 'side',
+            publicStatsStyle: 'cards',
+            publicCtaMode: 'sticky',
+          });
+        },
       },
-    },
-    {
-      key: 'powder',
-      label: locale === 'ru' ? 'Пудра' : 'Powder',
-      description: locale === 'ru' ? 'Светлая база и мягкие розово-персиковые акценты.' : 'Soft light base with muted pink-peach accents.',
-      accent: 'rose' as const,
-      publicAccent: 'peach' as const,
-      apply: () => {
-        setTheme('light');
-        setSettingsBatch({
-          accentTone: 'rose',
-          publicAccent: 'peach',
-          neutralTone: 'stone',
-          motion: 'smooth',
-          density: 'standard',
-          platformWidth: 'balanced',
-          sidebarDensity: 'balanced',
-          topbarDensity: 'balanced',
-          radius: 'soft',
-          cardStyle: 'soft',
-          publicButtonStyle: 'pill',
-          publicHeroLayout: 'centered',
-          publicSurface: 'soft',
-        });
-      },
-    },
-    {
-      key: 'ocean',
-      label: locale === 'ru' ? 'Океан' : 'Ocean',
-      description: locale === 'ru' ? 'Холодный тёмный набор с сине-бирюзовой связкой.' : 'Cool dark setup with blue-teal accents.',
-      accent: 'cobalt' as const,
-      publicAccent: 'cyan' as const,
-      apply: () => {
-        setTheme('dark');
-        setSettingsBatch({
-          accentTone: 'cobalt',
-          publicAccent: 'cyan',
-          neutralTone: 'slate',
-          motion: 'smooth',
-          density: 'standard',
-          platformWidth: 'balanced',
-          sidebarDensity: 'balanced',
-          topbarDensity: 'balanced',
-          radius: 'medium',
-          cardStyle: 'soft',
-          publicButtonStyle: 'rounded',
-          publicSurface: 'glass',
-        });
-      },
-    },
-    {
-      key: 'forest',
-      label: locale === 'ru' ? 'Лес' : 'Forest',
-      description: locale === 'ru' ? 'Глубокий зелёный акцент и более тёплая нейтраль.' : 'Deep green accent with a warmer neutral base.',
-      accent: 'teal' as const,
-      publicAccent: 'lime' as const,
-      apply: () => {
-        setTheme('dark');
-        setSettingsBatch({
-          accentTone: 'teal',
-          publicAccent: 'lime',
-          neutralTone: 'stone',
-          motion: 'smooth',
-          density: 'standard',
-          platformWidth: 'wide',
-          sidebarDensity: 'roomy',
-          topbarDensity: 'balanced',
-          radius: 'soft',
-          cardStyle: 'soft',
-          publicButtonStyle: 'pill',
-          publicHeroLayout: 'split',
-          publicSectionStyle: 'cards',
-        });
-      },
-    },
-    {
-      key: 'mono',
-      label: locale === 'ru' ? 'Моно' : 'Mono',
-      description: locale === 'ru' ? 'Нейтральный режим для тех, кто любит минимум акцента.' : 'Neutral mode with restrained accent usage.',
-      accent: 'indigo' as const,
-      publicAccent: 'sky' as const,
-      apply: () => {
-        setTheme('light');
-        setSettingsBatch({
-          accentTone: 'indigo',
-          publicAccent: 'sky',
-          neutralTone: 'slate',
-          motion: 'off',
-          density: 'compact',
-          platformWidth: 'focused',
-          sidebarDensity: 'tight',
-          topbarDensity: 'tight',
-          radius: 'medium',
-          cardStyle: 'flat',
-          publicButtonStyle: 'contrast',
-          publicSurface: 'contrast',
-        });
-      },
-    },
-  ];
+    ],
+    [locale, setSettingsBatch, setTheme],
+  );
+
+  if (!mounted) return null;
 
   return (
     <WorkspaceShell>
-      <div className="workspace-page workspace-page-wide dashboard-mobile-appearance space-y-4 md:space-y-5">
-        <DashboardHeader
-          badge={labels.badge}
-          title={labels.title}
-          description={isMobile ? (locale === 'ru' ? 'Тема, плотность, акцент и пресеты.' : 'Theme, density, accent, presets.') : labels.description}
-          actions={(
-            <>
-              <Button type="button" variant="outline" onClick={resetSettings} className="shadow-none">
-                <RotateCcw className="size-4" />
-                {labels.reset}
-              </Button>
-              <Button asChild>
-                <Link href={publicHref}>
-                  <Globe2 className="size-4" />
-                  {labels.openPage}
-                </Link>
-              </Button>
-            </>
-          )}
-        />
+      <main
+        className={cn(
+          'min-h-[calc(100dvh-68px)] px-4 pb-10 pt-5 md:px-7 md:pt-6',
+          pageBg(isLight),
+        )}
+      >
+        <div className="mx-auto w-full max-w-[var(--page-max-width)]">
+          <div className="mb-5">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <div className="min-w-0">
+                <h1
+                  className={cn(
+                    'text-[31px] font-semibold tracking-[-0.075em] md:text-[42px]',
+                    pageText(isLight),
+                  )}
+                >
+                  {copy.title}
+                </h1>
 
-        <section>
-          <SectionCard title={labels.general} description={labels.generalDescription}>
-            <div className="space-y-5">
-              <CompactPanel title={labels.quickPresets} description={labels.quickPresetsDescription}>
-                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-                  {workspacePresets.map((preset) => (
-                    <AppearancePresetCard
-                      key={preset.key}
-                      label={preset.label}
-                      description={preset.description}
-                      accent={preset.accent}
-                      publicAccent={preset.publicAccent}
-                      onApply={preset.apply}
+                <p className={cn('mt-2 max-w-[780px] text-[13px] leading-5', mutedText(isLight))}>
+                  {copy.description}
+                </p>
+              </div>
+
+              <ActionButton light={isLight} onClick={resetSettings}>
+                <RotateCcw className="size-3.5" />
+                {copy.reset}
+              </ActionButton>
+            </div>
+          </div>
+
+          <div className="grid gap-4">
+            <Card light={isLight}>
+              <CardTitle
+                title={copy.presets}
+                description={copy.presetsHint}
+                light={isLight}
+                right={<Sparkles className={cn('size-4', faintText(isLight))} />}
+              />
+
+              <div className="grid gap-2 p-4 sm:grid-cols-2 xl:grid-cols-6">
+                {presets.map((preset) => (
+                  <PresetCard
+                    key={preset.key}
+                    title={preset.title}
+                    description={preset.description}
+                    light={isLight}
+                    onClick={preset.apply}
+                  />
+                ))}
+              </div>
+            </Card>
+
+            <Card light={isLight}>
+              <CardTitle
+                title={copy.preview}
+                description={copy.previewHint}
+                light={isLight}
+              />
+
+              <div className="p-4">
+                <CompactPreview settings={settings} light={isLight} locale={locale} />
+              </div>
+            </Card>
+
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+              <Card light={isLight}>
+                <CardTitle
+                  title={copy.cabinet}
+                  description={copy.cabinetHint}
+                  light={isLight}
+                  right={<MonitorSmartphone className={cn('size-4', faintText(isLight))} />}
+                />
+
+                <div className={cn('divide-y p-4', divideTone(isLight))}>
+                  <SettingRow
+                    title={copy.theme}
+                    description={
+                      locale === 'ru'
+                        ? 'Светлая, тёмная или системная тема.'
+                        : 'Light, dark, or system theme.'
+                    }
+                    light={isLight}
+                  >
+                    <SegmentControl
+                      value={
+                        (theme === 'light' || theme === 'dark' || theme === 'system'
+                          ? theme
+                          : currentTheme) as 'light' | 'dark' | 'system'
+                      }
+                      options={themeOptions}
+                      onChange={(value) => setTheme(value)}
+                      light={isLight}
+                      accentColor={accentColor}
                     />
-                  ))}
-                </div>
-              </CompactPanel>
+                  </SettingRow>
 
-              <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_280px]">
-                <div>
-                  <SettingRow label={labels.theme} description={labels.themeDescription}>
-                    <div className="space-y-3">
-                      <ThemeCards value={currentTheme} locale={locale} onChange={setTheme} />
-                      <ThemeLookCards locale={locale} activeKey={themeLookActiveKey} onApply={applyThemeLook} />
+                  <SettingRow
+                    title={copy.colorCabinet}
+                    description={
+                      locale === 'ru'
+                        ? 'Акцент кнопок, точек и активных элементов.'
+                        : 'Accent for buttons, dots, and active states.'
+                    }
+                    light={isLight}
+                  >
+                    <ColorSelect
+                      value={settings.accentTone}
+                      onChange={(value) => setSetting('accentTone', value)}
+                      locale={locale}
+                      light={isLight}
+                    />
+                  </SettingRow>
+
+                  <SettingRow
+                    title={copy.layout}
+                    description={
+                      locale === 'ru'
+                        ? 'Ширина рабочей области и плотность страниц.'
+                        : 'Workspace width and page density.'
+                    }
+                    light={isLight}
+                  >
+                    <div className="grid gap-2 lg:grid-cols-2">
+                      <SegmentControl
+                        value={settings.platformWidth}
+                        options={platformOptions}
+                        onChange={(value) => setSetting('platformWidth', value)}
+                        light={isLight}
+                        accentColor={accentColor}
+                      />
+
+                      <SegmentControl
+                        value={settings.density}
+                        options={densityOptions}
+                        onChange={(value) => setSetting('density', value)}
+                        light={isLight}
+                        accentColor={accentColor}
+                      />
                     </div>
                   </SettingRow>
 
-                  <SettingRow label={labels.platformWidth} description={labels.platformWidthDescription}>
-                    <SegmentedControl value={settings.platformWidth} options={platformWidthOptions} onChange={(next) => setSetting('platformWidth', next)} />
-                  </SettingRow>
-
-                  <SettingRow label={labels.sidebarDensity} description={labels.sidebarDensityDescription}>
-                    <SegmentedControl value={settings.sidebarDensity} options={sidebarDensityOptions} onChange={(next) => setSetting('sidebarDensity', next)} />
-                  </SettingRow>
-
-                  <SettingRow label={labels.topbarDensity} description={labels.topbarDensityDescription}>
-                    <SegmentedControl value={settings.topbarDensity} options={topbarDensityOptions} onChange={(next) => setSetting('topbarDensity', next)} />
-                  </SettingRow>
-
-                  <SettingRow label={labels.motion} description={labels.motionDescription}>
-                    <SegmentedControl value={settings.motion} options={motionOptions} onChange={(next) => setSetting('motion', next)} />
-                  </SettingRow>
-
-                  <SettingRow label={labels.density} description={labels.densityDescription}>
-                    <SegmentedControl value={settings.density} options={densityOptions} onChange={(next) => setSetting('density', next)} />
-                  </SettingRow>
-
-                  <SettingRow label={labels.radius} description={labels.radiusDescription} noBorder>
-                    <SegmentedControl value={settings.radius} options={radiusOptions} onChange={(next) => setSetting('radius', next)} />
-                  </SettingRow>
-                </div>
-
-                <div className="space-y-3">
-                  <CompactPanel title={labels.activeStack} description={labels.activeStackDescription}>
+                  <SettingRow
+                    title={copy.cards}
+                    description={
+                      locale === 'ru'
+                        ? 'Скругление, поверхность и стиль карточек.'
+                        : 'Radius, surface, and card style.'
+                    }
+                    light={isLight}
+                  >
                     <div className="grid gap-2">
-                      <SummaryBadge label={labels.platformWidth} value={optionMaps.platformWidth[settings.platformWidth]} />
-                      <SummaryBadge label={labels.sidebarDensity} value={optionMaps.sidebarDensity[settings.sidebarDensity]} />
-                      <SummaryBadge label={labels.topbarDensity} value={optionMaps.topbarDensity[settings.topbarDensity]} />
-                      <SummaryBadge label={labels.motion} value={optionMaps.motion[settings.motion]} />
-                      <SummaryBadge label={labels.density} value={optionMaps.density[settings.density]} />
-                      <SummaryBadge label={labels.radius} value={optionMaps.radius[settings.radius]} />
-                    </div>
-                  </CompactPanel>
+                      <SegmentControl
+                        value={settings.radius}
+                        options={radiusOptions}
+                        onChange={(value) => setSetting('radius', value)}
+                        light={isLight}
+                        accentColor={accentColor}
+                      />
 
-                  <CompactPanel title={labels.quickAccess} description={labels.quickAccessDescription}>
-                    <div className="space-y-3">
-                      <div>
-                        <div className="mb-2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{labels.accent}</div>
-                        <AccentPalettePicker value={settings.accentTone} onChange={(next) => setSetting('accentTone', next)} />
-                      </div>
-                      <div>
-                        <div className="mb-2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{labels.publicAccent}</div>
-                        <AccentPalettePicker value={settings.publicAccent} onChange={(next) => setSetting('publicAccent', next)} />
-                      </div>
-                      <div>
-                        <div className="mb-2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{labels.neutral}</div>
-                        <NeutralTonePicker value={settings.neutralTone} locale={locale} onChange={(next) => setSetting('neutralTone', next)} />
-                      </div>
-                      <div className="grid gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setTheme('dark');
-                            setSetting('platformWidth', 'focused');
-                            setSetting('sidebarDensity', 'tight');
-                            setSetting('topbarDensity', 'tight');
-                          }}
-                          className="inline-flex h-9 items-center justify-between rounded-[12px] border border-border/80 bg-card/76 px-3 text-[11px] font-medium text-foreground transition hover:bg-accent/50"
-                        >
-                          <span>{labels.workspaceAction}</span>
-                          <PanelsTopLeft className="size-3.5 text-primary" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setTheme('light');
-                            setSetting('platformWidth', 'wide');
-                            setSetting('publicHeroLayout', 'centered');
-                            setSetting('publicButtonStyle', 'pill');
-                          }}
-                          className="inline-flex h-9 items-center justify-between rounded-[12px] border border-border/80 bg-card/76 px-3 text-[11px] font-medium text-foreground transition hover:bg-accent/50"
-                        >
-                          <span>{labels.publicAction}</span>
-                          <LayoutTemplate className="size-3.5 text-primary" />
-                        </button>
+                      <div className="grid gap-2 lg:grid-cols-2">
+                        <SegmentControl
+                          value={settings.cardStyle}
+                          options={cardOptions}
+                          onChange={(value) => setSetting('cardStyle', value)}
+                          light={isLight}
+                          accentColor={accentColor}
+                        />
+
+                        <SegmentControl
+                          value={settings.dashboardSurface}
+                          options={dashboardSurfaceOptions}
+                          onChange={(value) => setSetting('dashboardSurface', value)}
+                          light={isLight}
+                          accentColor={accentColor}
+                        />
                       </div>
                     </div>
-                  </CompactPanel>
+                  </SettingRow>
+
+                  <SettingRow
+                    title={copy.controls}
+                    description={
+                      locale === 'ru'
+                        ? 'Переключатели, движение и мобильная плотность.'
+                        : 'Controls, motion, and mobile density.'
+                    }
+                    light={isLight}
+                  >
+                    <div className="grid gap-2">
+                      <SegmentControl
+                        value={settings.dashboardControlStyle}
+                        options={dashboardControlOptions}
+                        onChange={(value) => setSetting('dashboardControlStyle', value)}
+                        light={isLight}
+                        accentColor={accentColor}
+                      />
+
+                      <div className="grid gap-2 lg:grid-cols-2">
+                        <SegmentControl
+                          value={settings.motion}
+                          options={motionOptions}
+                          onChange={(value) => setSetting('motion', value)}
+                          light={isLight}
+                          accentColor={accentColor}
+                        />
+
+                        <SegmentControl
+                          value={settings.mobileFontScale}
+                          options={mobileScaleOptions}
+                          onChange={(value) => setSetting('mobileFontScale', value)}
+                          light={isLight}
+                          accentColor={accentColor}
+                        />
+                      </div>
+                    </div>
+                  </SettingRow>
+
+                  <SettingRow
+                    title={copy.navigation}
+                    description={
+                      locale === 'ru'
+                        ? 'Плотность бокового меню и верхней панели.'
+                        : 'Sidebar and topbar density.'
+                    }
+                    light={isLight}
+                  >
+                    <div className="grid gap-2 lg:grid-cols-2">
+                      <SegmentControl
+                        value={settings.sidebarDensity}
+                        options={navDensityOptions}
+                        onChange={(value) => setSetting('sidebarDensity', value)}
+                        light={isLight}
+                        accentColor={accentColor}
+                      />
+
+                      <SegmentControl
+                        value={settings.topbarDensity}
+                        options={navDensityOptions}
+                        onChange={(value) => setSetting('topbarDensity', value)}
+                        light={isLight}
+                        accentColor={accentColor}
+                      />
+                    </div>
+                  </SettingRow>
                 </div>
-              </div>
+              </Card>
+
+              <Card light={isLight}>
+                <CardTitle
+                  title={copy.public}
+                  description={copy.publicHint}
+                  light={isLight}
+                  right={<Eye className={cn('size-4', faintText(isLight))} />}
+                />
+
+                <div className={cn('divide-y p-4', divideTone(isLight))}>
+                  <SettingRow
+                    title={copy.colorPublic}
+                    description={
+                      locale === 'ru'
+                        ? 'Акцент CTA, hero и клиентских секций.'
+                        : 'Accent for CTA, hero, and client sections.'
+                    }
+                    light={isLight}
+                  >
+                    <ColorSelect
+                      value={settings.publicAccent}
+                      onChange={(value) => setSetting('publicAccent', value)}
+                      locale={locale}
+                      light={isLight}
+                    />
+                  </SettingRow>
+
+                  <SettingRow
+                    title={copy.publicStructure}
+                    description={
+                      locale === 'ru'
+                        ? 'Первый экран, навигация, метрики и CTA.'
+                        : 'Hero, navigation, stats, and CTA.'
+                    }
+                    light={isLight}
+                  >
+                    <div className="grid gap-2">
+                      <div className="grid gap-2 lg:grid-cols-2">
+                        <SegmentControl
+                          value={settings.publicHeroLayout}
+                          options={publicHeroOptions}
+                          onChange={(value) => setSetting('publicHeroLayout', value)}
+                          light={isLight}
+                          accentColor={publicAccentColor}
+                        />
+
+                        <SegmentControl
+                          value={settings.publicNavigationStyle}
+                          options={publicNavigationOptions}
+                          onChange={(value) => setSetting('publicNavigationStyle', value)}
+                          light={isLight}
+                          accentColor={publicAccentColor}
+                        />
+                      </div>
+
+                      <div className="grid gap-2 lg:grid-cols-2">
+                        <SegmentControl
+                          value={settings.publicStatsStyle}
+                          options={publicStatsOptions}
+                          onChange={(value) => setSetting('publicStatsStyle', value)}
+                          light={isLight}
+                          accentColor={publicAccentColor}
+                        />
+
+                        <SegmentControl
+                          value={settings.publicCtaMode}
+                          options={publicCtaOptions}
+                          onChange={(value) => setSetting('publicCtaMode', value)}
+                          light={isLight}
+                          accentColor={publicAccentColor}
+                        />
+                      </div>
+                    </div>
+                  </SettingRow>
+
+                  <SettingRow
+                    title={copy.publicVisual}
+                    description={
+                      locale === 'ru'
+                        ? 'Обложка, поверхность и стиль карточек.'
+                        : 'Cover, surface, and card style.'
+                    }
+                    light={isLight}
+                  >
+                    <div className="grid gap-2">
+                      <SegmentControl
+                        value={settings.publicCover}
+                        options={publicCoverOptions}
+                        onChange={(value) => setSetting('publicCover', value)}
+                        light={isLight}
+                        accentColor={publicAccentColor}
+                      />
+
+                      <div className="grid gap-2 lg:grid-cols-2">
+                        <SegmentControl
+                          value={settings.publicSurface}
+                          options={publicSurfaceOptions}
+                          onChange={(value) => setSetting('publicSurface', value)}
+                          light={isLight}
+                          accentColor={publicAccentColor}
+                        />
+
+                        <SegmentControl
+                          value={settings.publicCardStyle}
+                          options={publicCardOptions}
+                          onChange={(value) => setSetting('publicCardStyle', value)}
+                          light={isLight}
+                          accentColor={publicAccentColor}
+                        />
+                      </div>
+                    </div>
+                  </SettingRow>
+
+                  <SettingRow
+                    title={copy.bookingServices}
+                    description={
+                      locale === 'ru'
+                        ? 'Вид кнопки, форма записи и список услуг.'
+                        : 'Button style, booking block, and service list.'
+                    }
+                    light={isLight}
+                  >
+                    <div className="grid gap-2">
+                      <SegmentControl
+                        value={settings.publicButtonStyle}
+                        options={publicButtonOptions}
+                        onChange={(value) => setSetting('publicButtonStyle', value)}
+                        light={isLight}
+                        accentColor={publicAccentColor}
+                      />
+
+                      <div className="grid gap-2 lg:grid-cols-2">
+                        <SegmentControl
+                          value={settings.publicBookingStyle}
+                          options={publicBookingOptions}
+                          onChange={(value) => setSetting('publicBookingStyle', value)}
+                          light={isLight}
+                          accentColor={publicAccentColor}
+                        />
+
+                        <SegmentControl
+                          value={settings.publicServicesStyle}
+                          options={publicServicesOptions}
+                          onChange={(value) => setSetting('publicServicesStyle', value)}
+                          light={isLight}
+                          accentColor={publicAccentColor}
+                        />
+                      </div>
+                    </div>
+                  </SettingRow>
+
+                  <SettingRow
+                    title={copy.secondarySections}
+                    description={
+                      locale === 'ru'
+                        ? 'Отзывы, контакты, FAQ и галерея.'
+                        : 'Reviews, contacts, FAQ, and gallery.'
+                    }
+                    light={isLight}
+                  >
+                    <div className="grid gap-2 lg:grid-cols-2">
+                      <SegmentControl
+                        value={settings.publicSectionStyle}
+                        options={publicSectionOptions}
+                        onChange={(value) => setSetting('publicSectionStyle', value)}
+                        light={isLight}
+                        accentColor={publicAccentColor}
+                      />
+
+                      <SegmentControl
+                        value={settings.publicGalleryStyle}
+                        options={publicGalleryOptions}
+                        onChange={(value) => setSetting('publicGalleryStyle', value)}
+                        light={isLight}
+                        accentColor={publicAccentColor}
+                      />
+                    </div>
+                  </SettingRow>
+
+                  <SettingRow
+                    title={copy.summary}
+                    description={
+                      locale === 'ru'
+                        ? 'Текущая публичная конфигурация.'
+                        : 'Current public configuration.'
+                    }
+                    light={isLight}
+                  >
+                    <div className="flex flex-wrap gap-2">
+                      <MicroLabel light={isLight} active accentColor={publicAccentColor}>
+                        <Eye className="size-3.5" />
+                        {toneLabel(locale, settings.publicAccent)}
+                      </MicroLabel>
+
+                      <MicroLabel light={isLight}>
+                        {settingValueLabel(locale, settings.publicHeroLayout)}
+                      </MicroLabel>
+
+                      <MicroLabel light={isLight}>
+                        {settingValueLabel(locale, settings.publicNavigationStyle)}
+                      </MicroLabel>
+
+                      <MicroLabel light={isLight}>
+                        {settingValueLabel(locale, settings.publicServicesStyle)}
+                      </MicroLabel>
+
+                      <MicroLabel light={isLight}>
+                        {settingValueLabel(locale, settings.publicButtonStyle)}
+                      </MicroLabel>
+                    </div>
+                  </SettingRow>
+                </div>
+              </Card>
             </div>
-          </SectionCard>
-        </section>
 
-        <section className="grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
-          <SectionCard
-            title={labels.app}
-            description={labels.appDescription}
-            actions={<Palette className="size-4 text-primary" />}
-            className="h-fit"
-          >
-            <SettingRow label={labels.accent} description={labels.accentDescription}>
-              <AccentPalettePicker value={settings.accentTone} onChange={(next) => setSetting('accentTone', next)} />
-            </SettingRow>
+            <Card light={isLight}>
+              <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <div className={cn('text-[13px] font-semibold', pageText(isLight))}>
+                    {locale === 'ru' ? 'Настройки применяются сразу' : 'Settings apply instantly'}
+                  </div>
 
-            <SettingRow label={labels.neutral} description={labels.neutralDescription}>
-              <NeutralTonePicker value={settings.neutralTone} locale={locale} onChange={(next) => setSetting('neutralTone', next)} />
-            </SettingRow>
-
-            <SettingRow label={labels.cards} description={labels.cardsDescription} noBorder>
-              <SegmentedControl value={settings.cardStyle} options={cardOptions} onChange={(next) => setSetting('cardStyle', next)} className="max-w-none sm:max-w-[360px]" />
-            </SettingRow>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-[16px] border border-border bg-accent/20 p-4">
-                <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                  {locale === 'ru' ? 'Текущий режим' : 'Current mode'}
+                  <div className={cn('mt-1 text-[11px] leading-4', mutedText(isLight))}>
+                    {locale === 'ru'
+                      ? 'Кабинет и публичная страница берут значения из общего контекста внешнего вида.'
+                      : 'Dashboard and public page read values from Appearance Context.'}
+                  </div>
                 </div>
-                <div className="mt-2 text-[14px] font-semibold text-foreground">
-                  {displayTheme === 'dark' ? (locale === 'ru' ? 'Тёмный кабинет' : 'Dark workspace') : (locale === 'ru' ? 'Светлый режим' : 'Light mode')}
-                </div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <span className="workspace-pill">{optionMaps.platformWidth[settings.platformWidth]}</span>
-                  <span className="workspace-pill">{optionMaps.sidebarDensity[settings.sidebarDensity]}</span>
-                  <span className="workspace-pill">{optionMaps.radius[settings.radius]}</span>
+
+                <div className="flex flex-wrap gap-2">
+                  <MicroLabel light={isLight}>
+                    <MoonStar className="size-3.5" />
+                    {settingValueLabel(locale, currentTheme)}
+                  </MicroLabel>
+
+                  <MicroLabel light={isLight}>
+                    <MonitorSmartphone className="size-3.5" />
+                    {settingValueLabel(locale, settings.mobileFontScale)}
+                  </MicroLabel>
                 </div>
               </div>
-
-              <div className="rounded-[16px] border border-border bg-accent/20 p-4">
-                <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                  {locale === 'ru' ? 'Публичная страница' : 'Public page'}
-                </div>
-                <div className="mt-2 text-[14px] font-semibold text-foreground">
-                  {optionMaps.motion[settings.motion]} · {optionMaps.density[settings.density]}
-                </div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <span className="workspace-pill">{settings.publicHeroLayout}</span>
-                  <span className="workspace-pill">{settings.publicButtonStyle}</span>
-                  <span className="workspace-pill">{settings.publicSectionStyle}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 grid gap-2 sm:grid-cols-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="justify-start shadow-none"
-                onClick={() => {
-                  setTheme('dark');
-                  setSetting('cardStyle', 'soft');
-                  setSetting('platformWidth', 'focused');
-                  setSetting('sidebarDensity', 'tight');
-                  setSetting('topbarDensity', 'tight');
-                  setSetting('publicAccent', settings.accentTone);
-                }}
-              >
-                <PanelsTopLeft className="size-4" />
-                {labels.workspaceAction}
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                className="justify-start shadow-none"
-                onClick={() => {
-                  setTheme('light');
-                  setSetting('platformWidth', 'wide');
-                  setSetting('sidebarDensity', 'balanced');
-                  setSetting('topbarDensity', 'roomy');
-                  setSetting('publicButtonStyle', 'pill');
-                  setSetting('publicCover', 'gradient');
-                }}
-              >
-                <LayoutTemplate className="size-4" />
-                {labels.publicAction}
-              </Button>
-
-              <Button type="button" variant="outline" className="justify-start shadow-none" onClick={resetSettings}>
-                <RotateCcw className="size-4" />
-                {labels.quickReset}
-              </Button>
-
-              <Button asChild variant="outline" className="justify-start shadow-none">
-                <Link href={publicHref}>
-                  <Globe2 className="size-4" />
-                  {labels.quickOpen}
-                </Link>
-              </Button>
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            title={labels.publicPage}
-            description={labels.publicDescription}
-            actions={<Brush className="size-4 text-primary" />}
-          >
-            <div className="grid gap-x-8 xl:grid-cols-2">
-              <div>
-                <SettingRow label={labels.cover} description={labels.coverDescription}>
-                  <SegmentedControl value={settings.publicCover} options={publicCoverOptions} onChange={(next) => setSetting('publicCover', next)} />
-                </SettingRow>
-
-                <SettingRow label={labels.publicAccent} description={labels.publicAccentDescription}>
-                  <AccentPalettePicker value={settings.publicAccent} onChange={(next) => setSetting('publicAccent', next)} />
-                </SettingRow>
-
-                <SettingRow label={labels.publicButton} description={labels.publicButtonDescription}>
-                  <SegmentedControl value={settings.publicButtonStyle} options={publicButtonOptions} onChange={(next) => setSetting('publicButtonStyle', next)} />
-                </SettingRow>
-
-                <SettingRow label={labels.publicCard} description={labels.publicCardDescription}>
-                  <SegmentedControl value={settings.publicCardStyle} options={publicCardOptions} onChange={(next) => setSetting('publicCardStyle', next)} />
-                </SettingRow>
-
-                <SettingRow label={labels.services} description={labels.servicesDescription} noBorder>
-                  <SegmentedControl value={settings.publicServicesStyle} options={publicServicesOptions} onChange={(next) => setSetting('publicServicesStyle', next)} />
-                </SettingRow>
-              </div>
-
-              <div>
-                <SettingRow label={labels.booking} description={labels.bookingDescription}>
-                  <SegmentedControl value={settings.publicBookingStyle} options={publicBookingOptions} onChange={(next) => setSetting('publicBookingStyle', next)} />
-                </SettingRow>
-
-                <SettingRow label={labels.hero} description={labels.heroDescription}>
-                  <SegmentedControl value={settings.publicHeroLayout} options={heroOptions} onChange={(next) => setSetting('publicHeroLayout', next)} />
-                </SettingRow>
-
-                <SettingRow label={labels.surface} description={labels.surfaceDescription}>
-                  <SegmentedControl value={settings.publicSurface} options={surfaceOptions} onChange={(next) => setSetting('publicSurface', next)} />
-                </SettingRow>
-
-                <SettingRow label={labels.sections} description={labels.sectionsDescription}>
-                  <SegmentedControl value={settings.publicSectionStyle} options={sectionOptions} onChange={(next) => setSetting('publicSectionStyle', next)} />
-                </SettingRow>
-
-                <SettingRow label={labels.gallery} description={labels.galleryDescription} noBorder>
-                  <SegmentedControl value={settings.publicGalleryStyle} options={galleryOptions} onChange={(next) => setSetting('publicGalleryStyle', next)} />
-                </SettingRow>
-              </div>
-            </div>
-          </SectionCard>
-        </section>
-
-      </div>
+            </Card>
+          </div>
+        </div>
+      </main>
     </WorkspaceShell>
   );
 }

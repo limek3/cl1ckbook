@@ -70,7 +70,7 @@ export function StateCard({
       <EmptyContent className="mt-1.5 w-auto max-w-none gap-2 sm:flex-row">
         <Button
           onClick={primaryAction.onClick}
-          className="h-10 rounded-md bg-primary px-3.5 text-[13px] font-semibold text-primary-foreground shadow-primary-glow hover:bg-primary-hover"
+          className="h-10 rounded-[15px] px-3.5 text-[13px] font-medium"
         >
           {primaryAction.label}
         </Button>
@@ -79,7 +79,7 @@ export function StateCard({
           <Button
             variant="outline"
             onClick={secondaryAction.onClick}
-            className="h-10 rounded-md border-border/70 px-3.5 text-[13px] font-semibold"
+            className="h-10 rounded-[15px] px-3.5 text-[13px] font-medium"
           >
             {secondaryAction.label}
           </Button>

@@ -201,9 +201,9 @@ function getSlides(locale: Locale): SlideMeta[] {
   return [
     {
       id: 'service',
-      eyebrow: 'One service for the master',
+      eyebrow: 'One service for the specialist',
       title:
-        'КликБук helps you manage bookings, client communication, and your workday in one place.',
+        'ClickBook helps you manage bookings, client communication, and your workday in one place.',
       description:
         'The public page, online booking, messages, and workspace are combined into one clear product.',
       accent: 'emerald',
@@ -219,7 +219,7 @@ function getSlides(locale: Locale): SlideMeta[] {
     },
     {
       id: 'public',
-      eyebrow: 'Public master page',
+      eyebrow: 'Public specialist page',
       title:
         'Show services, available time, and your booking link on one polished page.',
       description:
@@ -237,16 +237,16 @@ function getSlides(locale: Locale): SlideMeta[] {
     },
     {
       id: 'audience',
-      eyebrow: 'КликБук plans',
+      eyebrow: 'ClickBook plans',
       title:
-        'КликБук fits solo professionals, beauty specialists, and small studios.',
+        'ClickBook fits solo professionals, beauty specialists, and small studios.',
       description:
         'Pick the right plan and launch online booking without a long setup.',
       accent: 'emerald',
     },
     {
       id: 'final',
-      eyebrow: 'Sign in to КликБук',
+      eyebrow: 'Sign in to ClickBook',
       title:
         'Create an account or sign in to start taking bookings online.',
       description:
@@ -625,8 +625,8 @@ function DashboardPreview({
           live:
             focus === 'service'
               ? 'Public page is active'
-              : 'Master workspace',
-          title: focus === 'service' ? 'Main master link' : 'Master workspace',
+              : 'Specialist workspace',
+          title: focus === 'service' ? 'Main specialist link' : 'Specialist workspace',
           description:
             focus === 'service'
               ? 'Show the public page to clients, share the link, and start taking bookings online.'
@@ -660,7 +660,7 @@ function DashboardPreview({
             'Open chats',
             'Configure services',
             'Appearance',
-            'Master profile',
+            'Specialist profile',
           ],
           services: [
             ['Nails + coating', '46%', '14 400 ₽'],
@@ -899,7 +899,7 @@ function PublicPagePreview({
                 Anna Petrova
               </div>
               <div className="text-[11px] text-muted-foreground">
-                {locale === 'ru' ? 'Страница мастера' : 'Master page'}
+                {locale === 'ru' ? 'Страница мастера' : 'Specialist page'}
               </div>
             </div>
           </div>
@@ -1064,7 +1064,7 @@ function FlowScene({
                     ['Кабинет', 'Рабочие действия'],
                   ]
                 : [
-                    ['Master page', 'Services and profile'],
+                    ['Specialist page', 'Services and profile'],
                     ['Online booking', 'Available slot and CTA'],
                     ['Workspace', 'Work actions'],
                   ]
@@ -1285,7 +1285,7 @@ function AudienceScene({
 
         <Panel className="p-4">
           <SectionTitle
-            title={locale === 'ru' ? 'Почему выбирают КликБук' : 'Why people choose КликБук'}
+            title={locale === 'ru' ? 'Почему выбирают КликБук' : 'Why people choose ClickBook'}
             description={
               locale === 'ru'
                 ? 'Быстрый запуск страницы мастера, онлайн-запись и рабочий кабинет в одном сервисе.'
@@ -1295,7 +1295,7 @@ function AudienceScene({
           <div className="text-[13px] leading-7 text-muted-foreground">
             {locale === 'ru'
               ? 'КликБук помогает быстрее начать принимать записи, поддерживать связь с клиентами и держать рабочий день под контролем.'
-              : 'КликБук helps professionals start taking bookings faster, stay connected with clients, and keep the workday under control.'}
+              : 'ClickBook helps professionals start taking bookings faster, stay connected with clients, and keep the workday under control.'}
           </div>
         </Panel>
       </div>
@@ -1402,8 +1402,8 @@ function AuthScene({
           max: 'MAX',
         }
       : {
-          brand: 'КликБук',
-          subtitle: 'Master workspace',
+          brand: 'ClickBook',
+          subtitle: 'Specialist workspace',
           login: 'Sign in',
           register: 'Register',
           loginTitle: 'Sign in',
@@ -1549,7 +1549,7 @@ function AuthScene({
                         </button>
                       </div>
 
-                      <Button type="submit" className="h-12 w-full rounded-[14px] bg-foreground text-background hover:bg-foreground/90">
+                      <Button type="submit" className="h-12 w-full rounded-[15px]">
                         <LogIn className="h-4 w-4" />
                         {copy.submitLogin}
                       </Button>
@@ -1598,7 +1598,7 @@ function AuthScene({
                         <span>{copy.agreement}</span>
                       </label>
 
-                      <Button type="submit" className="h-12 w-full rounded-[14px] bg-foreground text-background hover:bg-foreground/90">
+                      <Button type="submit" className="h-12 w-full rounded-[15px]">
                         <UserPlus className="h-4 w-4" />
                         {copy.submitRegister}
                       </Button>
@@ -1999,7 +1999,7 @@ function PreviewLandingPage() {
             <h1 className="mt-3 text-[30px] font-semibold leading-[1.04] tracking-[-0.06em] text-foreground">
               {currentLocale === 'ru'
                 ? 'КликБук помогает принимать записи и держать рабочий день под рукой.'
-                : 'КликБук keeps bookings and your workday in one place.'}
+                : 'ClickBook keeps bookings and your workday in one place.'}
             </h1>
             <p className="mt-3 text-[14px] leading-7 text-muted-foreground">
               {currentLocale === 'ru'

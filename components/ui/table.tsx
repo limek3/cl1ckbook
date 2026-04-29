@@ -5,7 +5,10 @@ import { cn } from '@/lib/utils';
 
 function Table({ className, ...props }: React.ComponentProps<'table'>) {
   return (
-    <div data-slot="table-container" className="relative w-full overflow-x-auto border-y border-border/80 bg-transparent">
+    <div
+      data-slot="table-container"
+      className="relative w-full overflow-x-auto rounded-[18px] border border-border/80 bg-card/96 shadow-[var(--shadow-soft)]"
+    >
       <table data-slot="table" className={cn('w-full caption-bottom text-[13px]', className)} {...props} />
     </div>
   );
@@ -20,19 +23,19 @@ function TableBody({ className, ...props }: React.ComponentProps<'tbody'>) {
 }
 
 function TableFooter({ className, ...props }: React.ComponentProps<'tfoot'>) {
-  return <tfoot data-slot="table-footer" className={cn('border-t border-border/80 bg-muted/20 font-medium', className)} {...props} />;
+  return <tfoot data-slot="table-footer" className={cn('border-t border-border/80 bg-muted/18 font-medium', className)} {...props} />;
 }
 
 function TableRow({ className, ...props }: React.ComponentProps<'tr'>) {
-  return <tr data-slot="table-row" className={cn('border-b border-border/80 transition-colors hover:bg-accent/36', className)} {...props} />;
+  return <tr data-slot="table-row" className={cn('border-b border-border/80 transition-colors hover:bg-accent/52', className)} {...props} />;
 }
 
 function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
-  return <th data-slot="table-head" className={cn('h-10 px-4 text-left align-middle text-[10.5px] font-medium uppercase tracking-[0.11em] text-muted-foreground', className)} {...props} />;
+  return <th data-slot="table-head" className={cn('h-11 px-4 text-left align-middle text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground', className)} {...props} />;
 }
 
 function TableCell({ className, ...props }: React.ComponentProps<'td'>) {
-  return <td data-slot="table-cell" className={cn('px-4 py-3 align-middle text-[13px] text-foreground', className)} {...props} />;
+  return <td data-slot="table-cell" className={cn('px-4 py-3.5 align-middle text-[13px] text-foreground', className)} {...props} />;
 }
 
 function TableCaption({ className, ...props }: React.ComponentProps<'caption'>) {

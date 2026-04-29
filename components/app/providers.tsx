@@ -6,8 +6,6 @@ import { Toaster } from '@/components/ui/sonner';
 import { AppProvider } from '@/lib/app-context';
 import { AppearanceProvider } from '@/lib/appearance-context';
 import { LocaleProvider } from '@/lib/locale-context';
-import { TelegramContactWidget } from '@/components/shared/telegram-contact-widget';
-import { FancyCursor } from '@/components/shared/fancy-cursor';
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
@@ -16,8 +14,6 @@ export function Providers({ children }: { children: ReactNode }) {
         <AppProvider>
           <AppearanceProvider>
             {children}
-            <FancyCursor />
-            <TelegramContactWidget />
             <Toaster richColors position="top-center" />
           </AppearanceProvider>
         </AppProvider>

@@ -40,7 +40,7 @@ function patchHistoryMethod(method: 'pushState' | 'replaceState') {
 }
 
 export function useBrowserSearchParams() {
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => getSearchString());
 
   useEffect(() => {
     let frameId = 0;

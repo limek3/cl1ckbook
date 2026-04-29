@@ -12,7 +12,8 @@ import {
 import { useLocale } from '@/lib/locale-context';
 import { parseServices, slugify } from '@/lib/utils';
 import { buildWorkspaceSeed, type WorkspaceSections, type WorkspaceSnapshot } from '@/lib/workspace-store';
-import { getDemoBookings, getDemoProfile } from '@/lib/demo-data';
+import { getDemoBookings, getDemoProfile, saveStoredDemoProfile, SLOTY_DEMO_SLUG } from '@/lib/demo-data';
+import { isDashboardDemoEnabled } from '@/lib/dashboard-demo';
 import type {
   Booking,
   BookingFormValues,
@@ -33,6 +34,14 @@ interface CreateBookingResult {
   booking?: Booking;
 }
 
+type SaveProfileValues = MasterProfileFormValues &
+  Partial<
+    Pick<
+      MasterProfile,
+      'priceHint' | 'experienceLabel' | 'responseTime' | 'workGallery' | 'reviews' | 'rating' | 'reviewCount'
+    >
+  >;
+
 interface AppContextValue {
   hasHydrated: boolean;
   workspaceId: string | null;
@@ -40,7 +49,7 @@ interface AppContextValue {
   profiles: MasterProfile[];
   bookings: Booking[];
   workspaceData: WorkspaceSections;
-  saveProfile: (values: MasterProfileFormValues) => Promise<SaveProfileResult>;
+  saveProfile: (values: SaveProfileValues) => Promise<SaveProfileResult>;
   createBooking: (masterSlug: string, values: BookingFormValues) => Promise<CreateBookingResult>;
   updateBookingStatus: (bookingId: string, status: BookingStatus) => Promise<void>;
   updateWorkspaceSection: <T>(section: string, value: T) => Promise<boolean>;
@@ -54,7 +63,16 @@ interface AppContextValue {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
-function buildProfile(values: MasterProfileFormValues, previous?: MasterProfile | null): MasterProfile {
+function buildProfile(values: SaveProfileValues, previous?: MasterProfile | null): MasterProfile {
+  const priceHint = 'priceHint' in values ? values.priceHint?.trim() || undefined : previous?.priceHint;
+  const experienceLabel =
+    'experienceLabel' in values ? values.experienceLabel?.trim() || undefined : previous?.experienceLabel;
+  const responseTime = 'responseTime' in values ? values.responseTime?.trim() || undefined : previous?.responseTime;
+  const workGallery = values.workGallery ?? previous?.workGallery;
+  const reviews = values.reviews ?? previous?.reviews;
+  const rating = typeof values.rating === 'number' ? values.rating : previous?.rating;
+  const reviewCount = typeof values.reviewCount === 'number' ? values.reviewCount : previous?.reviewCount;
+
   return {
     id: previous?.id ?? crypto.randomUUID(),
     slug: slugify(values.slug || values.name),
@@ -70,6 +88,13 @@ function buildProfile(values: MasterProfileFormValues, previous?: MasterProfile 
     hideTelegram: values.hideTelegram,
     hideWhatsapp: values.hideWhatsapp,
     avatar: values.avatar.trim() || undefined,
+    priceHint,
+    experienceLabel,
+    responseTime,
+    workGallery,
+    reviews,
+    rating,
+    reviewCount,
     createdAt: previous?.createdAt ?? new Date().toISOString(),
   };
 }
@@ -164,8 +189,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const getDemoProfileBySlug = useCallback(
-    (slug: string) => getDemoProfile(slug),
-    [],
+    (slug: string) => getDemoProfile(slug, locale),
+    [locale],
   );
 
   const getBookingsBySlug = useCallback(
@@ -174,8 +199,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const getDemoBookingsBySlug = useCallback(
-    (slug: string) => getDemoBookings(slug),
-    [],
+    (slug: string) => getDemoBookings(slug, locale),
+    [locale],
   );
 
   const validateProfile = useCallback(
@@ -215,13 +240,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const saveProfile = useCallback(
-    async (values: MasterProfileFormValues): Promise<SaveProfileResult> => {
+    async (values: SaveProfileValues): Promise<SaveProfileResult> => {
       const error = validateProfile(values, ownedProfile);
       if (error) {
         return { success: false, error };
       }
 
-      const nextProfile = buildProfile(values, ownedProfile);
+      const demoMode =
+        typeof window !== 'undefined' &&
+        isDashboardDemoEnabled(new URLSearchParams(window.location.search || ''));
+      const previousProfile = demoMode ? getDemoProfile(SLOTY_DEMO_SLUG, locale) : ownedProfile;
+      const nextProfile = buildProfile(
+        demoMode ? { ...values, slug: SLOTY_DEMO_SLUG } : values,
+        previousProfile,
+      );
+
+      if (demoMode) {
+        saveStoredDemoProfile(nextProfile);
+        return {
+          success: true,
+          profile: nextProfile,
+        };
+      }
 
       try {
         const response = await fetch('/api/profile', {

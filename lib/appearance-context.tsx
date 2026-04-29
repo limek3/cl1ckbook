@@ -44,7 +44,21 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   const searchParams = useBrowserSearchParams();
   const demoMode = isDashboardDemoEnabled(searchParams);
   const storageKey = demoMode ? getDashboardDemoStorageKey('appearance') : APPEARANCE_STORAGE_KEY;
-  const [settings, setSettings] = useState<AppearanceSettings>(defaultAppearanceSettings);
+  const [settings, setSettings] = useState<AppearanceSettings>(() => {
+    if (typeof window === 'undefined') return defaultAppearanceSettings;
+
+    const currentParams = new URLSearchParams(window.location.search || '');
+    const currentDemoMode = isDashboardDemoEnabled(currentParams);
+    const currentStorageKey = currentDemoMode ? getDashboardDemoStorageKey('appearance') : APPEARANCE_STORAGE_KEY;
+    const fallback = currentDemoMode ? getDashboardDemoAppearance() : defaultAppearanceSettings;
+
+    try {
+      const raw = window.localStorage.getItem(currentStorageKey);
+      return normalizeAppearanceSettings(raw ? (JSON.parse(raw) as Partial<AppearanceSettings>) : fallback);
+    } catch {
+      return fallback;
+    }
+  });
   const lastSavedRef = useRef<string>('');
   const syncedWorkspaceRef = useRef<string | null>(null);
 
@@ -81,6 +95,11 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem(storageKey, JSON.stringify(settings));
     applyAppearance(settings);
+    window.dispatchEvent(
+      new CustomEvent('clickbook:appearance-updated', {
+        detail: { storageKey, settings },
+      }),
+    );
   }, [settings, storageKey]);
 
   useEffect(() => {

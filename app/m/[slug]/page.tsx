@@ -6,5 +6,6 @@ export default async function MasterPublicPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+
   return <PublicMasterPage slug={slug} />;
 }

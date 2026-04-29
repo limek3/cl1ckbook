@@ -2,8 +2,9 @@
 
 import * as React from 'react';
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
-import { CheckIcon, ChevronRightIcon, CircleIcon } from 'lucide-react';
+import { CheckIcon, ChevronRightIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { menuContentBaseClass, menuItemBaseClass, menuSeparatorBaseClass } from '@/lib/menu-styles';
 
 function DropdownMenu(props: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
   return <DropdownMenuPrimitive.Root data-slot="dropdown-menu" {...props} />;
@@ -28,7 +29,8 @@ function DropdownMenuContent({
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
         className={cn(
-          'z-50 min-w-[190px] overflow-hidden rounded-[14px] border border-border bg-popover p-1 text-popover-foreground shadow-2xl data-[state=open]:animate-in data-[state=closed]:animate-out',
+          menuContentBaseClass(),
+          'min-w-[220px] data-[state=open]:animate-in data-[state=closed]:animate-out',
           className,
         )}
         {...props}
@@ -56,7 +58,8 @@ function DropdownMenuItem({
       data-inset={inset}
       data-variant={variant}
       className={cn(
-        'relative flex cursor-default items-center gap-2 rounded-[10px] px-2.5 py-2 text-[13px] outline-none select-none transition data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-8 hover:bg-accent focus:bg-accent data-[variant=destructive]:text-destructive',
+        menuItemBaseClass(),
+        'relative flex cursor-default items-center gap-3 pl-2 pr-3 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-8 [&_svg]:size-3.5 [&_svg]:shrink-0',
         className,
       )}
       {...props}
@@ -73,16 +76,16 @@ function DropdownMenuCheckboxItem({
   return (
     <DropdownMenuPrimitive.CheckboxItem
       data-slot="dropdown-menu-checkbox-item"
-      className={cn('relative flex items-center gap-2 rounded-[10px] py-2 pl-8 pr-2.5 text-[13px] outline-none select-none hover:bg-accent focus:bg-accent', className)}
+      className={cn(menuItemBaseClass(), 'relative flex items-center gap-3 pl-2 pr-8', className)}
       checked={checked}
       {...props}
     >
-      <span className="absolute left-2 flex size-4 items-center justify-center">
+      {children}
+      <span className="absolute right-3 flex size-4 items-center justify-center text-blue-500 dark:text-blue-400">
         <DropdownMenuPrimitive.ItemIndicator>
-          <CheckIcon className="size-4" />
+          <CheckIcon className="size-3.5" />
         </DropdownMenuPrimitive.ItemIndicator>
       </span>
-      {children}
     </DropdownMenuPrimitive.CheckboxItem>
   );
 }
@@ -99,15 +102,15 @@ function DropdownMenuRadioItem({
   return (
     <DropdownMenuPrimitive.RadioItem
       data-slot="dropdown-menu-radio-item"
-      className={cn('relative flex items-center gap-2 rounded-[10px] py-2 pl-8 pr-2.5 text-[13px] outline-none select-none hover:bg-accent focus:bg-accent', className)}
+      className={cn(menuItemBaseClass(), 'relative flex items-center gap-3 pl-2 pr-8', className)}
       {...props}
     >
-      <span className="absolute left-2 flex size-4 items-center justify-center">
+      {children}
+      <span className="absolute right-3 flex size-4 items-center justify-center text-blue-500 dark:text-blue-400">
         <DropdownMenuPrimitive.ItemIndicator>
-          <CircleIcon className="size-2 fill-current" />
+          <CheckIcon className="size-3.5" />
         </DropdownMenuPrimitive.ItemIndicator>
       </span>
-      {children}
     </DropdownMenuPrimitive.RadioItem>
   );
 }
@@ -117,7 +120,7 @@ function DropdownMenuLabel({ className, inset, ...props }: React.ComponentProps<
 }
 
 function DropdownMenuSeparator({ className, ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Separator>) {
-  return <DropdownMenuPrimitive.Separator data-slot="dropdown-menu-separator" className={cn('my-1 h-px bg-border', className)} {...props} />;
+  return <DropdownMenuPrimitive.Separator data-slot="dropdown-menu-separator" className={cn(menuSeparatorBaseClass(), className)} {...props} />;
 }
 
 function DropdownMenuShortcut({ className, ...props }: React.ComponentProps<'span'>) {
@@ -138,7 +141,7 @@ function DropdownMenuSubTrigger({
     <DropdownMenuPrimitive.SubTrigger
       data-slot="dropdown-menu-sub-trigger"
       data-inset={inset}
-      className={cn('flex cursor-default items-center rounded-[10px] px-2.5 py-2 text-[13px] outline-none select-none hover:bg-accent focus:bg-accent data-[inset]:pl-8', className)}
+      className={cn(menuItemBaseClass(), 'flex cursor-default items-center data-[inset]:pl-8', className)}
       {...props}
     >
       {children}
@@ -148,7 +151,7 @@ function DropdownMenuSubTrigger({
 }
 
 function DropdownMenuSubContent({ className, ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.SubContent>) {
-  return <DropdownMenuPrimitive.SubContent data-slot="dropdown-menu-sub-content" className={cn('z-50 min-w-[190px] overflow-hidden rounded-[14px] border border-border bg-popover p-1 shadow-2xl', className)} {...props} />;
+  return <DropdownMenuPrimitive.SubContent data-slot="dropdown-menu-sub-content" className={cn(menuContentBaseClass(), 'min-w-[220px]', className)} {...props} />;
 }
 
 export {

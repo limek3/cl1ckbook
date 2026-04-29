@@ -292,7 +292,7 @@ export function TelegramContactWidget() {
             exit={{ opacity: 0, y: 12, scale: 0.96 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
             onClick={() => setOpen(true)}
-            className="pointer-events-auto flex items-center gap-3 rounded-full border border-border/80 bg-background/90 px-3.5 py-3 shadow-[var(--shadow-card)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-primary/16 hover:bg-accent/20"
+            className="pointer-events-auto flex items-center gap-3 rounded-full border border-border/80 bg-background/90 px-3.5 py-3 shadow-[var(--shadow-card)] backdrop-blur-xl transition-[background,border-color,box-shadow] hover:border-primary/16 hover:bg-accent/20"
           >
             <div className="flex size-10 items-center justify-center rounded-full border border-primary/20 bg-primary/10 shadow-[var(--shadow-soft)]">
               <MessageCircleMore className="size-4 text-primary" />

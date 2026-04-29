@@ -40,7 +40,7 @@ export function SiteHeader({ compact = false }: SiteHeaderProps) {
         publicPage: 'Страница',
       }
     : {
-        subtitle: compact ? 'Public page' : isAboutRoute ? 'About' : 'Master workspace',
+        subtitle: compact ? 'Public page' : isAboutRoute ? 'About' : 'Specialist workspace',
         back: 'Back to workspace',
         dashboard: 'Workspace',
         publicPage: 'Page',

@@ -1,237 +1,1123 @@
 'use client';
 
 import { addDays, format } from 'date-fns';
-import { useMemo, useState, type CSSProperties, type FormEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
+import { useTheme } from 'next-themes';
 import {
   ArrowRight,
-  CalendarDays,
+  CalendarClock,
+  Check,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
-  ChevronsUpDown,
   Clock3,
+  MessageSquareText,
+  Search,
+  Sparkles,
+  UserRound,
+  X,
 } from 'lucide-react';
-import type { Booking, BookingFormValues, MasterProfile } from '@/lib/types';
-import { useApp } from '@/lib/app-context';
-import { useAppearance } from '@/lib/appearance-context';
-import { getPublicButtonClassName } from '@/lib/appearance';
-import { accentPalette } from '@/lib/appearance-palette';
-import { useLocale } from '@/lib/locale-context';
-import { cn, formatDate } from '@/lib/utils';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Textarea } from '@/components/ui/textarea';
+import { useApp } from '@/lib/app-context';
+import {
+  normalizeAppearanceSettings,
+  type AppearanceSettings,
+} from '@/lib/appearance';
+import { useAppearance } from '@/lib/appearance-context';
+import { accentPalette } from '@/lib/appearance-palette';
+import { useLocale } from '@/lib/locale-context';
+import type { Booking, BookingFormValues, MasterProfile } from '@/lib/types';
+import { cn, formatDate } from '@/lib/utils';
+import { menuContentClass, menuItemClass, menuTriggerClass } from '@/lib/menu-styles';
 
-const initialValues: BookingFormValues = {
-  clientName: '',
-  clientPhone: '',
-  service: '',
-  date: '',
-  time: '',
-  comment: '',
+type ThemeMode = 'light' | 'dark';
+
+type BookingAvailabilityStatus = 'workday' | 'short' | 'day-off';
+
+type BookingAvailabilityDay = {
+  id?: string;
+  date?: string;
+  monthKey?: string;
+  dayNumber?: number;
+  weekdayIndex?: number;
+  label?: string;
+  status?: BookingAvailabilityStatus;
+  slots?: string[];
+  breaks?: string[];
+  custom?: boolean;
 };
 
-const timeSlots = ['09:00', '10:30', '12:00', '13:30', '15:00', '17:00', '18:30', '20:00'];
+type MasterProfileWithAvailability = MasterProfile & {
+  availability?: BookingAvailabilityDay[];
+  availabilityDays?: BookingAvailabilityDay[];
+  monthlyAvailability?: BookingAvailabilityDay[];
+  schedule?: BookingAvailabilityDay[];
+};
 
+function createInitialValues(service = ''): BookingFormValues {
+  return {
+    clientName: '',
+    clientPhone: '',
+    service,
+    date: '',
+    time: '',
+    comment: '',
+  };
+}
 
-function StepLabel({
-  label,
+function pageText(light: boolean) {
+  return light ? 'text-[#0e0e0e]' : 'text-white';
+}
+
+function mutedText(light: boolean) {
+  return light ? 'text-black/48' : 'text-white/42';
+}
+
+function faintText(light: boolean) {
+  return light ? 'text-black/32' : 'text-white/26';
+}
+
+function borderTone(light: boolean) {
+  return light ? 'border-black/[0.08]' : 'border-white/[0.08]';
+}
+
+function divideTone(light: boolean) {
+  return light ? 'divide-black/[0.08]' : 'divide-white/[0.08]';
+}
+
+function cardTone(light: boolean) {
+  return light
+    ? 'border-black/[0.08] bg-[#fbfbfa]'
+    : 'border-white/[0.08] bg-[#101010]';
+}
+
+function insetTone(light: boolean) {
+  return light
+    ? 'border-black/[0.07] bg-black/[0.025]'
+    : 'border-white/[0.07] bg-white/[0.035]';
+}
+
+function fieldTone(light: boolean) {
+  return light
+    ? 'border-black/[0.08] bg-white text-black placeholder:text-black/34'
+    : 'border-white/[0.08] bg-white/[0.035] text-white placeholder:text-white/30';
+}
+
+function buttonBase(light: boolean, active = false) {
+  return cn(
+    'inline-flex h-8 items-center justify-center gap-2 rounded-[9px] border px-3 text-[12px] font-medium shadow-none transition-[background,border-color,color,opacity,transform] duration-150 active:scale-[0.985] disabled:pointer-events-none disabled:opacity-40',
+    active
+      ? light
+        ? 'cb-neutral-primary cb-neutral-primary-light hover:opacity-[0.98]'
+        : 'cb-neutral-primary cb-neutral-primary-dark hover:opacity-[0.98]'
+      : light
+        ? 'border-black/[0.08] bg-white text-black/58 hover:border-black/[0.14] hover:bg-black/[0.035] hover:text-black'
+        : 'border-white/[0.08] bg-white/[0.04] text-white/55 hover:border-white/[0.14] hover:bg-white/[0.07] hover:text-white',
+  );
+}
+
+function inputClass(light: boolean) {
+  return cn(
+    'h-9 rounded-[9px] border px-3 text-[12px] shadow-none outline-none',
+    'focus-visible:ring-0 focus-visible:ring-offset-0',
+    fieldTone(light),
+  );
+}
+
+function textareaClass(light: boolean) {
+  return cn(
+    'rounded-[9px] border px-3 py-3 text-[12.5px] leading-6 shadow-none outline-none',
+    'focus-visible:ring-0 focus-visible:ring-offset-0',
+    fieldTone(light),
+  );
+}
+
+function quietButtonClass(light: boolean) {
+  return cn(buttonBase(light), 'cb-public-secondary-action');
+}
+
+function primaryButtonClass(light: boolean) {
+  return cn(buttonBase(light, true), 'cb-public-primary-action');
+}
+
+function accentDotStyle(color: string): CSSProperties {
+  return {
+    background: color,
+    boxShadow: `0 0 0 3px color-mix(in srgb, ${color} 14%, transparent)`,
+  };
+}
+
+function glassDropdownSurfaceStyle(light: boolean): CSSProperties {
+  return {
+    background: light
+      ? 'radial-gradient(420px 180px at 50% 0%, rgba(255,255,255,0.72), transparent 56%), linear-gradient(180deg, rgba(251,251,250,0.94), rgba(244,244,242,0.92))'
+      : 'radial-gradient(420px 190px at 50% 0%, rgba(255,255,255,0.105), transparent 58%), linear-gradient(180deg, rgba(47,47,45,0.94), rgba(34,34,33,0.94))',
+  };
+}
+
+function getMondayIndex(date: Date) {
+  return (date.getDay() + 6) % 7;
+}
+
+function splitInterval(value: string) {
+  const [startRaw, endRaw] = value.split('–').map((item) => item.trim());
+
+  return {
+    start: startRaw || '',
+    end: endRaw || '',
+  };
+}
+
+function timeToMinutes(value: string) {
+  const [hour, minute] = value.split(':').map(Number);
+
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+
+  return hour * 60 + minute;
+}
+
+function parseIntervalMinutes(value: string) {
+  const { start, end } = splitInterval(value);
+  const startMinutes = timeToMinutes(start);
+  const endMinutes = timeToMinutes(end);
+
+  if (startMinutes === null || endMinutes === null) return 0;
+
+  return Math.max(0, endMinutes - startMinutes);
+}
+
+function getTotalMinutes(items: readonly string[]) {
+  return items.reduce((total, item) => total + parseIntervalMinutes(item), 0);
+}
+
+function getBookingTimesFromSlots(slots?: string[]) {
+  return [...new Set((slots ?? []).map((slot) => splitInterval(slot).start).filter(Boolean))].sort(
+    (left, right) => (timeToMinutes(left) ?? 0) - (timeToMinutes(right) ?? 0),
+  );
+}
+
+function getBookingTimesFromDay(day?: BookingAvailabilityDay | null) {
+  if (!day || day.status === 'day-off') return [];
+  return getBookingTimesFromSlots(day.slots);
+}
+
+function isAvailabilityDay(value: unknown): value is BookingAvailabilityDay {
+  if (!value || typeof value !== 'object') return false;
+
+  const candidate = value as BookingAvailabilityDay;
+
+  return (
+    typeof candidate.date === 'string' ||
+    typeof candidate.weekdayIndex === 'number' ||
+    Array.isArray(candidate.slots)
+  );
+}
+
+function normalizeAvailabilityDays(items?: unknown): BookingAvailabilityDay[] {
+  if (!Array.isArray(items)) return [];
+
+  return items.filter(isAvailabilityDay).map((day) => ({
+    ...day,
+    status: day.status ?? 'workday',
+    slots: Array.isArray(day.slots) ? day.slots : [],
+    breaks: Array.isArray(day.breaks) ? day.breaks : [],
+  }));
+}
+
+function readProfileAvailability(
+  profile: MasterProfile,
+  externalAvailability?: BookingAvailabilityDay[] | null,
+) {
+  if (externalAvailability?.length) {
+    return normalizeAvailabilityDays(externalAvailability);
+  }
+
+  const extendedProfile = profile as MasterProfileWithAvailability;
+
+  return [
+    ...normalizeAvailabilityDays(extendedProfile.availability),
+    ...normalizeAvailabilityDays(extendedProfile.availabilityDays),
+    ...normalizeAvailabilityDays(extendedProfile.monthlyAvailability),
+    ...normalizeAvailabilityDays(extendedProfile.schedule),
+  ];
+}
+
+function findAvailabilityDay(
+  availability: BookingAvailabilityDay[],
+  dateIso: string,
+  weekdayIndex: number,
+) {
+  const exactDay = availability.find((day) => day.date === dateIso);
+
+  if (exactDay) return exactDay;
+
+  return (
+    availability.find(
+      (day) => !day.date && typeof day.weekdayIndex === 'number' && day.weekdayIndex === weekdayIndex,
+    ) ?? null
+  );
+}
+
+function formatMinutes(value: number, locale: 'ru' | 'en') {
+  const hours = Math.floor(value / 60);
+  const minutes = value % 60;
+
+  if (value <= 0) return '—';
+
+  if (locale === 'ru') {
+    if (minutes === 0) return `${hours} ч`;
+    return `${hours} ч ${minutes} мин`;
+  }
+
+  if (minutes === 0) return `${hours} h`;
+  return `${hours} h ${minutes} min`;
+}
+
+function MicroLabel({
+  children,
+  light,
   active,
-  complete,
+  accentColor,
+  className,
 }: {
-  label: string;
-  active: boolean;
-  complete: boolean;
+  children: ReactNode;
+  light: boolean;
+  active?: boolean;
+  accentColor?: string;
+  className?: string;
 }) {
   return (
-    <div
+    <span
       className={cn(
-        'flex items-center justify-center gap-1.5 rounded-full border px-2 py-1.5 text-[10px] font-medium transition sm:text-[10.5px]',
+        'inline-flex h-7 items-center gap-1.5 rounded-[9px] border px-2.5 text-[10.5px] font-medium',
         active
-          ? 'border-primary/18 bg-primary/10 text-foreground shadow-[0_1px_0_rgba(255,255,255,0.38)_inset]'
-          : complete
-            ? 'border-border/80 bg-background/60 text-foreground/84'
-            : 'border-border/70 bg-background/38 text-muted-foreground',
+          ? 'cb-accent-pill-active'
+          : light
+            ? 'border-black/[0.08] bg-white text-black/50'
+            : 'border-white/[0.08] bg-white/[0.04] text-white/42',
+        className,
       )}
     >
-      <span
-        className={cn(
-          'size-2 rounded-full transition',
-          active ? 'bg-primary shadow-[0_0_10px_var(--primary)]' : complete ? 'bg-foreground/40' : 'bg-border',
-        )}
-      />
-      <span className="truncate">{label}</span>
+      {active ? (
+        <span
+          className="size-1.5 shrink-0 rounded-full"
+          style={accentColor ? accentDotStyle(accentColor) : undefined}
+        />
+      ) : null}
+      {children}
+    </span>
+  );
+}
+
+function Panel({
+  children,
+  light,
+  className,
+}: {
+  children: ReactNode;
+  light: boolean;
+  className?: string;
+}) {
+  return (
+    <div className={cn('rounded-[10px] border', insetTone(light), className)}>
+      {children}
     </div>
   );
 }
 
-function SelectionChip({
+function StepRail({
+  steps,
+  currentStep,
+  light,
+  accentColor,
+}: {
+  steps: string[];
+  currentStep: number;
+  light: boolean;
+  accentColor: string;
+}) {
+  return (
+    <div
+      className={cn(
+        'grid h-10 overflow-hidden rounded-[12px] border',
+        light
+          ? 'border-black/[0.08] bg-white'
+          : 'border-white/[0.08] bg-white/[0.045]',
+      )}
+      style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}
+    >
+      {steps.map((step, index) => {
+        const active = index === currentStep;
+        const complete = index < currentStep;
+
+        return (
+          <button
+            key={step}
+            type="button"
+            disabled
+            className={cn(
+              'relative min-w-0 border-r px-3 text-[11px] font-semibold transition last:border-r-0',
+              divideTone(light),
+              active
+                ? light
+                  ? 'text-black'
+                  : 'text-white'
+                : complete
+                  ? light
+                    ? 'text-black/62'
+                    : 'text-white/62'
+                  : light
+                    ? 'text-black/34'
+                    : 'text-white/30',
+            )}
+          >
+            <span className="inline-flex max-w-full items-center justify-center gap-1.5">
+              {complete ? <Check className="size-3.5 shrink-0" /> : null}
+              <span className="truncate">{step}</span>
+            </span>
+
+            <span
+              className={cn(
+                'absolute bottom-1.5 left-1/2 size-1 -translate-x-1/2 rounded-full transition-all duration-200',
+                active ? 'opacity-100' : 'scale-0 opacity-0',
+              )}
+              style={active ? { background: accentColor } : undefined}
+            />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function SummaryBar({
+  items,
+  light,
+  label,
+  accentColor,
+}: {
+  items: string[];
+  light: boolean;
+  label: string;
+  accentColor: string;
+}) {
+  if (items.length === 0) return null;
+
+  return (
+    <Panel light={light} className="px-3 py-2.5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span
+          className={cn(
+            'mr-1 text-[10px] uppercase tracking-[0.14em]',
+            faintText(light),
+          )}
+        >
+          {label}
+        </span>
+
+        {items.map((item, index) => (
+          <MicroLabel key={`${item}-${index}`} light={light}>
+            {index === 0 ? (
+              <span
+                className="size-1.5 rounded-full"
+                style={{ background: accentColor }}
+              />
+            ) : null}
+            <span className="max-w-[220px] truncate">{item}</span>
+          </MicroLabel>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
+function glassSelectTriggerClass(light: boolean) {
+  return cn(menuTriggerClass(light), 'min-h-[58px] h-auto w-full justify-between px-3.5 py-3 text-left text-[12px]');
+}
+
+function glassSelectContentClass(light: boolean) {
+  return cn(menuContentClass(light), 'absolute left-0 right-0 top-[calc(100%+8px)] z-[140]');
+}
+
+function glassSelectItemClass(light: boolean, active?: boolean) {
+  return cn(menuItemClass(light, Boolean(active)), 'flex w-full items-center justify-between gap-3 pl-2 pr-3 text-left');
+}
+
+function ServiceDropdown({
+  value,
+  services,
+  query,
+  setQuery,
+  placeholder,
+  searchPlaceholder,
+  emptyLabel,
+  countLabel,
+  light,
+  accentColor,
+  onSelect,
+}: {
+  value: string;
+  services: string[];
+  query: string;
+  setQuery: (value: string) => void;
+  placeholder: string;
+  searchPlaceholder: string;
+  emptyLabel: string;
+  countLabel: string;
+  light: boolean;
+  accentColor: string;
+  onSelect: (service: string) => void;
+}) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [open, setOpen] = useState(false);
+
+  const filteredServices = useMemo(() => {
+    const cleanQuery = query.trim().toLowerCase();
+
+    if (!cleanQuery) return services;
+
+    return services.filter((service) =>
+      service.toLowerCase().includes(cleanQuery),
+    );
+  }, [query, services]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+
+    document.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className={cn(
+          glassSelectTriggerClass(light),
+          open &&
+            (light
+              ? 'border-black/[0.16] bg-[#fbfbfa] shadow-[0_14px_44px_rgba(15,15,15,0.08)]'
+              : 'border-white/[0.18] bg-[#343432]/94 shadow-[0_18px_56px_rgba(0,0,0,0.56)]'),
+        )}
+        style={
+          open || value
+            ? {
+                borderColor: `color-mix(in srgb, ${accentColor} 38%, transparent)`,
+              }
+            : undefined
+        }
+      >
+        <span className="flex min-w-0 items-center gap-3">
+          <span
+            className={cn(
+              'inline-flex size-9 shrink-0 items-center justify-center rounded-[9px] border backdrop-blur-[18px]',
+              light
+                ? 'border-black/[0.07] bg-white/76 text-black/42'
+                : 'border-white/[0.08] bg-black/18 text-white/42',
+            )}
+          >
+            <Sparkles
+              className="size-4"
+              style={{ color: value ? accentColor : undefined }}
+            />
+          </span>
+
+          <span className="min-w-0">
+            <span
+              className={cn(
+                'block truncate text-[13px] font-semibold tracking-[-0.018em]',
+                value ? pageText(light) : mutedText(light),
+              )}
+            >
+              {value || placeholder}
+            </span>
+
+            <span className={cn('mt-1 block text-[10.5px]', faintText(light))}>
+              {services.length} {countLabel}
+            </span>
+          </span>
+        </span>
+
+        <ChevronDown
+          className={cn(
+            'size-4 shrink-0 transition',
+            open && 'rotate-180',
+            light ? 'text-black/36' : 'text-white/30',
+          )}
+        />
+      </button>
+
+      <div
+        className={cn(
+          glassSelectContentClass(light),
+          open
+            ? 'pointer-events-auto translate-y-0 scale-100 opacity-100'
+            : 'pointer-events-none -translate-y-1 scale-[0.99] opacity-0',
+        )}
+        style={glassDropdownSurfaceStyle(light)}
+      >
+        <div className="relative">
+          <Search
+            className={cn(
+              'pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2',
+              light ? 'text-black/30' : 'text-white/26',
+            )}
+          />
+
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={searchPlaceholder}
+            className={cn(
+              'h-9 rounded-[10px] border pl-8 pr-8 text-[12px] shadow-none outline-none backdrop-blur-[22px]',
+              'focus-visible:ring-0 focus-visible:ring-offset-0',
+              light
+                ? 'border-black/[0.08] bg-white/86 text-black placeholder:text-black/28 focus:border-black/[0.16]'
+                : 'border-white/[0.08] bg-black/22 text-white placeholder:text-white/25 focus:border-white/[0.16]',
+            )}
+          />
+
+          {query ? (
+            <button
+              type="button"
+              onClick={() => setQuery('')}
+              className={cn(
+                'absolute right-1.5 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-[8px] transition',
+                light
+                  ? 'text-black/34 hover:bg-black/[0.055] hover:text-black'
+                  : 'text-white/30 hover:bg-white/[0.07] hover:text-white',
+              )}
+            >
+              <X className="size-3.5" />
+            </button>
+          ) : null}
+        </div>
+
+        <div className="mt-2 max-h-[236px] space-y-1 overflow-y-auto pr-1">
+          {filteredServices.map((service) => {
+            const active = value === service;
+
+            return (
+              <button
+                key={service}
+                type="button"
+                onClick={() => {
+                  onSelect(service);
+                  setOpen(false);
+                  setQuery('');
+                }}
+                className={glassSelectItemClass(light, active)}
+              >
+                <span className="truncate">{service}</span>
+
+                <span className="flex w-4 shrink-0 items-center justify-center">
+                  {active ? (
+                    <Check className="size-3.5" style={{ color: accentColor }} />
+                  ) : null}
+                </span>
+              </button>
+            );
+          })}
+
+          {filteredServices.length === 0 ? (
+            <div
+              className={cn(
+                'rounded-[9px] border border-dashed px-3 py-4 text-center text-[12px]',
+                borderTone(light),
+                mutedText(light),
+              )}
+            >
+              {emptyLabel}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DateOption({
+  label,
+  hint,
+  active,
+  disabled,
+  onClick,
+  light,
+  accentColor,
+}: {
+  label: string;
+  hint?: string;
+  active: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  light: boolean;
+  accentColor: string;
+}) {
+  const [weekday, rest] = label.split(',').map((item) => item.trim());
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        'relative min-h-[68px] rounded-[10px] border p-3 text-left transition active:scale-[0.99] disabled:pointer-events-none',
+        active
+          ? light
+            ? 'border-black/[0.13] bg-white text-black'
+            : 'border-white/[0.14] bg-white/[0.055] text-white'
+          : disabled
+            ? light
+              ? 'border-black/[0.05] bg-black/[0.018] text-black/26'
+              : 'border-white/[0.05] bg-white/[0.02] text-white/24'
+            : light
+              ? 'border-black/[0.07] bg-black/[0.025] text-black/62 hover:border-black/[0.12] hover:bg-white hover:text-black'
+              : 'border-white/[0.07] bg-white/[0.035] text-white/62 hover:border-white/[0.13] hover:bg-white/[0.055] hover:text-white',
+      )}
+      style={
+        active
+          ? {
+              borderColor: `color-mix(in srgb, ${accentColor} 42%, transparent)`,
+            }
+          : undefined
+      }
+    >
+      <span className={cn('block text-[10px] uppercase tracking-[0.14em]', faintText(light))}>
+        {weekday || label}
+      </span>
+
+      <span className="mt-1 block truncate text-[13px] font-semibold">
+        {rest || label}
+      </span>
+
+      {hint ? (
+        <span className={cn('mt-1 block truncate text-[10.5px]', disabled ? faintText(light) : mutedText(light))}>
+          {hint}
+        </span>
+      ) : null}
+
+      {active ? (
+        <span
+          className="absolute bottom-2 right-2 size-1.5 rounded-full"
+          style={accentDotStyle(accentColor)}
+        />
+      ) : null}
+    </button>
+  );
+}
+
+function TimeOption({
   label,
   active,
   onClick,
-  compact = false,
-  style,
+  light,
+  accentColor,
 }: {
   label: string;
   active: boolean;
   onClick: () => void;
-  compact?: boolean;
-  style?: CSSProperties;
+  light: boolean;
+  accentColor: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        'rounded-[14px] border text-left transition-[transform,background-color,border-color,color,box-shadow] duration-200 hover:-translate-y-[1px]',
-        compact ? 'px-2.5 py-2 text-[11.5px]' : 'px-3 py-2.5 text-[12px]',
+        'relative h-10 rounded-[9px] border px-3 text-[12px] font-semibold transition active:scale-[0.99]',
         active
-          ? 'text-foreground shadow-[0_10px_18px_rgba(15,23,42,0.05)]'
-          : 'border-border/80 bg-background/60 text-muted-foreground hover:border-primary/18 hover:bg-accent/14 hover:text-foreground',
+          ? light
+            ? 'border-black/[0.13] bg-white text-black'
+            : 'border-white/[0.14] bg-white/[0.055] text-white'
+          : light
+            ? 'border-black/[0.07] bg-black/[0.025] text-black/62 hover:border-black/[0.12] hover:bg-white hover:text-black'
+            : 'border-white/[0.07] bg-white/[0.035] text-white/62 hover:border-white/[0.13] hover:bg-white/[0.055] hover:text-white',
       )}
-      style={active ? style : undefined}
+      style={
+        active
+          ? {
+              borderColor: `color-mix(in srgb, ${accentColor} 42%, transparent)`,
+            }
+          : undefined
+      }
     >
       {label}
+
+      {active ? (
+        <span
+          className="absolute bottom-1.5 left-1/2 size-1 -translate-x-1/2 rounded-full"
+          style={{ background: accentColor }}
+        />
+      ) : null}
     </button>
   );
 }
 
-export function BookingForm({ profile, embedded = false }: { profile: MasterProfile; embedded?: boolean }) {
+function EmptySlotsBox({
+  children,
+  light,
+}: {
+  children: ReactNode;
+  light: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        'rounded-[10px] border border-dashed px-3 py-6 text-center text-[12px] leading-5',
+        light
+          ? 'border-black/[0.08] bg-black/[0.018] text-black/42'
+          : 'border-white/[0.08] bg-white/[0.025] text-white/38',
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+function FieldLabel({
+  children,
+  light,
+}: {
+  children: ReactNode;
+  light: boolean;
+}) {
+  return (
+    <div className={cn('mb-2 text-[10.5px] font-medium', mutedText(light))}>
+      {children}
+    </div>
+  );
+}
+
+function SuccessView({
+  booking,
+  labels,
+  light,
+  locale,
+  embedded,
+  onNew,
+}: {
+  booking: Booking;
+  labels: {
+    successTitle: string;
+    successDescription: string;
+    newRequest: string;
+  };
+  light: boolean;
+  locale: string;
+  embedded: boolean;
+  onNew: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        embedded ? 'bg-transparent p-0' : 'rounded-[11px] border p-4',
+        !embedded && cardTone(light),
+      )}
+    >
+      <Panel light={light} className="p-4">
+        <div
+          className={cn(
+            'flex size-12 items-center justify-center rounded-[10px] border',
+            light
+              ? 'border-black/[0.08] bg-white text-black/70'
+              : 'border-white/[0.08] bg-white/[0.04] text-white/70',
+          )}
+        >
+          <CheckCircle2 className="size-6" />
+        </div>
+
+        <div
+          className={cn(
+            'mt-5 text-[28px] font-semibold leading-[1.02] tracking-[-0.07em]',
+            pageText(light),
+          )}
+        >
+          {labels.successTitle}
+        </div>
+
+        <p className={cn('mt-2 text-[13px] leading-6', mutedText(light))}>
+          {labels.successDescription}
+        </p>
+
+        <div className="mt-5 grid gap-2">
+          {[booking.service, formatDate(booking.date, undefined, locale), booking.time].map(
+            (item) => (
+              <div
+                key={item}
+                className={cn(
+                  'rounded-[9px] border px-3.5 py-3 text-[12px] font-semibold',
+                  light
+                    ? 'border-black/[0.08] bg-white text-black/70'
+                    : 'border-white/[0.08] bg-white/[0.04] text-white/70',
+                )}
+              >
+                {item}
+              </div>
+            ),
+          )}
+        </div>
+
+        <Button
+          type="button"
+          className={cn('mt-5 w-full', primaryButtonClass(light))}
+          onClick={onNew}
+        >
+          {labels.newRequest}
+          <ArrowRight className="size-4" />
+        </Button>
+      </Panel>
+    </div>
+  );
+}
+
+export function BookingForm({
+  profile,
+  embedded = false,
+  selectedService,
+  appearanceSettings,
+  availabilityDays,
+}: {
+  profile: MasterProfile;
+  embedded?: boolean;
+  selectedService?: string;
+  appearanceSettings?: Partial<AppearanceSettings> | null;
+  availabilityDays?: BookingAvailabilityDay[] | null;
+}) {
   const { createBooking } = useApp();
   const { settings } = useAppearance();
   const { locale } = useLocale();
-  const [values, setValues] = useState<BookingFormValues>(initialValues);
+  const { resolvedTheme } = useTheme();
+
+  const [mounted, setMounted] = useState(false);
+
+  const effectiveAppearance = appearanceSettings
+    ? normalizeAppearanceSettings(appearanceSettings)
+    : settings;
+  const accent =
+    accentPalette[effectiveAppearance.publicAccent] ??
+    accentPalette[effectiveAppearance.accentTone] ??
+    Object.values(accentPalette)[0];
+  const accentColor = accent.solid;
+
+  const profileServices = useMemo(() => profile.services ?? [], [profile.services]);
+  const fallbackService = selectedService || profileServices[0] || '';
+
+  const [values, setValues] = useState<BookingFormValues>(() =>
+    createInitialValues(fallbackService),
+  );
   const [currentStep, setCurrentStep] = useState(0);
-  const [serviceMenuOpen, setServiceMenuOpen] = useState(false);
   const [serviceQuery, setServiceQuery] = useState('');
   const [submittedBooking, setSubmittedBooking] = useState<Booking | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const accent = accentPalette[settings.publicAccent];
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  const steps = locale === 'ru' ? ['Услуга', 'Дата и время', 'Контакты'] : ['Service', 'Date & time', 'Contacts'];
+  useEffect(() => {
+    if (!selectedService) return;
 
-  const quickDates = useMemo(
-    () =>
-      Array.from({ length: 7 }, (_, index) => {
-        const date = addDays(new Date(), index);
-        return {
-          value: format(date, 'yyyy-MM-dd'),
-          label: new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
-            weekday: 'short',
-            day: 'numeric',
-            month: 'short',
-          }).format(date),
-        };
-      }),
-    [locale],
-  );
+    setValues((current) =>
+      current.service === selectedService
+        ? current
+        : { ...current, service: selectedService },
+    );
+  }, [selectedService]);
 
+  useEffect(() => {
+    if (values.service || !profileServices[0]) return;
 
-  const filteredServices = useMemo(() => {
-    const query = serviceQuery.trim().toLowerCase();
-    if (!query) return profile.services;
-    return profile.services.filter((service) => service.toLowerCase().includes(query));
-  }, [profile.services, serviceQuery]);
+    setValues((current) => ({ ...current, service: profileServices[0] }));
+  }, [profileServices, values.service]);
+
+  const currentTheme: ThemeMode =
+    mounted && resolvedTheme === 'light' ? 'light' : 'dark';
+  const isLight = currentTheme === 'light';
 
   const labels =
     locale === 'ru'
       ? {
-          title: 'Оставить заявку',
-          description: 'Выберите услугу, время и оставьте контакты.',
+          title: 'Запись',
+          subtitle:
+            'Выберите услугу, удобный день, время и оставьте контакт для подтверждения.',
           selectService: 'Выберите услугу',
-          serviceTrigger: 'Открыть список услуг',
-          serviceSelected: 'Выбрана услуга',
+          serviceSearch: 'Найти услугу',
           serviceCount: 'вариантов',
           chooseDate: 'Выберите дату',
           chooseTime: 'Выберите время',
           yourName: 'Имя',
           yourPhone: 'Телефон',
           comment: 'Комментарий',
-          commentPlaceholder: 'Например: удобный диапазон времени или пожелания по записи.',
+          commentPlaceholder:
+            'Например: хочу спокойный нюд, есть пожелания по форме',
           next: 'Дальше',
           back: 'Назад',
           submit: 'Отправить',
-          summary: 'Что будет дальше',
-          summaryItems: [
-            'Мастер увидит заявку сразу в кабинете.',
-            'Выбранные услуга, дата и время сохранятся без переписки.',
-            'Подтверждение придёт по указанному номеру.',
-          ],
           successTitle: 'Заявка отправлена',
-          successDescription: 'Детали сохранены. Мастер увидит заявку и подтвердит время напрямую.',
-          selected: 'Выбрано',
-          hiddenContact: 'Контакт откроется после подтверждения',
+          successDescription: 'Мастер свяжется с вами для подтверждения записи.',
+          newRequest: 'Новая заявка',
+          nothingFound: 'Ничего не найдено.',
+          step: 'Шаг',
+          summary: 'Выбор',
+          serviceStep: 'Услуга',
+          dateStep: 'Время',
+          contactStep: 'Контакты',
+          contactDetails: 'Контактные данные',
+          optional: 'Необязательно',
+          availableSlots: 'слотов',
+          noSlots: 'Нет слотов',
+          chooseDateFirst: 'Сначала выберите дату.',
+          noSlotsForDate:
+            'На выбранный день мастер не включил рабочие слоты.',
+          noAvailableDates:
+            'На ближайшие дни пока нет доступных слотов.',
         }
       : {
-          title: 'Request a booking',
-          description: 'Choose a service, time, and leave your contacts.',
+          title: 'Booking',
+          subtitle:
+            'Choose a service, day, time, and leave your contact details for confirmation.',
           selectService: 'Choose a service',
-          serviceTrigger: 'Open service list',
-          serviceSelected: 'Service selected',
+          serviceSearch: 'Search service',
           serviceCount: 'options',
-          chooseDate: 'Choose a date',
-          chooseTime: 'Choose a time',
+          chooseDate: 'Choose date',
+          chooseTime: 'Choose time',
           yourName: 'Name',
           yourPhone: 'Phone',
           comment: 'Comment',
-          commentPlaceholder: 'Any helpful note or preferred time range.',
+          commentPlaceholder: 'For example: preferred style, details or wishes',
           next: 'Next',
           back: 'Back',
-          submit: 'Send request',
-          summary: 'What happens next',
-          summaryItems: [
-            'The request arrives in the workspace instantly.',
-            'The chosen service, date, and time stay attached to the request.',
-            'Confirmation is sent to the provided phone number.',
-          ],
+          submit: 'Send',
           successTitle: 'Request sent',
-          successDescription: 'Everything is saved. The master sees the request and will confirm it with you.',
-          selected: 'Selected',
-          hiddenContact: 'This contact is revealed after confirmation',
+          successDescription:
+            'The master will contact you to confirm the booking.',
+          newRequest: 'New request',
+          nothingFound: 'Nothing found.',
+          step: 'Step',
+          summary: 'Summary',
+          serviceStep: 'Service',
+          dateStep: 'Time',
+          contactStep: 'Contacts',
+          contactDetails: 'Contact details',
+          optional: 'Optional',
+          availableSlots: 'slots',
+          noSlots: 'No slots',
+          chooseDateFirst: 'Choose a date first.',
+          noSlotsForDate:
+            'The master has not enabled working slots for this day.',
+          noAvailableDates:
+            'No available slots for the nearest dates yet.',
         };
 
+  const steps = [labels.serviceStep, labels.dateStep, labels.contactStep];
+
+  const profileAvailability = useMemo(
+    () => readProfileAvailability(profile, availabilityDays),
+    [profile, availabilityDays],
+  );
+
+  const quickDates = useMemo(
+    () =>
+      Array.from({ length: 7 }, (_, index) => {
+        const date = addDays(new Date(), index);
+        const value = format(date, 'yyyy-MM-dd');
+        const weekdayIndex = getMondayIndex(date);
+        const availabilityDay = findAvailabilityDay(profileAvailability, value, weekdayIndex);
+        const times = getBookingTimesFromDay(availabilityDay);
+        const disabled = times.length === 0;
+
+        return {
+          value,
+          label: new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short',
+          }).format(date),
+          times,
+          disabled,
+          availabilityDay,
+        };
+      }),
+    [locale, profileAvailability],
+  );
+
+  const selectedDateOption = useMemo(
+    () => quickDates.find((date) => date.value === values.date) ?? null,
+    [quickDates, values.date],
+  );
+
+  const availableTimes = selectedDateOption?.times ?? [];
+  const hasAnyAvailableDate = quickDates.some((date) => !date.disabled);
+
+  useEffect(() => {
+    if (!values.date || !values.time) return;
+
+    if (!availableTimes.includes(values.time)) {
+      setValues((current) => ({ ...current, time: '' }));
+    }
+  }, [availableTimes, values.date, values.time]);
+
   const progressValue = ((currentStep + 1) / steps.length) * 100;
-  const progressPercent = `${Math.max(12, progressValue)}%`;
 
   const progressStyle = {
-    width: progressPercent,
-    background: accent.solid,
+    width: `${Math.max(18, progressValue)}%`,
+    background: accentColor,
   } satisfies CSSProperties;
 
-  const formShellStyle = embedded
-    ? undefined
-    : {
-        background: `linear-gradient(180deg, ${accent.solid}08, rgba(255,255,255,0) 72%)`,
-        borderColor: `${accent.solid}18`,
-      } satisfies CSSProperties;
+  const selectedItems = [
+    values.service || null,
+    values.date ? formatDate(values.date, undefined, locale) : null,
+    values.time || null,
+  ].filter(Boolean) as string[];
 
-  const activeSurfaceStyle = {
-    background: `linear-gradient(180deg, ${accent.solid}0b, ${accent.solid}04)`,
-    borderColor: `${accent.solid}20`,
-  } satisfies CSSProperties;
-
-  const summarySurfaceStyle = {
-    background: `linear-gradient(180deg, ${accent.solid}06, rgba(255,255,255,0))`,
-    borderColor: `${accent.solid}14`,
-  } satisfies CSSProperties;
-
-  const selectedChipStyle = {
-    background: `${accent.solid}0a`,
-    borderColor: `${accent.solid}18`,
-  } satisfies CSSProperties;
-
-  const embeddedPanelClass = 'rounded-[18px] border border-border/78 bg-background/44 p-3.5 backdrop-blur-sm';
-  const primaryButtonClass = cn(getPublicButtonClassName(settings.publicButtonStyle, 'primary'), 'min-w-[116px]');
-  const ghostButtonClass = getPublicButtonClassName(settings.publicButtonStyle, 'ghost');
   const canMoveForward = () => {
     if (currentStep === 0) return Boolean(values.service);
-    if (currentStep === 1) return Boolean(values.date && values.time);
+    if (currentStep === 1) return Boolean(values.date && values.time && availableTimes.includes(values.time));
+
     return Boolean(values.clientName.trim() && values.clientPhone.trim());
+  };
+
+  const goNext = () => {
+    if (!canMoveForward()) return;
+    setCurrentStep((step) => Math.min(steps.length - 1, step + 1));
+  };
+
+  const goBack = () => {
+    setCurrentStep((step) => Math.max(0, step - 1));
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    if (!canMoveForward()) return;
+
     const result = await createBooking(profile.slug, values);
 
     if (!result.success || !result.booking) {
@@ -241,52 +1127,20 @@ export function BookingForm({ profile, embedded = false }: { profile: MasterProf
 
     setError(null);
     setSubmittedBooking(result.booking);
-    setValues(initialValues);
+    setValues(createInitialValues(selectedService || profileServices[0] || ''));
     setCurrentStep(0);
   };
 
-  const selectedChips = [
-    values.service ? values.service : null,
-    values.date ? formatDate(values.date, undefined, locale) : null,
-    values.time ? values.time : null,
-  ].filter(Boolean) as string[];
-
   if (submittedBooking) {
     return (
-      <div
-        className={cn(
-          embedded ? 'p-0' : 'rounded-[22px] border border-border/80 bg-card/94 p-5',
-        )}
-        style={formShellStyle}
-      >
-        <div className={cn(embedded ? embeddedPanelClass : 'rounded-[20px] border p-5')} style={summarySurfaceStyle}>
-          <div className="flex size-11 items-center justify-center rounded-[16px] border border-border/80 bg-background/86">
-            <CheckCircle2 className="size-5 text-primary" />
-          </div>
-          <div className="mt-4 text-[24px] font-semibold tracking-[-0.04em] text-foreground">{labels.successTitle}</div>
-          <p className="mt-2 text-[13px] leading-6 text-muted-foreground">{labels.successDescription}</p>
-
-          <div className="mt-5 grid gap-2 sm:grid-cols-2">
-            {[
-              { label: labels.selectService, value: submittedBooking.service },
-              { label: labels.chooseDate, value: formatDate(submittedBooking.date, undefined, locale) },
-              { label: labels.chooseTime, value: submittedBooking.time },
-              { label: labels.yourName, value: submittedBooking.clientName },
-            ].map((item) => (
-              <div key={item.label} className="rounded-[16px] border border-border/80 bg-background/88 px-4 py-3">
-                <div className="text-[11px] text-muted-foreground">{item.label}</div>
-                <div className="mt-1 text-[13px] font-medium text-foreground">{item.value}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-5 flex justify-end">
-            <Button type="button" className={cn(primaryButtonClass, "h-9 px-4 text-[12px]")} onClick={() => setSubmittedBooking(null)}>
-              {labels.back}
-            </Button>
-          </div>
-        </div>
-      </div>
+      <SuccessView
+        booking={submittedBooking}
+        labels={labels}
+        light={isLight}
+        locale={locale}
+        embedded={embedded}
+        onNew={() => setSubmittedBooking(null)}
+      />
     );
   }
 
@@ -294,276 +1148,304 @@ export function BookingForm({ profile, embedded = false }: { profile: MasterProf
     <form
       onSubmit={handleSubmit}
       className={cn(
-        embedded ? 'bg-transparent p-0' : 'rounded-[22px] border bg-card/94 p-3.5 md:p-4',
+        embedded ? 'space-y-4 bg-transparent p-0' : 'rounded-[11px] border p-4',
+        !embedded && cardTone(isLight),
       )}
-      style={formShellStyle}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="max-w-[220px] space-y-1.5">
-          <div className="text-[17px] font-semibold tracking-[-0.04em] text-foreground md:text-[18px]">{labels.title}</div>
-          <p className="text-[12px] leading-5 text-muted-foreground">{labels.description}</p>
+      <div className="space-y-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <MicroLabel light={isLight} active accentColor={accentColor}>
+              <CalendarClock className="size-3.5" />
+              {labels.title}
+            </MicroLabel>
+
+            <MicroLabel light={isLight}>
+              {labels.step} {currentStep + 1}/{steps.length}
+            </MicroLabel>
+          </div>
+
+          <h3
+            className={cn(
+              'mt-4 text-[28px] font-semibold leading-[1.02] tracking-[-0.075em]',
+              pageText(isLight),
+            )}
+          >
+            {steps[currentStep]}
+          </h3>
+
+          <p
+            className={cn(
+              'mt-2 max-w-[520px] text-[13px] leading-6',
+              mutedText(isLight),
+            )}
+          >
+            {labels.subtitle}
+          </p>
         </div>
 
-        <div className="rounded-full border border-border/80 bg-background/86 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-          {currentStep + 1}/{steps.length}
+        <div
+          className={cn(
+            'h-1 overflow-hidden rounded-full',
+            isLight ? 'bg-black/[0.06]' : 'bg-white/[0.07]',
+          )}
+        >
+          <div
+            className="h-full rounded-full transition-all duration-300"
+            style={progressStyle}
+          />
         </div>
+
+        <StepRail
+          steps={steps}
+          currentStep={currentStep}
+          light={isLight}
+          accentColor={accentColor}
+        />
+
+        <SummaryBar
+          items={selectedItems}
+          label={labels.summary}
+          light={isLight}
+          accentColor={accentColor}
+        />
       </div>
 
-      <div className="mt-4 h-1 rounded-full bg-border/60">
-        <div className="h-full rounded-full transition-all duration-300" style={progressStyle} />
-      </div>
+      {currentStep === 0 ? (
+        <Panel light={isLight} className="relative z-20 space-y-3 overflow-visible p-3.5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <Sparkles
+                className="size-4 shrink-0"
+                style={{ color: accentColor }}
+              />
+              <div
+                className={cn(
+                  'truncate text-[13px] font-semibold',
+                  pageText(isLight),
+                )}
+              >
+                {labels.selectService}
+              </div>
+            </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-1.5 rounded-[16px] border border-border/72 bg-background/40 p-1">
-        {steps.map((step, index) => (
-          <StepLabel key={step} label={step} active={index === currentStep} complete={index < currentStep} />
-        ))}
-      </div>
+            <MicroLabel light={isLight}>
+              {profileServices.length} {labels.serviceCount}
+            </MicroLabel>
+          </div>
 
-      <div className="mt-5 space-y-4">
-        {currentStep === 0 ? (
-          <section className={cn("space-y-3", embeddedPanelClass)}>
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-[13px] font-semibold text-foreground">{labels.selectService}</div>
-              <span className="rounded-full border border-border/80 bg-background/88 px-2 py-1 text-[10px] text-muted-foreground">
-                {profile.services.length} {labels.serviceCount}
+          <ServiceDropdown
+            value={values.service}
+            services={profileServices}
+            query={serviceQuery}
+            setQuery={setServiceQuery}
+            placeholder={labels.selectService}
+            searchPlaceholder={labels.serviceSearch}
+            emptyLabel={labels.nothingFound}
+            countLabel={labels.serviceCount}
+            light={isLight}
+            accentColor={accentColor}
+            onSelect={(service) => {
+              setValues((current) => ({ ...current, service }));
+            }}
+          />
+        </Panel>
+      ) : null}
+
+      {currentStep === 1 ? (
+        <Panel light={isLight} className="space-y-5 p-3.5">
+          <div>
+            <div className="mb-3 flex items-center gap-2">
+              <CalendarClock className="size-4" style={{ color: accentColor }} />
+              <div className={cn('text-[13px] font-semibold', pageText(isLight))}>
+                {labels.chooseDate}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {quickDates.map((date) => (
+                <DateOption
+                  key={date.value}
+                  label={date.label}
+                  hint={
+                    date.disabled
+                      ? labels.noSlots
+                      : `${date.times.length} ${labels.availableSlots}`
+                  }
+                  disabled={date.disabled}
+                  active={values.date === date.value}
+                  light={isLight}
+                  accentColor={accentColor}
+                  onClick={() =>
+                    setValues((current) => ({
+                      ...current,
+                      date: date.value,
+                      time: date.times.includes(current.time) ? current.time : '',
+                    }))
+                  }
+                />
+              ))}
+            </div>
+
+            {!hasAnyAvailableDate ? (
+              <div className="mt-3">
+                <EmptySlotsBox light={isLight}>{labels.noAvailableDates}</EmptySlotsBox>
+              </div>
+            ) : null}
+          </div>
+
+          <div>
+            <div className="mb-3 flex items-center gap-2">
+              <Clock3 className="size-4" style={{ color: accentColor }} />
+              <div className={cn('text-[13px] font-semibold', pageText(isLight))}>
+                {labels.chooseTime}
+              </div>
+            </div>
+
+            {!values.date ? (
+              <EmptySlotsBox light={isLight}>{labels.chooseDateFirst}</EmptySlotsBox>
+            ) : availableTimes.length ? (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {availableTimes.map((time) => (
+                  <TimeOption
+                    key={time}
+                    label={time}
+                    active={values.time === time}
+                    light={isLight}
+                    accentColor={accentColor}
+                    onClick={() => {
+                      setValues((current) => ({ ...current, time }));
+                    }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <EmptySlotsBox light={isLight}>{labels.noSlotsForDate}</EmptySlotsBox>
+            )}
+          </div>
+        </Panel>
+      ) : null}
+
+      {currentStep === 2 ? (
+        <Panel light={isLight} className="space-y-4 p-3.5">
+          <div className="flex items-center gap-2">
+            <UserRound className="size-4" style={{ color: accentColor }} />
+            <div className={cn('text-[13px] font-semibold', pageText(isLight))}>
+              {labels.contactDetails}
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <FieldLabel light={isLight}>{labels.yourName}</FieldLabel>
+
+              <Input
+                value={values.clientName}
+                onChange={(event) =>
+                  setValues((current) => ({
+                    ...current,
+                    clientName: event.target.value,
+                  }))
+                }
+                placeholder={labels.yourName}
+                className={inputClass(isLight)}
+              />
+            </div>
+
+            <div>
+              <FieldLabel light={isLight}>{labels.yourPhone}</FieldLabel>
+
+              <Input
+                value={values.clientPhone}
+                onChange={(event) =>
+                  setValues((current) => ({
+                    ...current,
+                    clientPhone: event.target.value,
+                  }))
+                }
+                placeholder="+7 999 000-00-00"
+                className={inputClass(isLight)}
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <MessageSquareText
+                  className="size-4"
+                  style={{ color: accentColor }}
+                />
+                <div className={cn('text-[10.5px] font-medium', mutedText(isLight))}>
+                  {labels.comment}
+                </div>
+              </div>
+
+              <span className={cn('text-[10.5px]', faintText(isLight))}>
+                {labels.optional}
               </span>
             </div>
 
-            <Popover
-              open={serviceMenuOpen}
-              onOpenChange={(open) => {
-                setServiceMenuOpen(open);
-                if (!open) setServiceQuery('');
-              }}
-            >
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  className={cn(
-                    'flex w-full items-center justify-between gap-3 rounded-[14px] border px-3 py-2.5 text-left transition',
-                    values.service
-                      ? 'text-foreground'
-                      : 'border-border/80 bg-background/72 text-muted-foreground hover:border-primary/18 hover:bg-accent/14 hover:text-foreground',
-                  )}
-                  style={values.service ? activeSurfaceStyle : undefined}
-                >
-                  <div className="min-w-0">
-                    <div className="truncate text-[12px] font-medium text-foreground">
-                      {values.service || labels.serviceTrigger}
-                    </div>
-                    <div className="mt-0.5 text-[10px] text-muted-foreground">
-                      {values.service ? labels.serviceSelected : `${profile.services.length} ${labels.serviceCount}`}
-                    </div>
-                  </div>
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-border/80 bg-background/84 text-muted-foreground">
-                    <ChevronsUpDown className="size-3.5" />
-                  </span>
-                </button>
-              </PopoverTrigger>
-              <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] rounded-[16px] border border-border/80 p-2">
-                <div className="space-y-2">
-                  <Input
-                    value={serviceQuery}
-                    onChange={(event) => setServiceQuery(event.target.value)}
-                    placeholder={locale === 'ru' ? 'Поиск услуги' : 'Search service'}
-                    className="h-9"
-                  />
-                  <div className="max-h-[200px] space-y-1 overflow-y-auto pr-1">
-                    {filteredServices.map((service) => {
-                      const active = values.service === service;
-
-                      return (
-                        <button
-                          key={service}
-                          type="button"
-                          onClick={() => {
-                            setValues((current) => ({ ...current, service }));
-                            setServiceMenuOpen(false);
-                            setServiceQuery('');
-                          }}
-                          className={cn(
-                            'flex w-full items-center justify-between gap-3 rounded-[12px] border px-3 py-2 text-left transition',
-                            active
-                              ? 'text-foreground'
-                              : 'border-transparent text-foreground hover:border-border hover:bg-accent/14',
-                          )}
-                          style={active ? activeSurfaceStyle : undefined}
-                        >
-                          <span className="truncate text-[12.5px] font-medium">{service}</span>
-                          <span
-                            className={cn(
-                              'flex size-7 shrink-0 items-center justify-center rounded-full border text-[11px] transition',
-                              active ? 'border-primary/22 bg-background text-primary' : 'border-border/80 bg-background/84 text-muted-foreground',
-                            )}
-                          >
-                            <ArrowRight className="size-3.5" />
-                          </span>
-                        </button>
-                      );
-                    })}
-                    {filteredServices.length === 0 ? (
-                      <div className="rounded-[14px] border border-dashed border-border/80 px-3 py-3 text-[12px] text-muted-foreground">
-                        {locale === 'ru' ? 'Ничего не найдено. Попробуйте другой запрос.' : 'Nothing found. Try another query.'}
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
-
-            <div className="rounded-[15px] border border-border/72 bg-background/72 px-4 py-3">
-              <div className="text-[11px] text-muted-foreground">{labels.selected}</div>
-              <div className="mt-2 flex min-h-6 items-center">
-                {values.service ? (
-                  <span className="rounded-full border px-3 py-1 text-[11px] text-foreground" style={selectedChipStyle}>
-                    {values.service}
-                  </span>
-                ) : (
-                  <span className="text-[12px] text-muted-foreground">—</span>
-                )}
-              </div>
-            </div>
-          </section>
-        ) : null}
-
-        {currentStep === 1 ? (
-          <section className={cn("space-y-4", embeddedPanelClass)}>
-            <div>
-              <div className="mb-3 flex items-center gap-2 text-[13px] font-semibold text-foreground">
-                <CalendarDays className="size-4 text-primary" />
-                {labels.chooseDate}
-              </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {quickDates.map((date) => (
-                  <SelectionChip
-                    key={date.value}
-                    label={date.label}
-                    active={values.date === date.value}
-                    onClick={() => setValues((current) => ({ ...current, date: date.value }))}
-                    style={activeSurfaceStyle}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div className="mb-3 flex items-center gap-2 text-[13px] font-semibold text-foreground">
-                <Clock3 className="size-4 text-primary" />
-                {labels.chooseTime}
-              </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {timeSlots.map((time) => (
-                  <SelectionChip
-                    key={time}
-                    label={time}
-                    compact
-                    active={values.time === time}
-                    onClick={() => setValues((current) => ({ ...current, time }))}
-                    style={activeSurfaceStyle}
-                  />
-                ))}
-              </div>
-            </div>
-          </section>
-        ) : null}
-
-        {currentStep === 2 ? (
-          <section className={cn("space-y-3", embeddedPanelClass)}>
-            <div className="grid gap-3">
-              <div>
-                <div className="mb-2 text-[12px] font-medium text-foreground">{labels.yourName}</div>
-                <Input
-                  value={values.clientName}
-                  onChange={(event) => setValues((current) => ({ ...current, clientName: event.target.value }))}
-                  placeholder={labels.yourName}
-                />
-              </div>
-              <div>
-                <div className="mb-2 text-[12px] font-medium text-foreground">{labels.yourPhone}</div>
-                <Input
-                  value={values.clientPhone}
-                  onChange={(event) => setValues((current) => ({ ...current, clientPhone: event.target.value }))}
-                  placeholder="+31 6 1234 5678"
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="mb-2 text-[12px] font-medium text-foreground">{labels.comment}</div>
-              <Textarea
-                value={values.comment}
-                onChange={(event) => setValues((current) => ({ ...current, comment: event.target.value }))}
-                placeholder={labels.commentPlaceholder}
-                className="min-h-16 resize-none"
-              />
-            </div>
-          </section>
-        ) : null}
-
-        {error ? (
-          <div className="rounded-[16px] border border-destructive/26 bg-destructive/10 px-4 py-3 text-[12px] text-destructive">
-            {error}
+            <Textarea
+              value={values.comment}
+              onChange={(event) =>
+                setValues((current) => ({
+                  ...current,
+                  comment: event.target.value,
+                }))
+              }
+              placeholder={labels.commentPlaceholder}
+              className={cn('min-h-[104px] resize-none', textareaClass(isLight))}
+            />
           </div>
-        ) : null}
+        </Panel>
+      ) : null}
 
-        <section className={cn("space-y-3 pt-1", embeddedPanelClass)}>
-          <div className="rounded-[16px] border px-3.5 py-3" style={summarySurfaceStyle}>
-            <div className="text-[13px] font-semibold text-foreground">{labels.summary}</div>
-            <ul className="mt-2.5 space-y-1.5 text-[10.5px] leading-5 text-muted-foreground">
-              {labels.summaryItems.map((item) => (
-                <li key={item} className="flex gap-2">
-                  <span className="mt-[8px] size-1.5 rounded-full bg-primary" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
+      {error ? (
+        <div
+          className={cn(
+            'rounded-[10px] border px-3.5 py-3 text-[12px]',
+            isLight
+              ? 'border-red-500/20 bg-red-500/10 text-red-700'
+              : 'border-red-400/20 bg-red-400/10 text-red-300',
+          )}
+        >
+          {error}
+        </div>
+      ) : null}
 
-            <div className="mt-3 rounded-[14px] border border-border/70 bg-background/88 px-3 py-2.5">
-              <div className="text-[11px] text-muted-foreground">{labels.selected}</div>
-              <div className="mt-2 flex min-h-6 flex-wrap gap-1.5">
-                {selectedChips.length > 0 ? (
-                  selectedChips.map((item) => (
-                    <span key={item} className="rounded-full border px-2.5 py-1 text-[11px] text-foreground" style={selectedChipStyle}>
-                      {item}
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-[12px] text-muted-foreground">—</span>
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
+      <div className="flex items-center justify-between gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          className={quietButtonClass(isLight)}
+          onClick={goBack}
+          disabled={currentStep === 0}
+        >
+          <ChevronLeft className="size-4" />
+          {labels.back}
+        </Button>
 
-        <div className="flex items-center justify-between gap-2 pt-1">
+        {currentStep < steps.length - 1 ? (
           <Button
             type="button"
-            variant="ghost"
-            className={cn(ghostButtonClass, "h-9 px-3 text-[12px]")}
-            onClick={() => setCurrentStep((step) => Math.max(0, step - 1))}
-            disabled={currentStep === 0}
+            className={primaryButtonClass(isLight)}
+            onClick={goNext}
+            disabled={!canMoveForward()}
           >
-            <ChevronLeft className="size-4" />
-            {labels.back}
+            {labels.next}
+            <ArrowRight className="size-4" />
           </Button>
-
-          {currentStep < steps.length - 1 ? (
-            <Button
-              type="button"
-              className={cn(primaryButtonClass, "h-9 px-4 text-[12px]")}
-              onClick={() => setCurrentStep((step) => Math.min(steps.length - 1, step + 1))}
-              disabled={!canMoveForward()}
-            >
-              {labels.next}
-              <ArrowRight className="size-4" />
-            </Button>
-          ) : (
-            <Button type="submit" className={cn(primaryButtonClass, "h-9 px-4 text-[12px]")} disabled={!canMoveForward()}>
-              <CheckCircle2 className="size-4" />
-              {labels.submit}
-            </Button>
-          )}
-        </div>
+        ) : (
+          <Button
+            type="submit"
+            className={primaryButtonClass(isLight)}
+            disabled={!canMoveForward()}
+          >
+            <CheckCircle2 className="size-4" />
+            {labels.submit}
+          </Button>
+        )}
       </div>
     </form>
   );

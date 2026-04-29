@@ -30,7 +30,7 @@ function SocialButton({
   return (
     <button
       type="button"
-      className="flex h-12 items-center justify-center gap-2 rounded-[18px] border border-border/80 bg-background/82 text-[14px] font-medium text-foreground transition hover:border-primary/18 hover:bg-accent/24"
+      className="flex h-12 items-center justify-center gap-2 rounded-[18px] border px-4 text-[14px] font-medium transition-[background,border-color,color,box-shadow,transform] active:scale-[0.98] cb-menu-button-quiet"
     >
       {icon}
       {label}
@@ -179,7 +179,7 @@ export default function LoginPage() {
                 onClick={() => setView('login')}
                 className={cn(
                   'flex h-12 items-center justify-center gap-2 rounded-[16px] text-[14px] font-medium transition',
-                  view === 'login' ? 'bg-foreground text-background shadow-[var(--shadow-soft)]' : 'text-muted-foreground hover:bg-card/70 hover:text-foreground',
+                  view === 'login' ? 'cb-neutral-primary' : 'cb-menu-button-quiet',
                 )}
               >
                 <ArrowRight className="size-4" />
@@ -190,7 +190,7 @@ export default function LoginPage() {
                 onClick={() => setView('register')}
                 className={cn(
                   'flex h-12 items-center justify-center gap-2 rounded-[16px] text-[14px] font-medium transition',
-                  view === 'register' ? 'bg-foreground text-background shadow-[var(--shadow-soft)]' : 'text-muted-foreground hover:bg-card/70 hover:text-foreground',
+                  view === 'register' ? 'cb-neutral-primary' : 'cb-menu-button-quiet',
                 )}
               >
                 <UserPlus className="size-4" />
@@ -230,7 +230,7 @@ export default function LoginPage() {
                 onClick={() => setMode('password')}
                 className={cn(
                   'rounded-full px-3 py-2 text-[12px] font-medium transition',
-                  mode === 'password' ? 'bg-white text-black' : 'text-white/60',
+                  mode === 'password' ? 'cb-neutral-primary' : 'cb-menu-button-quiet-dark',
                 )}
               >
                 Пароль
@@ -240,7 +240,7 @@ export default function LoginPage() {
                 onClick={() => setMode('magic')}
                 className={cn(
                   'rounded-full px-3 py-2 text-[12px] font-medium transition',
-                  mode === 'magic' ? 'bg-white text-black' : 'text-white/60',
+                  mode === 'magic' ? 'cb-neutral-primary' : 'cb-menu-button-quiet-dark',
                 )}
               >
                 Email-ссылка
@@ -294,7 +294,7 @@ export default function LoginPage() {
                   onClick={() => setRemember((current) => !current)}
                   className={cn(
                     'inline-flex items-center gap-2 rounded-[14px] border px-3 py-2 text-[13px] transition',
-                    remember ? 'border-white/12 bg-white/[0.06] text-white' : 'border-white/8 bg-transparent text-white/58',
+                    remember ? 'cb-neutral-primary' : 'cb-menu-button-quiet-dark',
                   )}
                 >
                   <span className={cn('flex size-5 items-center justify-center rounded-[8px] border', remember ? 'border-white/20 bg-white text-black' : 'border-white/12 bg-transparent')} >
@@ -323,7 +323,7 @@ export default function LoginPage() {
               <Button
                 type="submit"
                 disabled={busy || !email.trim() || (mode === 'password' && !password.trim())}
-                className="mt-2 h-14 w-full rounded-[18px] bg-white text-black hover:bg-white/92"
+                className="mt-2 h-14 w-full rounded-[18px]"
               >
                 {view === 'login'
                   ? mode === 'password'

@@ -2,7 +2,7 @@
 
 import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
-import { CheckCircle2, Copy, ExternalLink, Globe2, Link2, Share2 } from 'lucide-react';
+import { CheckCircle2, Copy, ExternalLink, Globe2, Link2, Share2, Sparkles } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,25 +23,28 @@ export function DashboardHeader({
   description: string;
   actions?: ReactNode;
 }) {
-  const isMobile = useMobile();
-
   return (
-    <div
-      className={cn(
-        'dashboard-header border-b border-border/80 pb-4 md:pb-5',
-        isMobile && 'dashboard-header-mobile sticky top-[calc(52px+env(safe-area-inset-top,0px))] z-20 -mx-[var(--space-page-x)] bg-background px-[var(--space-page-x)] pt-2 pb-2',
-      )}
-      data-mobile-compact={isMobile ? 'true' : 'false'}
-    >
-      {!isMobile && badge ? <div className="chip-muted max-w-full truncate">{badge}</div> : null}
-      <div className={cn('mt-2 flex flex-col gap-2.5 lg:flex-row lg:items-end lg:justify-between', isMobile && 'mt-0 gap-2')}>
-        <div className="min-w-0">
-          {isMobile && badge ? <div className="page-kicker">{badge}</div> : null}
-          <h1 className="page-title leading-none">{title}</h1>
-          {!isMobile ? <p className="page-subtitle">{description}</p> : null}
-        </div>
-        {actions ? <div className="dashboard-header-actions flex flex-wrap items-center gap-2">{actions}</div> : null}
+    <div className="mb-6 flex flex-col gap-5 md:mb-7 md:flex-row md:items-end md:justify-between">
+      <div className="min-w-0">
+        {badge ? (
+          <div className="mb-3 inline-flex h-7 items-center gap-1.5 rounded-[9px] border border-black/[0.08] bg-black/[0.025] px-2.5 text-[10.5px] font-medium text-black/50 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/42">
+            <span className="size-1.5 rounded-full bg-black dark:bg-white" />
+            {badge}
+          </div>
+        ) : null}
+
+        <h1 className="text-[31px] font-semibold tracking-[-0.075em] text-[#0e0e0e] dark:text-white md:text-[42px]">
+          {title}
+        </h1>
+
+        {description ? (
+          <p className="mt-2 max-w-[760px] text-[13px] leading-5 text-black/48 dark:text-white/42">
+            {description}
+          </p>
+        ) : null}
       </div>
+
+      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </div>
   );
 }
@@ -59,50 +62,34 @@ export function MetricCard({
   delta?: string;
   icon?: LucideIcon;
 }) {
-  const isMobile = useMobile();
   const compactValue = value.trim().length >= 8;
 
   return (
-    <div
-      className={cn(
-        'dashboard-kpi-card workspace-metric-card workspace-card rounded-[14px] p-4 md:p-5',
-        isMobile && 'workspace-metric-card-mobile',
-      )}
-    >
-      <div className="flex h-full flex-col gap-3.5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="metric-label dashboard-kpi-card-label">{label}</div>
-          </div>
-          {Icon ? (
-            <div
-              className={cn(
-                'dashboard-kpi-card-icon flex size-10 shrink-0 items-center justify-center rounded-[14px] border border-border/80 bg-accent/58 text-muted-foreground',
-                isMobile && 'size-9 rounded-[13px]',
-              )}
-            >
-              <Icon className="size-4" />
-            </div>
-          ) : null}
-        </div>
-
-        <div className="mt-auto min-w-0">
+    <div className="min-w-0 p-4 md:p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[11px] font-medium text-black/48 dark:text-white/42">{label}</div>
           <div
             className={cn(
-              'metric-value dashboard-kpi-card-value',
-              compactValue && 'dashboard-kpi-card-value-compact',
-              isMobile && 'text-[18px]',
+              'mt-2 truncate text-[25px] font-semibold tracking-[-0.06em] text-[#0e0e0e] dark:text-white',
+              compactValue && 'text-[21px]',
             )}
           >
             {value}
           </div>
           {hint || delta ? (
-            <div className={cn('mt-2 flex flex-wrap items-center gap-2 text-[11px] md:text-[12px]', isMobile && 'mt-1.5 gap-1.5')}>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-black/48 dark:text-white/42">
               {delta ? <span className="workspace-pill">{delta}</span> : null}
-              {hint ? <span className="text-muted-foreground">{hint}</span> : null}
+              {hint ? <span>{hint}</span> : null}
             </div>
           ) : null}
         </div>
+
+        {Icon ? (
+          <div className="inline-flex size-8 shrink-0 items-center justify-center rounded-[9px] border border-black/[0.07] bg-black/[0.025] text-black/38 dark:border-white/[0.07] dark:bg-white/[0.035] dark:text-white/38">
+            <Icon className="size-4" />
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -114,37 +101,37 @@ export function SectionCard({
   actions,
   children,
   className,
+  bodyClassName,
 }: {
   title: string;
   description?: string;
   actions?: ReactNode;
   children: ReactNode;
   className?: string;
+  bodyClassName?: string;
 }) {
-  const isMobile = useMobile();
-
   return (
-    <section
-      className={cn(
-        'workspace-section-card workspace-card rounded-[14px] p-4 md:p-5',
-        isMobile && 'workspace-section-card-mobile',
-        className,
-      )}
-    >
-      <div className="flex flex-col gap-2.5 border-b border-border pb-3 md:flex-row md:items-start md:justify-between">
-        <div className="min-w-0">
-          <div className={cn('text-[14px] font-semibold tracking-[-0.02em] text-foreground md:text-[16px]', isMobile && 'text-[13.5px]')}>
-            {title}
+    <section className={cn('space-y-3.5', className)}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-[9px] border border-black/[0.07] bg-black/[0.025] text-black/38 dark:border-white/[0.07] dark:bg-white/[0.035] dark:text-white/38">
+            <Sparkles className="size-4" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-[13px] font-semibold tracking-[-0.018em] text-[#0e0e0e] dark:text-white">{title}</h2>
+            {description ? (
+              <p className="mt-1 max-w-[720px] text-[11px] leading-4 text-black/48 dark:text-white/42">
+                {description}
+              </p>
+            ) : null}
           </div>
-          {description && !isMobile ? (
-            <p className="mt-1 text-[11.5px] leading-5 text-muted-foreground md:text-[12.5px] md:leading-[1.45rem]">
-              {description}
-            </p>
-          ) : null}
         </div>
-        {actions ? <div className="section-card-actions flex w-full flex-wrap items-center gap-2 md:w-auto md:justify-end">{actions}</div> : null}
+        {actions ? <div className="shrink-0">{actions}</div> : null}
       </div>
-      <div className={cn('mt-3', isMobile && 'mt-2.5')}>{children}</div>
+
+      <div className="overflow-hidden rounded-[11px] border border-black/[0.08] bg-[#fbfbfa] shadow-none dark:border-white/[0.08] dark:bg-[#101010]">
+        <div className={cn('p-4', bodyClassName)}>{children}</div>
+      </div>
     </section>
   );
 }
@@ -202,7 +189,7 @@ export function PublicPageHero({
       }
     : {
         badge: 'Public page is active',
-        title: 'Primary master link',
+        title: 'Primary specialist link',
         description: 'See the page card, the live URL, and the sharing actions in one compact block.',
         connected: 'Connected',
         live: 'Ready to accept bookings',
@@ -216,7 +203,7 @@ export function PublicPageHero({
     return (
       <section
         className={cn(
-          'workspace-card overflow-hidden rounded-[14px] p-3',
+          'workspace-card accent-gradient overflow-hidden rounded-[18px] p-3',
           alignTop && 'mt-0',
         )}
       >
@@ -229,10 +216,10 @@ export function PublicPageHero({
                 {labels.connected}
               </Badge>
             </div>
-            <div className="mt-1 truncate text-[15px] font-semibold tracking-[-0.03em] text-foreground">
+            <div className="mt-1 truncate text-[15px] font-semibold tracking-[-0.03em] text-[#0e0e0e] dark:text-white">
               {profile.name}
             </div>
-            <div className="truncate text-[11px] text-muted-foreground">
+            <div className="truncate text-[11px] font-medium text-black/48 dark:text-white/42">
               {profile.profession} · {profile.city}
             </div>
           </div>
@@ -251,14 +238,14 @@ export function PublicPageHero({
             { label: locale === 'ru' ? 'Режим' : 'Mode', value: labels.live },
           ].map((item) => (
             <div key={item.label} className="rounded-[14px] border border-border/80 bg-card/72 px-2.5 py-2">
-              <div className="truncate text-[9.5px] uppercase tracking-[0.14em] text-muted-foreground">{item.label}</div>
-              <div className="mt-1 truncate text-[11px] font-medium text-foreground">{item.value}</div>
+              <div className="truncate text-[9.5px] uppercase tracking-[0.14em] text-black/48 dark:text-white/42">{item.label}</div>
+              <div className="mt-1 truncate text-[11px] font-medium text-[#0e0e0e] dark:text-white">{item.value}</div>
             </div>
           ))}
         </div>
 
         <div className="mt-3 rounded-[14px] border border-border/80 bg-card/72 px-3 py-2.5">
-          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-2 text-[11px] font-medium text-black/48 dark:text-white/42">
             <Link2 className="size-3.5 shrink-0" />
             <span className="truncate">{publicUrl}</span>
           </div>
@@ -298,8 +285,8 @@ export function PublicPageHero({
           </Badge>
 
           <div>
-            <h2 className="text-[20px] font-semibold tracking-[-0.04em] text-foreground md:text-[30px]">{labels.title}</h2>
-            <p className="mt-2 max-w-[720px] text-[12px] leading-6 text-muted-foreground md:mt-3 md:text-[14px] md:leading-7">
+            <h2 className="text-[20px] font-semibold tracking-[-0.04em] text-[#0e0e0e] dark:text-white md:text-[30px]">{labels.title}</h2>
+            <p className="mt-2 max-w-[720px] text-[12px] leading-6 text-black/48 dark:text-white/42 md:mt-3 md:text-[14px] md:leading-7">
               {labels.description}
             </p>
           </div>
@@ -311,16 +298,16 @@ export function PublicPageHero({
               { label: locale === 'ru' ? 'Публичный режим' : 'Public mode', value: labels.live },
             ].map((item) => (
               <div key={item.label} className="rounded-[14px] border border-border bg-card/70 px-3 py-2.5 backdrop-blur">
-                <div className="text-[10px] text-muted-foreground md:text-[11px]">{item.label}</div>
-                <div className="mt-1 truncate text-[12px] font-medium text-foreground md:text-[13px]">{item.value}</div>
+                <div className="text-[10px] text-black/48 dark:text-white/42 md:text-[11px]">{item.label}</div>
+                <div className="mt-1 truncate text-[12px] font-medium text-[#0e0e0e] dark:text-white md:text-[13px]">{item.value}</div>
               </div>
             ))}
           </div>
 
           <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
             <div className="workspace-soft-panel flex min-h-10 items-center gap-2.5 px-3 py-2.5">
-              <Link2 className="size-4 text-muted-foreground" />
-              <span className="truncate text-[12px] text-foreground md:text-[13px]">{publicUrl}</span>
+              <Link2 className="size-4 text-black/48 dark:text-white/42" />
+              <span className="truncate text-[12px] text-[#0e0e0e] dark:text-white md:text-[13px]">{publicUrl}</span>
             </div>
             <Button type="button" variant="outline" size="sm" onClick={() => copyValue(publicUrl, 'link')}>
               <Copy className="size-4" />
@@ -342,18 +329,18 @@ export function PublicPageHero({
             <MasterAvatar name={profile.name} avatar={profile.avatar} className="h-14 w-14 rounded-[16px] md:h-16 md:w-16 md:rounded-[18px]" />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <div className="truncate text-[15px] font-semibold text-foreground md:text-[17px]">{profile.name}</div>
+                <div className="truncate text-[15px] font-semibold text-[#0e0e0e] dark:text-white md:text-[17px]">{profile.name}</div>
                 <Badge variant="outline">
                   <Globe2 className="size-3.5" />
                   {labels.connected}
                 </Badge>
               </div>
-              <div className="truncate text-[12px] text-muted-foreground md:text-[13px]">{profile.profession}</div>
-              <div className="mt-1 truncate text-[11px] text-muted-foreground md:text-[12px]">{profile.city}</div>
+              <div className="truncate text-[12px] text-black/48 dark:text-white/42 md:text-[13px]">{profile.profession}</div>
+              <div className="mt-1 truncate text-[11px] font-medium text-black/48 dark:text-white/42 md:text-[12px]">{profile.city}</div>
             </div>
           </div>
 
-          <div className="mt-3 line-clamp-3 text-[12px] leading-5 text-muted-foreground md:mt-4 md:text-[13px] md:leading-6">{profile.bio}</div>
+          <div className="mt-3 line-clamp-3 text-[12px] leading-5 text-black/48 dark:text-white/42 md:mt-4 md:text-[13px] md:leading-6">{profile.bio}</div>
 
           <div className="mt-3 flex flex-wrap gap-2 md:mt-4">
             {profile.services.slice(0, 4).map((service) => (

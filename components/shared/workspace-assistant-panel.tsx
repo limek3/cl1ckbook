@@ -656,7 +656,7 @@ export function WorkspaceAssistantPanel({
               <div className="grid gap-3 sm:grid-cols-2">
                 <TinyStat
                   label={locale === 'ru' ? 'Профиль' : 'Profile'}
-                  value={ownedProfileName ?? (locale === 'ru' ? 'Страница мастера' : 'Master page')}
+                  value={ownedProfileName ?? (locale === 'ru' ? 'Страница мастера' : 'Specialist page')}
                   icon={Link2}
                 />
                 <TinyStat

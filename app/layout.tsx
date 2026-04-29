@@ -17,13 +17,13 @@ export const viewport: Viewport = {
   initialScale: 1,
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#f5f6f8' },
-    { media: '(prefers-color-scheme: dark)', color: '#020304' },
+    { media: '(prefers-color-scheme: dark)', color: '#090909' },
   ],
 };
 
 const shellPreferenceScript = `
   try {
-    const collapsed = window.localStorage.getItem('sloty-shell-collapsed');
+    const collapsed = window.localStorage.getItem('clickbook-sidebar-premium-v15');
     document.documentElement.dataset.slotySidebar = collapsed === 'true' ? 'collapsed' : 'expanded';
   } catch (error) {
     document.documentElement.dataset.slotySidebar = 'expanded';

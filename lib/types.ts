@@ -5,7 +5,7 @@ export interface ReviewItem {
   author: string;
   rating: number;
   text: string;
-  dateLabel: string;
+  dateLabel?: string;
   service?: string;
 }
 

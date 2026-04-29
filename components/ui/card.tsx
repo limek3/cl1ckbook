@@ -2,7 +2,7 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 function Card({ className, ...props }: React.ComponentProps<'div'>) {
-  return <div data-slot="card" className={cn('workspace-card flex flex-col gap-4 p-5 text-card-foreground', className)} {...props} />;
+  return <div data-slot="card" className={cn('workspace-card flex flex-col gap-4 p-4 text-card-foreground', className)} {...props} />;
 }
 
 function CardHeader({ className, ...props }: React.ComponentProps<'div'>) {
@@ -10,7 +10,7 @@ function CardHeader({ className, ...props }: React.ComponentProps<'div'>) {
 }
 
 function CardTitle({ className, ...props }: React.ComponentProps<'div'>) {
-  return <div data-slot="card-title" className={cn('text-[16px] font-semibold tracking-[-0.02em]', className)} {...props} />;
+  return <div data-slot="card-title" className={cn('text-[15px] font-semibold tracking-[-0.02em]', className)} {...props} />;
 }
 
 function CardDescription({ className, ...props }: React.ComponentProps<'div'>) {
@@ -26,7 +26,7 @@ function CardContent({ className, ...props }: React.ComponentProps<'div'>) {
 }
 
 function CardFooter({ className, ...props }: React.ComponentProps<'div'>) {
-  return <div data-slot="card-footer" className={cn('flex items-center border-t border-border/75 px-0 pt-4', className)} {...props} />;
+  return <div data-slot="card-footer" className={cn('flex items-center px-0', className)} {...props} />;
 }
 
 export { Card, CardHeader, CardFooter, CardTitle, CardAction, CardDescription, CardContent };
