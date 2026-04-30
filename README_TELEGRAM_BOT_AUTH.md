@@ -1,13 +1,17 @@
 # Telegram bot auth flow
 
-This build replaces Telegram Login Widget with a bot-based login flow:
+This build uses bot-based login instead of Telegram Login Widget. It does **not** use the browser widget, so `Bot domain invalid` is avoided.
 
-1. The user clicks “Войти через Telegram”.
-2. The app creates a temporary login token.
-3. The browser opens `https://t.me/<bot>?start=auth_<token>`.
-4. The user presses Start in the bot.
+Flow:
+
+1. User clicks “Войти через Telegram”.
+2. App creates a temporary login token.
+3. Browser opens `https://t.me/<bot>?start=auth_<token>`.
+4. User presses Start in the bot.
 5. Telegram sends an update to `/api/telegram/webhook`.
 6. The site polls `/api/auth/telegram/status` and receives Supabase session tokens.
+
+If Telegram sends only `/start`, the bot now replies with instructions. The UI also has a fallback button: “Скопировать команду для бота”.
 
 ## Required Vercel variables
 
@@ -21,6 +25,8 @@ NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
 ```
 
+`TELEGRAM_BOT_TOKEN` and `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` must belong to the same bot.
+
 ## Supabase SQL
 
 Run:
@@ -30,6 +36,8 @@ supabase/migrations/20260430_0006_telegram_bot_auth.sql
 ```
 
 ## Set Telegram webhook
+
+Run after Vercel deploy is Ready.
 
 PowerShell:
 
@@ -51,3 +59,21 @@ Check:
 ```powershell
 Invoke-RestMethod -Uri "https://api.telegram.org/bot$TOKEN/getWebhookInfo" -Method Get
 ```
+
+Expected important fields:
+
+```txt
+url: https://cl1ckbuk.vercel.app/api/telegram/webhook
+pending_update_count: 0 or more
+last_error_message: empty/null
+```
+
+If bot is silent after `/start`, webhook is not set or the `secret_token` does not match `TELEGRAM_WEBHOOK_SECRET` in Vercel.
+
+To reset webhook:
+
+```powershell
+Invoke-RestMethod -Uri "https://api.telegram.org/bot$TOKEN/deleteWebhook" -Method Post
+```
+
+Then run `setWebhook` again.

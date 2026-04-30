@@ -30,10 +30,27 @@ function appUrl() {
 }
 
 function extractAuthToken(text?: string) {
-  if (!text) return null;
+  const value = text?.trim();
 
-  const match = text.match(/^\/start\s+auth_([a-f0-9]{64})$/i);
-  return match?.[1] ?? null;
+  if (!value) return null;
+
+  const patterns = [
+    /^\/start\s+auth_([a-f0-9]{64})(?:\s|$)/i,
+    /^\/start@\w+\s+auth_([a-f0-9]{64})(?:\s|$)/i,
+    /^auth_([a-f0-9]{64})(?:\s|$)/i,
+    /^([a-f0-9]{64})(?:\s|$)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = value.match(pattern);
+    if (match?.[1]) return match[1];
+  }
+
+  return null;
+}
+
+function isPlainStart(text?: string) {
+  return /^\/start(?:@\w+)?\s*$/i.test(text?.trim() ?? '');
 }
 
 async function sendTelegramMessage(params: { chatId: number; text: string }) {
@@ -83,7 +100,19 @@ export async function POST(request: Request) {
     const message = update.message;
     const token = extractAuthToken(message?.text);
 
-    if (!message || !token || !message.from || message.from.is_bot) {
+    if (!message || !message.from || message.from.is_bot) {
+      return NextResponse.json({ ok: true });
+    }
+
+    if (!token) {
+      if (isPlainStart(message.text)) {
+        await sendTelegramMessage({
+          chatId: message.chat.id,
+          text:
+            'Чтобы войти в ClickBook, вернитесь на сайт и нажмите «Войти через Telegram». Если сайт уже ждёт подтверждение, нажмите «Скопировать команду для бота» и отправьте её сюда.',
+        });
+      }
+
       return NextResponse.json({ ok: true });
     }
 

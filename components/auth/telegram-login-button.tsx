@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Check, Loader2, Send, X } from 'lucide-react';
+import { Check, Copy, ExternalLink, Loader2, Send, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
@@ -35,6 +35,9 @@ export function TelegramLoginButton({
   const [botUrl, setBotUrl] = useState<string | null>(null);
   const [state, setState] = useState<'idle' | 'opening' | 'waiting' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState<string | null>(null);
+  const [copiedCommand, setCopiedCommand] = useState(false);
+
+  const manualCommand = token ? `/start auth_${token}` : null;
 
   const clearPoll = () => {
     if (pollTimerRef.current) {
@@ -64,7 +67,7 @@ export function TelegramLoginButton({
     setMessage('Готово. Открываем кабинет...');
 
     window.setTimeout(() => {
-      router.replace(redirectTo);
+      window.location.assign(redirectTo);
       router.refresh();
     }, 350);
   };
@@ -104,7 +107,7 @@ export function TelegramLoginButton({
     setState('error');
     setMessage(
       payload.status === 'expired'
-        ? 'Ссылка входа устарела. Нажмите кнопку ещё раз.'
+        ? 'Ссылка устарела. Нажмите кнопку ещё раз.'
         : payload.status === 'consumed'
           ? 'Эта ссылка уже использована. Нажмите кнопку ещё раз.'
           : 'Не удалось подтвердить вход. Нажмите кнопку ещё раз.',
@@ -117,6 +120,7 @@ export function TelegramLoginButton({
     setMessage(null);
     setToken(null);
     setBotUrl(null);
+    setCopiedCommand(false);
 
     try {
       const response = await fetch('/api/auth/telegram/start', {
@@ -134,7 +138,7 @@ export function TelegramLoginButton({
       setToken(payload.token);
       setBotUrl(payload.botUrl);
       setState('waiting');
-      setMessage('Откроется бот. Нажмите Start — вход завершится автоматически.');
+      setMessage('В Telegram нажмите Start. Если бот открылся без команды — скопируйте команду ниже.');
       startedAtRef.current = Date.now();
 
       window.open(payload.botUrl, '_blank', 'noopener,noreferrer');
@@ -149,11 +153,11 @@ export function TelegramLoginButton({
               : 'Не удалось проверить подтверждение Telegram.',
           );
         });
-      }, 1800);
+      }, 1600);
 
       window.setTimeout(() => {
         void pollStatus(payload.token as string).catch(() => {});
-      }, 900);
+      }, 800);
     } catch (error) {
       clearPoll();
       setState('error');
@@ -162,6 +166,18 @@ export function TelegramLoginButton({
           ? error.message
           : 'Не удалось начать вход через Telegram.',
       );
+    }
+  };
+
+  const copyManualCommand = async () => {
+    if (!manualCommand) return;
+
+    try {
+      await navigator.clipboard.writeText(manualCommand);
+      setCopiedCommand(true);
+      window.setTimeout(() => setCopiedCommand(false), 1400);
+    } catch {
+      setCopiedCommand(false);
     }
   };
 
@@ -176,7 +192,7 @@ export function TelegramLoginButton({
         onClick={startLogin}
         disabled={loading || success}
         className={cn(
-          'inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] border px-4 text-[13px] font-semibold shadow-none transition-[background,border-color,color,opacity,transform] duration-150 active:scale-[0.99] disabled:pointer-events-none',
+          'inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[11px] border px-4 text-[13px] font-semibold shadow-none transition-[background,border-color,color,opacity,transform] duration-150 active:scale-[0.99] disabled:pointer-events-none',
           success
             ? 'border-emerald-500/20 bg-emerald-500/12 text-emerald-700 dark:text-emerald-100'
             : failed
@@ -207,25 +223,39 @@ export function TelegramLoginButton({
       {message ? (
         <div
           className={cn(
-            'rounded-[9px] border px-3 py-2 text-[11px] leading-4',
+            'rounded-[10px] border px-3 py-2 text-[11px] leading-4',
             failed
               ? 'border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-100'
               : success
                 ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-100'
-                : 'border-black/[0.08] bg-white/50 text-black/48 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/46',
+                : 'border-black/[0.08] bg-white/58 text-black/48 dark:border-white/[0.08] dark:bg-white/[0.045] dark:text-white/46',
           )}
         >
           {message}
+        </div>
+      ) : null}
 
-          {botUrl && state === 'waiting' ? (
-            <a
-              href={botUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="ml-1 font-semibold underline underline-offset-2"
+      {botUrl && state === 'waiting' ? (
+        <div className="grid gap-2 rounded-[11px] border border-black/[0.08] bg-white/50 p-2 dark:border-white/[0.08] dark:bg-white/[0.04]">
+          <a
+            href={botUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-8 items-center justify-center gap-2 rounded-[9px] border border-black/[0.08] bg-white text-[11px] font-semibold text-black/56 transition hover:bg-black/[0.035] hover:text-black dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/56 dark:hover:bg-white/[0.07] dark:hover:text-white"
+          >
+            <ExternalLink className="size-3.5" />
+            Открыть бота ещё раз
+          </a>
+
+          {manualCommand ? (
+            <button
+              type="button"
+              onClick={copyManualCommand}
+              className="inline-flex min-h-8 items-center justify-center gap-2 rounded-[9px] border border-black/[0.08] bg-white px-2 text-[10.5px] font-semibold text-black/50 transition hover:bg-black/[0.035] hover:text-black dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/50 dark:hover:bg-white/[0.07] dark:hover:text-white"
             >
-              Открыть ещё раз
-            </a>
+              {copiedCommand ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+              {copiedCommand ? 'Команда скопирована' : 'Скопировать команду /start'}
+            </button>
           ) : null}
         </div>
       ) : null}
