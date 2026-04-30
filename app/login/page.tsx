@@ -13,7 +13,6 @@ import {
   Send,
   UserPlus,
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 
 import { BrandLogo } from '@/components/brand/brand-logo';
 import { Button } from '@/components/ui/button';
@@ -171,7 +170,6 @@ const inputClass =
   'h-10 rounded-[10px] border-black/[0.08] bg-white/65 pl-9 text-[13px] text-black shadow-none outline-none placeholder:text-black/28 focus-visible:ring-0 focus-visible:ring-offset-0 dark:border-white/[0.09] dark:bg-white/[0.055] dark:text-white dark:placeholder:text-white/26';
 
 export default function LoginPage() {
-  const router = useRouter();
   const searchParams = useBrowserSearchParams();
 
   const redirectTo = useMemo(
@@ -228,8 +226,9 @@ export default function LoginPage() {
 
         await supabase.auth.getSession();
 
-        router.replace(redirectTo);
-        router.refresh();
+        // Hard navigation makes the next request go through Supabase SSR cookie
+        // refresh before protected dashboard/API calls run.
+        window.location.assign(redirectTo);
       }
     } catch (nextError) {
       setError(

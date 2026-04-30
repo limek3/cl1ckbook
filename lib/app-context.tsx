@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useLocale } from '@/lib/locale-context';
+import { createClient as createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { parseServices, slugify } from '@/lib/utils';
 import { buildWorkspaceSeed, type WorkspaceSections, type WorkspaceSnapshot } from '@/lib/workspace-store';
 import { getDemoBookings, getDemoProfile, saveStoredDemoProfile, SLOTY_DEMO_SLUG } from '@/lib/demo-data';
@@ -115,6 +116,27 @@ async function parseJson<T>(response: Response) {
   return (await response.json()) as T;
 }
 
+async function getAuthHeaders(includeJson = false) {
+  const headers: Record<string, string> = includeJson
+    ? { 'Content-Type': 'application/json' }
+    : {};
+
+  try {
+    const supabase = createSupabaseBrowserClient();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (session?.access_token) {
+      headers.Authorization = `Bearer ${session.access_token}`;
+    }
+  } catch {
+    // Cookie-based auth can still work without the fallback header.
+  }
+
+  return headers;
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const { copy, locale } = useLocale();
   const [hasHydrated, setHasHydrated] = useState(false);
@@ -143,6 +165,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const response = await fetch('/api/workspace', {
         credentials: 'include',
         cache: 'no-store',
+        headers: await getAuthHeaders(),
       });
 
       if (response.status === 401 || response.status === 404) {
@@ -271,9 +294,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           method: 'POST',
           credentials: 'include',
           cache: 'no-store',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: await getAuthHeaders(true),
           body: JSON.stringify({
             workspaceId,
             profile: nextProfile,
@@ -395,9 +416,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           method: 'PATCH',
           credentials: 'include',
           cache: 'no-store',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: await getAuthHeaders(true),
           body: JSON.stringify({
             workspaceId,
             section,
@@ -435,9 +454,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           method: 'PATCH',
           credentials: 'include',
           cache: 'no-store',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: await getAuthHeaders(true),
           body: JSON.stringify({
             bookingId,
             status,
