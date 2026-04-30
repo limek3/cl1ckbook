@@ -1,26 +1,24 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Send } from 'lucide-react';
+import { Check, Loader2, Send, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 
-type TelegramLoginUser = {
-  id: number;
-  first_name?: string;
-  last_name?: string;
-  username?: string;
-  photo_url?: string;
-  auth_date: number;
-  hash: string;
+type TelegramStartResponse = {
+  token?: string;
+  botUrl?: string;
+  expiresIn?: number;
+  error?: string;
 };
 
-declare global {
-  interface Window {
-    onTelegramAuth?: (user: TelegramLoginUser) => void;
-  }
-}
+type TelegramStatusResponse = {
+  status: 'pending' | 'confirmed' | 'expired' | 'consumed' | 'invalid' | 'not_found' | 'error';
+  access_token?: string;
+  refresh_token?: string;
+  error?: string;
+};
 
 export function TelegramLoginButton({
   redirectTo = '/dashboard',
@@ -30,110 +28,211 @@ export function TelegramLoginButton({
   className?: string;
 }) {
   const router = useRouter();
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [fallbackVisible, setFallbackVisible] = useState(false);
+  const pollTimerRef = useRef<number | null>(null);
+  const startedAtRef = useRef<number>(0);
+
+  const [token, setToken] = useState<string | null>(null);
+  const [botUrl, setBotUrl] = useState<string | null>(null);
+  const [state, setState] = useState<'idle' | 'opening' | 'waiting' | 'success' | 'error'>('idle');
+  const [message, setMessage] = useState<string | null>(null);
+
+  const clearPoll = () => {
+    if (pollTimerRef.current) {
+      window.clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  };
 
   useEffect(() => {
-    const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
+    return () => clearPoll();
+  }, []);
 
-    if (!botUsername || !containerRef.current) {
-      setFallbackVisible(true);
+  const finishLogin = async (payload: TelegramStatusResponse) => {
+    if (!payload.access_token || !payload.refresh_token) {
+      throw new Error('telegram_session_missing');
+    }
+
+    const supabase = createClient();
+    const { error } = await supabase.auth.setSession({
+      access_token: payload.access_token,
+      refresh_token: payload.refresh_token,
+    });
+
+    if (error) throw error;
+
+    setState('success');
+    setMessage('Готово. Открываем кабинет...');
+
+    window.setTimeout(() => {
+      router.replace(redirectTo);
+      router.refresh();
+    }, 350);
+  };
+
+  const pollStatus = async (nextToken: string) => {
+    const response = await fetch(
+      `/api/auth/telegram/status?token=${encodeURIComponent(nextToken)}`,
+      {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store',
+      },
+    );
+
+    const payload = (await response.json()) as TelegramStatusResponse;
+
+    if (!response.ok || payload.status === 'error') {
+      throw new Error(payload.error || 'telegram_status_failed');
+    }
+
+    if (payload.status === 'pending') {
+      if (Date.now() - startedAtRef.current > 10 * 60 * 1000) {
+        clearPoll();
+        setState('error');
+        setMessage('Время входа истекло. Нажмите кнопку ещё раз.');
+      }
       return;
     }
 
-    window.onTelegramAuth = async (telegramUser: TelegramLoginUser) => {
-      setLoading(true);
+    if (payload.status === 'confirmed') {
+      clearPoll();
+      await finishLogin(payload);
+      return;
+    }
 
-      try {
-        const response = await fetch('/api/auth/telegram', {
-          method: 'POST',
-          credentials: 'include',
-          cache: 'no-store',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(telegramUser),
-        });
+    clearPoll();
+    setState('error');
+    setMessage(
+      payload.status === 'expired'
+        ? 'Ссылка входа устарела. Нажмите кнопку ещё раз.'
+        : payload.status === 'consumed'
+          ? 'Эта ссылка уже использована. Нажмите кнопку ещё раз.'
+          : 'Не удалось подтвердить вход. Нажмите кнопку ещё раз.',
+    );
+  };
 
-        const payload = (await response.json()) as {
-          access_token?: string;
-          refresh_token?: string;
-          error?: string;
-        };
+  const startLogin = async () => {
+    clearPoll();
+    setState('opening');
+    setMessage(null);
+    setToken(null);
+    setBotUrl(null);
 
-        if (!response.ok || !payload.access_token || !payload.refresh_token) {
-          throw new Error(payload.error || 'telegram_auth_failed');
-        }
+    try {
+      const response = await fetch('/api/auth/telegram/start', {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+      });
 
-        const supabase = createClient();
+      const payload = (await response.json()) as TelegramStartResponse;
 
-        const { error } = await supabase.auth.setSession({
-          access_token: payload.access_token,
-          refresh_token: payload.refresh_token,
-        });
-
-        if (error) {
-          throw error;
-        }
-
-        router.replace(redirectTo);
-        router.refresh();
-      } catch (error) {
-        console.error(error);
-        setFallbackVisible(true);
-      } finally {
-        setLoading(false);
+      if (!response.ok || !payload.token || !payload.botUrl) {
+        throw new Error(payload.error || 'telegram_start_failed');
       }
-    };
 
-    containerRef.current.innerHTML = '';
+      setToken(payload.token);
+      setBotUrl(payload.botUrl);
+      setState('waiting');
+      setMessage('Откроется бот. Нажмите Start — вход завершится автоматически.');
+      startedAtRef.current = Date.now();
 
-    const script = document.createElement('script');
-    script.async = true;
-    script.src = 'https://telegram.org/js/telegram-widget.js?22';
-    script.setAttribute('data-telegram-login', botUsername);
-    script.setAttribute('data-size', 'large');
-    script.setAttribute('data-radius', '10');
-    script.setAttribute('data-userpic', 'false');
-    script.setAttribute('data-request-access', 'write');
-    script.setAttribute('data-onauth', 'onTelegramAuth(user)');
+      window.open(payload.botUrl, '_blank', 'noopener,noreferrer');
 
-    containerRef.current.appendChild(script);
+      pollTimerRef.current = window.setInterval(() => {
+        void pollStatus(payload.token as string).catch((error) => {
+          clearPoll();
+          setState('error');
+          setMessage(
+            error instanceof Error
+              ? error.message
+              : 'Не удалось проверить подтверждение Telegram.',
+          );
+        });
+      }, 1800);
 
-    const timer = window.setTimeout(() => {
-      setFallbackVisible(true);
-    }, 2500);
+      window.setTimeout(() => {
+        void pollStatus(payload.token as string).catch(() => {});
+      }, 900);
+    } catch (error) {
+      clearPoll();
+      setState('error');
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Не удалось начать вход через Telegram.',
+      );
+    }
+  };
 
-    return () => {
-      window.clearTimeout(timer);
-
-      if (window.onTelegramAuth) {
-        delete window.onTelegramAuth;
-      }
-    };
-  }, [redirectTo, router]);
+  const loading = state === 'opening' || state === 'waiting';
+  const success = state === 'success';
+  const failed = state === 'error';
 
   return (
     <div className={cn('grid gap-2', className)}>
-      <div
-        ref={containerRef}
+      <button
+        type="button"
+        onClick={startLogin}
+        disabled={loading || success}
         className={cn(
-          'min-h-10 overflow-hidden rounded-[10px]',
-          loading ? 'pointer-events-none opacity-50' : '',
+          'inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] border px-4 text-[13px] font-semibold shadow-none transition-[background,border-color,color,opacity,transform] duration-150 active:scale-[0.99] disabled:pointer-events-none',
+          success
+            ? 'border-emerald-500/20 bg-emerald-500/12 text-emerald-700 dark:text-emerald-100'
+            : failed
+              ? 'border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-100'
+              : 'border-[#2692d8] bg-[#2ea6ff] text-white hover:bg-[#2299f0] dark:border-[#2692d8]',
+          loading ? 'opacity-85' : '',
         )}
-      />
+      >
+        {loading ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : success ? (
+          <Check className="size-4" />
+        ) : failed ? (
+          <X className="size-4" />
+        ) : (
+          <Send className="size-4" />
+        )}
 
-      {fallbackVisible ? (
-        <div className="flex items-center justify-center">
-          <button
-            type="button"
-            disabled
-            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-[10px] border border-white/[0.08] bg-white/[0.04] px-3 text-[12px] font-semibold text-white/55 opacity-70"
-          >
-            <Send className="size-4" />
-            Telegram вход загружается
-          </button>
+        {success
+          ? 'Telegram подтверждён'
+          : failed
+            ? 'Повторить вход через Telegram'
+            : loading
+              ? 'Ждём подтверждение в Telegram'
+              : 'Войти через Telegram'}
+      </button>
+
+      {message ? (
+        <div
+          className={cn(
+            'rounded-[9px] border px-3 py-2 text-[11px] leading-4',
+            failed
+              ? 'border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-100'
+              : success
+                ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-100'
+                : 'border-black/[0.08] bg-white/50 text-black/48 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/46',
+          )}
+        >
+          {message}
+
+          {botUrl && state === 'waiting' ? (
+            <a
+              href={botUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="ml-1 font-semibold underline underline-offset-2"
+            >
+              Открыть ещё раз
+            </a>
+          ) : null}
+        </div>
+      ) : null}
+
+      {token && state === 'waiting' ? (
+        <div className="text-center text-[10.5px] text-black/34 dark:text-white/30">
+          Вход активен 10 минут.
         </div>
       ) : null}
     </div>
