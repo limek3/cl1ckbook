@@ -14,6 +14,7 @@ import {
   UserPlus,
 } from 'lucide-react';
 
+import { TelegramLoginButton } from '@/components/auth/telegram-login-button';
 import { BrandLogo } from '@/components/brand/brand-logo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -126,6 +127,7 @@ function ModeChip({
       )}
     >
       {children}
+
       {active ? (
         <span className="absolute bottom-1 left-1/2 h-[2px] w-3 -translate-x-1/2 rounded-full bg-black/55 dark:bg-white/60" />
       ) : null}
@@ -133,7 +135,7 @@ function ModeChip({
   );
 }
 
-function SocialButton({
+function DisabledAuthOption({
   icon,
   label,
   hint,
@@ -143,26 +145,26 @@ function SocialButton({
   hint: string;
 }) {
   return (
-    <button
-      type="button"
-      className="group flex min-h-11 items-center justify-between gap-3 rounded-[10px] border border-black/[0.08] bg-white/55 px-3 text-left transition active:scale-[0.99] hover:border-black/[0.13] hover:bg-white/80 dark:border-white/[0.08] dark:bg-white/[0.035] dark:hover:border-white/[0.14] dark:hover:bg-white/[0.06]"
-    >
+    <div className="flex min-h-11 items-center justify-between gap-3 rounded-[10px] border border-black/[0.07] bg-white/40 px-3 text-left opacity-70 dark:border-white/[0.07] dark:bg-white/[0.03]">
       <span className="flex min-w-0 items-center gap-2">
-        <span className="flex size-7 shrink-0 items-center justify-center rounded-[8px] border border-black/[0.07] bg-black/[0.025] text-black/60 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/58">
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-[8px] border border-black/[0.07] bg-black/[0.025] text-black/42 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/42">
           {icon}
         </span>
+
         <span className="min-w-0">
-          <span className="block truncate text-[12px] font-semibold text-black/78 dark:text-white/76">
+          <span className="block truncate text-[12px] font-semibold text-black/56 dark:text-white/52">
             {label}
           </span>
-          <span className="block truncate text-[10.5px] text-black/38 dark:text-white/35">
+          <span className="block truncate text-[10.5px] text-black/34 dark:text-white/32">
             {hint}
           </span>
         </span>
       </span>
 
-      <ArrowRight className="size-3.5 shrink-0 text-black/26 transition group-hover:translate-x-0.5 group-hover:text-black/48 dark:text-white/24 dark:group-hover:text-white/46" />
-    </button>
+      <span className="rounded-[7px] border border-black/[0.07] bg-black/[0.025] px-2 py-1 text-[10px] font-semibold text-black/34 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-white/32">
+        позже
+      </span>
+    </div>
   );
 }
 
@@ -226,8 +228,6 @@ export default function LoginPage() {
 
         await supabase.auth.getSession();
 
-        // Hard navigation makes the next request go through Supabase SSR cookie
-        // refresh before protected dashboard/API calls run.
         window.location.assign(redirectTo);
       }
     } catch (nextError) {
@@ -285,6 +285,7 @@ export default function LoginPage() {
             <div className="flex items-center justify-between gap-3 border-b border-black/[0.08] p-4 dark:border-white/[0.08] sm:p-5">
               <div className="flex min-w-0 items-center gap-3">
                 <BrandLogo className="w-[74px] shrink-0 sm:w-[82px]" />
+
                 <div className="min-w-0">
                   <div className="truncate text-[14px] font-semibold tracking-[-0.02em]">
                     Кабинет мастера
@@ -318,6 +319,7 @@ export default function LoginPage() {
                   <div>NEXT_PUBLIC_SUPABASE_URL=...</div>
                   <div>NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...</div>
                   <div>SUPABASE_SERVICE_ROLE_KEY=...</div>
+                  <div>NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=...</div>
                   <div>NEXT_PUBLIC_APP_URL=http://localhost:3000</div>
                 </div>
 
@@ -342,6 +344,7 @@ export default function LoginPage() {
           <div className="flex items-center justify-between gap-3 border-b border-black/[0.08] p-4 dark:border-white/[0.08] sm:p-5">
             <div className="flex min-w-0 items-center gap-3">
               <BrandLogo className="w-[74px] shrink-0 sm:w-[82px]" />
+
               <div className="min-w-0">
                 <div className="truncate text-[14px] font-semibold tracking-[-0.02em]">
                   Кабинет мастера
@@ -382,6 +385,7 @@ export default function LoginPage() {
                         Откроется рабочий dashboard
                       </div>
                     </div>
+
                     <div className="max-w-[150px] truncate text-[11px] font-semibold text-black/48 dark:text-white/42">
                       {redirectTo}
                     </div>
@@ -389,11 +393,23 @@ export default function LoginPage() {
 
                   <div className="flex items-center justify-between rounded-[10px] border border-black/[0.07] bg-[#fbfbfa]/60 px-3 py-2.5 dark:border-white/[0.08] dark:bg-[#101010]/60">
                     <div>
-                      <div className="text-[12px] font-semibold">Доступ</div>
+                      <div className="text-[12px] font-semibold">Telegram</div>
                       <div className="mt-0.5 text-[11px] text-black/38 dark:text-white/35">
-                        Пароль или email-ссылка
+                        Вход и регистрация одной кнопкой
                       </div>
                     </div>
+
+                    <Send className="size-4 text-black/32 dark:text-white/30" />
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-[10px] border border-black/[0.07] bg-[#fbfbfa]/60 px-3 py-2.5 dark:border-white/[0.08] dark:bg-[#101010]/60">
+                    <div>
+                      <div className="text-[12px] font-semibold">Email-доступ</div>
+                      <div className="mt-0.5 text-[11px] text-black/38 dark:text-white/35">
+                        Пароль или ссылка на почту
+                      </div>
+                    </div>
+
                     <LockKeyhole className="size-4 text-black/32 dark:text-white/30" />
                   </div>
                 </div>
@@ -402,6 +418,7 @@ export default function LoginPage() {
               <div className="mt-5 border-t border-black/[0.08] pt-4 dark:border-white/[0.08]">
                 <div className="flex flex-wrap items-center justify-between gap-3 text-[11px] text-black/38 dark:text-white/35">
                   <span>ClickBook workspace</span>
+
                   <Link
                     href="/about"
                     className="font-semibold text-black/52 transition hover:text-black dark:text-white/48 dark:hover:text-white"
@@ -442,30 +459,34 @@ export default function LoginPage() {
               </Panel>
 
               <Panel className="p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <MicroLabel>Быстрый вход</MicroLabel>
                     <div className="mt-1 text-[12px] text-black/42 dark:text-white/38">
-                      Варианты можно подключить через Supabase OAuth
+                      Telegram создаёт аккаунт автоматически, если его ещё нет
                     </div>
+                  </div>
+
+                  <div className="rounded-[9px] border border-black/[0.08] bg-white/55 px-2.5 py-1.5 text-[10.5px] font-semibold text-black/42 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/38">
+                    основной способ
                   </div>
                 </div>
 
-                <div className="mt-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
-                  <SocialButton
+                <div className="mt-3 rounded-[10px] border border-black/[0.08] bg-white/45 p-3 dark:border-white/[0.08] dark:bg-white/[0.035]">
+                  <TelegramLoginButton redirectTo={redirectTo} />
+                </div>
+
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <DisabledAuthOption
                     icon={<Chrome className="size-3.5" />}
                     label="Google"
-                    hint="OAuth"
+                    hint="OAuth позже"
                   />
-                  <SocialButton
-                    icon={<Send className="size-3.5" />}
-                    label="Telegram"
-                    hint="Mini App"
-                  />
-                  <SocialButton
+
+                  <DisabledAuthOption
                     icon={<MessageCircleMore className="size-3.5" />}
                     label="MAX"
-                    hint="Позже"
+                    hint="Интеграция позже"
                   />
                 </div>
               </Panel>
@@ -474,8 +495,9 @@ export default function LoginPage() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <MicroLabel>
-                      {view === 'login' ? 'Авторизация' : 'Регистрация'}
+                      {view === 'login' ? 'Email-вход' : 'Email-регистрация'}
                     </MicroLabel>
+
                     <div className="mt-2 text-[24px] font-semibold leading-none tracking-[-0.065em]">
                       {view === 'login' ? 'Данные для входа' : 'Новый аккаунт'}
                     </div>
@@ -485,6 +507,7 @@ export default function LoginPage() {
                     <ModeChip active={mode === 'password'} onClick={() => setMode('password')}>
                       Пароль
                     </ModeChip>
+
                     <ModeChip active={mode === 'magic'} onClick={() => setMode('magic')}>
                       Email-ссылка
                     </ModeChip>
@@ -502,6 +525,7 @@ export default function LoginPage() {
 
                     <div className="relative">
                       <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-3.5 -translate-y-1/2 text-black/30 dark:text-white/28" />
+
                       <Input
                         id="email"
                         type="email"
@@ -526,6 +550,7 @@ export default function LoginPage() {
 
                       <div className="relative">
                         <KeyRound className="pointer-events-none absolute left-3.5 top-1/2 size-3.5 -translate-y-1/2 text-black/30 dark:text-white/28" />
+
                         <Input
                           id="password"
                           type="password"
@@ -602,11 +627,12 @@ export default function LoginPage() {
                   >
                     {view === 'login'
                       ? mode === 'password'
-                        ? 'Войти в кабинет'
+                        ? 'Войти по email'
                         : 'Отправить ссылку'
                       : mode === 'password'
-                        ? 'Создать кабинет'
+                        ? 'Создать через email'
                         : 'Получить ссылку'}
+
                     <ArrowRight className="size-4" />
                   </Button>
                 </form>
