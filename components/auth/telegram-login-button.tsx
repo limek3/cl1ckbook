@@ -20,6 +20,36 @@ type TelegramStatusResponse = {
   error?: string;
 };
 
+async function readJsonSafe<T>(response: Response): Promise<T> {
+  const text = await response.text();
+
+  if (!text) return {} as T;
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return { error: text } as T;
+  }
+}
+
+function humanTelegramError(value?: string) {
+  if (!value) return 'Не удалось завершить Telegram-вход.';
+
+  if (value.includes('supabase_token_failed')) {
+    return 'Telegram подтверждён, но Supabase не выдал сессию. Проверьте Email provider в Supabase Auth и переменные Vercel.';
+  }
+
+  if (value.includes('sloty_telegram_accounts')) {
+    return 'Не найдена таблица Telegram-аккаунтов. Выполните SQL migration 20260430_0006_telegram_bot_auth.sql в Supabase.';
+  }
+
+  if (value.includes('Internal Server Error')) {
+    return 'Сервер не завершил Telegram-вход. Проверьте Vercel Function Logs для /api/auth/telegram/status.';
+  }
+
+  return value;
+}
+
 export function TelegramLoginButton({
   redirectTo = '/dashboard',
   className,
@@ -82,10 +112,10 @@ export function TelegramLoginButton({
       },
     );
 
-    const payload = (await response.json()) as TelegramStatusResponse;
+    const payload = await readJsonSafe<TelegramStatusResponse>(response);
 
     if (!response.ok || payload.status === 'error') {
-      throw new Error(payload.error || 'telegram_status_failed');
+      throw new Error(humanTelegramError(payload.error || 'telegram_status_failed'));
     }
 
     if (payload.status === 'pending') {
@@ -129,10 +159,10 @@ export function TelegramLoginButton({
         cache: 'no-store',
       });
 
-      const payload = (await response.json()) as TelegramStartResponse;
+      const payload = await readJsonSafe<TelegramStartResponse>(response);
 
       if (!response.ok || !payload.token || !payload.botUrl) {
-        throw new Error(payload.error || 'telegram_start_failed');
+        throw new Error(humanTelegramError(payload.error || 'telegram_start_failed'));
       }
 
       setToken(payload.token);
