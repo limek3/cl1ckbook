@@ -15,6 +15,7 @@ type TelegramStartResponse = {
 
 type TelegramStatusResponse = {
   status: 'pending' | 'confirmed' | 'expired' | 'consumed' | 'invalid' | 'not_found' | 'error';
+  app_session?: boolean;
   access_token?: string;
   refresh_token?: string;
   error?: string;
@@ -81,6 +82,20 @@ export function TelegramLoginButton({
   }, []);
 
   const finishLogin = async (payload: TelegramStatusResponse) => {
+    // New stable flow: the server sets an HttpOnly ClickBook session cookie.
+    // No Supabase browser session is required here. This avoids failing on
+    // Supabase password/magic-link token creation.
+    if (payload.app_session) {
+      setState('success');
+      setMessage('Готово. Открываем кабинет...');
+
+      window.setTimeout(() => {
+        window.location.assign(redirectTo);
+      }, 350);
+      return;
+    }
+
+    // Legacy fallback for old deployments that still return Supabase tokens.
     if (!payload.access_token || !payload.refresh_token) {
       throw new Error('telegram_session_missing');
     }

@@ -1,19 +1,11 @@
 import { randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
-import { createClient as createSupabaseClient, type Session, type User } from '@supabase/supabase-js';
+import type { User } from '@supabase/supabase-js';
 import { createSupabaseAdminClient } from '@/lib/server/supabase-admin';
-import { getSupabasePublishableKey, getSupabaseUrl } from '@/lib/supabase/env';
+import { setTelegramAppSessionCookie } from '@/lib/server/app-session';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-type TokenResponse = {
-  access_token: string;
-  refresh_token: string;
-  expires_in: number;
-  token_type?: string;
-  user: User;
-};
 
 type LoginRequestRow = {
   token: string;
@@ -28,16 +20,7 @@ type LoginRequestRow = {
   expires_at: string;
 };
 
-function getAppOrigin(request: Request) {
-  const configured = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '');
-  if (configured) return configured;
-
-  const url = new URL(request.url);
-  return url.origin;
-}
-
 function telegramEmail(telegramId: number) {
-  // Use a normal looking domain. Some auth/email validators are stricter with .local.
   return `telegram_${telegramId}@auth.clickbook.app`;
 }
 
@@ -45,18 +28,19 @@ function legacyTelegramEmail(telegramId: number) {
   return `telegram_${telegramId}@telegram.clickbook.local`;
 }
 
-function errorMessage(error: unknown) {
-  if (error instanceof Error) return error.message;
-  if (typeof error === 'string') return error;
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return 'telegram_status_failed';
-  }
-}
-
 function normalizeReason(value: unknown) {
-  const raw = errorMessage(value);
+  let raw: string;
+
+  if (value instanceof Error) raw = value.message;
+  else if (typeof value === 'string') raw = value;
+  else {
+    try {
+      raw = JSON.stringify(value);
+    } catch {
+      raw = 'telegram_status_failed';
+    }
+  }
+
   return raw.length > 900 ? `${raw.slice(0, 900)}...` : raw;
 }
 
@@ -65,10 +49,7 @@ async function findAuthUserByEmail(
   email: string,
 ) {
   for (let page = 1; page <= 20; page += 1) {
-    const { data, error } = await admin.auth.admin.listUsers({
-      page,
-      perPage: 1000,
-    });
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
 
     if (error) throw error;
 
@@ -83,23 +64,12 @@ async function findAuthUserByEmail(
   return null;
 }
 
-async function findAuthUserByTelegramEmail(
-  admin: ReturnType<typeof createSupabaseAdminClient>,
-  telegramId: number,
-) {
-  const primaryEmail = telegramEmail(telegramId);
-  const legacyEmail = legacyTelegramEmail(telegramId);
-
-  return (
-    (await findAuthUserByEmail(admin, primaryEmail)) ??
-    (await findAuthUserByEmail(admin, legacyEmail))
-  );
-}
-
 async function getAuthUserById(
   admin: ReturnType<typeof createSupabaseAdminClient>,
-  userId: string,
+  userId?: string | null,
 ) {
+  if (!userId) return null;
+
   try {
     const { data, error } = await admin.auth.admin.getUserById(userId);
     if (error || !data.user) return null;
@@ -109,132 +79,89 @@ async function getAuthUserById(
   }
 }
 
-function sessionToTokenResponse(session: Session): TokenResponse {
-  return {
-    access_token: session.access_token,
-    refresh_token: session.refresh_token,
-    expires_in: session.expires_in ?? 3600,
-    token_type: session.token_type,
-    user: session.user,
-  };
+async function findTelegramAuthUser(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  telegramId: number,
+  accountUserId?: string | null,
+) {
+  return (
+    (await getAuthUserById(admin, accountUserId)) ??
+    (await findAuthUserByEmail(admin, telegramEmail(telegramId))) ??
+    (await findAuthUserByEmail(admin, legacyTelegramEmail(telegramId)))
+  );
 }
 
-async function signInWithPasswordRest(email: string, password: string) {
-  const publishableKey = getSupabasePublishableKey();
+async function ensureTelegramAuthUser(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  telegramId: number;
+  accountUserId?: string | null;
+  username?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  photoUrl?: string | null;
+}) {
+  const email = telegramEmail(params.telegramId);
+  const password = randomBytes(48).toString('hex');
+  const userMetadata = {
+    provider: 'telegram',
+    telegram_id: params.telegramId,
+    telegram_username: params.username ?? null,
+    telegram_first_name: params.firstName ?? null,
+    telegram_last_name: params.lastName ?? null,
+    telegram_photo_url: params.photoUrl ?? null,
+  };
 
-  const response = await fetch(`${getSupabaseUrl()}/auth/v1/token?grant_type=password`, {
-    method: 'POST',
-    headers: {
-      apikey: publishableKey,
-      Authorization: `Bearer ${publishableKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
+  const existing = await findTelegramAuthUser(
+    params.admin,
+    params.telegramId,
+    params.accountUserId,
+  );
+
+  if (existing) {
+    const updatePayload: Parameters<typeof params.admin.auth.admin.updateUserById>[1] = {
+      user_metadata: userMetadata,
+      app_metadata: {
+        provider: 'telegram',
+        providers: ['telegram'],
+      },
+    };
+
+    // Do not force email change for old users. It can fail if Supabase still has
+    // a legacy synthetic address. The app session only needs the stable user id.
+    const { data, error } = await params.admin.auth.admin.updateUserById(
+      existing.id,
+      updatePayload,
+    );
+
+    if (error) {
+      // Metadata update is not critical for login. Keep the stable user id.
+      console.warn('[telegram-status] user metadata update skipped', error.message);
+    }
+
+    return (data?.user ?? existing) as User;
+  }
+
+  const { data: createdUser, error: createUserError } =
+    await params.admin.auth.admin.createUser({
       email,
       password,
-    }),
-    cache: 'no-store',
-  });
+      email_confirm: true,
+      user_metadata: userMetadata,
+      app_metadata: {
+        provider: 'telegram',
+        providers: ['telegram'],
+      },
+    });
 
-  if (!response.ok) {
-    const text = await response.text().catch(() => '');
-    throw new Error(`password_rest_failed:${text || response.statusText}`);
+  if (createUserError || !createdUser.user) {
+    // Rare race: user may have been created between listUsers and createUser.
+    const racedUser = await findTelegramAuthUser(params.admin, params.telegramId);
+    if (racedUser) return racedUser;
+
+    throw createUserError ?? new Error('telegram_user_create_failed');
   }
 
-  return (await response.json()) as TokenResponse;
-}
-
-async function signInWithPasswordClient(email: string, password: string) {
-  const publicClient = createSupabaseClient(getSupabaseUrl(), getSupabasePublishableKey(), {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-      detectSessionInUrl: false,
-    },
-  });
-
-  const { data, error } = await publicClient.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error || !data.session) {
-    throw new Error(`password_client_failed:${error?.message ?? 'session_missing'}`);
-  }
-
-  return sessionToTokenResponse(data.session);
-}
-
-async function signInWithGeneratedMagicLink(
-  admin: ReturnType<typeof createSupabaseAdminClient>,
-  email: string,
-  redirectTo: string,
-) {
-  const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
-    type: 'magiclink',
-    email,
-    options: {
-      redirectTo,
-    },
-  });
-
-  if (linkError) {
-    throw new Error(`magiclink_generate_failed:${linkError.message}`);
-  }
-
-  const tokenHash = linkData.properties?.hashed_token;
-
-  if (!tokenHash) {
-    throw new Error('magiclink_generate_failed:hashed_token_missing');
-  }
-
-  const publicClient = createSupabaseClient(getSupabaseUrl(), getSupabasePublishableKey(), {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-      detectSessionInUrl: false,
-    },
-  });
-
-  const { data, error } = await publicClient.auth.verifyOtp({
-    type: 'magiclink',
-    token_hash: tokenHash,
-  });
-
-  if (error || !data.session) {
-    throw new Error(`magiclink_verify_failed:${error?.message ?? 'session_missing'}`);
-  }
-
-  return sessionToTokenResponse(data.session);
-}
-
-async function createSessionForTelegramUser(params: {
-  admin: ReturnType<typeof createSupabaseAdminClient>;
-  email: string;
-  password: string;
-  redirectTo: string;
-}) {
-  const reasons: string[] = [];
-
-  try {
-    return await signInWithPasswordRest(params.email, params.password);
-  } catch (error) {
-    reasons.push(normalizeReason(error));
-  }
-
-  try {
-    return await signInWithPasswordClient(params.email, params.password);
-  } catch (error) {
-    reasons.push(normalizeReason(error));
-  }
-
-  try {
-    return await signInWithGeneratedMagicLink(params.admin, params.email, params.redirectTo);
-  } catch (error) {
-    reasons.push(normalizeReason(error));
-  }
-
-  throw new Error(`telegram_session_create_failed:${reasons.join(' | ')}`);
+  return createdUser.user;
 }
 
 export async function GET(request: Request) {
@@ -293,8 +220,24 @@ export async function GET(request: Request) {
     }
 
     const telegramId = Number(loginRequest.telegram_id);
-    const email = telegramEmail(telegramId);
-    const password = randomBytes(48).toString('hex');
+
+    const { data: existingAccount, error: accountError } = await admin
+      .from('sloty_telegram_accounts')
+      .select('user_id')
+      .eq('telegram_id', telegramId)
+      .maybeSingle();
+
+    if (accountError) throw accountError;
+
+    const user = await ensureTelegramAuthUser({
+      admin,
+      telegramId,
+      accountUserId: existingAccount?.user_id as string | undefined,
+      username: loginRequest.username,
+      firstName: loginRequest.first_name,
+      lastName: loginRequest.last_name,
+      photoUrl: loginRequest.photo_url,
+    });
 
     const userMetadata = {
       provider: 'telegram',
@@ -305,58 +248,10 @@ export async function GET(request: Request) {
       telegram_photo_url: loginRequest.photo_url,
     };
 
-    const { data: existingAccount, error: accountError } = await admin
-      .from('sloty_telegram_accounts')
-      .select('user_id')
-      .eq('telegram_id', telegramId)
-      .maybeSingle();
-
-    if (accountError) throw accountError;
-
-    let userId = existingAccount?.user_id as string | undefined;
-    let user = userId ? await getAuthUserById(admin, userId) : null;
-
-    if (!user) {
-      user = await findAuthUserByTelegramEmail(admin, telegramId);
-      userId = user?.id;
-    }
-
-    if (userId) {
-      const { error: updateUserError } = await admin.auth.admin.updateUserById(userId, {
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: userMetadata,
-        app_metadata: {
-          provider: 'telegram',
-          providers: ['telegram'],
-        },
-      });
-
-      if (updateUserError) throw updateUserError;
-    } else {
-      const { data: createdUser, error: createUserError } = await admin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: userMetadata,
-        app_metadata: {
-          provider: 'telegram',
-          providers: ['telegram'],
-        },
-      });
-
-      if (createUserError || !createdUser.user) {
-        throw createUserError ?? new Error('telegram_user_create_failed');
-      }
-
-      userId = createdUser.user.id;
-    }
-
     const { error: upsertError } = await admin.from('sloty_telegram_accounts').upsert(
       {
         telegram_id: telegramId,
-        user_id: userId,
+        user_id: user.id,
         username: loginRequest.username,
         first_name: loginRequest.first_name,
         last_name: loginRequest.last_name,
@@ -365,19 +260,10 @@ export async function GET(request: Request) {
         metadata: userMetadata,
         updated_at: new Date().toISOString(),
       },
-      {
-        onConflict: 'telegram_id',
-      },
+      { onConflict: 'telegram_id' },
     );
 
     if (upsertError) throw upsertError;
-
-    const tokenPayload = await createSessionForTelegramUser({
-      admin,
-      email,
-      password,
-      redirectTo: `${getAppOrigin(request)}/auth/callback?next=/dashboard`,
-    });
 
     await admin
       .from('sloty_telegram_login_requests')
@@ -388,16 +274,26 @@ export async function GET(request: Request) {
       })
       .eq('token', token);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       status: 'confirmed',
-      access_token: tokenPayload.access_token,
-      refresh_token: tokenPayload.refresh_token,
-      expires_in: tokenPayload.expires_in,
-      user: tokenPayload.user,
+      app_session: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        app_metadata: user.app_metadata,
+        user_metadata: user.user_metadata,
+      },
+    });
+
+    return setTelegramAppSessionCookie(response, {
+      userId: user.id,
+      telegramId,
+      username: loginRequest.username,
+      firstName: loginRequest.first_name,
+      lastName: loginRequest.last_name,
     });
   } catch (error) {
     const message = normalizeReason(error);
-
     console.error('[telegram-status]', message);
 
     return NextResponse.json({ status: 'error', error: message }, { status: 500 });

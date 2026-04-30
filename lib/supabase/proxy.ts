@@ -3,11 +3,38 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabasePublishableKey, getSupabaseUrl } from '@/lib/supabase/env';
 
 const PROTECTED_PREFIXES = ['/dashboard', '/create-profile'];
+const APP_SESSION_COOKIE = 'clickbook_auth_session';
 
 function isProtectedPath(pathname: string) {
   return PROTECTED_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
+}
+
+function decodeBase64Url(value: string) {
+  try {
+    const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(
+      normalized.length + ((4 - (normalized.length % 4)) % 4),
+      '=',
+    );
+    return JSON.parse(atob(padded)) as { sub?: string; exp?: number };
+  } catch {
+    return null;
+  }
+}
+
+function hasLikelyActiveAppSession(request: NextRequest) {
+  const raw = request.cookies.get(APP_SESSION_COOKIE)?.value;
+  if (!raw) return false;
+
+  const payloadPart = raw.split('.')[0];
+  if (!payloadPart) return false;
+
+  const payload = decodeBase64Url(payloadPart);
+  if (!payload?.sub || !payload.exp) return false;
+
+  return payload.exp > Math.floor(Date.now() / 1000);
 }
 
 export async function updateSession(request: NextRequest) {
@@ -46,16 +73,18 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const hasAppSession = hasLikelyActiveAppSession(request);
+  const isAuthed = Boolean(user || hasAppSession);
   const { pathname, search } = request.nextUrl;
 
-  if (!user && isProtectedPath(pathname)) {
+  if (!isAuthed && isProtectedPath(pathname)) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = '/login';
     redirectUrl.searchParams.set('redirectTo', `${pathname}${search}`);
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (user && pathname === '/login') {
+  if (isAuthed && pathname === '/login') {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = '/dashboard';
     redirectUrl.search = '';

@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { createClient as createSupabaseClient, type User } from '@supabase/supabase-js';
 import { createClient as createServerSupabaseClient } from '@/lib/supabase/server';
 import { getSupabasePublishableKey, getSupabaseUrl } from '@/lib/supabase/env';
+import { getTelegramAppSessionUser } from '@/lib/server/app-session';
 
 function parseBearerToken(value: string | null) {
   if (!value) return null;
@@ -53,6 +54,12 @@ export async function requireAuthUser(): Promise<User> {
     if (!tokenError && tokenData.user) {
       return tokenData.user;
     }
+  }
+
+  const telegramUser = await getTelegramAppSessionUser();
+
+  if (telegramUser) {
+    return telegramUser;
   }
 
   throw new Error('unauthorized');
