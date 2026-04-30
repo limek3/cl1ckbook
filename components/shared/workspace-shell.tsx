@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type ReactNode,
 } from 'react';
 import Link from 'next/link';
@@ -19,6 +20,7 @@ import {
   Bug,
   CalendarClock,
   CalendarRange,
+  Check,
   CheckCircle2,
   ChevronRight,
   ExternalLink,
@@ -87,6 +89,8 @@ type ReportCategory = 'bug' | 'idea' | 'question';
 type ThemeOption = 'light' | 'dark' | 'system';
 type SidebarScope = 'main' | 'profile';
 
+const SIDEBAR_WIDTH = 344;
+
 const SHIMMER_CSS = [
   '@keyframes cb-robo-bubble-in {',
   '  0% { transform: translateY(5px) scale(0.96); opacity: 0; }',
@@ -113,6 +117,22 @@ const SHIMMER_CSS = [
   '  50% { opacity: 0.78; transform: scale(1.14); }',
   '}',
   '',
+  '@keyframes cb-faq-mark-spin {',
+  '  0%, 76% { transform: rotate(0deg) scale(1); }',
+  '  82% { transform: rotate(28deg) scale(1.04); }',
+  '  88% { transform: rotate(-22deg) scale(1.06); }',
+  '  94% { transform: rotate(180deg) scale(1.06); }',
+  '  100% { transform: rotate(360deg) scale(1); }',
+  '}',
+  '',
+  '@keyframes cb-settings-gear-spin {',
+  '  0%, 78% { transform: rotate(0deg) scale(1); }',
+  '  84% { transform: rotate(20deg) scale(1.04); }',
+  '  89% { transform: rotate(-16deg) scale(1.05); }',
+  '  94% { transform: rotate(90deg) scale(1.05); }',
+  '  100% { transform: rotate(0deg) scale(1); }',
+  '}',
+  '',
   '.cb-robo-soft-glow {',
   '  animation: cb-robo-soft-pulse 3.8s ease-in-out infinite;',
   '}',
@@ -134,6 +154,18 @@ const SHIMMER_CSS = [
   '  animation: cb-robo-dot-three 1.25s ease-in-out infinite;',
   '  animation-delay: 240ms;',
   '}',
+  '',
+  '.cb-faq-mark {',
+  '  display: inline-flex;',
+  '  transform-origin: center;',
+  '  animation: cb-faq-mark-spin 4.8s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;',
+  '}',
+  '',
+  '.cb-settings-gear {',
+  '  display: inline-flex;',
+  '  transform-origin: center;',
+  '  animation: cb-settings-gear-spin 5.6s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;',
+  '}',
 ].join('\n');
 
 function getPathOnly(href: string) {
@@ -149,6 +181,19 @@ function isActive(pathname: string, href: string, exact = false) {
   return pathname === cleanHref || pathname.startsWith(cleanHref + '/');
 }
 
+function footerTriggerClass(open = false) {
+  return cn(
+    'group relative flex h-[44px] w-full items-center gap-2.5 rounded-[11px] border px-3 text-left',
+    'border-black/[0.07] bg-black/[0.022] text-black/68 backdrop-blur-[18px]',
+    'transition-[border-color,background-color,color,transform,box-shadow] duration-200 active:scale-[0.985]',
+    'hover:border-black/[0.12] hover:bg-black/[0.04] hover:text-black hover:shadow-[0_10px_30px_rgba(15,15,15,0.06)]',
+    'dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/64',
+    'dark:hover:border-white/[0.14] dark:hover:bg-white/[0.065] dark:hover:text-white dark:hover:shadow-[0_16px_44px_rgba(0,0,0,0.32)]',
+    open &&
+      'border-black/[0.14] bg-[#fbfbfa] text-black dark:border-white/[0.16] dark:bg-white/[0.085] dark:text-white',
+  );
+}
+
 function ActiveDot({ className }: { className?: string }) {
   return (
     <span
@@ -157,15 +202,6 @@ function ActiveDot({ className }: { className?: string }) {
         'absolute bottom-[1px] left-1/2 h-[3px] w-[3px] -translate-x-1/2 rounded-full bg-black dark:bg-white',
         className,
       )}
-    />
-  );
-}
-
-function SoftDivider() {
-  return (
-    <span
-      aria-hidden="true"
-      className="h-4 w-px shrink-0 bg-black/[0.075] dark:bg-white/[0.08]"
     />
   );
 }
@@ -591,7 +627,7 @@ function DropdownSurface({
           ? 'pointer-events-auto translate-y-0 scale-100 opacity-100'
           : 'pointer-events-none translate-y-1.5 scale-[0.98] opacity-0',
       )}
-      style={{ width }}
+      style={{ width, maxWidth: 'calc(100vw - 24px)' }}
     >
       {children}
     </div>
@@ -628,7 +664,87 @@ function DropdownHeader({
   );
 }
 
-function SettingsMenu({ locale }: { locale: 'ru' | 'en' }) {
+function ThemeIconInline({ value }: { value: ThemeOption }) {
+  if (value === 'light') {
+    return <SunMedium className="size-[12.5px] stroke-[1.85]" />;
+  }
+
+  if (value === 'dark') {
+    return <Moon className="size-[12.5px] stroke-[1.85]" />;
+  }
+
+  return <MonitorSmartphone className="size-[12.5px] stroke-[1.85]" />;
+}
+
+function SettingsOptionRow({
+  active,
+  icon,
+  label,
+  hint,
+  onClick,
+}: {
+  active: boolean;
+  icon: ReactNode;
+  label: string;
+  hint: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'group flex w-full items-center justify-between gap-3 rounded-[10px] px-2.5 py-2 text-left outline-none',
+        'transition-[background-color,color,transform] duration-150 active:scale-[0.99]',
+        active
+          ? 'bg-black/[0.055] text-black dark:bg-white/[0.075] dark:text-white'
+          : 'text-black/62 hover:bg-black/[0.04] hover:text-black dark:text-white/56 dark:hover:bg-white/[0.06] dark:hover:text-white',
+      )}
+      role="menuitemradio"
+      aria-checked={active}
+    >
+      <span className="flex min-w-0 items-center gap-2.5">
+        <span
+          className={cn(
+            'flex size-7 shrink-0 items-center justify-center rounded-[9px] border transition',
+            active
+              ? 'border-black/[0.08] bg-[#fbfbfa] text-black dark:border-white/[0.10] dark:bg-white/[0.09] dark:text-white'
+              : 'border-black/[0.06] bg-black/[0.025] text-black/42 group-hover:text-black/68 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-white/40 dark:group-hover:text-white/70',
+          )}
+        >
+          {icon}
+        </span>
+
+        <span className="min-w-0">
+          <span className="block truncate text-[11.5px] font-semibold leading-none tracking-[-0.025em]">
+            {label}
+          </span>
+
+          <span className="mt-1 block truncate text-[9.5px] font-medium leading-none text-black/38 dark:text-white/30">
+            {hint}
+          </span>
+        </span>
+      </span>
+
+      <span
+        className={cn(
+          'flex size-5 shrink-0 items-center justify-center rounded-full transition',
+          active ? 'text-black dark:text-white' : 'text-transparent',
+        )}
+      >
+        <Check className="size-[13.5px] stroke-[2.2]" />
+      </span>
+    </button>
+  );
+}
+
+function SettingsMenu({
+  locale,
+  className,
+}: {
+  locale: 'ru' | 'en';
+  className?: string;
+}) {
   const { locale: currentLocale, setLocale } = useLocale();
   const { theme, setTheme } = useTheme();
 
@@ -662,152 +778,276 @@ function SettingsMenu({ locale }: { locale: 'ru' | 'en' }) {
     };
   }, [open]);
 
+  const safeLocale: 'ru' | 'en' = currentLocale === 'en' ? 'en' : 'ru';
   const currentTheme = mounted ? ((theme || 'system') as ThemeOption) : 'system';
 
   const labels =
     locale === 'ru'
       ? {
           title: 'Настройки',
-          subtitle: 'Язык и тема интерфейса',
+          subtitle: 'Тема и язык кабинета',
           button: 'Настройки',
           language: 'Язык',
           theme: 'Тема',
-          light: 'Свет',
+          light: 'Светлая',
           dark: 'Тёмная',
           system: 'Авто',
+          lightHint: 'Всегда светлый интерфейс',
+          darkHint: 'Всегда тёмный интерфейс',
+          systemHint: 'Как в настройках устройства',
+          russian: 'Русский',
+          english: 'English',
+          russianHint: 'Интерфейс на русском',
+          englishHint: 'Интерфейс на английском',
+          signOut: 'Выйти',
+          signOutHint: 'Завершить текущую сессию',
         }
       : {
           title: 'Settings',
-          subtitle: 'Language and interface theme',
+          subtitle: 'Theme and workspace language',
           button: 'Settings',
           language: 'Language',
           theme: 'Theme',
           light: 'Light',
           dark: 'Dark',
           system: 'Auto',
+          lightHint: 'Always use light mode',
+          darkHint: 'Always use dark mode',
+          systemHint: 'Follow device settings',
+          russian: 'Русский',
+          english: 'English',
+          russianHint: 'Russian interface',
+          englishHint: 'English interface',
+          signOut: 'Sign out',
+          signOutHint: 'End current session',
         };
 
   const themeOptions: Array<{
     value: ThemeOption;
     label: string;
+    hint: string;
+    shortLabel: string;
     icon: ReactNode;
   }> = [
     {
       value: 'light',
       label: labels.light,
-      icon: <SunMedium className="size-[13.5px] stroke-[1.75]" />,
+      hint: labels.lightHint,
+      shortLabel: labels.light,
+      icon: <SunMedium className="size-[13.5px] stroke-[1.85]" />,
     },
     {
       value: 'dark',
       label: labels.dark,
-      icon: <Moon className="size-[13.5px] stroke-[1.75]" />,
+      hint: labels.darkHint,
+      shortLabel: labels.dark,
+      icon: <Moon className="size-[13.5px] stroke-[1.85]" />,
     },
     {
       value: 'system',
       label: labels.system,
-      icon: <MonitorSmartphone className="size-[13.5px] stroke-[1.75]" />,
+      hint: labels.systemHint,
+      shortLabel: labels.system,
+      icon: <MonitorSmartphone className="size-[13.5px] stroke-[1.85]" />,
     },
   ];
 
+  const languageOptions: Array<{
+    value: 'ru' | 'en';
+    label: string;
+    hint: string;
+    badge: string;
+  }> = [
+    {
+      value: 'ru',
+      label: labels.russian,
+      hint: labels.russianHint,
+      badge: 'RU',
+    },
+    {
+      value: 'en',
+      label: labels.english,
+      hint: labels.englishHint,
+      badge: 'EN',
+    },
+  ];
+
+  const activeTheme =
+    themeOptions.find((option) => option.value === currentTheme) ??
+    themeOptions[2];
+
+  const activeLanguage =
+    languageOptions.find((option) => option.value === safeLocale) ??
+    languageOptions[0];
+
   return (
-    <div ref={rootRef} className="relative shrink-0">
+    <div ref={rootRef} className={cn('relative', className)}>
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
+        aria-haspopup="menu"
         aria-label={labels.button}
         title={labels.button}
-        className={cn(
-          'relative flex size-8 items-center justify-center rounded-none bg-transparent p-0',
-          'text-black/42 transition-[color,opacity,transform] duration-200',
-          'hover:bg-transparent hover:text-black/78 active:scale-[0.96]',
-          'dark:text-white/42 dark:hover:bg-transparent dark:hover:text-white/82',
-          open && 'text-black dark:text-white',
-        )}
+        className={footerTriggerClass(open)}
       >
-        <Settings2 className="size-[15px] stroke-[1.8]" />
-        {open ? <ActiveDot /> : null}
+        <span
+          className={cn(
+            'flex size-8 shrink-0 items-center justify-center rounded-[9px] border',
+            'border-black/[0.07] bg-black/[0.04] text-black/54',
+            'dark:border-white/[0.08] dark:bg-white/[0.055] dark:text-white/52',
+            open && 'text-black dark:text-white',
+          )}
+        >
+          <Settings2 className="cb-settings-gear size-[14px] stroke-[1.9]" />
+        </span>
+
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[10.5px] font-semibold leading-none tracking-[-0.025em]">
+            {labels.title}
+          </span>
+          <span className="mt-1 block truncate text-[9px] leading-none text-black/40 dark:text-white/32">
+            {activeLanguage.badge} · {activeTheme.shortLabel}
+          </span>
+        </span>
+
+        <ChevronRight
+          className={cn(
+            'size-3 shrink-0 text-black/30 transition-transform duration-200 dark:text-white/30',
+            open && '-rotate-90 text-black/56 dark:text-white/58',
+          )}
+        />
       </button>
 
-      <DropdownSurface open={open} width={258}>
-        <DropdownHeader
-          icon={<Settings2 className="size-3.5" />}
-          title={labels.title}
-          subtitle={labels.subtitle}
-        />
+      <DropdownSurface open={open} width={420}>
+        <div className="px-2.5 pb-2 pt-2">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[12.5px] font-semibold leading-none tracking-[-0.04em] text-black dark:text-white">
+                {labels.title}
+              </div>
+              <div className="mt-1.5 truncate text-[10px] font-medium leading-none text-black/42 dark:text-white/32">
+                {labels.subtitle}
+              </div>
+            </div>
 
-        <DropdownDivider />
-
-        <div className="px-2.5 py-2.5">
-          <div className="mb-2 flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-black/34 dark:text-white/26">
-            <Languages className="size-3" />
-            {labels.language}
-          </div>
-
-          <div className="flex h-8 items-center gap-5">
-            {(['ru', 'en'] as const).map((value) => {
-              const active = currentLocale === value;
-
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setLocale(value)}
-                  className={cn(
-                    'relative flex h-8 items-center justify-center rounded-none bg-transparent px-0.5',
-                    'text-[10.5px] font-semibold tracking-[0.08em] transition active:scale-[0.96]',
-                    active
-                      ? 'text-black dark:text-white'
-                      : 'text-black/36 hover:text-black/78 dark:text-white/34 dark:hover:text-white/82',
-                  )}
-                >
-                  {value.toUpperCase()}
-                  {active ? <ActiveDot /> : null}
-                </button>
-              );
-            })}
+            <div
+              className={cn(
+                'flex h-7 shrink-0 items-center gap-1 rounded-[9px] border px-2',
+                'border-black/[0.07] bg-black/[0.025] text-black/52',
+                'dark:border-white/[0.08] dark:bg-white/[0.045] dark:text-white/54',
+              )}
+            >
+              <span className="text-[9.5px] font-bold tracking-[0.08em]">
+                {activeLanguage.badge}
+              </span>
+              <span className="h-3 w-px bg-black/[0.10] dark:bg-white/[0.12]" />
+              <ThemeIconInline value={currentTheme} />
+            </div>
           </div>
         </div>
 
         <DropdownDivider />
 
-        <div className="px-2.5 py-2.5">
-          <div className="mb-2 flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-black/34 dark:text-white/26">
-            <SunMedium className="size-3" />
-            {labels.theme}
-          </div>
+        <div className="grid gap-1 px-1.5 py-1.5 sm:grid-cols-2">
+          <div>
+            <div className="mb-1.5 flex items-center gap-1.5 px-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-black/34 dark:text-white/26">
+              <SunMedium className="size-3" />
+              {labels.theme}
+            </div>
 
-          <div className="flex h-8 items-center gap-5">
-            {themeOptions.map((option) => {
-              const active = currentTheme === option.value;
-
-              return (
-                <button
+            <div className="grid gap-0.5">
+              {themeOptions.map((option) => (
+                <SettingsOptionRow
                   key={option.value}
-                  type="button"
-                  onClick={() => setTheme(option.value)}
-                  className={cn(
-                    'relative flex h-8 items-center justify-center gap-1.5 rounded-none bg-transparent px-0.5',
-                    'text-[10.5px] font-medium transition active:scale-[0.96]',
-                    active
-                      ? 'text-black dark:text-white'
-                      : 'text-black/36 hover:text-black/78 dark:text-white/34 dark:hover:text-white/82',
-                  )}
-                >
-                  {option.icon}
-                  <span>{option.label}</span>
-                  {active ? <ActiveDot /> : null}
-                </button>
-              );
-            })}
+                  active={currentTheme === option.value}
+                  icon={option.icon}
+                  label={option.label}
+                  hint={option.hint}
+                  onClick={() => {
+                    setTheme(option.value);
+                    setOpen(false);
+                  }}
+                />
+              ))}
+            </div>
           </div>
+
+          <div>
+            <div className="mb-1.5 flex items-center gap-1.5 px-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-black/34 dark:text-white/26">
+              <Languages className="size-3" />
+              {labels.language}
+            </div>
+
+            <div className="grid gap-0.5">
+              {languageOptions.map((option) => (
+                <SettingsOptionRow
+                  key={option.value}
+                  active={safeLocale === option.value}
+                  icon={
+                    <span className="text-[9.5px] font-bold leading-none tracking-[0.08em]">
+                      {option.badge}
+                    </span>
+                  }
+                  label={option.label}
+                  hint={option.hint}
+                  onClick={() => {
+                    setLocale(option.value);
+                    setOpen(false);
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <DropdownDivider />
+
+        <div className="p-1.5">
+          <Link
+            href="/auth/signout"
+            className={cn(
+              'group flex w-full items-center justify-between gap-3 rounded-[10px] px-2.5 py-2 text-left outline-none',
+              'transition-[background-color,color,transform] duration-150 active:scale-[0.99]',
+              'text-black/62 hover:bg-black/[0.04] hover:text-black dark:text-white/56 dark:hover:bg-white/[0.06] dark:hover:text-white',
+            )}
+          >
+            <span className="flex min-w-0 items-center gap-2.5">
+              <span
+                className={cn(
+                  'flex size-7 shrink-0 items-center justify-center rounded-[9px] border',
+                  'border-black/[0.06] bg-black/[0.025] text-black/42 group-hover:text-black/68',
+                  'dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-white/40 dark:group-hover:text-white/70',
+                )}
+              >
+                <LogOut className="size-[13.5px] stroke-[1.85]" />
+              </span>
+
+              <span className="min-w-0">
+                <span className="block truncate text-[11.5px] font-semibold leading-none tracking-[-0.025em]">
+                  {labels.signOut}
+                </span>
+                <span className="mt-1 block truncate text-[9.5px] font-medium leading-none text-black/38 dark:text-white/30">
+                  {labels.signOutHint}
+                </span>
+              </span>
+            </span>
+
+            <ChevronRight className="size-3 shrink-0 opacity-40 transition group-hover:opacity-70" />
+          </Link>
         </div>
       </DropdownSurface>
     </div>
   );
 }
 
-function HelpMenu({ locale }: { locale: 'ru' | 'en' }) {
+function HelpMenu({
+  locale,
+  className,
+}: {
+  locale: 'ru' | 'en';
+  className?: string;
+}) {
   const pathname = usePathname();
 
   const [open, setOpen] = useState(false);
@@ -853,8 +1093,8 @@ function HelpMenu({ locale }: { locale: 'ru' | 'en' }) {
   const labels =
     locale === 'ru'
       ? {
-          title: 'Помощь',
-          subtitle: 'Поддержка, репорты и быстрые ответы',
+          title: 'FAQ',
+          subtitle: 'Быстрые ответы и поддержка',
           button: 'FAQ',
           back: 'Назад',
           contact: 'Связаться с поддержкой',
@@ -873,7 +1113,9 @@ function HelpMenu({ locale }: { locale: 'ru' | 'en' }) {
           sent: 'Сообщение отправлено',
           sentHint: 'Поддержка получила сообщение в Telegram.',
           reportValidation: 'Опишите ситуацию чуть подробнее.',
-          reportError: 'Не удалось отправить сообщение. Проверьте настройки Telegram API.',
+          reportError:
+            'Не удалось отправить сообщение. Проверьте настройки Telegram API.',
+          quickLabel: 'Быстрые ответы',
           categories: {
             bug: 'Ошибка',
             idea: 'Идея',
@@ -883,8 +1125,8 @@ function HelpMenu({ locale }: { locale: 'ru' | 'en' }) {
           faqSubtitle: 'Короткие подсказки по кабинету.',
         }
       : {
-          title: 'Help',
-          subtitle: 'Support, reports, and quick answers',
+          title: 'FAQ',
+          subtitle: 'Quick help and support',
           button: 'FAQ',
           back: 'Back',
           contact: 'Contact support',
@@ -894,7 +1136,8 @@ function HelpMenu({ locale }: { locale: 'ru' | 'en' }) {
           faq: 'Knowledge base',
           faqHint: 'Platform guides',
           reportTitle: 'Send a support message',
-          reportSubtitle: 'Describe the situation — it will be sent to support in Telegram.',
+          reportSubtitle:
+            'Describe the situation — it will be sent to support in Telegram.',
           reportPlaceholder:
             'For example: profile description is not saved, button does not work, demo theme resets...',
           contactPlaceholder: 'Telegram / phone / email for reply',
@@ -904,6 +1147,7 @@ function HelpMenu({ locale }: { locale: 'ru' | 'en' }) {
           sentHint: 'Message was sent to Telegram.',
           reportValidation: 'Describe the issue in more detail.',
           reportError: 'Could not send. Check API route and env.',
+          quickLabel: 'Quick help',
           categories: {
             bug: 'Bug',
             idea: 'Idea',
@@ -1069,22 +1313,42 @@ function HelpMenu({ locale }: { locale: 'ru' | 'en' }) {
   ];
 
   return (
-    <div ref={rootRef} className="relative shrink-0">
+    <div ref={rootRef} className={cn('relative', className)}>
       <button
         type="button"
         onClick={openMenu}
         aria-expanded={open}
-        className={cn(
-          'relative flex h-8 items-center justify-center rounded-none bg-transparent px-1',
-          'text-[10.5px] font-semibold tracking-[-0.02em]',
-          'text-black/42 transition-[color,opacity,transform] duration-200',
-          'hover:bg-transparent hover:text-black/78 active:scale-[0.96]',
-          'dark:text-white/42 dark:hover:bg-transparent dark:hover:text-white/82',
-          open && 'text-black dark:text-white',
-        )}
+        aria-haspopup="menu"
+        aria-label={labels.button}
+        title={labels.button}
+        className={footerTriggerClass(open)}
       >
-        <span>FAQ</span>
-        {open ? <ActiveDot /> : null}
+        <span
+          className={cn(
+            'flex size-8 shrink-0 items-center justify-center rounded-[9px] border',
+            'border-black/[0.07] bg-black/[0.04] text-black/54',
+            'dark:border-white/[0.08] dark:bg-white/[0.055] dark:text-white/52',
+            open && 'text-black dark:text-white',
+          )}
+        >
+          <span className="cb-faq-mark text-[13px] font-bold leading-none">?</span>
+        </span>
+
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[10.5px] font-semibold leading-none tracking-[-0.025em]">
+            {labels.title}
+          </span>
+          <span className="mt-1 block truncate text-[9px] leading-none text-black/40 dark:text-white/32">
+            {labels.quickLabel}
+          </span>
+        </span>
+
+        <ChevronRight
+          className={cn(
+            'size-3 shrink-0 text-black/30 transition-transform duration-200 dark:text-white/30',
+            open && '-rotate-90 text-black/56 dark:text-white/58',
+          )}
+        />
       </button>
 
       <DropdownSurface open={open} width={252}>
@@ -1162,26 +1426,28 @@ function HelpMenu({ locale }: { locale: 'ru' | 'en' }) {
 
             <div className="space-y-2 px-1.5 py-1.5">
               <div className="grid grid-cols-3 gap-1">
-                {(['bug', 'idea', 'question'] as ReportCategory[]).map((category) => {
-                  const active = reportCategory === category;
+                {(['bug', 'idea', 'question'] as ReportCategory[]).map(
+                  (category) => {
+                    const active = reportCategory === category;
 
-                  return (
-                    <button
-                      key={category}
-                      type="button"
-                      onClick={() => setReportCategory(category)}
-                      className={cn(
-                        'relative h-8 rounded-[9px] text-[10px] font-medium transition active:scale-[0.98]',
-                        active
-                          ? 'text-black dark:text-white'
-                          : 'text-black/40 hover:bg-black/[0.035] hover:text-black dark:text-white/34 dark:hover:bg-white/[0.055] dark:hover:text-white',
-                      )}
-                    >
-                      {labels.categories[category]}
-                      {active ? <ActiveDot /> : null}
-                    </button>
-                  );
-                })}
+                    return (
+                      <button
+                        key={category}
+                        type="button"
+                        onClick={() => setReportCategory(category)}
+                        className={cn(
+                          'relative h-8 rounded-[9px] text-[10px] font-medium transition active:scale-[0.98]',
+                          active
+                            ? 'text-black dark:text-white'
+                            : 'text-black/40 hover:bg-black/[0.035] hover:text-black dark:text-white/34 dark:hover:bg-white/[0.055] dark:hover:text-white',
+                        )}
+                      >
+                        {labels.categories[category]}
+                        {active ? <ActiveDot /> : null}
+                      </button>
+                    );
+                  },
+                )}
               </div>
 
               <textarea
@@ -1333,10 +1599,16 @@ function HelpMenu({ locale }: { locale: 'ru' | 'en' }) {
   );
 }
 
-function RoboFooterButton({ locale }: { locale: 'ru' | 'en' }) {
+function RoboFooterButton({
+  locale,
+  className,
+}: {
+  locale: 'ru' | 'en';
+  className?: string;
+}) {
   const label = locale === 'ru' ? 'Робо' : 'Robo';
   const title = locale === 'ru' ? 'Чем помочь?' : 'How can I help?';
-  const subtitle = locale === 'ru' ? 'записи, профиль, клиенты' : 'bookings, profile, clients';
+  const subtitle = locale === 'ru' ? 'помощь по кабинету' : 'workspace help';
 
   const handleOpenRobo = () => {
     window.dispatchEvent(new CustomEvent('clickbook:open-robo'));
@@ -1352,10 +1624,7 @@ function RoboFooterButton({ locale }: { locale: 'ru' | 'en' }) {
     <button
       type="button"
       onClick={handleOpenRobo}
-      className={cn(
-        'group relative flex h-8 items-center justify-center rounded-none bg-transparent px-0',
-        'transition-[opacity,transform] duration-200 active:scale-[0.96]',
-      )}
+      className={cn('group relative', className)}
       aria-label={label}
       title={label}
     >
@@ -1419,23 +1688,38 @@ function RoboFooterButton({ locale }: { locale: 'ru' | 'en' }) {
         </span>
       </span>
 
-      <span
-        className={cn(
-          'relative flex h-7 items-center justify-center gap-1.5 overflow-hidden rounded-[10px] px-2.5',
-          'border border-black/[0.07] bg-black/[0.025] text-black/58 backdrop-blur-[18px]',
-          'transition-[border-color,background-color,color,box-shadow,transform] duration-200',
-          'hover:border-black/[0.13] hover:bg-black/[0.045] hover:text-black hover:shadow-[0_10px_30px_rgba(15,15,15,0.07)]',
-          'dark:border-white/[0.075] dark:bg-white/[0.045] dark:text-white/58',
-          'dark:hover:border-white/[0.14] dark:hover:bg-white/[0.075] dark:hover:text-white dark:hover:shadow-[0_16px_44px_rgba(0,0,0,0.36)]',
-        )}
-      >
-        <Bot className="relative z-10 size-[13.5px] shrink-0 stroke-[1.9]" />
+      <span className={cn(footerTriggerClass(false), 'justify-between')}>
+        <span className="flex min-w-0 items-center gap-2.5">
+          <span
+            className={cn(
+              'relative flex size-8 shrink-0 items-center justify-center rounded-[9px] border',
+              'border-black/[0.07] bg-black/[0.04] text-black/58',
+              'dark:border-white/[0.08] dark:bg-white/[0.055] dark:text-white/56',
+            )}
+          >
+            <Bot className="size-[14px] stroke-[1.9]" />
 
-        <span className="relative z-10 text-[10.5px] font-semibold leading-none tracking-[-0.035em]">
-          {label}
+            <span
+              aria-hidden="true"
+              className={cn(
+                'cb-robo-soft-glow absolute -right-[1px] -top-[1px] size-[4px] rounded-full',
+                'bg-black/55 shadow-[0_0_0_2px_rgba(251,251,250,0.9)]',
+                'dark:bg-white/72 dark:shadow-[0_0_0_2px_rgba(16,16,16,0.95)]',
+              )}
+            />
+          </span>
+
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[10.5px] font-semibold leading-none tracking-[-0.025em]">
+              {label}
+            </span>
+            <span className="mt-1 block truncate text-[9px] leading-none text-black/40 dark:text-white/32">
+              {subtitle}
+            </span>
+          </span>
         </span>
 
-        <span className="relative z-10 ml-0.5 flex items-end gap-[2px] pb-[2px]">
+        <span className="ml-2 flex items-end gap-[2px] pb-[1px] text-current/80">
           <span className="cb-robo-dot-1 size-[3px] rounded-full bg-current" />
           <span className="cb-robo-dot-2 size-[3px] rounded-full bg-current" />
           <span className="cb-robo-dot-3 size-[3px] rounded-full bg-current" />
@@ -1447,40 +1731,10 @@ function RoboFooterButton({ locale }: { locale: 'ru' | 'en' }) {
 
 function FooterActions({ locale }: { locale: 'ru' | 'en' }) {
   return (
-    <div className="flex h-8 items-center justify-between gap-2">
-      <div className="flex min-w-0 items-center gap-2">
-        <SettingsMenu locale={locale} />
-
-        <SoftDivider />
-
-        <HelpMenu locale={locale} />
-
-        <SoftDivider />
-
-        <RoboFooterButton locale={locale} />
-      </div>
-
-      <div className="flex shrink-0 items-center">
-        <Button
-          asChild
-          variant="ghost"
-          size="icon-sm"
-          className={cn(
-            'relative size-8 shrink-0 rounded-none border-0 bg-transparent p-0 shadow-none',
-            'text-black/42 transition-[color,opacity,transform] duration-200',
-            'hover:bg-transparent hover:text-black/78 active:scale-[0.96]',
-            'dark:text-white/42 dark:hover:bg-transparent dark:hover:text-white/82',
-          )}
-        >
-          <Link
-            href="/auth/signout"
-            aria-label={locale === 'ru' ? 'Выйти' : 'Sign out'}
-            title={locale === 'ru' ? 'Выйти' : 'Sign out'}
-          >
-            <LogOut className="size-[15px] stroke-[1.8]" />
-          </Link>
-        </Button>
-      </div>
+    <div className="grid grid-cols-2 gap-1.5">
+      <SettingsMenu locale={locale} />
+      <HelpMenu locale={locale} />
+      <RoboFooterButton locale={locale} className="col-span-2" />
     </div>
   );
 }
@@ -1576,7 +1830,7 @@ function SidebarContent({
 }) {
   return (
     <div className="flex h-full flex-col">
-      <div className="shrink-0 px-3 pb-3 pt-4">
+      <div className="shrink-0 px-4 pb-3 pt-4">
         <Link
           href={withDashboardDemoParam('/dashboard', selectedMode === 'demo')}
           onClick={onNavigate}
@@ -1609,7 +1863,7 @@ function SidebarContent({
         />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 pt-1 [scrollbar-width:thin]">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-3 pt-1 [scrollbar-width:thin]">
         {scope === 'profile' ? (
           <ProfileScopeContent
             groups={profileGroups}
@@ -1657,7 +1911,7 @@ function SidebarContent({
         )}
       </div>
 
-      <div className="shrink-0 px-3 py-3">
+      <div className="shrink-0 px-4 py-3">
         <FooterHairline />
         <FooterActions locale={locale} />
       </div>
@@ -1709,7 +1963,7 @@ function MobileSheet({
 
       <aside
         className={cn(
-          'absolute inset-y-0 left-0 w-[min(88vw,320px)] border-r border-black/[0.08] bg-[#f4f4f2] shadow-[0_24px_70px_rgba(15,23,42,0.22)] transition-transform duration-200 dark:border-white/[0.08] dark:bg-[#090909] dark:shadow-[0_28px_80px_rgba(0,0,0,0.55)]',
+          'absolute inset-y-0 left-0 w-[min(92vw,356px)] border-r border-black/[0.08] bg-[#f4f4f2] shadow-[0_24px_70px_rgba(15,23,42,0.22)] transition-transform duration-200 dark:border-white/[0.08] dark:bg-[#090909] dark:shadow-[0_28px_80px_rgba(0,0,0,0.55)]',
           open ? 'translate-x-0' : '-translate-x-full',
         )}
       >
@@ -1753,7 +2007,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
 
   useEffect(() => {
     document.documentElement.dataset.slotySidebar =
-      'linear-sidebar-minimal-v26-robo-blobs-footer-line';
+      'linear-sidebar-minimal-v27-footer-grid';
   }, []);
 
   useEffect(() => {
@@ -1769,6 +2023,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
   const profileBookings = ownedProfile
     ? getBookingsBySlug(ownedProfile.slug)
     : [];
+
   const newBookings = profileBookings.filter(
     (item) => item.status === 'new',
   ).length;
@@ -2209,10 +2464,16 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
   };
 
   return (
-    <div className="min-h-screen bg-[#f4f4f2] text-slate-950 dark:bg-[#090909] dark:text-white">
+    <div
+      className="min-h-screen bg-[#f4f4f2] text-slate-950 dark:bg-[#090909] dark:text-white"
+      style={{ '--sidebar-width': `${SIDEBAR_WIDTH}px` } as CSSProperties}
+    >
       <style dangerouslySetInnerHTML={{ __html: SHIMMER_CSS }} />
 
-      <aside className="cb-workspace-sidebar fixed inset-y-0 left-0 z-40 hidden w-[268px] border-r border-black/[0.07] bg-[#f4f4f2] dark:border-white/[0.07] dark:bg-[#090909] xl:block">
+      <aside
+        className="cb-workspace-sidebar fixed inset-y-0 left-0 z-40 hidden border-r border-black/[0.07] bg-[#f4f4f2] dark:border-white/[0.07] dark:bg-[#090909] xl:block"
+        style={{ width: SIDEBAR_WIDTH }}
+      >
         <SidebarContent {...sidebarProps} />
       </aside>
 
@@ -2228,7 +2489,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
 
       <main
         className={cn(
-          'cb-workspace-main min-h-screen pb-[88px] xl:pl-[268px] xl:pb-0',
+          'cb-workspace-main min-h-screen pb-[88px] xl:pb-0 xl:pl-[var(--sidebar-width)]',
           className,
         )}
         data-workspace-route={getPathOnly(pathname)}

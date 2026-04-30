@@ -1241,7 +1241,10 @@ export default function DashboardChatsPage() {
       setError(null);
 
       try {
-        const response = await fetch('/api/chats', { cache: 'no-store' });
+        const response = await fetch('/api/chats', {
+          credentials: 'include',
+          cache: 'no-store',
+        });
 
         if (!response.ok) {
           throw new Error('chat_fetch_failed');
@@ -1305,6 +1308,8 @@ export default function DashboardChatsPage() {
 
     await fetch('/api/chats', {
       method: 'PATCH',
+      credentials: 'include',
+      cache: 'no-store',
       headers: {
         'Content-Type': 'application/json',
       },
@@ -1337,6 +1342,8 @@ export default function DashboardChatsPage() {
       if (!demoMode) {
         fetch('/api/chats', {
           method: 'DELETE',
+          credentials: 'include',
+          cache: 'no-store',
           headers: {
             'Content-Type': 'application/json',
           },
@@ -1636,6 +1643,8 @@ export default function DashboardChatsPage() {
     try {
       const response = await fetch('/api/chats', {
         method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'thread', clientName, clientPhone, channel: 'Telegram' }),
       });
@@ -1694,6 +1703,8 @@ export default function DashboardChatsPage() {
     try {
       const response = await fetch('/api/chats', {
         method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'message',

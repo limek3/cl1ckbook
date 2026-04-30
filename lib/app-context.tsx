@@ -140,7 +140,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const refreshWorkspace = useCallback(async () => {
     try {
-      const response = await fetch('/api/workspace', { cache: 'no-store' });
+      const response = await fetch('/api/workspace', {
+        credentials: 'include',
+        cache: 'no-store',
+      });
 
       if (response.status === 401 || response.status === 404) {
         applySnapshot(null);
@@ -266,6 +269,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         const response = await fetch('/api/profile', {
           method: 'POST',
+          credentials: 'include',
+          cache: 'no-store',
           headers: {
             'Content-Type': 'application/json',
           },
@@ -329,6 +334,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         const response = await fetch('/api/bookings', {
           method: 'POST',
+          credentials: 'include',
+          cache: 'no-store',
           headers: {
             'Content-Type': 'application/json',
           },
@@ -386,6 +393,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         const response = await fetch('/api/workspace/section', {
           method: 'PATCH',
+          credentials: 'include',
+          cache: 'no-store',
           headers: {
             'Content-Type': 'application/json',
           },
@@ -424,6 +433,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         const response = await fetch('/api/bookings', {
           method: 'PATCH',
+          credentials: 'include',
+          cache: 'no-store',
           headers: {
             'Content-Type': 'application/json',
           },

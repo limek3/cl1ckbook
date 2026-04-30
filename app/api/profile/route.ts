@@ -11,6 +11,9 @@ import {
   updateWorkspace,
 } from '@/lib/server/supabase-workspaces';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function POST(request: Request) {
   try {
     const user = await requireAuthUser();
@@ -24,9 +27,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'profile_required' }, { status: 400 });
     }
 
-    const currentWorkspace = body.workspaceId
+    const ownedWorkspace = await fetchWorkspaceByOwner(user.id);
+    const requestedWorkspace = body.workspaceId
       ? await fetchWorkspaceById(body.workspaceId)
-      : await fetchWorkspaceByOwner(user.id);
+      : null;
+
+    if (requestedWorkspace?.ownerId && requestedWorkspace.ownerId !== user.id) {
+      return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+    }
+
+    const currentWorkspace = ownedWorkspace ?? requestedWorkspace;
+
+    if (body.workspaceId && currentWorkspace && body.workspaceId !== currentWorkspace.id) {
+      return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+    }
 
     await ensureUniqueSlug(body.profile.slug, currentWorkspace?.id ?? null);
 

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+
 import type { Booking } from '@/lib/types';
 import { requireAuthUser } from '@/lib/server/require-auth-user';
 import { createBookingRecord, listBookingsByWorkspace, updateBookingStatusRecord } from '@/lib/server/supabase-bookings';
@@ -13,6 +14,9 @@ import {
   fetchWorkspaceBySlug,
   updateWorkspace,
 } from '@/lib/server/supabase-workspaces';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 function buildClientBooking(masterSlug: string, values: Omit<Booking, 'id' | 'masterSlug' | 'status' | 'createdAt'>): Booking {
   return {

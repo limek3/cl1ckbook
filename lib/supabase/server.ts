@@ -10,11 +10,14 @@ export async function createClient() {
       getAll() {
         return cookieStore.getAll();
       },
-      setAll(cookiesToSet, _headers) {
+      setAll(cookiesToSet) {
         try {
-          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+          });
         } catch {
-          // Session refresh is handled in proxy.ts for server-rendered routes.
+          // Server Components cannot always mutate cookies.
+          // Route handlers and proxy.ts refresh the session cookies.
         }
       },
     },

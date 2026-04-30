@@ -1,6 +1,8 @@
-
 import { NextResponse } from 'next/server';
 import { fetchWorkspaceBySlug } from '@/lib/server/supabase-workspaces';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(
   _request: Request,

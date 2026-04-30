@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
+
 import { requireAuthUser } from '@/lib/server/require-auth-user';
 import { fetchWorkspaceByOwner, updateWorkspace } from '@/lib/server/supabase-workspaces';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function PATCH(request: Request) {
   try {

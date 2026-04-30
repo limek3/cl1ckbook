@@ -112,6 +112,8 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
       void updateWorkspaceSection('appearance', settings);
       void fetch('/api/appearance', {
         method: 'PATCH',
+        credentials: 'include',
+        cache: 'no-store',
         headers: {
           'Content-Type': 'application/json',
         },

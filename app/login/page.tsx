@@ -226,6 +226,8 @@ export default function LoginPage() {
           window.localStorage.setItem('klikbuk-last-login', email.trim());
         }
 
+        await supabase.auth.getSession();
+
         router.replace(redirectTo);
         router.refresh();
       }

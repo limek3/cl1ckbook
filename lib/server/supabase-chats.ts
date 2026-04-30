@@ -244,3 +244,12 @@ export async function createChatMessage(
   const rows = (await response.json()) as ChatMessageRow[];
   return rows[0] ? mapMessage(rows[0]) : null;
 }
+
+export async function deleteChatThread(workspaceId: string, threadId: string) {
+  await supabaseRestRequest(
+    `/rest/v1/sloty_chat_threads?id=eq.${encodeURIComponent(threadId)}&workspace_id=eq.${encodeURIComponent(workspaceId)}`,
+    {
+      method: 'DELETE',
+    },
+  );
+}
