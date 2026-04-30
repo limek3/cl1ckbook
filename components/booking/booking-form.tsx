@@ -21,6 +21,7 @@ import {
   Clock3,
   MessageSquareText,
   Search,
+  Send,
   Sparkles,
   UserRound,
   X,
@@ -822,13 +823,17 @@ function SuccessView({
   locale,
   embedded,
   onNew,
+  telegramUrl,
 }: {
   booking: Booking;
   labels: {
     successTitle: string;
     successDescription: string;
     newRequest: string;
+    telegramConfirm: string;
+    telegramConfirmHint: string;
   };
+  telegramUrl?: string | null;
   light: boolean;
   locale: string;
   embedded: boolean;
@@ -884,9 +889,33 @@ function SuccessView({
           )}
         </div>
 
+        {telegramUrl ? (
+          <a
+            href={telegramUrl}
+            target="_blank"
+            rel="noreferrer"
+            className={cn(
+              'mt-5 inline-flex h-10 w-full items-center justify-center gap-2 rounded-[10px] border px-4 text-[12px] font-semibold transition active:scale-[0.99]',
+              primaryButtonClass(light),
+            )}
+          >
+            <Send className="size-4" />
+            {labels.telegramConfirm}
+          </a>
+        ) : null}
+
+        {telegramUrl ? (
+          <p className={cn('mt-2 text-center text-[10.5px] leading-4', faintText(light))}>
+            {labels.telegramConfirmHint}
+          </p>
+        ) : null}
+
         <Button
           type="button"
-          className={cn('mt-5 w-full', primaryButtonClass(light))}
+          className={cn(
+            telegramUrl ? 'mt-3 w-full' : 'mt-5 w-full',
+            telegramUrl ? quietButtonClass(light) : primaryButtonClass(light),
+          )}
           onClick={onNew}
         >
           {labels.newRequest}
@@ -935,6 +964,7 @@ export function BookingForm({
   const [currentStep, setCurrentStep] = useState(0);
   const [serviceQuery, setServiceQuery] = useState('');
   const [submittedBooking, setSubmittedBooking] = useState<Booking | null>(null);
+  const [submittedTelegramUrl, setSubmittedTelegramUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -981,7 +1011,11 @@ export function BookingForm({
           back: 'Назад',
           submit: 'Отправить',
           successTitle: 'Заявка отправлена',
-          successDescription: 'Мастер свяжется с вами для подтверждения записи.',
+          successDescription:
+            'Мастер получил заявку. Подключите Telegram, чтобы получить подтверждение и напоминания.',
+          telegramConfirm: 'Получить в Telegram',
+          telegramConfirmHint:
+            'Бот отправит подтверждение и напомнит о записи ближе ко времени.',
           newRequest: 'Новая заявка',
           nothingFound: 'Ничего не найдено.',
           step: 'Шаг',
@@ -1017,7 +1051,10 @@ export function BookingForm({
           submit: 'Send',
           successTitle: 'Request sent',
           successDescription:
-            'The master will contact you to confirm the booking.',
+            'The master received your request. Connect Telegram to receive confirmation and reminders.',
+          telegramConfirm: 'Get in Telegram',
+          telegramConfirmHint:
+            'The bot will send confirmation and remind you before the booking.',
           newRequest: 'New request',
           nothingFound: 'Nothing found.',
           step: 'Step',
@@ -1127,6 +1164,7 @@ export function BookingForm({
 
     setError(null);
     setSubmittedBooking(result.booking);
+    setSubmittedTelegramUrl(result.telegramConfirmationUrl ?? null);
     setValues(createInitialValues(selectedService || profileServices[0] || ''));
     setCurrentStep(0);
   };
@@ -1139,7 +1177,11 @@ export function BookingForm({
         light={isLight}
         locale={locale}
         embedded={embedded}
-        onNew={() => setSubmittedBooking(null)}
+        telegramUrl={submittedTelegramUrl}
+        onNew={() => {
+          setSubmittedBooking(null);
+          setSubmittedTelegramUrl(null);
+        }}
       />
     );
   }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import type { Booking } from '@/lib/types';
 import { requireAuthUser } from '@/lib/server/require-auth-user';
+import { createClientTelegramBookingLink, notifyWorkspaceOwnerAboutBooking } from '@/lib/server/booking-telegram';
 import { createBookingRecord, listBookingsByWorkspace, updateBookingStatusRecord } from '@/lib/server/supabase-bookings';
 import {
   createChatMessage,
@@ -70,6 +71,29 @@ export async function POST(request: Request) {
       },
     });
 
+    let telegramBookingLink: { token: string; url: string | null } | null = null;
+
+    try {
+      telegramBookingLink = await createClientTelegramBookingLink({
+        workspaceId: workspace.id,
+        masterSlug: body.masterSlug,
+        booking: persistedBooking,
+      });
+    } catch {
+      telegramBookingLink = null;
+    }
+
+    try {
+      await notifyWorkspaceOwnerAboutBooking({
+        ownerId: workspace.ownerId ?? null,
+        workspaceSlug: workspace.slug,
+        profile: workspace.profile,
+        booking: persistedBooking,
+      });
+    } catch {
+      // Booking must stay successful even if Telegram notification fails.
+    }
+
     try {
       const existingThread = await fetchChatThreadByPhone(workspace.id, persistedBooking.clientPhone);
       const bookingSummary = `Booking: ${persistedBooking.service} · ${persistedBooking.date} ${persistedBooking.time}`;
@@ -133,7 +157,7 @@ export async function POST(request: Request) {
       // Keep public booking flow resilient even if inbox tables are not migrated yet.
     }
 
-    return NextResponse.json({ booking: persistedBooking, workspaceId: workspace.id });
+    return NextResponse.json({ booking: persistedBooking, workspaceId: workspace.id, telegram: telegramBookingLink });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'unknown_error' }, { status: 500 });
   }

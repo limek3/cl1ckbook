@@ -46,6 +46,11 @@ export default function RootLayout({
         <Script id="sloty-shell-preferences" strategy="beforeInteractive">
           {shellPreferenceScript}
         </Script>
+        <Script
+          id="telegram-miniapp-sdk"
+          src="https://telegram.org/js/telegram-web-app.js"
+          strategy="beforeInteractive"
+        />
         <Suspense fallback={null}>
           <Providers>{children}</Providers>
         </Suspense>

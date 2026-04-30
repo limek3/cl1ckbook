@@ -94,6 +94,11 @@ export default function LoginPage() {
     [searchParams],
   );
 
+  const botUrl = useMemo(() => {
+    const username = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME?.replace(/^@/, '').trim();
+    return username ? `https://t.me/${username}` : null;
+  }, []);
+
   if (!authConfigured) {
     return (
       <main className="grid min-h-screen place-items-center bg-[#f4f4f2] px-4 py-8 text-[#0e0e0e] dark:bg-[#090909] dark:text-white">
@@ -183,13 +188,33 @@ export default function LoginPage() {
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <div className="text-[12px] font-semibold text-black/72 dark:text-white/72">
-                  Telegram
+                  Telegram Mini App
                 </div>
                 <div className="mt-0.5 text-[10.5px] text-black/38 dark:text-white/35">
-                  основной способ входа
+                  самый быстрый вход для мастера
                 </div>
               </div>
               <Send className="size-4 text-black/32 dark:text-white/30" />
+            </div>
+
+            {botUrl ? (
+              <a
+                href={botUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[11px] border border-[#2692d8] bg-[#2ea6ff] px-4 text-[13px] font-semibold text-white transition hover:bg-[#2299f0] active:scale-[0.99]"
+              >
+                <Send className="size-4" />
+                Открыть кабинет в Telegram
+              </a>
+            ) : null}
+
+            <div className="my-3 flex items-center gap-2">
+              <span className="h-px flex-1 bg-black/[0.08] dark:bg-white/[0.08]" />
+              <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/30 dark:text-white/28">
+                веб-вход
+              </span>
+              <span className="h-px flex-1 bg-black/[0.08] dark:bg-white/[0.08]" />
             </div>
 
             <TelegramLoginButton redirectTo={redirectTo} />
