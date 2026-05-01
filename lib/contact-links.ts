@@ -19,12 +19,12 @@ export function getMaxHref(value?: string, fallbackText?: string) {
   const handle = raw.replace(/^@/, '').replace(/\s+/g, '');
 
   if (handle && /[a-zA-Zа-яА-Я0-9_.-]+/.test(handle) && !/^\+?\d+$/.test(handle)) {
-    return `https://max.ru/${encodeURIComponent(handle)}`;
+    return `https://vk.com/${encodeURIComponent(handle)}`;
   }
 
   const text = fallbackText || raw;
 
   if (!text) return undefined;
 
-  return `https://max.ru/:share?text=${encodeURIComponent(text)}`;
+  return `https://vk.com/:share?text=${encodeURIComponent(text)}`;
 }

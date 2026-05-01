@@ -152,8 +152,8 @@ export interface WorkspaceDataset {
 }
 
 const SOURCE_LABELS: Record<Locale, string[]> = {
-  ru: ['Инстаграм', 'MAX', 'Телеграм', 'Рекомендации', 'Сайт'],
-  en: ['Instagram', 'MAX', 'Telegram', 'Referral', 'Website'],
+  ru: ['ТГ', 'Инстаграм', 'ВК'],
+  en: ['Telegram', 'Instagram', 'VK'],
 };
 
 const CATEGORY_LABELS: Record<Locale, string[]> = {
@@ -269,16 +269,28 @@ function buildClients(bookings: Booking[], services: ServiceInsight[], locale: L
 
   return Array.from(grouped.entries())
     .map(([key, items], index) => {
+      const now = Date.now();
       const sorted = [...items].sort((a, b) => getBookingDateTime(b).getTime() - getBookingDateTime(a).getTime());
-      const future = sorted.find((booking) => getBookingDateTime(booking).getTime() > Date.now());
-      const lastVisit = sorted[0];
-      const totalRevenue = sorted.reduce((total, booking) => {
+      const sortedAsc = [...items].sort((a, b) => getBookingDateTime(a).getTime() - getBookingDateTime(b).getTime());
+      const futureItems = sortedAsc.filter((booking) => getBookingDateTime(booking).getTime() > now);
+      const pastItems = sorted.filter((booking) => getBookingDateTime(booking).getTime() <= now);
+      const nextBooking = futureItems[0];
+      const lastVisit = pastItems[0] ?? sortedAsc[0] ?? sorted[0];
+      const revenueBookings = sorted.filter((booking) => booking.status !== 'cancelled');
+      const totalRevenue = revenueBookings.reduce((total, booking) => {
         const service = serviceMap.get(booking.service);
         return total + (service?.price ?? 2400);
       }, 0);
-      const averageCheck = Math.round(totalRevenue / sorted.length);
-      const daysSince = Math.round((Date.now() - getBookingDateTime(lastVisit).getTime()) / 86400000);
-      const segment: ClientInsight['segment'] = daysSince > 45 ? 'sleeping' : sorted.length >= 2 ? 'regular' : 'new';
+      const averageCheck = revenueBookings.length > 0 ? Math.round(totalRevenue / revenueBookings.length) : 0;
+      const daysSince = pastItems[0]
+        ? Math.round((now - getBookingDateTime(pastItems[0]).getTime()) / 86400000)
+        : 0;
+      const segment: ClientInsight['segment'] =
+        !nextBooking && pastItems[0] && daysSince > 45
+          ? 'sleeping'
+          : pastItems.length >= 2
+            ? 'regular'
+            : 'new';
       const sourcePool = SOURCE_LABELS[locale];
       const source = sourcePool[index % sourcePool.length];
 
@@ -286,13 +298,13 @@ function buildClients(bookings: Booking[], services: ServiceInsight[], locale: L
         id: key,
         name: sorted[0].clientName,
         phone: sorted[0].clientPhone,
-        lastVisit: sorted[0].date,
-        nextVisit: future?.date,
+        lastVisit: lastVisit.date,
+        nextVisit: nextBooking?.date,
         visits: sorted.length,
         averageCheck,
         totalRevenue,
         segment,
-        favorite: sorted.length >= 2 || totalRevenue >= 120,
+        favorite: sorted.length >= 3 || totalRevenue >= 10000,
         note: NOTES[locale][index % NOTES[locale].length],
         source,
         service: sorted[0].service,
@@ -407,7 +419,7 @@ function buildTemplates(locale: Locale): MessageTemplateInsight[] {
         {
           id: 'confirm',
           title: 'Подтверждение записи',
-          channel: locale === 'ru' ? 'MAX / Телеграм' : 'MAX / Telegram',
+          channel: locale === 'ru' ? 'ВК / Телеграм' : 'VK / Telegram',
           conversion: '74%',
           variables: ['{{имя}}', '{{дата}}', '{{время}}', '{{услуга}}'],
           content: 'Здравствуйте, {{имя}}! Подтверждаю вашу запись на {{услуга}} — {{дата}} в {{время}}. Если планы изменятся, напишите заранее.',
@@ -415,7 +427,7 @@ function buildTemplates(locale: Locale): MessageTemplateInsight[] {
         {
           id: 'reminder',
           title: 'Напоминание за день',
-          channel: locale === 'ru' ? 'Пуш / MAX' : 'Push / MAX',
+          channel: locale === 'ru' ? 'Пуш / ВК' : 'Push / VK',
           conversion: '68%',
           variables: ['{{имя}}', '{{дата}}', '{{время}}'],
           content: 'Напоминаю о визите завтра, {{имя}}. Жду вас {{дата}} в {{время}}. Если понадобится сдвинуть время — дайте знать.',
@@ -431,7 +443,7 @@ function buildTemplates(locale: Locale): MessageTemplateInsight[] {
         {
           id: 'return',
           title: 'Возврат клиента',
-          channel: 'MAX',
+          channel: 'VK',
           conversion: '31%',
           variables: ['{{имя}}', '{{ссылка}}'],
           content: 'Здравствуйте, {{имя}}! У меня появились новые удобные слоты на ближайшие недели. Вот быстрая ссылка для записи: {{ссылка}}',
@@ -441,7 +453,7 @@ function buildTemplates(locale: Locale): MessageTemplateInsight[] {
         {
           id: 'confirm',
           title: 'Booking confirmation',
-          channel: locale === 'ru' ? 'MAX / Телеграм' : 'MAX / Telegram',
+          channel: locale === 'ru' ? 'ВК / Телеграм' : 'VK / Telegram',
           conversion: '74%',
           variables: ['{{name}}', '{{date}}', '{{time}}', '{{service}}'],
           content: 'Hi {{name}}! Your {{service}} booking is confirmed for {{date}} at {{time}}. If anything changes, just reply to this message.',
@@ -449,7 +461,7 @@ function buildTemplates(locale: Locale): MessageTemplateInsight[] {
         {
           id: 'reminder',
           title: 'Reminder message',
-          channel: locale === 'ru' ? 'Пуш / MAX' : 'Push / MAX',
+          channel: locale === 'ru' ? 'Пуш / ВК' : 'Push / VK',
           conversion: '68%',
           variables: ['{{name}}', '{{date}}', '{{time}}'],
           content: 'A quick reminder about your appointment tomorrow, {{name}} — {{date}} at {{time}}. Let me know if you need to adjust the time.',
@@ -465,7 +477,7 @@ function buildTemplates(locale: Locale): MessageTemplateInsight[] {
         {
           id: 'return',
           title: 'Return invitation',
-          channel: 'MAX',
+          channel: 'VK',
           conversion: '31%',
           variables: ['{{name}}', '{{link}}'],
           content: 'Hi {{name}}! New time slots are open for the coming weeks. Here is the quick booking link: {{link}}',
@@ -499,14 +511,14 @@ function buildIntegrations(locale: Locale): IntegrationInsight[] {
   return locale === 'ru'
     ? [
         { id: 'telegram', name: 'Телеграм', description: 'Подтверждения и быстрые уведомления в личные сообщения.', status: 'connected', hint: 'Подключён и синхронизирует новые заявки.' },
-        { id: 'whatsapp', name: 'MAX', description: 'Отправка ссылки, напоминаний и статусов визита.', status: 'connected', hint: 'Активен для клиентских шаблонов.' },
+        { id: 'whatsapp', name: 'ВК', description: 'Отправка ссылки, напоминаний и статусов визита.', status: 'connected', hint: 'Активен для клиентских шаблонов.' },
         { id: 'instagram', name: 'Ссылка из Инстаграм', description: 'Ссылка в профиле и метки переходов на публичную страницу.', status: 'recommended', hint: 'Высокий потенциал конверсии из профиля.' },
         { id: 'calendar', name: 'Календарь', description: 'Экспорт подтверждённых визитов в рабочий календарь.', status: 'available', hint: 'Помогает избежать накладок по времени.' },
         { id: 'site', name: 'Taplink / сайт', description: 'Встроить кнопку записи на ваш внешний сайт.', status: 'available', hint: 'Полезно для студий и команд.' },
       ]
     : [
         { id: 'telegram', name: 'Telegram', description: 'Confirmations and fast alerts in direct messages.', status: 'connected', hint: 'Already syncing new requests.' },
-        { id: 'whatsapp', name: 'MAX', description: 'Send the link, reminders, and visit status updates.', status: 'connected', hint: 'Enabled for client templates.' },
+        { id: 'whatsapp', name: 'ВК', description: 'Send the link, reminders, and visit status updates.', status: 'connected', hint: 'Enabled for client templates.' },
         { id: 'instagram', name: 'Instagram link', description: 'Track clicks from bio to the public booking page.', status: 'recommended', hint: 'High conversion potential from profile traffic.' },
         { id: 'calendar', name: 'Calendar', description: 'Export confirmed appointments to your calendar.', status: 'available', hint: 'Prevents time overlaps.' },
         { id: 'site', name: 'Website / Taplink', description: 'Embed the booking button on an external site.', status: 'available', hint: 'Useful for studios and teams.' },
@@ -520,7 +532,7 @@ function buildNotifications(locale: Locale): NotificationInsight[] {
         { id: 'visit-reminder', title: 'Напоминание клиенту', description: 'Отправлять клиенту подтверждение и напоминания через Telegram.', channel: 'telegram', enabled: true },
         { id: 'chat-message', title: 'Сообщение клиенту', description: 'Доставлять исходящие сообщения из чата клиенту через бота.', channel: 'telegram', enabled: true },
         { id: 'cancellation', title: 'Отмена или перенос', description: 'Сразу сообщать об изменении записи в Телеграм.', channel: 'telegram', enabled: true, critical: true },
-        { id: 'schedule-change', title: 'Изменение графика', description: 'Отправлять себе сводку в MAX о блокировках и спецдатах.', channel: 'max', enabled: false },
+        { id: 'schedule-change', title: 'Изменение графика', description: 'Отправлять себе сводку в ВК о блокировках и спецдатах.', channel: 'max', enabled: false },
         { id: 'weekly-digest', title: 'Недельная сводка', description: 'Доход, конверсия и загрузка по неделе.', channel: 'email', enabled: true },
       ]
     : [
@@ -528,7 +540,7 @@ function buildNotifications(locale: Locale): NotificationInsight[] {
         { id: 'visit-reminder', title: 'Client reminder', description: 'Send confirmations and reminders to the client via Telegram.', channel: 'telegram', enabled: true },
         { id: 'chat-message', title: 'Client chat message', description: 'Deliver outgoing chat messages to the client through the bot.', channel: 'telegram', enabled: true },
         { id: 'cancellation', title: 'Cancellation or reschedule', description: 'Alert immediately in Telegram when an appointment changes.', channel: 'telegram', enabled: true, critical: true },
-        { id: 'schedule-change', title: 'Schedule changes', description: 'Send a MAX summary about blocked time and special dates.', channel: 'max', enabled: false },
+        { id: 'schedule-change', title: 'Schedule changes', description: 'Send a VK summary about blocked time and special dates.', channel: 'max', enabled: false },
         { id: 'weekly-digest', title: 'Weekly digest', description: 'Revenue, conversion, and load summary for the week.', channel: 'email', enabled: true },
       ];
 }
@@ -654,7 +666,7 @@ export function buildWorkspaceDataset(
   const channels = buildChannels(profile, daily, locale);
   const weeklyLoad = buildWeeklyLoad(profile, daily);
   const peakHours = buildPeakHours(profile, bookings);
-  const paidBookings = bookings.filter((booking) => booking.status === 'confirmed' || booking.status === 'completed');
+  const paidBookings = bookings.filter((booking) => booking.status !== 'cancelled');
   const totalsRevenue = sum(
     paidBookings.map((booking) => services.find((service) => service.name === booking.service)?.price ?? 0),
   );

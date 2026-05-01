@@ -284,6 +284,7 @@ export async function POST(request: Request) {
               workspaceId: workspace.id,
               bookingId: persistedBooking.id,
               clientPhone: persistedBooking.clientPhone,
+              clientName: persistedBooking.clientName,
               text: `Ваша заявка принята. ${persistedBooking.service} · ${persistedBooking.date} ${persistedBooking.time}`,
             }).catch(() => false)
           : false;

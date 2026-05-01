@@ -1399,7 +1399,7 @@ function AuthScene({
           socialTitle: 'Быстрый вход',
           google: 'Google',
           telegram: 'Telegram',
-          max: 'MAX',
+          max: 'ВК',
         }
       : {
           brand: 'ClickBook',
@@ -1421,7 +1421,7 @@ function AuthScene({
           socialTitle: 'Quick access',
           google: 'Google',
           telegram: 'Telegram',
-          max: 'MAX',
+          max: 'ВК',
         };
 
   const panelVariants: Variants = reduceMotion
@@ -1494,7 +1494,7 @@ function AuthScene({
             <div className="rounded-[22px] border border-border/80 bg-background p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">{copy.socialTitle}</div>
-                <div className="text-[11px] text-muted-foreground">Google · Telegram · MAX</div>
+                <div className="text-[11px] text-muted-foreground">Google · Telegram · ВК</div>
               </div>
               <div className="mt-3 grid gap-2 sm:grid-cols-3">
                 <AuthSocialButton icon={Chrome}>{copy.google}</AuthSocialButton>

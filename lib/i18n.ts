@@ -81,7 +81,7 @@ export const messages = {
         },
         {
           title: 'Подключите каналы связи',
-          description: 'Телефон, MAX, Telegram и публичная ссылка всегда доступны клиенту.',
+          description: 'Телефон, ВК, Telegram и публичная ссылка всегда доступны клиенту.',
         },
         {
           title: 'Используйте AI-помощника',
@@ -139,7 +139,7 @@ export const messages = {
         services: 'Услуги',
         phone: 'Телефон',
         telegram: 'Телеграм',
-        whatsapp: 'MAX',
+        whatsapp: 'ВК',
         avatar: 'Фото мастера',
       },
       placeholders: {
@@ -151,7 +151,7 @@ export const messages = {
         services: 'Добавьте услуги по одной строке. Например: Маникюр + гель-лак, Педикюр, Укрепление ногтей',
         phone: '+31 6 1234 5678',
         telegram: '@anna_nails',
-        whatsapp: '@anna.max',
+        whatsapp: 'vk.com/anna',
         avatar: 'Загрузите фото специалиста или оставьте пусто — тогда покажем инициалы',
       },
       slugHint: 'Страница будет доступна по адресу',
@@ -322,7 +322,7 @@ export const messages = {
         },
         {
           title: 'Connect contact channels',
-          description: 'Phone, MAX, Telegram, and the public link stay easy to find.',
+          description: 'Phone, ВК, Telegram, and the public link stay easy to find.',
         },
         {
           title: 'Use the AI helper',
@@ -380,7 +380,7 @@ export const messages = {
         services: 'Services',
         phone: 'Phone',
         telegram: 'Telegram',
-        whatsapp: 'MAX',
+        whatsapp: 'ВК',
         avatar: 'Specialist photo',
       },
       placeholders: {
@@ -392,7 +392,7 @@ export const messages = {
         services: 'Add one service per line. Example: Gel polish manicure, Pedicure, Nail strengthening',
         phone: '+31 6 1234 5678',
         telegram: '@anna_nails',
-        whatsapp: '@anna.max',
+        whatsapp: 'vk.com/anna',
         avatar: 'Upload a photo from your device or leave it empty to use initials',
       },
       slugHint: 'The page will be available at',

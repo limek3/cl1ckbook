@@ -209,29 +209,48 @@ function buildClientTimeline(client: ClientInsight, locale: 'ru' | 'en') {
   }
 
   const lastVisit = new Date(client.lastVisit);
-  const totalPastEvents = Math.max(1, Math.min(client.visits, 4));
+  const safeLastVisit = Number.isNaN(lastVisit.getTime()) ? new Date() : lastVisit;
 
-  for (let index = 0; index < totalPastEvents; index += 1) {
-    const date = new Date(lastVisit);
-    date.setDate(lastVisit.getDate() - index * 21);
-
+  if (client.visits <= 1) {
     timeline.push({
-      id: `${client.id}-history-${index}`,
-      title:
-        index === 0
-          ? locale === 'ru'
-            ? 'Последний визит'
-            : 'Last visit'
-          : locale === 'ru'
-            ? 'Предыдущий визит'
-            : 'Previous visit',
-      subtitle:
-        index === 0
-          ? client.service
-          : locale === 'ru'
-            ? 'Повторный визит'
-            : 'Repeat visit',
-      date: formatClientDate(locale, date.toISOString()),
+      id: `${client.id}-first`,
+      title: locale === 'ru' ? 'Первый визит' : 'First visit',
+      subtitle: client.service,
+      date: formatClientDate(locale, client.lastVisit),
+      tone: 'default',
+    });
+
+    return timeline;
+  }
+
+  timeline.push({
+    id: `${client.id}-last`,
+    title: locale === 'ru' ? 'Последний визит' : 'Last visit',
+    subtitle: client.service,
+    date: formatClientDate(locale, client.lastVisit),
+    tone: 'default',
+  });
+
+  const firstVisit = new Date(safeLastVisit);
+  firstVisit.setDate(safeLastVisit.getDate() - Math.max(1, client.visits - 1) * 21);
+
+  timeline.push({
+    id: `${client.id}-first`,
+    title: locale === 'ru' ? 'Первый визит' : 'First visit',
+    subtitle: client.service,
+    date: formatClientDate(locale, firstVisit.toISOString()),
+    tone: 'default',
+  });
+
+  if (client.visits > 2) {
+    const previousVisit = new Date(safeLastVisit);
+    previousVisit.setDate(safeLastVisit.getDate() - 21);
+
+    timeline.splice(1, 0, {
+      id: `${client.id}-previous`,
+      title: locale === 'ru' ? 'Предыдущий визит' : 'Previous visit',
+      subtitle: client.service,
+      date: formatClientDate(locale, previousVisit.toISOString()),
       tone: 'default',
     });
   }
@@ -1084,12 +1103,14 @@ function ClientCrmDialog({
   const [draftNote, setDraftNote] = useState(noteValue ?? client?.note ?? '');
   const [draftReminderText, setDraftReminderText] = useState(reminderValue?.text ?? '');
   const [draftReminderAt, setDraftReminderAt] = useState(reminderValue?.remindAt ?? '');
+  const [activeMiniDialog, setActiveMiniDialog] = useState<'note' | 'reminder' | null>(null);
 
   useEffect(() => {
     if (!client) return;
     setDraftNote(noteValue ?? client.note ?? '');
     setDraftReminderText(reminderValue?.text ?? '');
     setDraftReminderAt(reminderValue?.remindAt ?? '');
+    setActiveMiniDialog(null);
   }, [client, noteValue, reminderValue?.remindAt, reminderValue?.text]);
 
   if (!open || !client || typeof document === 'undefined') return null;
@@ -1262,14 +1283,6 @@ function ClientCrmDialog({
 
         <div className={cn('flex items-start justify-between gap-4 border-b p-5', borderTone(light))}>
           <div className="min-w-0">
-            <div
-              className="mb-3 inline-flex h-7 items-center gap-2 rounded-[9px] border px-2.5 text-[10.5px] font-medium"
-              style={accentPillStyle(segmentAccent, light, 'soft')}
-            >
-              <StatusDot light={light} active accentColor={segmentAccent} />
-              {client.favorite ? copy.statusFavorite : copy.statusDefault}
-            </div>
-
             <div className="flex min-w-0 items-center gap-3">
               <ClientAvatar name={client.name} light={light} />
 
@@ -1349,48 +1362,6 @@ function ClientCrmDialog({
                 </div>
               </Panel>
 
-              <Panel light={light} className="p-4">
-                <div className="flex items-start gap-3">
-                  <div
-                    className={cn(
-                      'grid size-9 shrink-0 place-items-center rounded-[10px] border',
-                      light
-                        ? 'border-black/[0.08] bg-white'
-                        : 'border-white/[0.08] bg-white/[0.045]',
-                    )}
-                  >
-                    <NotebookPen className={cn('size-4', mutedText(light))} />
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className={cn('text-[13px] font-semibold', pageText(light))}>
-                      {copy.note}
-                    </div>
-
-                    <textarea
-                      value={draftNote}
-                      onChange={(event) => setDraftNote(event.target.value)}
-                      rows={3}
-                      className={cn(
-                        'mt-2 w-full resize-none rounded-[10px] border px-3 py-2 text-[12px] leading-5 outline-none transition-colors',
-                        light
-                          ? 'border-black/[0.08] bg-white text-black placeholder:text-black/28 focus:border-black/[0.16]'
-                          : 'border-white/[0.08] bg-white/[0.045] text-white placeholder:text-white/28 focus:border-white/[0.16]',
-                      )}
-                      placeholder={locale === 'ru' ? 'Что важно помнить о клиенте...' : 'What should be remembered about this client...'}
-                    />
-
-                    <button
-                      type="button"
-                      onClick={() => onSaveNote?.(client.id, draftNote)}
-                      className={cn('mt-2 h-8 rounded-[9px] px-3 text-[11px]', buttonBase(light, false))}
-                    >
-                      {locale === 'ru' ? 'Сохранить заметку' : 'Save note'}
-                    </button>
-                  </div>
-                </div>
-              </Panel>
-
               <Panel light={light} className="overflow-hidden">
                 <div className={cn('border-b px-4 py-3', borderTone(light))}>
                   <div className={cn('text-[12.5px] font-semibold', pageText(light))}>
@@ -1443,51 +1414,9 @@ function ClientCrmDialog({
                 />
               </Panel>
 
-              <Panel light={light} className="p-4">
-                <div className={cn('text-[12.5px] font-semibold', pageText(light))}>
-                  {copy.remind}
-                </div>
-                <input
-                  type="datetime-local"
-                  value={draftReminderAt}
-                  onChange={(event) => setDraftReminderAt(event.target.value)}
-                  className={cn(
-                    'mt-2 h-10 w-full rounded-[10px] border px-3 text-[12px] outline-none',
-                    light
-                      ? 'border-black/[0.08] bg-white text-black'
-                      : 'border-white/[0.08] bg-white/[0.045] text-white',
-                  )}
-                />
-                <textarea
-                  value={draftReminderText}
-                  onChange={(event) => setDraftReminderText(event.target.value)}
-                  rows={2}
-                  className={cn(
-                    'mt-2 w-full resize-none rounded-[10px] border px-3 py-2 text-[12px] leading-5 outline-none',
-                    light
-                      ? 'border-black/[0.08] bg-white text-black placeholder:text-black/28'
-                      : 'border-white/[0.08] bg-white/[0.045] text-white placeholder:text-white/28',
-                  )}
-                  placeholder={locale === 'ru' ? 'Например: напомнить о повторной записи' : 'Example: remind about the next booking'}
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    onSaveReminder?.(client.id, {
-                      text: draftReminderText,
-                      remindAt: draftReminderAt,
-                      updatedAt: new Date().toISOString(),
-                    })
-                  }
-                  className={cn('mt-2 h-8 rounded-[9px] px-3 text-[11px]', buttonBase(light, false))}
-                >
-                  {locale === 'ru' ? 'Сохранить напоминание' : 'Save reminder'}
-                </button>
-              </Panel>
-
               <div className="space-y-2">
                 <a
-                  href={`tel:${client.phone.replace(/\s+/g, '')}`}
+                  href={`tel:${client.phone.replace(/\D+/g, '') || client.phone}`}
                   className={cn(
                     'flex h-11 w-full items-center justify-between gap-3 rounded-[10px] border px-3 text-left text-[12px] font-medium transition-colors active:scale-[0.992]',
                     light
@@ -1518,19 +1447,13 @@ function ClientCrmDialog({
                 <ModalActionButton
                   icon={<NotebookPen className="size-4" />}
                   label={copy.addNote}
-                  onClick={() => onSaveNote?.(client.id, draftNote)}
+                  onClick={() => setActiveMiniDialog('note')}
                 />
 
                 <ModalActionButton
                   icon={<Sparkles className="size-4" />}
                   label={copy.remind}
-                  onClick={() =>
-                    onSaveReminder?.(client.id, {
-                      text: draftReminderText,
-                      remindAt: draftReminderAt,
-                      updatedAt: new Date().toISOString(),
-                    })
-                  }
+                  onClick={() => setActiveMiniDialog('reminder')}
                 />
 
                 <button
@@ -1545,6 +1468,116 @@ function ClientCrmDialog({
             </div>
           </div>
         </div>
+      {activeMiniDialog ? (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/30 px-4 backdrop-blur-[8px]">
+          <div
+            className={cn(
+              'w-full max-w-[420px] rounded-[16px] border p-4 shadow-[0_24px_70px_rgba(0,0,0,0.22)]',
+              light ? 'border-black/[0.09] bg-[#fbfbfa]' : 'border-white/[0.10] bg-[#101010]',
+            )}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className={cn('text-[18px] font-semibold tracking-[-0.055em]', pageText(light))}>
+                  {activeMiniDialog === 'note' ? copy.note : copy.remind}
+                </div>
+                <p className={cn('mt-1 text-[12px] leading-5', mutedText(light))}>
+                  {activeMiniDialog === 'note'
+                    ? locale === 'ru'
+                      ? 'Зафиксируйте важную деталь по клиенту.'
+                      : 'Save an important detail about this client.'
+                    : locale === 'ru'
+                      ? 'Поставьте дату, время и текст напоминания.'
+                      : 'Set the date, time, and reminder text.'}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setActiveMiniDialog(null)}
+                className={cn(
+                  'grid size-8 shrink-0 place-items-center rounded-[10px] border transition-colors',
+                  light
+                    ? 'border-black/[0.08] bg-white text-black/42 hover:bg-black/[0.035] hover:text-black'
+                    : 'border-white/[0.08] bg-white/[0.04] text-white/42 hover:bg-white/[0.07] hover:text-white',
+                )}
+                aria-label={copy.close}
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            {activeMiniDialog === 'reminder' ? (
+              <input
+                type="datetime-local"
+                value={draftReminderAt}
+                onChange={(event) => setDraftReminderAt(event.target.value)}
+                className={cn(
+                  'mt-4 h-10 w-full rounded-[10px] border px-3 text-[12px] outline-none',
+                  light
+                    ? 'border-black/[0.08] bg-white text-black'
+                    : 'border-white/[0.08] bg-white/[0.045] text-white',
+                )}
+              />
+            ) : null}
+
+            <textarea
+              value={activeMiniDialog === 'note' ? draftNote : draftReminderText}
+              onChange={(event) =>
+                activeMiniDialog === 'note'
+                  ? setDraftNote(event.target.value)
+                  : setDraftReminderText(event.target.value)
+              }
+              rows={activeMiniDialog === 'note' ? 5 : 3}
+              className={cn(
+                'mt-3 w-full resize-none rounded-[10px] border px-3 py-2 text-[12px] leading-5 outline-none transition-colors',
+                light
+                  ? 'border-black/[0.08] bg-white text-black placeholder:text-black/28 focus:border-black/[0.16]'
+                  : 'border-white/[0.08] bg-white/[0.045] text-white placeholder:text-white/28 focus:border-white/[0.16]',
+              )}
+              placeholder={
+                activeMiniDialog === 'note'
+                  ? locale === 'ru'
+                    ? 'Что важно помнить о клиенте...'
+                    : 'What should be remembered about this client...'
+                  : locale === 'ru'
+                    ? 'Например: напомнить о повторной записи'
+                    : 'Example: remind about the next booking'
+              }
+            />
+
+            <div className="mt-3 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveMiniDialog(null)}
+                className={cn(buttonBase(light, false), 'h-9 rounded-[10px]')}
+              >
+                {copy.close}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (activeMiniDialog === 'note') {
+                    onSaveNote?.(client.id, draftNote);
+                  } else {
+                    onSaveReminder?.(client.id, {
+                      text: draftReminderText,
+                      remindAt: draftReminderAt,
+                      updatedAt: new Date().toISOString(),
+                    });
+                  }
+                  setActiveMiniDialog(null);
+                }}
+                className={cn(buttonBase(light, true), 'h-9 rounded-[10px]')}
+              >
+                {locale === 'ru' ? 'Сохранить' : 'Save'}
+                <ArrowRight className="size-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       </div>
     </div>,
     document.body,
@@ -2010,26 +2043,9 @@ export default function ClientsPage() {
           <div className="grid gap-4">
             <Card light={isLight} className="overflow-hidden">
               <div className="p-5 md:p-6">
-                <div className="flex flex-wrap items-center gap-2">
-                  <MicroLabel light={isLight} active accentColor={accentColor}>
-                    <StatusDot light={isLight} active accentColor={accentColor} />
-                    {copy.baseReady}
-                  </MicroLabel>
-
-                  <MicroLabel light={isLight}>
-                    <StatusDot light={isLight} />
-                    {copy.crmReady}
-                  </MicroLabel>
-
-                  <MicroLabel light={isLight}>
-                    <StatusDot light={isLight} />
-                    {copy.notesReady}
-                  </MicroLabel>
-                </div>
-
                 <div
                   className={cn(
-                    'mt-8 text-[32px] font-semibold tracking-[-0.08em] md:text-[44px]',
+                    'text-[32px] font-semibold tracking-[-0.08em] md:text-[44px]',
                     pageText(isLight),
                   )}
                 >

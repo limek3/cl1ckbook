@@ -923,7 +923,7 @@ export default function NotificationsPage() {
           createProfileButton: 'Создать профиль',
           emptyBadge: 'Профиль не найден',
           emptyCardChannelsLabel: 'Каналы',
-          emptyCardChannelsTitle: 'Telegram, MAX и Email',
+          emptyCardChannelsTitle: 'Telegram, ВК и Email',
           emptyCardChannelsText: 'После создания профиля появятся каналы доставки уведомлений.',
           emptyCardFlowsLabel: 'Сценарии',
           emptyCardFlowsTitle: 'Логика сообщений',
@@ -938,7 +938,7 @@ export default function NotificationsPage() {
           channels: 'Каналы',
 
           deliveryChannels: 'Каналы доставки',
-          deliveryChannelsDescription: 'Общий статус Telegram, MAX и Email.',
+          deliveryChannelsDescription: 'Общий статус Telegram, ВК и Email.',
           test: 'Проверить',
 
           flows: 'Сценарии',
@@ -973,7 +973,7 @@ export default function NotificationsPage() {
           createProfileButton: 'Create profile',
           emptyBadge: 'Profile missing',
           emptyCardChannelsLabel: 'Channels',
-          emptyCardChannelsTitle: 'Telegram, MAX, and Email',
+          emptyCardChannelsTitle: 'Telegram, VK, and Email',
           emptyCardChannelsText: 'Delivery channels will appear after profile setup.',
           emptyCardFlowsLabel: 'Flows',
           emptyCardFlowsTitle: 'Message logic',
@@ -988,7 +988,7 @@ export default function NotificationsPage() {
           channels: 'Channels',
 
           deliveryChannels: 'Delivery channels',
-          deliveryChannelsDescription: 'Overall status of Telegram, MAX, and Email.',
+          deliveryChannelsDescription: 'Overall status of Telegram, VK, and Email.',
           test: 'Test',
 
           flows: 'Flows',
@@ -1025,7 +1025,7 @@ export default function NotificationsPage() {
         icon: Send,
       },
       max: {
-        title: 'MAX',
+        title: 'ВК',
         description:
           locale === 'ru'
             ? 'Напоминания, подтверждения и сообщения клиентам.'
@@ -1122,7 +1122,7 @@ export default function NotificationsPage() {
       channel === 'telegram'
         ? '@master.telegram'
         : channel === 'max'
-          ? '@master.max'
+          ? 'vk.com/master'
           : 'master@klikbuk.app';
 
     setLastTest(
@@ -1528,7 +1528,7 @@ export default function NotificationsPage() {
                         </ActionButton>
 
                         <ActionButton light={isLight} onClick={() => sendTest('max')}>
-                          MAX
+                          ВК
                         </ActionButton>
 
                         <ActionButton light={isLight} onClick={() => sendTest('email')}>

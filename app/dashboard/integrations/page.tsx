@@ -47,7 +47,7 @@ export default function IntegrationsPage() {
                 : 'Connections, statuses, and fast actions.'
               : locale === 'ru'
                 ? 'Каналы связи и сервисы.'
-                : 'Telegram, MAX, Instagram, website, calendar, and notifications in one system block.'
+                : 'Telegram, ВК, Instagram, website, calendar, and notifications in one system block.'
           }
         />
 

@@ -44,7 +44,7 @@ export const demoMasterProfile: MasterProfile = {
   ],
   phone: '+31 6 1234 5678',
   telegram: '@anna_nails',
-  whatsapp: '@anna.max',
+  whatsapp: 'vk.com/anna',
   hideWhatsapp: true,
   avatar: '',
   rating: 4.9,

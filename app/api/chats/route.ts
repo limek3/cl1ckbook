@@ -265,7 +265,7 @@ export async function POST(request: Request) {
     if (bodyType === 'thread') {
       const clientName = typeof body.clientName === 'string' ? body.clientName.trim() : '';
       const clientPhone = typeof body.clientPhone === 'string' ? body.clientPhone.trim() : '';
-      const channel: ChatChannel = body.channel === 'MAX' ? 'MAX' : 'Telegram';
+      const channel: ChatChannel = body.channel === 'VK' ? 'VK' : body.channel === 'Instagram' ? 'Instagram' : 'Telegram';
 
       if (!clientName || !clientPhone) {
         return NextResponse.json({ error: 'client_name_and_phone_required' }, { status: 400 });
@@ -325,6 +325,11 @@ export async function POST(request: Request) {
           workspaceId: workspace.id,
           bookingId: getThreadBookingId(thread, bookings),
           clientPhone: thread.clientPhone,
+          clientName: thread.clientName,
+          directChatId:
+            typeof thread.metadata?.clientTelegramChatId === 'number' || typeof thread.metadata?.clientTelegramChatId === 'string'
+              ? thread.metadata.clientTelegramChatId
+              : null,
           text,
         }).catch(() => false)
       : false;

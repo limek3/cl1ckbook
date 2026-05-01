@@ -1808,7 +1808,9 @@ export default function DashboardChatsPage() {
 
   const channelLabel = (value: ChatThreadRecord['channel']) => {
     if (locale !== 'ru') return value;
-    if (value === 'Telegram') return 'Телеграм';
+    if (value === 'Telegram') return 'ТГ';
+    if (value === 'Instagram') return 'Инстаграм';
+    if (value === 'VK') return 'ВК';
     return value;
   };
 
@@ -2003,8 +2005,9 @@ export default function DashboardChatsPage() {
 
   const channelOptions = [
     { value: 'all', label: labels.allChannels },
-    { value: 'Telegram', label: locale === 'ru' ? 'Телеграм' : 'Telegram' },
-    { value: 'MAX', label: 'MAX' },
+    { value: 'Telegram', label: locale === 'ru' ? 'ТГ' : 'Telegram' },
+    { value: 'Instagram', label: locale === 'ru' ? 'Инстаграм' : 'Instagram' },
+    { value: 'VK', label: locale === 'ru' ? 'ВК' : 'VK' },
   ] as const;
 
   const sortOptions = [

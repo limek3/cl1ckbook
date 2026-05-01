@@ -30,7 +30,10 @@ export async function findClientTelegramChatId(params: {
   workspaceId: string;
   bookingId?: string | null;
   clientPhone?: string | null;
+  clientName?: string | null;
+  directChatId?: number | string | null;
 }) {
+  if (params.directChatId) return params.directChatId;
   const rows = await listConfirmedClientLinks(params.workspaceId);
   const normalizedPhone = normalizePhone(params.clientPhone);
 
@@ -49,6 +52,16 @@ export async function findClientTelegramChatId(params: {
     if (byPhone?.chat_id) return byPhone.chat_id;
   }
 
+  const normalizedName = (params.clientName ?? '').trim().toLowerCase();
+  if (normalizedName) {
+    const byName = rows.find((row) =>
+      row.chat_id &&
+      (row.booking_snapshot?.clientName ?? '').trim().toLowerCase() === normalizedName,
+    );
+
+    if (byName?.chat_id) return byName.chat_id;
+  }
+
   return null;
 }
 
@@ -56,12 +69,16 @@ export async function sendClientTelegramMessage(params: {
   workspaceId: string;
   bookingId?: string | null;
   clientPhone?: string | null;
+  clientName?: string | null;
+  directChatId?: number | string | null;
   text: string;
 }) {
   const chatId = await findClientTelegramChatId({
     workspaceId: params.workspaceId,
     bookingId: params.bookingId,
     clientPhone: params.clientPhone,
+    clientName: params.clientName,
+    directChatId: params.directChatId,
   });
 
   if (!chatId) return false;

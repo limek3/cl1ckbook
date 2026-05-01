@@ -228,7 +228,7 @@ export default function LoginPage() {
             />
             <DisabledAuthOption
               icon={<MessageCircleMore className="size-3.5" />}
-              label="MAX"
+              label="ВК"
               hint="Интеграция позже"
             />
           </div>

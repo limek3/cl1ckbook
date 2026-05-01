@@ -630,7 +630,7 @@ export default function MarketingPage() {
           emptyCardCopyLabel: 'Тексты',
           emptyCardCopyTitle: 'Готовые сообщения',
           emptyCardCopyText:
-            'Появятся тексты для Telegram, MAX, био, рассылок и рекомендаций.',
+            'Появятся тексты для Telegram, ВК, био, рассылок и рекомендаций.',
 
           pageActive: 'Страница активна',
           publicLink: 'Персональная ссылка',
@@ -658,7 +658,7 @@ export default function MarketingPage() {
 
           materials: 'Материалы для отправки',
           materialsDescription:
-            'Готовые тексты для MAX, Telegram, био, рассылок и рекомендаций.',
+            'Готовые тексты для ВК, Telegram, био, рассылок и рекомендаций.',
           shortTitle: 'Короткое описание',
           clientTitle: 'Сообщение для клиента',
           referralTitle: 'Реферальный текст',
@@ -696,7 +696,7 @@ export default function MarketingPage() {
           emptyCardCopyLabel: 'Copy',
           emptyCardCopyTitle: 'Ready messages',
           emptyCardCopyText:
-            'Copy for Telegram, MAX, bio, broadcasts, and referrals will appear here.',
+            'Copy for Telegram, ВК, bio, broadcasts, and referrals will appear here.',
 
           pageActive: 'Page active',
           publicLink: 'Personal link',
@@ -724,7 +724,7 @@ export default function MarketingPage() {
 
           materials: 'Materials to send',
           materialsDescription:
-            'Ready-to-send copy for MAX, Telegram, bio, broadcasts, and referrals.',
+            'Ready-to-send copy for ВК, Telegram, bio, broadcasts, and referrals.',
           shortTitle: 'Short profile text',
           clientTitle: 'Client message',
           referralTitle: 'Referral copy',

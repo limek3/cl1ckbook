@@ -44,7 +44,7 @@ import { menuContentClass, menuTriggerClass } from '@/lib/menu-styles';
 
 type ThemeMode = 'light' | 'dark';
 
-const CHANNEL_OPTIONS = ['Telegram', 'MAX', 'Push'] as const;
+const CHANNEL_OPTIONS = ['Telegram', 'VK', 'Push'] as const;
 
 type ChannelOption = (typeof CHANNEL_OPTIONS)[number];
 type ChannelFilter = 'all' | ChannelOption;
@@ -96,7 +96,7 @@ function buildTemplatePreset(
       return {
         id,
         title: 'Спасибо после визита',
-        channel: 'MAX',
+        channel: 'VK',
         conversion: '0%',
         variables: ['{имя}', '{ссылка}'],
         content:
@@ -143,7 +143,7 @@ function buildTemplatePreset(
     return {
       id,
       title: 'Post-visit thanks',
-      channel: 'MAX',
+      channel: 'VK',
       conversion: '0%',
       variables: ['{name}', '{link}'],
       content:
@@ -252,7 +252,7 @@ function normalizeChannel(channel: string): ChannelOption {
   const value = channel.trim().toLowerCase();
 
   if (value.includes('telegram') || value.includes('телеграм')) return 'Telegram';
-  if (value === 'max' || value.includes(' max')) return 'MAX';
+  if (value === 'max' || value.includes(' max')) return 'VK';
   if (value.includes('push') || value.includes('пуш')) return 'Push';
 
   return 'Telegram';
@@ -286,7 +286,8 @@ function channelDisplayLabel(channel: string, locale: 'ru' | 'en') {
   const normalized = normalizeChannel(channel);
 
   if (locale !== 'ru') return normalized;
-  if (normalized === 'Telegram') return 'Телеграм';
+  if (normalized === 'Telegram') return 'ТГ';
+  if (normalized === 'VK') return 'ВК';
   if (normalized === 'Push') return 'Пуш';
 
   return normalized;

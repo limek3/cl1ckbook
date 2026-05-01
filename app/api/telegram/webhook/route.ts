@@ -419,7 +419,55 @@ async function handleClientChatMessage(params: {
     .limit(1);
 
   const link = Array.isArray(linkRows) ? (linkRows[0] as BookingLinkRow | undefined) : null;
-  if (!link) return;
+  if (!link) {
+    const { data: threadRowsByNumber } = await admin
+      .from('sloty_chat_threads')
+      .select('id,workspace_id,metadata,unread_count')
+      .contains('metadata', { clientTelegramChatId: params.chatId })
+      .order('last_message_at', { ascending: false })
+      .limit(1);
+
+    const { data: threadRowsByString } = await admin
+      .from('sloty_chat_threads')
+      .select('id,workspace_id,metadata,unread_count')
+      .contains('metadata', { clientTelegramChatId: String(params.chatId) })
+      .order('last_message_at', { ascending: false })
+      .limit(1);
+
+    const threadRows = Array.isArray(threadRowsByNumber) && threadRowsByNumber.length > 0
+      ? threadRowsByNumber
+      : threadRowsByString;
+
+    const thread = Array.isArray(threadRows)
+      ? (threadRows[0] as { id: string; workspace_id: string; metadata: Record<string, unknown> | null; unread_count: number } | undefined)
+      : null;
+
+    if (!thread?.id || !thread.workspace_id) return;
+
+    const now = new Date().toISOString();
+    await createChatMessage(thread.workspace_id, {
+      threadId: thread.id,
+      author: 'client',
+      body: text,
+      deliveryState: null,
+      viaBot: true,
+      metadata: { source: 'telegram_inbox', clientTelegramChatId: params.chatId },
+    }).catch(() => null);
+
+    await updateChatThread(thread.workspace_id, thread.id, {
+      lastMessagePreview: text,
+      lastMessageAt: now,
+      unreadCount: (thread.unread_count ?? 0) + 1,
+      botConnected: true,
+      metadata: {
+        ...(thread.metadata ?? {}),
+        clientTelegramChatId: params.chatId,
+        clientTelegramId: params.from.id,
+      },
+    }).catch(() => null);
+
+    return;
+  }
 
   const { data: bookingRow } = await admin
     .from('sloty_bookings')
