@@ -387,8 +387,8 @@ function buildBotDraft(
 ) {
   if (flow === 'confirm') {
     return locale === 'ru'
-      ? `Здравствуйте, ${thread.clientName}! Подтверждаю запись. Если планы поменяются, просто ответьте в этот чат.`
-      : `Hi ${thread.clientName}! Your booking is confirmed. If anything changes, just reply in this chat.`;
+      ? `Здравствуйте, ${thread.clientName}! Отправляю детали вашей записи. Если планы поменяются, просто ответьте в этот чат.`
+      : `Hi ${thread.clientName}! Here are your booking details. If anything changes, just reply in this chat.`;
   }
 
   if (flow === 'reschedule') {
@@ -1041,7 +1041,7 @@ export default function DashboardChatsPage() {
           send: 'Отправить',
           export: 'Экспорт',
           deleteChat: 'Удалить чат',
-          confirm: 'Подтвердить',
+          confirm: 'Детали записи',
           reschedule: 'Перенос',
           followup: 'Повторный контакт',
           date: 'Дата',
@@ -1916,8 +1916,8 @@ export default function DashboardChatsPage() {
     }
 
     return locale === 'ru'
-      ? { title: 'Диалог под контролем', detail: 'Можно отправить подтверждение, уточнить время или быстро предложить новое окно.' }
-      : { title: 'The chat is under control', detail: 'You can confirm, clarify the time, or prepare a reschedule.' };
+      ? { title: 'Диалог под контролем', detail: 'Можно отправить детали записи, уточнить время или быстро предложить новое окно.' }
+      : { title: 'The chat is under control', detail: 'You can send booking details, clarify the time, or prepare a reschedule.' };
   }, [activeThread, locale]);
 
   const applyQuickTransfer = (date: string, time: string) => {
@@ -3453,7 +3453,7 @@ export default function DashboardChatsPage() {
                         disabled={!activeThread}
                         onClick={() => handleAssistantScenario('confirm')}
                       >
-                        {locale === 'ru' ? 'Подтвердить запись' : 'Confirm booking'}
+                        {locale === 'ru' ? 'Отправить детали записи' : 'Send booking details'}
                         <ChevronRight className="size-4" />
                       </button>
 

@@ -406,16 +406,16 @@ function InlineCopyButton({
 
 function bookingStatusLabel(status: string, locale: 'ru' | 'en') {
   if (locale === 'ru') {
-    if (status === 'new') return 'Новая';
-    if (status === 'confirmed') return 'Подтверждена';
+    if (status === 'new') return 'Запланирована';
+    if (status === 'confirmed') return 'Запланирована';
     if (status === 'completed') return 'Пришёл';
     if (status === 'no_show') return 'Не пришёл';
     if (status === 'cancelled') return 'Отменена';
     return status;
   }
 
-  if (status === 'new') return 'New';
-  if (status === 'confirmed') return 'Confirmed';
+  if (status === 'new') return 'Scheduled';
+  if (status === 'confirmed') return 'Scheduled';
   if (status === 'completed') return 'Arrived';
   if (status === 'no_show') return 'No-show';
   if (status === 'cancelled') return 'Cancelled';
@@ -425,16 +425,16 @@ function bookingStatusLabel(status: string, locale: 'ru' | 'en') {
 
 function bookingStatusHint(status: string, locale: 'ru' | 'en') {
   if (locale === 'ru') {
-    if (status === 'new') return 'ожидает';
-    if (status === 'confirmed') return 'в работе';
+    if (status === 'new') return 'ожидает визита';
+    if (status === 'confirmed') return 'ожидает визита';
     if (status === 'completed') return 'пришёл';
     if (status === 'no_show') return 'не пришёл';
     if (status === 'cancelled') return 'снята';
     return 'статус';
   }
 
-  if (status === 'new') return 'waiting';
-  if (status === 'confirmed') return 'active';
+  if (status === 'new') return 'waiting visit';
+  if (status === 'confirmed') return 'waiting visit';
   if (status === 'completed') return 'arrived';
   if (status === 'no_show') return 'no-show';
   if (status === 'cancelled') return 'cancelled';
@@ -781,10 +781,10 @@ export default function DashboardPage() {
           metricsTitle: 'Метрики',
           metricsDescription: 'Короткий срез по заявкам, деньгам и клиентам.',
           requestsToday: 'Заявки сегодня',
-          revenueWeek: 'Доход недели',
+          revenueWeek: 'Факт недели',
           pageViews: 'Просмотры',
           returning: 'Повторные',
-          confirmed: 'подтверждено',
+          confirmed: 'запланировано',
           avgCheck: 'средний чек',
           conversionWord: 'конверсия',
           newIn30: 'новых за 30 дней',

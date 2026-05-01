@@ -245,7 +245,11 @@ function bookingPrice(booking: Booking, services: ServiceInsight[]) {
 }
 
 function countsAsRevenue(booking: Booking) {
-  return booking.status !== 'cancelled' && booking.status !== 'no_show';
+  return booking.status === 'completed';
+}
+
+function countsAsScheduledBooking(booking: Booking) {
+  return booking.status === 'new' || booking.status === 'confirmed' || booking.status === 'completed';
 }
 
 function countsAsActiveBooking(booking: Booking) {
@@ -311,7 +315,7 @@ function buildClients(bookings: Booking[], services: ServiceInsight[], locale: L
       const pastItems = sorted.filter((booking) => getBookingDateTime(booking).getTime() <= now);
       const nextBooking = futureItems[0];
       const lastVisit = pastItems[0] ?? sortedAsc[0] ?? sorted[0];
-      const revenueBookings = sorted.filter(countsAsActiveBooking);
+      const revenueBookings = sorted.filter(countsAsRevenue);
       const totalRevenue = revenueBookings.reduce((total, booking) => {
         const service = serviceMap.get(booking.service);
         return total + (booking.priceAmount ?? service?.price ?? servicePriceFromName(booking.service, 2400));
@@ -382,7 +386,7 @@ function buildDaily(profile: MasterProfile, bookings: Booking[], services: Servi
     const dayBookings = bookings.filter((booking) => booking.date === iso);
     const createdBookings = bookings.filter((booking) => booking.createdAt.slice(0, 10) === iso);
     const requests = createdBookings.length;
-    const confirmed = dayBookings.filter((booking) => booking.status === 'confirmed' || booking.status === 'completed').length;
+    const confirmed = dayBookings.filter((booking) => countsAsScheduledBooking(booking)).length;
     const revenue = dayBookings
       .filter(countsAsRevenue)
       .reduce((total, booking) => total + bookingPrice(booking, services), 0);
@@ -418,7 +422,7 @@ function buildChannels(profile: MasterProfile, daily: DailyInsight[], locale: Lo
     const label = normalizeSourceLabel(booking.source ?? booking.channel, locale);
     const item = grouped.get(label) ?? { visitors: 0, bookings: 0, revenue: 0 };
     item.visitors += 1;
-    item.bookings += booking.status === 'confirmed' || booking.status === 'completed' ? 1 : 0;
+    item.bookings += countsAsScheduledBooking(booking) ? 1 : 0;
     item.revenue += countsAsRevenue(booking) ? bookingPrice(booking, services) : 0;
     grouped.set(label, item);
   }
@@ -474,11 +478,11 @@ function buildTemplates(locale: Locale): MessageTemplateInsight[] {
     ? [
         {
           id: 'confirm',
-          title: 'Подтверждение записи',
+          title: 'Запись создана',
           channel: locale === 'ru' ? 'ВК / Телеграм' : 'VK / Telegram',
           conversion: '74%',
           variables: ['{{имя}}', '{{дата}}', '{{время}}', '{{услуга}}'],
-          content: 'Здравствуйте, {{имя}}! Подтверждаю вашу запись на {{услуга}} — {{дата}} в {{время}}. Если планы изменятся, напишите заранее.',
+          content: 'Здравствуйте, {{имя}}! Ваша запись на {{услуга}} создана: {{дата}} в {{время}}. Быстрая ссылка: https://www.кликбук.рф/m/{{slug}}',
         },
         {
           id: 'reminder',
@@ -493,26 +497,26 @@ function buildTemplates(locale: Locale): MessageTemplateInsight[] {
           title: 'Спасибо после визита',
           channel: locale === 'ru' ? 'Телеграм' : 'Telegram',
           conversion: '42%',
-          variables: ['{{имя}}', '{{ссылка}}'],
-          content: 'Спасибо за визит, {{имя}}! Буду рада видеть вас снова. Сохраните ссылку {{ссылка}}, чтобы в следующий раз записаться быстрее.',
+          variables: ['{{имя}}', 'https://www.кликбук.рф/m/{{slug}}'],
+          content: 'Спасибо за визит, {{имя}}! Буду рада видеть вас снова. Сохраните ссылку https://www.кликбук.рф/m/{{slug}}, чтобы в следующий раз записаться быстрее.',
         },
         {
           id: 'return',
           title: 'Возврат клиента',
           channel: 'VK',
           conversion: '31%',
-          variables: ['{{имя}}', '{{ссылка}}'],
-          content: 'Здравствуйте, {{имя}}! У меня появились новые удобные слоты на ближайшие недели. Вот быстрая ссылка для записи: {{ссылка}}',
+          variables: ['{{имя}}', 'https://www.кликбук.рф/m/{{slug}}'],
+          content: 'Здравствуйте, {{имя}}! У меня появились новые удобные слоты на ближайшие недели. Вот быстрая ссылка для записи: https://www.кликбук.рф/m/{{slug}}',
         },
       ]
     : [
         {
           id: 'confirm',
-          title: 'Booking confirmation',
+          title: 'Booking created',
           channel: locale === 'ru' ? 'ВК / Телеграм' : 'VK / Telegram',
           conversion: '74%',
           variables: ['{{name}}', '{{date}}', '{{time}}', '{{service}}'],
-          content: 'Hi {{name}}! Your {{service}} booking is confirmed for {{date}} at {{time}}. If anything changes, just reply to this message.',
+          content: 'Hi {{name}}! Your {{service}} booking is created for {{date}} at {{time}}. Quick link: https://www.кликбук.рф/m/{{slug}}',
         },
         {
           id: 'reminder',
@@ -527,16 +531,16 @@ function buildTemplates(locale: Locale): MessageTemplateInsight[] {
           title: 'Post-visit thank you',
           channel: locale === 'ru' ? 'Телеграм' : 'Telegram',
           conversion: '42%',
-          variables: ['{{name}}', '{{link}}'],
-          content: 'Thanks for coming, {{name}}. I would love to see you again. Save this link {{link}} to book faster next time.',
+          variables: ['{{name}}', 'https://www.кликбук.рф/m/{{slug}}'],
+          content: 'Thanks for coming, {{name}}. I would love to see you again. Save this link https://www.кликбук.рф/m/{{slug}} to book faster next time.',
         },
         {
           id: 'return',
           title: 'Return invitation',
           channel: 'VK',
           conversion: '31%',
-          variables: ['{{name}}', '{{link}}'],
-          content: 'Hi {{name}}! New time slots are open for the coming weeks. Here is the quick booking link: {{link}}',
+          variables: ['{{name}}', 'https://www.кликбук.рф/m/{{slug}}'],
+          content: 'Hi {{name}}! New time slots are open for the coming weeks. Here is the quick booking link: https://www.кликбук.рф/m/{{slug}}',
         },
       ];
 }
@@ -722,10 +726,10 @@ export function buildWorkspaceDataset(
   const channels = buildChannels(profile, daily, locale, bookings, services);
   const weeklyLoad = buildWeeklyLoad(profile, daily);
   const peakHours = buildPeakHours(profile, bookings);
-  const paidBookings = bookings.filter(countsAsActiveBooking);
-  const totalsRevenue = sum(paidBookings.filter(countsAsRevenue).map((booking) => bookingPrice(booking, services)));
+  const paidBookings = bookings.filter(countsAsRevenue);
+  const totalsRevenue = sum(paidBookings.map((booking) => bookingPrice(booking, services)));
   const visitors = sum(daily.map((item) => item.visitors));
-  const confirmed = bookings.filter((booking) => booking.status === 'confirmed' || booking.status === 'completed').length;
+  const confirmed = bookings.filter((booking) => countsAsScheduledBooking(booking)).length;
   const completed = bookings.filter((booking) => booking.status === 'completed').length;
 
   const totals = {
@@ -763,7 +767,7 @@ export function bookingStatusLabel(status: BookingStatus, locale: Locale) {
   if (locale === 'ru') {
     return {
       new: 'Новая',
-      confirmed: 'Подтверждена',
+      confirmed: 'Запланирована',
       completed: 'Пришёл',
       no_show: 'Не пришёл',
       cancelled: 'Отменена',
@@ -772,7 +776,7 @@ export function bookingStatusLabel(status: BookingStatus, locale: Locale) {
 
   return {
     new: 'New',
-    confirmed: 'Confirmed',
+    confirmed: 'Scheduled',
     completed: 'Arrived',
     no_show: 'No-show',
     cancelled: 'Cancelled',

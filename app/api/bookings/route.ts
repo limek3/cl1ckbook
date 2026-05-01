@@ -34,8 +34,9 @@ function buildClientBooking(masterSlug: string, values: Omit<Booking, 'id' | 'ma
     date: values.date,
     time: values.time,
     comment: values.comment?.trim() || undefined,
-    status: 'new',
+    status: 'confirmed',
     createdAt: new Date().toISOString(),
+    confirmedAt: new Date().toISOString(),
     source: 'ТГ',
     channel: 'telegram',
   };

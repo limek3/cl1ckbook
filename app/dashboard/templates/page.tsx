@@ -108,7 +108,7 @@ function buildTemplatePreset(
       return {
         id,
         title: 'Возвратный визит',
-        channel: 'Push',
+        channel: 'VK',
         conversion: '0%',
         variables: ['{имя}', '{ссылка}'],
         content:
@@ -118,12 +118,12 @@ function buildTemplatePreset(
 
     return {
       id,
-      title: 'Подтверждение записи',
+      title: 'Запись создана',
       channel: 'Telegram',
       conversion: '0%',
       variables: ['{имя}', '{дата}', '{время}', '{услуга}', '{ссылка}'],
       content:
-        'Здравствуйте, {имя}! Подтверждаю вашу запись на {услуга} {дата} в {время}. Ссылка на детали: {ссылка}',
+        'Здравствуйте, {имя}! Ваша запись на {услуга} создана: {дата} в {время}. Детали и повторная запись: {ссылка}',
     };
   }
 
@@ -155,7 +155,7 @@ function buildTemplatePreset(
     return {
       id,
       title: 'Return visit',
-      channel: 'Push',
+      channel: 'VK',
       conversion: '0%',
       variables: ['{name}', '{link}'],
       content:
@@ -165,12 +165,12 @@ function buildTemplatePreset(
 
   return {
     id,
-    title: 'Booking confirmation',
+    title: 'Booking created',
     channel: 'Telegram',
     conversion: '0%',
     variables: ['{name}', '{date}', '{time}', '{service}', '{link}'],
     content:
-      'Hello, {name}! Your {service} booking is confirmed for {date} at {time}. Details are here: {link}',
+      'Hello, {name}! Your {service} booking is created for {date} at {time}. Details and rebooking: {link}',
   };
 }
 
@@ -253,6 +253,7 @@ function normalizeChannel(channel: string): ChannelOption {
 
   if (value.includes('telegram') || value.includes('телеграм')) return 'Telegram';
   if (value === 'max' || value.includes(' max')) return 'VK';
+  if (value.includes('vk') || value.includes('вк') || value.includes('max') || value.includes('макс')) return 'VK';
   if (value.includes('push') || value.includes('пуш')) return 'Push';
 
   return 'Telegram';
@@ -303,24 +304,24 @@ function buildPreview(
           '{имя}': 'Анна',
           '{дата}': '15 ноября',
           '{время}': '14:30',
-          '{ссылка}': 'klikbuk.ru/book',
+          '{ссылка}': 'https://www.кликбук.рф/m/demo',
           '{услуга}': 'маникюр',
           '{name}': 'Анна',
           '{date}': '15 ноября',
           '{time}': '14:30',
-          '{link}': 'klikbuk.ru/book',
+          '{link}': 'https://www.кликбук.рф/m/demo',
           '{service}': 'маникюр',
         }
       : {
           '{name}': 'Anna',
           '{date}': '15 November',
           '{time}': '2:30 PM',
-          '{link}': 'klikbuk.ru/book',
+          '{link}': 'https://www.кликбук.рф/m/demo',
           '{service}': 'manicure',
           '{имя}': 'Anna',
           '{дата}': '15 November',
           '{время}': '2:30 PM',
-          '{ссылка}': 'klikbuk.ru/book',
+          '{ссылка}': 'https://www.кликбук.рф/m/demo',
           '{услуга}': 'manicure',
         };
 

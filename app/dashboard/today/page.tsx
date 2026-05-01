@@ -39,6 +39,8 @@ type TimelineSource = 'booking';
 
 interface TimelineItem {
   id: string;
+  date: string;
+  dateLabel: string;
   time: string;
   timeMinutes: number;
   clientName: string;
@@ -172,6 +174,12 @@ function mapBookingToTimelineItem(
   now: Date,
   locale: 'ru' | 'en',
 ): TimelineItem {
+  let dateLabel = booking.date;
+  try {
+    dateLabel = new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', { day: 'numeric', month: 'short' }).format(new Date(`${booking.date}T${booking.time}:00`));
+  } catch {
+    dateLabel = booking.date;
+  }
   const bookingDateTime = new Date(`${booking.date}T${booking.time}:00`);
   const diff = bookingDateTime.getTime() - now.getTime();
   const timeMinutes = parseTimeToMinutes(booking.time);
@@ -181,14 +189,14 @@ function mapBookingToTimelineItem(
       ? 'done'
       : booking.status === 'no_show' || booking.status === 'cancelled'
         ? 'no_show'
-        : booking.status === 'new'
-        ? 'new'
         : diff <= 45 * 60 * 1000
           ? 'next'
           : 'queue';
 
   return {
     id: booking.id,
+    date: booking.date,
+    dateLabel,
     time: booking.time,
     timeMinutes,
     clientName: booking.clientName,
@@ -861,9 +869,11 @@ export default function DashboardTodayPage() {
     [bookings, todayIso],
   );
 
+  const timelineBookings = todayBookings.length ? todayBookings : upcomingBookings;
+
   const todayItems = useMemo(
-    () => todayBookings.map((booking) => mapBookingToTimelineItem(booking, now, locale)),
-    [locale, now, todayBookings],
+    () => timelineBookings.map((booking) => mapBookingToTimelineItem(booking, now, locale)),
+    [locale, now, timelineBookings],
   );
 
   const filteredItems = useMemo(() => {
@@ -919,7 +929,7 @@ export default function DashboardTodayPage() {
           metrics: {
             total: 'На сегодня',
             next: 'Ближайшие',
-            newRequests: 'Новые заявки',
+            newRequests: 'Запланировано',
             done: 'Завершено',
           },
           stages: {
@@ -927,14 +937,14 @@ export default function DashboardTodayPage() {
             queue: 'В очереди',
             done: 'Пришёл',
             no_show: 'Не пришёл',
-            new: 'Новая',
+            new: 'Запланирована',
           },
           stageHints: {
             next: 'следующая',
             queue: 'ожидает',
             done: 'пришёл',
             no_show: 'не пришёл',
-            new: 'новая',
+            new: 'ожидает визита',
           },
           filters: {
             all: 'Весь день',
@@ -949,7 +959,6 @@ export default function DashboardTodayPage() {
           liveDay: 'Карточка визита',
           liveDayText: 'Контакт, заметка и статус выбранной записи.',
           sampleBadge: 'Пока нет записей',
-          confirm: 'Подтвердить',
           complete: 'Клиент пришёл',
           noShow: 'Клиент не пришёл',
           activeBooking: 'Активная запись',
@@ -992,7 +1001,7 @@ export default function DashboardTodayPage() {
           metrics: {
             total: 'Today',
             next: 'Next up',
-            newRequests: 'New requests',
+            newRequests: 'Scheduled',
             done: 'Completed',
           },
           stages: {
@@ -1000,14 +1009,14 @@ export default function DashboardTodayPage() {
             queue: 'In queue',
             done: 'Arrived',
             no_show: 'No-show',
-            new: 'New',
+            new: 'Scheduled',
           },
           stageHints: {
             next: 'next',
             queue: 'waiting',
             done: 'arrived',
             no_show: 'no-show',
-            new: 'new',
+            new: 'waiting visit',
           },
           filters: {
             all: 'All day',
@@ -1022,7 +1031,6 @@ export default function DashboardTodayPage() {
           liveDay: 'Visit card',
           liveDayText: 'Contact, note, and current status for the selected booking.',
           sampleBadge: 'No bookings yet',
-          confirm: 'Confirm',
           complete: 'Client arrived',
           noShow: 'Client no-show',
           activeBooking: 'Active booking',
@@ -1049,7 +1057,7 @@ export default function DashboardTodayPage() {
     total: todayItems.length,
     next: todayItems.filter((item) => item.stage === 'next' || item.stage === 'queue')
       .length,
-    newRequests: todayItems.filter((item) => item.stage === 'new').length,
+    newRequests: todayItems.filter((item) => item.stage === 'new' || item.stage === 'queue' || item.stage === 'next').length,
     done: todayItems.filter((item) => item.stage === 'done').length,
   };
 
@@ -1096,7 +1104,7 @@ export default function DashboardTodayPage() {
 
   const activeBooking =
     activeItem?.source === 'booking'
-      ? todayBookings.find((booking) => booking.id === activeItem.id) ?? null
+      ? timelineBookings.find((booking) => booking.id === activeItem.id) ?? null
       : null;
 
   async function handleStatusChange(status: BookingStatus) {
@@ -1339,9 +1347,9 @@ export default function DashboardTodayPage() {
 
                 <div className="mt-6 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                   <HeroStat
-                    label={labels.metrics.total}
+                    label={todayBookings.length ? labels.metrics.total : labels.metrics.next}
                     value={metrics.total}
-                    hint={labels.preview}
+                    hint={todayBookings.length ? labels.preview : locale === 'ru' ? 'ближайшие дни' : 'upcoming days'}
                     light={isLight}
                   />
 
@@ -1411,8 +1419,12 @@ export default function DashboardTodayPage() {
                     )}
                   >
                     {locale === 'ru'
-                      ? 'Клик по записи открывает карточку клиента. Таймлайн обновляется по времени и показывает текущий момент.'
-                      : 'Click a visit to open the client card. The timeline updates with time and shows the current moment.'}
+                      ? todayBookings.length
+                        ? 'Клик по записи открывает карточку клиента. Таймлайн обновляется по времени и показывает текущий момент.'
+                        : 'Сегодня записей нет — ниже показаны ближайшие будущие визиты, чтобы мастер видел расписание вперёд.'
+                      : todayBookings.length
+                        ? 'Click a visit to open the client card. The timeline updates with time and shows the current moment.'
+                        : 'No bookings today — the nearest upcoming visits are shown below so the specialist sees the schedule ahead.'}
                   </p>
 
                   <ControlGroup light={isLight} className="max-w-full overflow-x-auto">
@@ -1499,7 +1511,7 @@ export default function DashboardTodayPage() {
                                           mutedText(isLight),
                                         )}
                                       >
-                                        {item.service}
+                                        {todayBookings.length ? item.service : `${item.dateLabel} · ${item.service}`}
                                         {item.note ? ` · ${item.note}` : ''}
                                       </div>
                                     </div>
@@ -1588,6 +1600,10 @@ export default function DashboardTodayPage() {
 
                           <div className="mt-3 flex flex-wrap gap-1.5">
                             <MicroLabel light={isLight}>
+                              {activeItem.dateLabel}
+                            </MicroLabel>
+
+                            <MicroLabel light={isLight}>
                               {activeItem.time}–
                               {formatMinutesAsTime(activeItem.timeMinutes + 60)}
                             </MicroLabel>
@@ -1655,18 +1671,6 @@ export default function DashboardTodayPage() {
 
                         {activeBooking ? (
                           <div className="grid gap-2">
-                            {activeBooking.status === 'new' ? (
-                              <Button
-                                type="button"
-                                className={cn('justify-start', buttonBase(isLight))}
-                                onClick={() => void handleStatusChange('confirmed')}
-                                disabled={actionLoading !== null}
-                              >
-                                <CheckCircle2 className="size-3.5" />
-                                {actionLoading === 'confirmed' ? '…' : labels.confirm}
-                              </Button>
-                            ) : null}
-
                             {activeBooking.status !== 'completed' && activeBooking.status !== 'no_show' && activeBooking.status !== 'cancelled' ? (
                               <Button
                                 type="button"

@@ -81,6 +81,10 @@ export async function createBookingRecord(workspaceId: string, booking: Booking)
         price_amount: booking.priceAmount ?? null,
         source: booking.source ?? 'ТГ',
         channel: booking.channel ?? 'telegram',
+        confirmed_at: booking.status === 'confirmed' ? booking.confirmedAt ?? new Date().toISOString() : null,
+        completed_at: booking.completedAt ?? null,
+        no_show_at: booking.noShowAt ?? null,
+        cancelled_at: booking.cancelledAt ?? null,
       },
     ]),
   });

@@ -2031,7 +2031,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
   })();
 
   const newBookings = profileBookings.filter(
-    (item) => item.date === todayIso && item.status === 'new',
+    (item) => item.date === todayIso && item.status !== 'cancelled' && item.status !== 'no_show',
   ).length;
 
   const labels =

@@ -646,7 +646,7 @@ export default function MarketingPage() {
           topSource: 'Источник',
           visits: 'визитов',
           bookings: 'записей',
-          confirmed: 'подтверждено',
+          confirmed: 'запланировано',
           source: 'канал',
 
           linkDetails: 'Детали ссылки',

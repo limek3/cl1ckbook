@@ -481,16 +481,16 @@ function FilterChip({
 
 function bookingStatusLabel(status: string, locale: 'ru' | 'en') {
   if (locale === 'ru') {
-    if (status === 'new') return 'Новая';
-    if (status === 'confirmed') return 'Подтверждена';
+    if (status === 'new') return 'Запланирована';
+    if (status === 'confirmed') return 'Запланирована';
     if (status === 'completed') return 'Пришёл';
     if (status === 'no_show') return 'Не пришёл';
     if (status === 'cancelled') return 'Отменена';
     return status;
   }
 
-  if (status === 'new') return 'New';
-  if (status === 'confirmed') return 'Confirmed';
+  if (status === 'new') return 'Scheduled';
+  if (status === 'confirmed') return 'Scheduled';
   if (status === 'completed') return 'Arrived';
   if (status === 'no_show') return 'No-show';
   if (status === 'cancelled') return 'Cancelled';
@@ -500,16 +500,16 @@ function bookingStatusLabel(status: string, locale: 'ru' | 'en') {
 
 function bookingStatusHint(status: string, locale: 'ru' | 'en') {
   if (locale === 'ru') {
-    if (status === 'new') return 'ожидает';
-    if (status === 'confirmed') return 'в работе';
+    if (status === 'new') return 'ожидает визита';
+    if (status === 'confirmed') return 'ожидает визита';
     if (status === 'completed') return 'пришёл';
     if (status === 'no_show') return 'не пришёл';
     if (status === 'cancelled') return 'снята';
     return 'статус';
   }
 
-  if (status === 'new') return 'waiting';
-  if (status === 'confirmed') return 'active';
+  if (status === 'new') return 'waiting visit';
+  if (status === 'confirmed') return 'waiting visit';
   if (status === 'completed') return 'arrived';
   if (status === 'no_show') return 'no-show';
   if (status === 'cancelled') return 'cancelled';
@@ -523,8 +523,7 @@ function statusColor(
   publicAccentColor: string,
   light: boolean,
 ) {
-  if (status === 'new') return accentColor;
-  if (status === 'confirmed') return publicAccentColor;
+  if (status === 'new' || status === 'confirmed') return accentColor;
 
   if (status === 'completed') {
     return light ? 'rgba(0,0,0,0.34)' : 'rgba(255,255,255,0.38)';
@@ -732,22 +731,22 @@ export default function DashboardStatsPage() {
           sourceHint: 'Наиболее эффективный канал за период',
 
           bookingsIn30: 'Записи за 30 дней',
-          revenueIn30: 'Доход за 30 дней',
+          revenueIn30: 'Факт за 30 дней',
           pageVisits: 'Просмотры страницы',
           newClients: 'Новые клиенты',
-          confirmed: 'подтверждено',
+          confirmed: 'запланировано',
           avgCheck: 'средний чек',
           conversion: 'конверсия',
           returning: 'возвратных',
 
-          revenue: 'Доход',
+          revenue: 'Факт',
           bookingsWord: 'Записи',
           visitors: 'Посетители',
           conversionWord: 'Конверсия',
 
           requestsIn: `Заявки за ${activityDays} дн.`,
-          confirmedIn: `Подтверждено за ${activityDays} дн.`,
-          revenueIn: `Доход за ${activityDays} дн.`,
+          confirmedIn: `Запланировано за ${activityDays} дн.`,
+          revenueIn: `Факт за ${activityDays} дн.`,
           newClientsIn: `Новые клиенты за ${activityDays} дн.`,
 
           averageCheck: 'Средний чек',
@@ -799,7 +798,7 @@ export default function DashboardStatsPage() {
           sourceHint: 'Most efficient source for the period',
 
           bookingsIn30: 'Bookings in 30 days',
-          revenueIn30: 'Revenue in 30 days',
+          revenueIn30: 'Actual revenue in 30 days',
           pageVisits: 'Page visits',
           newClients: 'New clients',
           confirmed: 'confirmed',
@@ -807,14 +806,14 @@ export default function DashboardStatsPage() {
           conversion: 'conversion',
           returning: 'returning',
 
-          revenue: 'Revenue',
+          revenue: 'Actual',
           bookingsWord: 'Bookings',
           visitors: 'Visitors',
           conversionWord: 'Conversion',
 
           requestsIn: `Requests in ${activityDays} days`,
           confirmedIn: `Confirmed in ${activityDays} days`,
-          revenueIn: `Revenue in ${activityDays} days`,
+          revenueIn: `Actual revenue in ${activityDays} days`,
           newClientsIn: `New clients in ${activityDays} days`,
 
           averageCheck: 'Average check',
@@ -1030,7 +1029,7 @@ export default function DashboardStatsPage() {
   const metricConfig = {
     revenue: { label: copy.revenue, color: accentColor },
     confirmed: {
-      label: locale === 'ru' ? 'Подтверждения' : 'Confirmed',
+      label: locale === 'ru' ? 'Запланировано' : 'Scheduled',
       color: publicAccentColor,
     },
     visitors: { label: copy.visitors, color: publicAccentColor },

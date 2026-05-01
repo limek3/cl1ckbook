@@ -94,7 +94,11 @@ function parsePriceFromName(name: string, fallback = 0) {
 }
 
 function countsAsRevenue(status: string) {
-  return status !== 'cancelled' && status !== 'no_show';
+  return status === 'completed';
+}
+
+function countsAsScheduled(status: string) {
+  return status === 'new' || status === 'confirmed' || status === 'completed';
 }
 
 function sourceLabel(value: unknown, locale: Locale) {
@@ -166,7 +170,7 @@ export function buildWorkspaceDatasetFromStored(
   const serviceMap = new Map(effectiveServices.map((service) => [service.name, service]));
   const daily = base.daily.map((day) => {
     const dayBookings = bookings.filter((booking) => booking.date === day.date);
-    const confirmed = dayBookings.filter((booking) => booking.status === 'confirmed' || booking.status === 'completed').length;
+    const confirmed = dayBookings.filter((booking) => countsAsScheduled(booking.status)).length;
     const revenue = dayBookings
       .filter((booking) => countsAsRevenue(booking.status))
       .reduce((sum, booking) => sum + (booking.priceAmount ?? serviceMap.get(booking.service)?.price ?? parsePriceFromName(booking.service, 0)), 0);
@@ -177,7 +181,7 @@ export function buildWorkspaceDatasetFromStored(
     const label = sourceLabel(booking.source ?? booking.channel, locale);
     const next = channelMap.get(label) ?? { visitors: 0, bookings: 0, revenue: 0 };
     next.visitors += 1;
-    next.bookings += booking.status === 'confirmed' || booking.status === 'completed' ? 1 : 0;
+    next.bookings += countsAsScheduled(booking.status) ? 1 : 0;
     next.revenue += countsAsRevenue(booking.status) ? (booking.priceAmount ?? serviceMap.get(booking.service)?.price ?? parsePriceFromName(booking.service, 0)) : 0;
     channelMap.set(label, next);
   }
@@ -194,7 +198,7 @@ export function buildWorkspaceDatasetFromStored(
     };
   });
   const visitors = daily.reduce((sum, item) => sum + item.visitors, 0);
-  const confirmed = bookings.filter((booking) => booking.status === 'confirmed' || booking.status === 'completed').length;
+  const confirmed = bookings.filter((booking) => countsAsScheduled(booking.status)).length;
   const activeBookings = bookings.filter((booking) => booking.status !== 'cancelled' && booking.status !== 'no_show');
   const revenue = activeBookings.filter((booking) => countsAsRevenue(booking.status)).reduce((sum, booking) => sum + (booking.priceAmount ?? serviceMap.get(booking.service)?.price ?? parsePriceFromName(booking.service, 0)), 0);
 
@@ -210,12 +214,12 @@ export function buildWorkspaceDatasetFromStored(
     totals: {
       ...base.totals,
       confirmed,
-      completed: bookings.filter((booking) => booking.status === 'completed').length,
+      completed: bookings.filter((booking) => countsAsRevenue(booking.status)).length,
       cancelled: bookings.filter((booking) => booking.status === 'cancelled' || booking.status === 'no_show').length,
       revenue,
       visitors,
       conversion: visitors > 0 ? Number(((confirmed / visitors) * 100).toFixed(1)) : 0,
-      averageCheck: activeBookings.length > 0 ? Math.round(revenue / activeBookings.length) : 0,
+      averageCheck: bookings.filter((booking) => countsAsRevenue(booking.status)).length > 0 ? Math.round(revenue / bookings.filter((booking) => countsAsRevenue(booking.status)).length) : 0,
     },
   };
 }
