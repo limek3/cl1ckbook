@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { Locale } from '@/lib/i18n';
-import type { MasterProfile } from '@/lib/types';
+import type { Booking, MasterProfile } from '@/lib/types';
 import { requireAuthUser } from '@/lib/server/require-auth-user';
 import { buildWorkspaceSeed } from '@/lib/workspace-store';
 import {
@@ -13,6 +13,41 @@ import {
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+
+function mergeWorkspaceDataForProfile(
+  currentData: Record<string, unknown> | null | undefined,
+  profile: MasterProfile,
+  locale: Locale,
+) {
+  const data = currentData ?? {};
+  const seed = buildWorkspaceSeed(profile, Array.isArray(data.bookings) ? (data.bookings as Booking[]) : [], locale);
+  const currentServices = Array.isArray(data.services) ? (data.services as Record<string, unknown>[]) : [];
+  const currentByName = new Map(
+    currentServices
+      .filter((service) => service && typeof service.name === 'string')
+      .map((service) => [String(service.name), service]),
+  );
+
+  return {
+    ...data,
+    services: seed.services.map((service) => ({
+      ...service,
+      ...(currentByName.get(service.name) ?? {}),
+      id: currentByName.get(service.name)?.id ?? service.id,
+      name: service.name,
+    })),
+    availability: Array.isArray(data.availability) && data.availability.length > 0
+      ? data.availability
+      : seed.availability,
+    templates: Array.isArray(data.templates) && data.templates.length > 0
+      ? data.templates
+      : seed.templates,
+    notifications: Array.isArray(data.notifications) && data.notifications.length > 0
+      ? data.notifications
+      : seed.notifications,
+  };
+}
 
 export async function POST(request: Request) {
   try {
@@ -48,6 +83,7 @@ export async function POST(request: Request) {
       const updated = await updateWorkspace(currentWorkspace.id, {
         slug: body.profile.slug,
         profile: body.profile,
+        data: mergeWorkspaceDataForProfile(currentWorkspace.data, body.profile, body.locale ?? 'ru'),
       });
 
       return NextResponse.json(updated);

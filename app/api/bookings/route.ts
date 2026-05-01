@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+import { isSlotAvailable, normalizeAvailabilityDays, normalizeServiceDetails } from '@/lib/availability';
+import { buildWorkspaceSeed } from '@/lib/workspace-store';
 import type { Booking } from '@/lib/types';
 import { requireAuthUser } from '@/lib/server/require-auth-user';
 import { createClientTelegramBookingLink, notifyWorkspaceOwnerAboutBooking } from '@/lib/server/booking-telegram';
@@ -51,8 +53,54 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'master_not_found' }, { status: 404 });
     }
 
+    const currentBookings = await listBookingsByWorkspace(workspace.id).catch(() => {
+      return Array.isArray(workspace.data?.bookings) ? (workspace.data.bookings as Booking[]) : [];
+    });
+
+    const requestedService = body.values.service.trim();
+    const profileServices = Array.isArray(workspace.profile?.services) ? workspace.profile.services : [];
+    const serviceDetails = normalizeServiceDetails(workspace.data?.services);
+    const hasServiceInDetails = serviceDetails.some(
+      (service) =>
+        service.name === requestedService &&
+        service.visible !== false &&
+        service.status !== 'draft',
+    );
+    const hasServiceInProfile = profileServices.includes(requestedService);
+
+    if (!hasServiceInDetails && !hasServiceInProfile) {
+      return NextResponse.json({ error: 'service_not_available' }, { status: 400 });
+    }
+
+    const seed = buildWorkspaceSeed(workspace.profile, currentBookings, 'ru');
+    const availability = normalizeAvailabilityDays(
+      Array.isArray(workspace.data?.availability) && workspace.data.availability.length > 0
+        ? workspace.data.availability
+        : seed.availability,
+    );
+    const effectiveServiceDetails = serviceDetails.length > 0 ? serviceDetails : seed.services;
+    const bookedSlots = currentBookings.map((item) => ({
+      id: item.id,
+      date: item.date,
+      time: item.time,
+      service: item.service,
+      status: item.status,
+    }));
+
+    if (
+      !isSlotAvailable({
+        availability,
+        date: body.values.date,
+        time: body.values.time,
+        serviceName: requestedService,
+        services: effectiveServiceDetails,
+        bookedSlots,
+      })
+    ) {
+      return NextResponse.json({ error: 'slot_unavailable' }, { status: 409 });
+    }
+
     const booking = buildClientBooking(body.masterSlug, body.values);
-    const currentBookings = Array.isArray(workspace.data?.bookings) ? (workspace.data.bookings as Booking[]) : [];
 
     let persistedBooking = booking;
     let nextBookings = [booking, ...currentBookings];

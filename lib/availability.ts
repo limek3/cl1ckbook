@@ -1,0 +1,224 @@
+import type { BookingStatus } from '@/lib/types';
+
+export type BookingAvailabilityStatus = 'workday' | 'short' | 'day-off';
+
+export type BookingAvailabilityDay = {
+  id?: string;
+  date?: string;
+  monthKey?: string;
+  dayNumber?: number;
+  weekdayIndex?: number;
+  label?: string;
+  status?: BookingAvailabilityStatus;
+  slots?: string[];
+  breaks?: string[];
+  custom?: boolean;
+};
+
+export type BookingServiceDetails = {
+  id?: string;
+  name: string;
+  duration?: number;
+  price?: number;
+  status?: 'active' | 'seasonal' | 'draft' | string;
+  visible?: boolean;
+};
+
+export type BookedSlot = {
+  id?: string;
+  date: string;
+  time: string;
+  service?: string;
+  status?: BookingStatus | string;
+  durationMinutes?: number | null;
+};
+
+type Interval = {
+  start: number;
+  end: number;
+};
+
+function splitInterval(value: string) {
+  const [startRaw, endRaw] = value
+    .replace(/—/g, '–')
+    .replace(/-/g, '–')
+    .split('–')
+    .map((item) => item.trim());
+
+  return {
+    start: startRaw || '',
+    end: endRaw || '',
+  };
+}
+
+export function timeToMinutes(value: string) {
+  const [hour, minute] = value.split(':').map(Number);
+
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+
+  return hour * 60 + minute;
+}
+
+export function minutesToTime(value: number) {
+  const normalized = Math.max(0, Math.min(24 * 60 - 1, Math.round(value)));
+  const hours = Math.floor(normalized / 60).toString().padStart(2, '0');
+  const minutes = (normalized % 60).toString().padStart(2, '0');
+
+  return `${hours}:${minutes}`;
+}
+
+function parseInterval(value: string): Interval | null {
+  const { start, end } = splitInterval(value);
+  const startMinutes = timeToMinutes(start);
+  const endMinutes = timeToMinutes(end);
+
+  if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) {
+    return null;
+  }
+
+  return {
+    start: startMinutes,
+    end: endMinutes,
+  };
+}
+
+function overlaps(left: Interval, right: Interval) {
+  return left.start < right.end && right.start < left.end;
+}
+
+function getMondayIndex(date: Date) {
+  return (date.getDay() + 6) % 7;
+}
+
+function isAvailabilityDay(value: unknown): value is BookingAvailabilityDay {
+  if (!value || typeof value !== 'object') return false;
+
+  const candidate = value as BookingAvailabilityDay;
+
+  return (
+    typeof candidate.date === 'string' ||
+    typeof candidate.weekdayIndex === 'number' ||
+    Array.isArray(candidate.slots)
+  );
+}
+
+export function normalizeAvailabilityDays(items?: unknown): BookingAvailabilityDay[] {
+  if (!Array.isArray(items)) return [];
+
+  return items.filter(isAvailabilityDay).map((day) => ({
+    ...day,
+    status: day.status ?? 'workday',
+    slots: Array.isArray(day.slots) ? day.slots : [],
+    breaks: Array.isArray(day.breaks) ? day.breaks : [],
+  }));
+}
+
+export function findAvailabilityDay(
+  availability: BookingAvailabilityDay[],
+  dateIso: string,
+) {
+  const date = new Date(`${dateIso}T00:00:00`);
+  const weekdayIndex = getMondayIndex(date);
+  const exactDay = availability.find((day) => day.date === dateIso);
+
+  if (exactDay) return exactDay;
+
+  return (
+    availability.find(
+      (day) => !day.date && typeof day.weekdayIndex === 'number' && day.weekdayIndex === weekdayIndex,
+    ) ?? null
+  );
+}
+
+export function normalizeServiceDetails(items?: unknown): BookingServiceDetails[] {
+  if (!Array.isArray(items)) return [];
+
+  return items
+    .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
+    .map((item, index) => ({
+      id: typeof item.id === 'string' ? item.id : `service-${index}`,
+      name: String(item.name ?? '').trim(),
+      duration: typeof item.duration === 'number' && Number.isFinite(item.duration) ? item.duration : undefined,
+      price: typeof item.price === 'number' && Number.isFinite(item.price) ? item.price : undefined,
+      status: typeof item.status === 'string' ? item.status : 'active',
+      visible: typeof item.visible === 'boolean' ? item.visible : true,
+    }))
+    .filter((item) => item.name);
+}
+
+export function getServiceDuration(
+  serviceName: string,
+  services: BookingServiceDetails[] | null | undefined,
+  fallbackMinutes = 60,
+) {
+  const normalizedName = serviceName.trim().toLowerCase();
+  const service = services?.find((item) => item.name.trim().toLowerCase() === normalizedName);
+  const duration = service?.duration;
+
+  if (typeof duration === 'number' && Number.isFinite(duration) && duration > 0) {
+    return Math.max(15, Math.round(duration));
+  }
+
+  return fallbackMinutes;
+}
+
+export function getAvailableTimesForDate({
+  availability,
+  date,
+  serviceName,
+  services,
+  bookedSlots,
+  fallbackDurationMinutes = 60,
+}: {
+  availability: BookingAvailabilityDay[];
+  date: string;
+  serviceName: string;
+  services?: BookingServiceDetails[] | null;
+  bookedSlots?: BookedSlot[] | null;
+  fallbackDurationMinutes?: number;
+}) {
+  const day = findAvailabilityDay(availability, date);
+
+  if (!day || day.status === 'day-off') return [];
+
+  const duration = getServiceDuration(serviceName, services, fallbackDurationMinutes);
+  const workIntervals = (day.slots ?? []).map(parseInterval).filter(Boolean) as Interval[];
+  const breakIntervals = (day.breaks ?? []).map(parseInterval).filter(Boolean) as Interval[];
+  const bookedIntervals = (bookedSlots ?? [])
+    .filter((slot) => slot.date === date && slot.status !== 'cancelled')
+    .map((slot) => {
+      const start = timeToMinutes(slot.time);
+      if (start === null) return null;
+      return {
+        start,
+        end: start + (slot.durationMinutes || getServiceDuration(slot.service || '', services, fallbackDurationMinutes)),
+      } satisfies Interval;
+    })
+    .filter(Boolean) as Interval[];
+
+  const times = new Set<string>();
+
+  for (const interval of workIntervals) {
+    for (let start = interval.start; start + duration <= interval.end; start += duration) {
+      const candidate = { start, end: start + duration };
+
+      if (breakIntervals.some((item) => overlaps(candidate, item))) continue;
+      if (bookedIntervals.some((item) => overlaps(candidate, item))) continue;
+
+      times.add(minutesToTime(start));
+    }
+  }
+
+  return Array.from(times).sort((left, right) => (timeToMinutes(left) ?? 0) - (timeToMinutes(right) ?? 0));
+}
+
+export function isSlotAvailable(input: {
+  availability: BookingAvailabilityDay[];
+  date: string;
+  time: string;
+  serviceName: string;
+  services?: BookingServiceDetails[] | null;
+  bookedSlots?: BookedSlot[] | null;
+}) {
+  return getAvailableTimesForDate(input).includes(input.time);
+}

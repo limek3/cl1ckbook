@@ -236,25 +236,18 @@ function buildServices(profile: MasterProfile, bookings: Booking[], locale: Loca
     const price = servicePriceByName(service, index);
     const duration = serviceDurationByName(service, index);
     const related = bookings.filter((booking) => booking.service === service);
-    const bookingsCount = related.length || Math.floor(seededFloat(`${profile.slug}-${service}-fallback`) * 6) + 1;
+    const bookingsCount = related.length;
     const revenue = related
       .filter((booking) => booking.status === 'confirmed' || booking.status === 'completed')
-      .reduce((total) => total + price, 0) || bookingsCount * price;
-    const status: ServiceInsight['status'] = index === profile.services.length - 1 && profile.services.length > 4
-      ? 'seasonal'
-      : index === 0
-        ? 'active'
-        : seededFloat(`${service}-status`) > 0.84
-          ? 'draft'
-          : 'active';
+      .reduce((total) => total + price, 0);
 
     return {
       id: `${profile.slug}-service-${index}`,
       name: service,
       duration,
       price,
-      status,
-      visible: seededFloat(`${service}-visible`) > 0.12,
+      status: 'active',
+      visible: true,
       bookings: bookingsCount,
       revenue,
       popularity: Math.round((bookingsCount / totalBookings) * 100),
@@ -330,25 +323,11 @@ function buildDaily(profile: MasterProfile, bookings: Booking[], services: Servi
     const iso = normalizeDate(date);
     const dayBookings = bookings.filter((booking) => booking.date === iso);
     const createdBookings = bookings.filter((booking) => booking.createdAt.slice(0, 10) === iso);
-    const weekday = date.getDay();
-    const demandBoost = weekday === 0 ? 0.74 : weekday === 6 ? 0.82 : 1.08;
-    const seedBase = `${profile.slug}-${iso}`;
-    const baseViews = 24 + Math.round(seededFloat(`${seedBase}-views`) * 18) + services.length * 3;
-    const visitors = Math.round(baseViews * demandBoost + createdBookings.length * 9);
-    const requests = Math.max(
-      createdBookings.length,
-      Math.round(1 + seededFloat(`${seedBase}-requests`) * 4 + createdBookings.length * 1.2),
-    );
-    const confirmed = Math.max(
-      dayBookings.filter((booking) => booking.status === 'confirmed' || booking.status === 'completed').length,
-      clamp(Math.round(requests * (0.48 + seededFloat(`${seedBase}-confirmed`) * 0.22)), 0, requests),
-    );
-    const revenue = Math.max(
-      dayBookings
-        .filter((booking) => booking.status === 'confirmed' || booking.status === 'completed')
-        .reduce((total, booking) => total + (serviceMap.get(booking.service)?.price ?? 45), 0),
-      confirmed * 2400,
-    );
+    const requests = createdBookings.length;
+    const confirmed = dayBookings.filter((booking) => booking.status === 'confirmed' || booking.status === 'completed').length;
+    const revenue = dayBookings
+      .filter((booking) => booking.status === 'confirmed' || booking.status === 'completed')
+      .reduce((total, booking) => total + (serviceMap.get(booking.service)?.price ?? 0), 0);
     const newClients = createdBookings.filter((booking) => {
       const key = booking.clientPhone || booking.clientName;
       return firstClientVisit.get(key) === iso;
@@ -357,48 +336,46 @@ function buildDaily(profile: MasterProfile, bookings: Booking[], services: Servi
     return {
       date: iso,
       label: dayLabel(date, locale),
-      visitors,
+      visitors: requests,
       requests,
       confirmed,
       revenue,
-      newClients: Math.max(newClients, Math.round(seededFloat(`${seedBase}-clients`) * 2)),
-      pageViews: visitors + Math.round(seededFloat(`${seedBase}-pages`) * 12),
+      newClients,
+      pageViews: requests,
     };
   });
 }
 
 function buildChannels(profile: MasterProfile, daily: DailyInsight[], locale: Locale): ChannelInsight[] {
-  const totalVisitors = sum(daily.map((item) => item.visitors));
-  const totalConfirmed = sum(daily.map((item) => item.confirmed));
-  const totalRevenue = sum(daily.map((item) => item.revenue));
-  const labels = SOURCE_LABELS[locale];
-  const weights = [0.34, 0.24, 0.18, 0.16, 0.08];
+  const visitors = sum(daily.map((item) => item.visitors));
+  const bookings = sum(daily.map((item) => item.confirmed));
+  const revenue = sum(daily.map((item) => item.revenue));
 
-  return labels.map((label, index) => {
-    const variance = 0.9 + seededFloat(`${profile.slug}-${label}`) * 0.2;
-    const visitors = Math.round(totalVisitors * weights[index] * variance);
-    const bookings = Math.max(1, Math.round(totalConfirmed * (weights[index] + index * 0.015)));
-    const revenue = Math.round(totalRevenue * (weights[index] + index * 0.01));
-    const conversion = Number(((bookings / Math.max(1, visitors)) * 100).toFixed(1));
+  if (visitors === 0 && bookings === 0 && revenue === 0) {
+    return [];
+  }
 
-    return {
-      id: `${profile.slug}-channel-${index}`,
-      label,
+  return [
+    {
+      id: `${profile.slug}-channel-public`,
+      label: locale === 'ru' ? 'Публичная страница' : 'Public page',
       visitors,
       bookings,
       revenue,
-      conversion,
-    };
-  });
+      conversion: visitors > 0 ? Number(((bookings / visitors) * 100).toFixed(1)) : 0,
+    },
+  ];
 }
 
 function buildWeeklyLoad(profile: MasterProfile, daily: DailyInsight[]): WeeklyLoadInsight[] {
+  void profile;
+
   return Array.from({ length: 6 }, (_, index) => {
     const start = index * 5;
     const slice = daily.slice(start, start + 5);
     const bookings = sum(slice.map((item) => item.confirmed));
-    const hours = Math.round(bookings * (1.2 + seededFloat(`${profile.slug}-hours-${index}`) * 0.5));
-    const utilization = clamp(Math.round(52 + seededFloat(`${profile.slug}-util-${index}`) * 24), 42, 92);
+    const hours = Math.round(bookings);
+    const utilization = bookings > 0 ? Math.min(100, Math.round((hours / 40) * 100)) : 0;
 
     return {
       week: `W${index + 1}`,
@@ -410,15 +387,16 @@ function buildWeeklyLoad(profile: MasterProfile, daily: DailyInsight[]): WeeklyL
 }
 
 function buildPeakHours(profile: MasterProfile, bookings: Booking[]): PeakHourInsight[] {
+  void profile;
+
   return Array.from({ length: 10 }, (_, index) => {
     const hour = 9 + index;
     const label = `${String(hour).padStart(2, '0')}:00`;
     const actual = bookings.filter((booking) => Number(booking.time.split(':')[0]) === hour).length;
-    const seeded = Math.round(seededFloat(`${profile.slug}-hour-${hour}`) * 4);
 
     return {
       hour: label,
-      bookings: actual + seeded + (hour >= 14 && hour <= 18 ? 2 : 0),
+      bookings: actual,
     };
   });
 }
@@ -554,14 +532,8 @@ function buildNotifications(locale: Locale): NotificationInsight[] {
 }
 
 function buildPayments(locale: Locale): PaymentInsight[] {
-  const basePlan = locale === 'ru' ? 'Pro · ежемесячно' : 'Pro · monthly';
-
-  return [
-    { id: 'pay-1', date: '2026-04-01', amount: 990, status: 'paid', method: 'Visa •••• 3142', plan: basePlan },
-    { id: 'pay-2', date: '2026-03-01', amount: 990, status: 'paid', method: 'Visa •••• 3142', plan: basePlan },
-    { id: 'pay-3', date: '2026-02-01', amount: 990, status: 'paid', method: 'Visa •••• 3142', plan: basePlan },
-    { id: 'pay-4', date: '2026-01-17', amount: 390, status: 'refunded', method: 'Apple Pay', plan: locale === 'ru' ? 'Start · апгрейд' : 'Start · upgrade' },
-  ];
+  void locale;
+  return [];
 }
 
 function buildPlans(locale: Locale): SubscriptionPlan[] {
@@ -649,20 +621,20 @@ function buildLimits(services: ServiceInsight[], clients: ClientInsight[], local
     {
       id: 'clients',
       label: locale === 'ru' ? 'Клиенты в месяц' : 'Clients per month',
-      used: Math.max(6, clients.length * 3),
+      used: clients.length,
       total: 150,
     },
     {
       id: 'reminders',
       label: locale === 'ru' ? 'Напоминания' : 'Reminders',
-      used: 84,
+      used: 0,
       total: 120,
       accent: 'warning',
     },
     {
       id: 'exports',
       label: locale === 'ru' ? 'Экспорты данных' : 'Data exports',
-      used: 3,
+      used: 0,
       total: 10,
       accent: 'success',
     },
@@ -680,24 +652,25 @@ export function buildWorkspaceDataset(
   const channels = buildChannels(profile, daily, locale);
   const weeklyLoad = buildWeeklyLoad(profile, daily);
   const peakHours = buildPeakHours(profile, bookings);
+  const paidBookings = bookings.filter((booking) => booking.status === 'confirmed' || booking.status === 'completed');
   const totalsRevenue = sum(
-    bookings
-      .filter((booking) => booking.status === 'confirmed' || booking.status === 'completed')
-      .map((booking) => services.find((service) => service.name === booking.service)?.price ?? 45),
+    paidBookings.map((booking) => services.find((service) => service.name === booking.service)?.price ?? 0),
   );
+  const visitors = sum(daily.map((item) => item.visitors));
+  const confirmed = bookings.filter((booking) => booking.status === 'confirmed').length;
+  const completed = bookings.filter((booking) => booking.status === 'completed').length;
 
   const totals = {
     bookings: bookings.length,
-    confirmed: bookings.filter((booking) => booking.status === 'confirmed').length,
-    completed: bookings.filter((booking) => booking.status === 'completed').length,
+    confirmed,
+    completed,
     cancelled: bookings.filter((booking) => booking.status === 'cancelled').length,
-    revenue: Math.max(totalsRevenue, sum(daily.map((item) => item.revenue)) // smooth low-volume data
-      ),
-    visitors: sum(daily.map((item) => item.visitors)),
-    conversion: Number(((sum(daily.map((item) => item.confirmed)) / Math.max(1, sum(daily.map((item) => item.visitors)))) * 100).toFixed(1)),
-    averageCheck: Math.round(sum(services.map((service) => service.price)) / Math.max(1, services.length)),
+    revenue: totalsRevenue,
+    visitors,
+    conversion: visitors > 0 ? Number(((sum(daily.map((item) => item.confirmed)) / visitors) * 100).toFixed(1)) : 0,
+    averageCheck: paidBookings.length > 0 ? Math.round(totalsRevenue / paidBookings.length) : 0,
     newClients: sum(daily.map((item) => item.newClients)),
-    returnRate: Number(((clients.filter((client) => client.segment === 'regular').length / Math.max(1, clients.length)) * 100).toFixed(1)),
+    returnRate: clients.length > 0 ? Number(((clients.filter((client) => client.segment === 'regular').length / clients.length) * 100).toFixed(1)) : 0,
   };
 
   return {

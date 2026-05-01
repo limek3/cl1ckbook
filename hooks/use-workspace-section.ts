@@ -43,7 +43,6 @@ export function useWorkspaceSection<T>(
 
   const [state, setState] = useState<T>(() => (demoMode ? readDemoValue(demoStorageKey, fallbackValue) : remoteValue));
   const lastRemoteRef = useRef(stableStringify(remoteValue));
-  const initialSeededRef = useRef(false);
 
   useEffect(() => {
     if (demoMode) {
@@ -58,14 +57,6 @@ export function useWorkspaceSection<T>(
     lastRemoteRef.current = serialized;
     setState(remoteValue);
   }, [demoMode, demoStorageKey, fallbackValue, remoteValue]);
-
-  useEffect(() => {
-    if (demoMode || !hasHydrated || !ownedProfile || initialSeededRef.current) return;
-    const hasRemote = key in workspaceData;
-    if (hasRemote) return;
-    initialSeededRef.current = true;
-    void updateWorkspaceSection(key, fallbackValue);
-  }, [demoMode, fallbackValue, hasHydrated, key, ownedProfile, updateWorkspaceSection, workspaceData]);
 
   useEffect(() => {
     if (!hasHydrated) return;

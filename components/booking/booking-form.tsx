@@ -41,30 +41,16 @@ import { useLocale } from '@/lib/locale-context';
 import type { Booking, BookingFormValues, MasterProfile } from '@/lib/types';
 import { cn, formatDate } from '@/lib/utils';
 import { menuContentClass, menuItemClass, menuTriggerClass } from '@/lib/menu-styles';
+import {
+  getAvailableTimesForDate,
+  normalizeAvailabilityDays,
+  normalizeServiceDetails,
+  type BookedSlot,
+  type BookingAvailabilityDay,
+  type BookingServiceDetails,
+} from '@/lib/availability';
 
 type ThemeMode = 'light' | 'dark';
-
-type BookingAvailabilityStatus = 'workday' | 'short' | 'day-off';
-
-type BookingAvailabilityDay = {
-  id?: string;
-  date?: string;
-  monthKey?: string;
-  dayNumber?: number;
-  weekdayIndex?: number;
-  label?: string;
-  status?: BookingAvailabilityStatus;
-  slots?: string[];
-  breaks?: string[];
-  custom?: boolean;
-};
-
-type MasterProfileWithAvailability = MasterProfile & {
-  availability?: BookingAvailabilityDay[];
-  availabilityDays?: BookingAvailabilityDay[];
-  monthlyAvailability?: BookingAvailabilityDay[];
-  schedule?: BookingAvailabilityDay[];
-};
 
 function createInitialValues(service = ''): BookingFormValues {
   return {
@@ -165,109 +151,6 @@ function glassDropdownSurfaceStyle(light: boolean): CSSProperties {
       ? 'radial-gradient(420px 180px at 50% 0%, rgba(255,255,255,0.72), transparent 56%), linear-gradient(180deg, rgba(251,251,250,0.94), rgba(244,244,242,0.92))'
       : 'radial-gradient(420px 190px at 50% 0%, rgba(255,255,255,0.105), transparent 58%), linear-gradient(180deg, rgba(47,47,45,0.94), rgba(34,34,33,0.94))',
   };
-}
-
-function getMondayIndex(date: Date) {
-  return (date.getDay() + 6) % 7;
-}
-
-function splitInterval(value: string) {
-  const [startRaw, endRaw] = value.split('–').map((item) => item.trim());
-
-  return {
-    start: startRaw || '',
-    end: endRaw || '',
-  };
-}
-
-function timeToMinutes(value: string) {
-  const [hour, minute] = value.split(':').map(Number);
-
-  if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
-
-  return hour * 60 + minute;
-}
-
-function parseIntervalMinutes(value: string) {
-  const { start, end } = splitInterval(value);
-  const startMinutes = timeToMinutes(start);
-  const endMinutes = timeToMinutes(end);
-
-  if (startMinutes === null || endMinutes === null) return 0;
-
-  return Math.max(0, endMinutes - startMinutes);
-}
-
-function getTotalMinutes(items: readonly string[]) {
-  return items.reduce((total, item) => total + parseIntervalMinutes(item), 0);
-}
-
-function getBookingTimesFromSlots(slots?: string[]) {
-  return [...new Set((slots ?? []).map((slot) => splitInterval(slot).start).filter(Boolean))].sort(
-    (left, right) => (timeToMinutes(left) ?? 0) - (timeToMinutes(right) ?? 0),
-  );
-}
-
-function getBookingTimesFromDay(day?: BookingAvailabilityDay | null) {
-  if (!day || day.status === 'day-off') return [];
-  return getBookingTimesFromSlots(day.slots);
-}
-
-function isAvailabilityDay(value: unknown): value is BookingAvailabilityDay {
-  if (!value || typeof value !== 'object') return false;
-
-  const candidate = value as BookingAvailabilityDay;
-
-  return (
-    typeof candidate.date === 'string' ||
-    typeof candidate.weekdayIndex === 'number' ||
-    Array.isArray(candidate.slots)
-  );
-}
-
-function normalizeAvailabilityDays(items?: unknown): BookingAvailabilityDay[] {
-  if (!Array.isArray(items)) return [];
-
-  return items.filter(isAvailabilityDay).map((day) => ({
-    ...day,
-    status: day.status ?? 'workday',
-    slots: Array.isArray(day.slots) ? day.slots : [],
-    breaks: Array.isArray(day.breaks) ? day.breaks : [],
-  }));
-}
-
-function readProfileAvailability(
-  profile: MasterProfile,
-  externalAvailability?: BookingAvailabilityDay[] | null,
-) {
-  if (externalAvailability?.length) {
-    return normalizeAvailabilityDays(externalAvailability);
-  }
-
-  const extendedProfile = profile as MasterProfileWithAvailability;
-
-  return [
-    ...normalizeAvailabilityDays(extendedProfile.availability),
-    ...normalizeAvailabilityDays(extendedProfile.availabilityDays),
-    ...normalizeAvailabilityDays(extendedProfile.monthlyAvailability),
-    ...normalizeAvailabilityDays(extendedProfile.schedule),
-  ];
-}
-
-function findAvailabilityDay(
-  availability: BookingAvailabilityDay[],
-  dateIso: string,
-  weekdayIndex: number,
-) {
-  const exactDay = availability.find((day) => day.date === dateIso);
-
-  if (exactDay) return exactDay;
-
-  return (
-    availability.find(
-      (day) => !day.date && typeof day.weekdayIndex === 'number' && day.weekdayIndex === weekdayIndex,
-    ) ?? null
-  );
 }
 
 function formatMinutes(value: number, locale: 'ru' | 'en') {
@@ -932,12 +815,16 @@ export function BookingForm({
   selectedService,
   appearanceSettings,
   availabilityDays,
+  serviceDetails,
+  bookedSlots,
 }: {
   profile: MasterProfile;
   embedded?: boolean;
   selectedService?: string;
   appearanceSettings?: Partial<AppearanceSettings> | null;
   availabilityDays?: BookingAvailabilityDay[] | null;
+  serviceDetails?: BookingServiceDetails[] | null;
+  bookedSlots?: BookedSlot[] | null;
 }) {
   const { createBooking } = useApp();
   const { settings } = useAppearance();
@@ -1076,8 +963,13 @@ export function BookingForm({
   const steps = [labels.serviceStep, labels.dateStep, labels.contactStep];
 
   const profileAvailability = useMemo(
-    () => readProfileAvailability(profile, availabilityDays),
-    [profile, availabilityDays],
+    () => normalizeAvailabilityDays(availabilityDays),
+    [availabilityDays],
+  );
+
+  const normalizedServiceDetails = useMemo(
+    () => normalizeServiceDetails(serviceDetails),
+    [serviceDetails],
   );
 
   const quickDates = useMemo(
@@ -1085,9 +977,13 @@ export function BookingForm({
       Array.from({ length: 7 }, (_, index) => {
         const date = addDays(new Date(), index);
         const value = format(date, 'yyyy-MM-dd');
-        const weekdayIndex = getMondayIndex(date);
-        const availabilityDay = findAvailabilityDay(profileAvailability, value, weekdayIndex);
-        const times = getBookingTimesFromDay(availabilityDay);
+        const times = getAvailableTimesForDate({
+          availability: profileAvailability,
+          date: value,
+          serviceName: values.service || fallbackService,
+          services: normalizedServiceDetails,
+          bookedSlots,
+        });
         const disabled = times.length === 0;
 
         return {
@@ -1099,10 +995,9 @@ export function BookingForm({
           }).format(date),
           times,
           disabled,
-          availabilityDay,
         };
       }),
-    [locale, profileAvailability],
+    [bookedSlots, fallbackService, locale, normalizedServiceDetails, profileAvailability, values.service],
   );
 
   const selectedDateOption = useMemo(

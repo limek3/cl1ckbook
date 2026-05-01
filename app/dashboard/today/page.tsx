@@ -35,7 +35,7 @@ type ThemeMode = 'light' | 'dark';
 type TimelineStage = 'next' | 'queue' | 'done' | 'new';
 type TimelinePeriod = 'morning' | 'day' | 'evening';
 type TimelineFilter = 'all' | TimelinePeriod;
-type TimelineSource = 'booking' | 'mock';
+type TimelineSource = 'booking';
 
 interface TimelineItem {
   id: string;
@@ -199,117 +199,6 @@ function mapBookingToTimelineItem(
     source: 'booking',
     bookingStatus: booking.status,
   };
-}
-
-function buildMockTimeline(locale: 'ru' | 'en'): TimelineItem[] {
-  const entries =
-    locale === 'ru'
-      ? [
-          {
-            id: 'mock-1',
-            time: '09:30',
-            clientName: 'Алина Морозова',
-            service: 'Маникюр + покрытие',
-            phone: '+7 999 240-00-11',
-            note: 'Первый визит. Любит спокойную палитру и короткую форму.',
-            stage: 'next' as TimelineStage,
-          },
-          {
-            id: 'mock-2',
-            time: '11:00',
-            clientName: 'Софья Жукова',
-            service: 'Снятие + укрепление',
-            phone: '+7 999 240-00-12',
-            note: 'Нужно короткое напоминание за 30 минут.',
-            stage: 'new' as TimelineStage,
-          },
-          {
-            id: 'mock-3',
-            time: '13:00',
-            clientName: 'Елизавета Новикова',
-            service: 'Дизайн + коррекция',
-            phone: '+7 999 240-00-13',
-            note: 'Принесёт референс, лучше сразу показать 2 оттенка.',
-            stage: 'queue' as TimelineStage,
-          },
-          {
-            id: 'mock-4',
-            time: '15:30',
-            clientName: 'Марина Орлова',
-            service: 'Смарт-педикюр',
-            phone: '+7 999 240-00-14',
-            note: 'Постоянный клиент. Можно предложить следующее окно после визита.',
-            stage: 'queue' as TimelineStage,
-          },
-          {
-            id: 'mock-5',
-            time: '18:00',
-            clientName: 'Ксения Белова',
-            service: 'Экспресс-уход',
-            phone: '+7 999 240-00-15',
-            note: 'Вечерний слот, любит быстрый чек-аут без лишних вопросов.',
-            stage: 'done' as TimelineStage,
-          },
-        ]
-      : [
-          {
-            id: 'mock-1',
-            time: '09:30',
-            clientName: 'Alina Morozova',
-            service: 'Manicure + coating',
-            phone: '+7 999 240-00-11',
-            note: 'First visit. Prefers calm tones and a short shape.',
-            stage: 'next' as TimelineStage,
-          },
-          {
-            id: 'mock-2',
-            time: '11:00',
-            clientName: 'Sofia Zhukova',
-            service: 'Removal + strengthening',
-            phone: '+7 999 240-00-12',
-            note: 'Needs a short reminder 30 minutes before.',
-            stage: 'new' as TimelineStage,
-          },
-          {
-            id: 'mock-3',
-            time: '13:00',
-            clientName: 'Elizaveta Novikova',
-            service: 'Design + correction',
-            phone: '+7 999 240-00-13',
-            note: 'Will bring a reference. Better to prepare two tones in advance.',
-            stage: 'queue' as TimelineStage,
-          },
-          {
-            id: 'mock-4',
-            time: '15:30',
-            clientName: 'Marina Orlova',
-            service: 'Smart pedicure',
-            phone: '+7 999 240-00-14',
-            note: 'Regular client. Offer the next slot right after the visit.',
-            stage: 'queue' as TimelineStage,
-          },
-          {
-            id: 'mock-5',
-            time: '18:00',
-            clientName: 'Kseniya Belova',
-            service: 'Express care',
-            phone: '+7 999 240-00-15',
-            note: 'Evening slot, prefers a very fast checkout.',
-            stage: 'done' as TimelineStage,
-          },
-        ];
-
-  return entries.map((entry) => {
-    const timeMinutes = parseTimeToMinutes(entry.time);
-
-    return {
-      ...entry,
-      timeMinutes,
-      period: getTimelinePeriod(timeMinutes),
-      durationLabel: locale === 'ru' ? '60 мин' : '60 min',
-      source: 'mock' as TimelineSource,
-    };
-  });
 }
 
 function buildDayInsight(items: TimelineItem[], locale: 'ru' | 'en'): DayInsight {
@@ -960,15 +849,10 @@ export default function DashboardTodayPage() {
 
   const hasRealBookings = todayBookings.length > 0;
 
-  const todayItems = useMemo(() => {
-    if (hasRealBookings) {
-      return todayBookings.map((booking) =>
-        mapBookingToTimelineItem(booking, now, locale),
-      );
-    }
-
-    return buildMockTimeline(locale);
-  }, [hasRealBookings, locale, now, todayBookings]);
+  const todayItems = useMemo(
+    () => todayBookings.map((booking) => mapBookingToTimelineItem(booking, now, locale)),
+    [locale, now, todayBookings],
+  );
 
   const filteredItems = useMemo(() => {
     if (selectedFilter === 'all') return todayItems;
@@ -1010,11 +894,11 @@ export default function DashboardTodayPage() {
           emptyDescription:
             'Создайте профиль, чтобы открыть рабочий день, ленту записей, чаты и быстрые действия.',
           emptyAction: 'Создать профиль',
-          preview: hasRealBookings ? (demoMode ? 'Демо-режим' : 'Рабочий день') : 'Предпросмотр',
+          preview: demoMode ? 'Демо-режим' : 'Рабочий день',
           overviewTitle: 'Сводка дня',
           overviewDescription: hasRealBookings
             ? 'Ближайшие визиты, статусы и ритм дня в одном спокойном экране.'
-            : 'Демонстрационные записи для визуальной проверки таймлайна.',
+            : 'На сегодня пока нет записей. Когда клиент отправит заявку, она появится здесь автоматически.',
           timelineTitle: 'Таймлайн дня',
           timelineDescription:
             'Список визитов сверху вниз: видно, кто следующий, где плотный блок и где есть окно.',
@@ -1050,11 +934,11 @@ export default function DashboardTodayPage() {
           completion: 'Прогресс дня',
           liveDay: 'Карточка визита',
           liveDayText: 'Контакт, заметка и статус выбранной записи.',
-          sampleBadge: 'Демо / мок-данные',
+          sampleBadge: 'Пока нет записей',
           confirm: 'Подтвердить',
           complete: 'Завершить',
           activeBooking: 'Активная запись',
-          sampleCopy: 'Это мок-данные для предпросмотра. Они не сохраняются.',
+          sampleCopy: 'Выберите реальную запись из ленты, когда она появится.',
           note: 'Комментарий',
           phone: 'Телефон',
           time: 'Время',
@@ -1080,11 +964,11 @@ export default function DashboardTodayPage() {
           emptyDescription:
             'Create a profile to unlock the day flow, booking timeline, chats, and quick actions.',
           emptyAction: 'Create profile',
-          preview: hasRealBookings ? (demoMode ? 'Demo mode' : 'Workday') : 'Preview',
+          preview: demoMode ? 'Demo mode' : 'Workday',
           overviewTitle: 'Day summary',
           overviewDescription: hasRealBookings
             ? 'Upcoming visits, statuses, and the whole day rhythm in one calm screen.'
-            : 'Demo bookings so the timeline always has a polished preview.',
+            : 'No bookings for today yet. Once a client submits a request, it will appear here automatically.',
           timelineTitle: 'Day timeline',
           timelineDescription:
             'A top-to-bottom visit list: next client, dense blocks, and free windows stay visible.',
@@ -1120,11 +1004,11 @@ export default function DashboardTodayPage() {
           completion: 'Day progress',
           liveDay: 'Visit card',
           liveDayText: 'Contact, note, and current status for the selected booking.',
-          sampleBadge: 'Demo / mock data',
+          sampleBadge: 'No bookings yet',
           confirm: 'Confirm',
           complete: 'Complete',
           activeBooking: 'Active booking',
-          sampleCopy: 'This is preview data only and it is not saved.',
+          sampleCopy: 'Select a real booking from the timeline when it appears.',
           note: 'Note',
           phone: 'Phone',
           time: 'Time',

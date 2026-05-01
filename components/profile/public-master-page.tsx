@@ -58,8 +58,11 @@ import {
   DEMO_PROFILE_STORAGE_KEY,
   DEMO_PROFILE_UPDATED_EVENT,
   getDashboardDemoAppearance,
+  getDemoBookings,
 } from '@/lib/demo-data';
+import { buildWorkspaceDataset } from '@/lib/master-workspace';
 import type { MasterProfile, WorkGalleryItem } from '@/lib/types';
+import type { BookedSlot, BookingAvailabilityDay, BookingServiceDetails } from '@/lib/availability';
 import { cn } from '@/lib/utils';
 
 type ThemeMode = 'light' | 'dark';
@@ -67,6 +70,9 @@ type ThemeMode = 'light' | 'dark';
 type PublicProfilePayload = {
   profile: MasterProfile;
   appearance?: Partial<AppearanceSettings> | null;
+  availability?: BookingAvailabilityDay[] | null;
+  services?: BookingServiceDetails[] | null;
+  bookedSlots?: BookedSlot[] | null;
 };
 
 function pageBg(light: boolean) {
@@ -1067,6 +1073,9 @@ export function PublicMasterPage({
   const [mounted, setMounted] = useState(false);
   const [remoteProfile, setRemoteProfile] = useState<MasterProfile | null>(null);
   const [remoteAppearance, setRemoteAppearance] = useState<AppearanceSettings | null>(null);
+  const [remoteAvailability, setRemoteAvailability] = useState<BookingAvailabilityDay[]>([]);
+  const [remoteServiceDetails, setRemoteServiceDetails] = useState<BookingServiceDetails[]>([]);
+  const [remoteBookedSlots, setRemoteBookedSlots] = useState<BookedSlot[]>([]);
   const [demoAppearance, setDemoAppearance] = useState<AppearanceSettings | null>(null);
   const [demoProfileRevision, setDemoProfileRevision] = useState(0);
   const [isProfileLoading, setIsProfileLoading] = useState(!isDemo);
@@ -1090,6 +1099,9 @@ export function PublicMasterPage({
     if (isDemo) {
       setRemoteProfile(null);
       setRemoteAppearance(null);
+      setRemoteAvailability([]);
+      setRemoteServiceDetails([]);
+      setRemoteBookedSlots([]);
       setIsProfileLoading(false);
       return;
     }
@@ -1100,6 +1112,9 @@ export function PublicMasterPage({
     setIsProfileLoading(true);
     setRemoteProfile(null);
     setRemoteAppearance(null);
+    setRemoteAvailability([]);
+    setRemoteServiceDetails([]);
+    setRemoteBookedSlots([]);
 
     fetch(`/api/public/${encodeURIComponent(slug)}`, {
       cache: 'no-store',
@@ -1116,11 +1131,17 @@ export function PublicMasterPage({
         setRemoteAppearance(
           payload?.appearance ? normalizeAppearanceSettings(payload.appearance) : null,
         );
+        setRemoteAvailability(Array.isArray(payload?.availability) ? payload.availability : []);
+        setRemoteServiceDetails(Array.isArray(payload?.services) ? payload.services : []);
+        setRemoteBookedSlots(Array.isArray(payload?.bookedSlots) ? payload.bookedSlots : []);
       })
       .catch(() => {
         if (!active) return;
         setRemoteProfile(null);
         setRemoteAppearance(null);
+        setRemoteAvailability([]);
+        setRemoteServiceDetails([]);
+        setRemoteBookedSlots([]);
       })
       .finally(() => {
         if (!active) return;
@@ -1674,6 +1695,28 @@ export function PublicMasterPage({
 
   const visibleWorks = worksExpanded ? works : works.slice(0, 8);
   const hasHiddenWorks = works.length > 8;
+
+  const demoBookings = useMemo(
+    () => (isDemo ? getDemoBookings(slug, locale) : []),
+    [isDemo, locale, slug],
+  );
+
+  const demoDataset = useMemo(
+    () => (isDemo && profile ? buildWorkspaceDataset(profile, demoBookings, locale) : null),
+    [demoBookings, isDemo, locale, profile],
+  );
+
+  const bookingAvailability = isDemo ? demoDataset?.availability ?? [] : remoteAvailability;
+  const bookingServiceDetails = isDemo ? demoDataset?.services ?? [] : remoteServiceDetails;
+  const bookingBookedSlots = isDemo
+    ? demoBookings.map((booking) => ({
+        id: booking.id,
+        date: booking.date,
+        time: booking.time,
+        service: booking.service,
+        status: booking.status,
+      }))
+    : remoteBookedSlots;
 
   const bookingProfile = useMemo<MasterProfile | null>(() => {
     if (!profile) return null;
@@ -2316,6 +2359,9 @@ export function PublicMasterPage({
                 selectedService={selectedService ?? undefined}
                 embedded
                 appearanceSettings={settings}
+                availabilityDays={bookingAvailability}
+                serviceDetails={bookingServiceDetails}
+                bookedSlots={bookingBookedSlots}
               />
             </div>
           </div>

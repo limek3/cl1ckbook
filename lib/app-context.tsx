@@ -401,6 +401,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }),
         });
 
+        if (response.status === 409) {
+          return {
+            success: false,
+            error: locale === 'ru'
+              ? 'Это время уже занято или недоступно в графике. Выберите другой слот.'
+              : 'This time is already booked or unavailable. Please choose another slot.',
+          };
+        }
+
         if (!response.ok) {
           return {
             success: false,
