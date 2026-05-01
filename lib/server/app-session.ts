@@ -5,6 +5,8 @@ import { cookies } from 'next/headers';
 import type { NextResponse } from 'next/server';
 
 export const APP_SESSION_COOKIE_NAME = 'clickbook_app_session';
+export const CLICKBOOK_AUTH_COOKIE = APP_SESSION_COOKIE_NAME;
+export const CLICKBOOK_AUTH_COOKIE_LEGACY = 'clickbook_auth_session';
 
 const APP_SESSION_MAX_AGE = 60 * 60 * 24 * 30;
 
