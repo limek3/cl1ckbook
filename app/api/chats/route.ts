@@ -9,7 +9,7 @@ import {
   listChatsForWorkspace,
   updateChatThread,
 } from '@/lib/server/supabase-chats';
-import { fetchWorkspaceByOwner } from '@/lib/server/supabase-workspaces';
+import { fetchWorkspaceForUser } from '@/lib/server/supabase-workspaces';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -17,7 +17,7 @@ export const revalidate = 0;
 export async function GET() {
   try {
     const user = await requireAuthUser();
-    const workspace = await fetchWorkspaceByOwner(user.id);
+    const workspace = await fetchWorkspaceForUser(user);
 
     if (!workspace) {
       return NextResponse.json({ error: 'not_found' }, { status: 404 });
@@ -40,7 +40,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const user = await requireAuthUser();
-    const workspace = await fetchWorkspaceByOwner(user.id);
+    const workspace = await fetchWorkspaceForUser(user);
 
     if (!workspace) {
       return NextResponse.json({ error: 'not_found' }, { status: 404 });
@@ -111,7 +111,7 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const user = await requireAuthUser();
-    const workspace = await fetchWorkspaceByOwner(user.id);
+    const workspace = await fetchWorkspaceForUser(user);
 
     if (!workspace) {
       return NextResponse.json({ error: 'not_found' }, { status: 404 });
@@ -149,7 +149,7 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const user = await requireAuthUser();
-    const workspace = await fetchWorkspaceByOwner(user.id);
+    const workspace = await fetchWorkspaceForUser(user);
 
     if (!workspace) {
       return NextResponse.json({ error: 'not_found' }, { status: 404 });

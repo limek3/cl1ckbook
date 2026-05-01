@@ -3,6 +3,7 @@ import { buildWorkspaceSeed } from '@/lib/workspace-store';
 import { listBookingsByWorkspace } from '@/lib/server/supabase-bookings';
 import { fetchWorkspaceBySlug } from '@/lib/server/supabase-workspaces';
 import type { Booking } from '@/lib/types';
+import { normalizeAvailabilityDays } from '@/lib/availability';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -27,10 +28,12 @@ export async function GET(
       Array.isArray(workspace.data?.services) && workspace.data.services.length > 0
         ? workspace.data.services
         : seed.services;
-    const availability =
-      Array.isArray(workspace.data?.availability) && workspace.data.availability.length > 0
-        ? workspace.data.availability
-        : seed.availability;
+    const storedAvailability = Array.isArray(workspace.data?.availability)
+      ? workspace.data.availability
+      : [];
+    const availability = storedAvailability.length > 0
+      ? [...seed.availability, ...storedAvailability]
+      : seed.availability;
     const publicServiceNames = serviceDetails
       .filter((service) => {
         if (!service || typeof service !== 'object') return false;
@@ -45,7 +48,7 @@ export async function GET(
         : workspace.profile,
       appearance: workspace.appearance ?? workspace.data?.appearance ?? null,
       workspaceId: workspace.id,
-      availability,
+      availability: normalizeAvailabilityDays(availability),
       services: serviceDetails,
       bookedSlots: bookings.map((booking) => ({
         id: booking.id,

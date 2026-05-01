@@ -74,8 +74,20 @@ export function useWorkspaceSection<T>(
     if (!ownedProfile || serialized === lastRemoteRef.current) return;
 
     const timeout = window.setTimeout(() => {
-      lastRemoteRef.current = serialized;
-      void updateWorkspaceSection(key, state);
+      void updateWorkspaceSection(key, state).then((success) => {
+        if (success) {
+          lastRemoteRef.current = serialized;
+          return;
+        }
+
+        window.setTimeout(() => {
+          void updateWorkspaceSection(key, state).then((retrySuccess) => {
+            if (retrySuccess) {
+              lastRemoteRef.current = serialized;
+            }
+          });
+        }, 1200);
+      });
     }, 250);
 
     return () => {

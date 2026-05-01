@@ -149,7 +149,7 @@ async function fetchWithTelegramMiniAppRetry(input: RequestInfo | URL, init?: Re
     return response;
   }
 
-  const auth = await authorizeTelegramMiniAppSession({ force: true });
+  const auth = await authorizeTelegramMiniAppSession({ force: true, waitMs: 2200 });
 
   if (!auth.ok) {
     return response;
@@ -183,6 +183,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const refreshWorkspace = useCallback(async () => {
     try {
+      await authorizeTelegramMiniAppSession({ waitMs: 1400 });
+
       const response = await fetchWithTelegramMiniAppRetry('/api/workspace', {
         credentials: 'include',
         cache: 'no-store',

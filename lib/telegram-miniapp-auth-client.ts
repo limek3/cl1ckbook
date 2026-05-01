@@ -17,6 +17,11 @@ export type TelegramMiniAppAuthPayload = {
 
 type TelegramWebApp = {
   initData?: string;
+  initDataUnsafe?: {
+    user?: unknown;
+    auth_date?: number;
+    start_param?: string;
+  };
   ready?: () => void;
   expand?: () => void;
 };
@@ -52,6 +57,43 @@ export function hasTelegramMiniAppInitData() {
   return getTelegramMiniAppInitData().length > 10;
 }
 
+export function hasTelegramMiniAppRuntime() {
+  if (typeof window === 'undefined') return false;
+
+  const webApp = getTelegramWebApp();
+
+  return Boolean(webApp?.initData || webApp?.initDataUnsafe?.user);
+}
+
+export async function waitForTelegramMiniAppInitData(timeoutMs = 1800) {
+  const immediate = getTelegramMiniAppInitData();
+  if (immediate) return immediate;
+
+  if (typeof window === 'undefined') return '';
+
+  const startedAt = Date.now();
+
+  return new Promise<string>((resolve) => {
+    const tick = () => {
+      const value = getTelegramMiniAppInitData();
+
+      if (value) {
+        resolve(value);
+        return;
+      }
+
+      if (Date.now() - startedAt >= timeoutMs) {
+        resolve('');
+        return;
+      }
+
+      window.setTimeout(tick, 80);
+    };
+
+    tick();
+  });
+}
+
 function dispatchAuthReady(payload: TelegramMiniAppAuthPayload) {
   if (typeof window === 'undefined') return;
 
@@ -73,8 +115,8 @@ async function readJsonSafe(response: Response) {
   }
 }
 
-export async function authorizeTelegramMiniAppSession(options?: { force?: boolean }) {
-  const initData = getTelegramMiniAppInitData();
+export async function authorizeTelegramMiniAppSession(options?: { force?: boolean; waitMs?: number }) {
+  const initData = await waitForTelegramMiniAppInitData(options?.waitMs ?? 1800);
 
   if (!initData) {
     return {

@@ -13,7 +13,7 @@ import {
   updateChatThread,
 } from '@/lib/server/supabase-chats';
 import {
-  fetchWorkspaceByOwner,
+  fetchWorkspaceForUser,
   fetchWorkspaceBySlug,
   updateWorkspace,
 } from '@/lib/server/supabase-workspaces';
@@ -73,9 +73,12 @@ export async function POST(request: Request) {
     }
 
     const seed = buildWorkspaceSeed(workspace.profile, currentBookings, 'ru');
+    const storedAvailability = Array.isArray(workspace.data?.availability)
+      ? workspace.data.availability
+      : [];
     const availability = normalizeAvailabilityDays(
-      Array.isArray(workspace.data?.availability) && workspace.data.availability.length > 0
-        ? workspace.data.availability
+      storedAvailability.length > 0
+        ? [...seed.availability, ...storedAvailability]
         : seed.availability,
     );
     const effectiveServiceDetails = serviceDetails.length > 0 ? serviceDetails : seed.services;
@@ -223,7 +226,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'booking_id_and_status_required' }, { status: 400 });
     }
 
-    const workspace = await fetchWorkspaceByOwner(user.id);
+    const workspace = await fetchWorkspaceForUser(user);
 
     if (!workspace) {
       return NextResponse.json({ error: 'not_found' }, { status: 404 });

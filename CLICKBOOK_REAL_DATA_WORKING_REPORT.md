@@ -41,3 +41,8 @@
 
 - ZIP проверен через `unzip -t`.
 - Полный `next build` здесь не запускался: в окружении нет `node_modules`, а установка зависимостей из сети недоступна.
+
+
+## SQL fix v2
+
+Дополнительно усилена миграция `20260501_0009_clickbook_real_data_no_mocks.sql`: для уже существующей старой таблицы `sloty_availability_days` теперь добавляются `weekday_index`, `status`, `slots` и переносится старый weekday из `day_index` / `day_of_week` / `weekday`, если такая колонка была в прежней схеме.

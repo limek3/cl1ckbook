@@ -7,7 +7,7 @@ import {
   createWorkspace,
   ensureUniqueSlug,
   fetchWorkspaceById,
-  fetchWorkspaceByOwner,
+  fetchWorkspaceForUser,
   updateWorkspace,
 } from '@/lib/server/supabase-workspaces';
 
@@ -52,6 +52,9 @@ function mergeWorkspaceDataForProfile(
 export async function POST(request: Request) {
   try {
     const user = await requireAuthUser();
+    const telegramOwnerId = Number(user.user_metadata?.telegram_id);
+    const ownerTelegramId = Number.isFinite(telegramOwnerId) && telegramOwnerId > 0 ? Math.trunc(telegramOwnerId) : null;
+
     const body = (await request.json()) as {
       workspaceId?: string | null;
       profile?: MasterProfile;
@@ -62,7 +65,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'profile_required' }, { status: 400 });
     }
 
-    const ownedWorkspace = await fetchWorkspaceByOwner(user.id);
+    const ownedWorkspace = await fetchWorkspaceForUser(user);
     const requestedWorkspace = body.workspaceId
       ? await fetchWorkspaceById(body.workspaceId)
       : null;
@@ -83,7 +86,10 @@ export async function POST(request: Request) {
       const updated = await updateWorkspace(currentWorkspace.id, {
         slug: body.profile.slug,
         profile: body.profile,
-        data: mergeWorkspaceDataForProfile(currentWorkspace.data, body.profile, body.locale ?? 'ru'),
+        data: {
+          ...mergeWorkspaceDataForProfile(currentWorkspace.data, body.profile, body.locale ?? 'ru'),
+          ...(ownerTelegramId ? { ownerTelegramId } : {}),
+        },
       });
 
       return NextResponse.json(updated);
@@ -93,7 +99,10 @@ export async function POST(request: Request) {
       ownerId: user.id,
       slug: body.profile.slug,
       profile: body.profile,
-      data: buildWorkspaceSeed(body.profile, [], body.locale ?? 'ru'),
+      data: {
+        ...buildWorkspaceSeed(body.profile, [], body.locale ?? 'ru'),
+        ...(ownerTelegramId ? { ownerTelegramId } : {}),
+      },
       appearance: null,
     });
 

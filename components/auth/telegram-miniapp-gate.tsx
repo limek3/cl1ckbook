@@ -3,10 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { CheckCircle2, ExternalLink, Loader2, Send, ShieldCheck } from 'lucide-react';
-import {
-  authorizeTelegramMiniAppSession,
-  hasTelegramMiniAppInitData,
-} from '@/lib/telegram-miniapp-auth-client';
+import { authorizeTelegramMiniAppSession } from '@/lib/telegram-miniapp-auth-client';
 import { cn } from '@/lib/utils';
 
 type MiniAppAuthState = 'checking' | 'success' | 'outside' | 'error';
@@ -52,15 +49,15 @@ export function TelegramMiniAppGate({
     let cancelled = false;
 
     async function authorizeMiniApp() {
-      if (!hasTelegramMiniAppInitData()) {
+      const payload = await authorizeTelegramMiniAppSession({ force: true, waitMs: 2400 });
+
+      if (!payload.ok && payload.error === 'telegram_init_data_empty') {
         if (!cancelled) {
           setState('outside');
           setMessage('Откройте кабинет через Telegram-бота. В браузере можно пользоваться веб-входом через кнопку ниже.');
         }
         return;
       }
-
-      const payload = await authorizeTelegramMiniAppSession({ force: true });
 
       if (cancelled) return;
 

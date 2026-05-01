@@ -102,11 +102,61 @@ function isAvailabilityDay(value: unknown): value is BookingAvailabilityDay {
   );
 }
 
+const WEEKDAY_ID_TO_INDEX: Record<string, number> = {
+  mon: 0,
+  monday: 0,
+  tue: 1,
+  tuesday: 1,
+  wed: 2,
+  wednesday: 2,
+  thu: 3,
+  thursday: 3,
+  fri: 4,
+  friday: 4,
+  sat: 5,
+  saturday: 5,
+  sun: 6,
+  sunday: 6,
+};
+
+const WEEKDAY_LABEL_TO_INDEX: Record<string, number> = {
+  'понедельник': 0,
+  'пн': 0,
+  'вторник': 1,
+  'вт': 1,
+  'среда': 2,
+  'ср': 2,
+  'четверг': 3,
+  'чт': 3,
+  'пятница': 4,
+  'пт': 4,
+  'суббота': 5,
+  'сб': 5,
+  'воскресенье': 6,
+  'вс': 6,
+};
+
+function inferWeekdayIndex(day: BookingAvailabilityDay) {
+  if (typeof day.weekdayIndex === 'number' && day.weekdayIndex >= 0 && day.weekdayIndex <= 6) {
+    return day.weekdayIndex;
+  }
+
+  const id = day.id?.toLowerCase().trim();
+  if (id && id in WEEKDAY_ID_TO_INDEX) return WEEKDAY_ID_TO_INDEX[id];
+
+  const label = day.label?.toLowerCase().trim();
+  if (label && label in WEEKDAY_ID_TO_INDEX) return WEEKDAY_ID_TO_INDEX[label];
+  if (label && label in WEEKDAY_LABEL_TO_INDEX) return WEEKDAY_LABEL_TO_INDEX[label];
+
+  return undefined;
+}
+
 export function normalizeAvailabilityDays(items?: unknown): BookingAvailabilityDay[] {
   if (!Array.isArray(items)) return [];
 
   return items.filter(isAvailabilityDay).map((day) => ({
     ...day,
+    weekdayIndex: inferWeekdayIndex(day),
     status: day.status ?? 'workday',
     slots: Array.isArray(day.slots) ? day.slots : [],
     breaks: Array.isArray(day.breaks) ? day.breaks : [],

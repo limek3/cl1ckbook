@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { requireAuthUser } from '@/lib/server/require-auth-user';
-import { fetchWorkspaceByOwner, updateWorkspace } from '@/lib/server/supabase-workspaces';
+import { fetchWorkspaceForUser, updateWorkspace } from '@/lib/server/supabase-workspaces';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -15,7 +15,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'section_required' }, { status: 400 });
     }
 
-    const workspace = await fetchWorkspaceByOwner(user.id);
+    const workspace = await fetchWorkspaceForUser(user);
 
     if (!workspace) {
       return NextResponse.json({ error: 'not_found' }, { status: 404 });

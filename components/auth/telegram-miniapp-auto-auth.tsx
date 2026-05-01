@@ -3,10 +3,7 @@
 import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useBrowserSearchParams } from '@/hooks/use-browser-search-params';
-import {
-  authorizeTelegramMiniAppSession,
-  hasTelegramMiniAppInitData,
-} from '@/lib/telegram-miniapp-auth-client';
+import { authorizeTelegramMiniAppSession } from '@/lib/telegram-miniapp-auth-client';
 
 function normalizeRedirect(value: string | null) {
   if (!value) return '/dashboard';
@@ -35,13 +32,12 @@ export function TelegramMiniAppAutoAuth() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!hasTelegramMiniAppInitData()) return;
-
     let cancelled = false;
 
     (async () => {
       const result = await authorizeTelegramMiniAppSession({
         force: shouldForceTelegramSession(pathname),
+        waitMs: 2200,
       });
       if (cancelled || !result.ok) return;
 

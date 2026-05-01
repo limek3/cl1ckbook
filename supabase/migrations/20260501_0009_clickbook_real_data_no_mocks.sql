@@ -70,13 +70,45 @@ create table if not exists public.sloty_availability_days (
 
 -- Existing ClickBook databases may already have this table from an older schema.
 -- CREATE TABLE IF NOT EXISTS does not add missing columns, so keep the table shape aligned.
+alter table public.sloty_availability_days add column if not exists weekday_index integer;
 alter table public.sloty_availability_days add column if not exists date date;
 alter table public.sloty_availability_days add column if not exists label text;
+alter table public.sloty_availability_days add column if not exists status text not null default 'workday';
+alter table public.sloty_availability_days add column if not exists slots jsonb not null default '[]'::jsonb;
 alter table public.sloty_availability_days add column if not exists breaks jsonb not null default '[]'::jsonb;
 alter table public.sloty_availability_days add column if not exists custom boolean not null default false;
 alter table public.sloty_availability_days add column if not exists metadata jsonb not null default '{}'::jsonb;
 alter table public.sloty_availability_days add column if not exists created_at timestamptz not null default timezone('utc', now());
 alter table public.sloty_availability_days add column if not exists updated_at timestamptz not null default timezone('utc', now());
+
+-- If an older schema used another weekday column name, copy it into the new field.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'sloty_availability_days' and column_name = 'day_index'
+  ) then
+    execute 'update public.sloty_availability_days set weekday_index = day_index where weekday_index is null and day_index between 0 and 6';
+  elsif exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'sloty_availability_days' and column_name = 'day_of_week'
+  ) then
+    execute 'update public.sloty_availability_days set weekday_index = day_of_week where weekday_index is null and day_of_week between 0 and 6';
+  elsif exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'sloty_availability_days' and column_name = 'weekday'
+  ) then
+    execute 'update public.sloty_availability_days set weekday_index = weekday where weekday_index is null and weekday between 0 and 6';
+  end if;
+end $$;
+
+do $$
+begin
+  alter table public.sloty_availability_days
+    add constraint sloty_availability_days_weekday_index_check
+    check (weekday_index is null or weekday_index between 0 and 6);
+exception when duplicate_object then null;
+end $$;
 
 create unique index if not exists sloty_availability_days_weekday_unique
   on public.sloty_availability_days (workspace_id, weekday_index)

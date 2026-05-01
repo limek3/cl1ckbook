@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { requireAuthUser } from '@/lib/server/require-auth-user';
 import { listBookingsByWorkspace } from '@/lib/server/supabase-bookings';
-import { fetchWorkspaceByOwner } from '@/lib/server/supabase-workspaces';
+import { fetchWorkspaceForUser } from '@/lib/server/supabase-workspaces';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -10,7 +10,7 @@ export const revalidate = 0;
 export async function GET() {
   try {
     const user = await requireAuthUser();
-    const workspace = await fetchWorkspaceByOwner(user.id);
+    const workspace = await fetchWorkspaceForUser(user);
 
     if (!workspace) {
       return NextResponse.json({ error: 'not_found' }, { status: 404 });

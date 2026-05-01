@@ -78,7 +78,7 @@ export function verifyTelegramMiniAppInitData(initData: string) {
     throw new Error('telegram_init_auth_date_invalid');
   }
 
-  const maxAgeSeconds = 60 * 60 * 24;
+  const maxAgeSeconds = 60 * 60 * 24 * 7;
   const nowSeconds = Math.floor(Date.now() / 1000);
 
   if (nowSeconds - authDateSeconds > maxAgeSeconds) {

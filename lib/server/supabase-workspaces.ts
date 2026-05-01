@@ -107,3 +107,53 @@ export async function ensureUniqueSlug(slug: string, workspaceId?: string | null
     throw new Error('slug_taken');
   }
 }
+
+function getTelegramIdFromUser(user: { user_metadata?: Record<string, unknown> | null }) {
+  const raw = user.user_metadata?.telegram_id;
+  const value = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : NaN;
+  return Number.isFinite(value) && value > 0 ? String(Math.trunc(value)) : null;
+}
+
+async function fetchSingleWorkspaceForRepair() {
+  const response = await supabaseRequest('/rest/v1/sloty_workspaces?select=*&order=updated_at.desc&limit=2');
+  const rows = (await response.json()) as Record<string, unknown>[];
+
+  if (rows.length !== 1) return null;
+
+  return mapRow(rows[0]);
+}
+
+export async function updateWorkspaceOwner(workspaceId: string, ownerId: string) {
+  const response = await supabaseRequest(`/rest/v1/sloty_workspaces?id=eq.${encodeURIComponent(workspaceId)}&select=*`, {
+    method: 'PATCH',
+    headers: {
+      Prefer: 'return=representation',
+    },
+    body: JSON.stringify({ owner_id: ownerId }),
+  });
+
+  const rows = (await response.json()) as Record<string, unknown>[];
+  return rows[0] ? mapRow(rows[0]) : null;
+}
+
+export async function fetchWorkspaceForUser(user: {
+  id: string;
+  user_metadata?: Record<string, unknown> | null;
+}) {
+  const owned = await fetchWorkspaceByOwner(user.id);
+  if (owned) return owned;
+
+  const telegramId = getTelegramIdFromUser(user);
+  if (!telegramId || process.env.CLICKBOOK_DISABLE_SINGLE_WORKSPACE_REPAIR === '1') {
+    return null;
+  }
+
+  // Recovery for early MVP databases: old Telegram auth could create a new
+  // Supabase Auth user while the existing workspace stayed attached to the
+  // previous synthetic user. If this project has exactly one workspace, safely
+  // reattach it to the current Telegram user instead of showing "create profile".
+  const singleWorkspace = await fetchSingleWorkspaceForRepair();
+  if (!singleWorkspace) return null;
+
+  return updateWorkspaceOwner(singleWorkspace.id, user.id);
+}
