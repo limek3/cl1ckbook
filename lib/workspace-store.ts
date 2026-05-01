@@ -24,6 +24,9 @@ export interface WorkspaceSections {
   appearance?: AppearanceSettings;
   quietHours?: boolean;
   fallbackEmail?: boolean;
+  exports?: unknown[];
+  promotionCampaigns?: unknown[];
+  subscription?: { planId?: string; status?: string; period?: string; currentPeriodEnd?: string };
   clientNotes?: Record<string, string>;
   clientReminders?: Record<string, { text?: string; remindAt?: string; updatedAt?: string }>;
   clientFavorites?: Record<string, boolean>;

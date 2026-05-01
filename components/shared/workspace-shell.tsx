@@ -52,6 +52,7 @@ import {
 import { useApp } from '@/lib/app-context';
 import { SLOTY_DEMO_SLUG } from '@/lib/demo-data';
 import { useBrowserSearchParams } from '@/hooks/use-browser-search-params';
+import { useBillingStatus } from '@/hooks/use-billing-status';
 import {
   isDashboardDemoEnabled,
   withDashboardDemoParam,
@@ -84,87 +85,21 @@ interface NavigationGroup {
   items: NavigationItem[];
 }
 
-type HelpView = 'menu' | 'report' | 'faq';
 type ReportCategory = 'bug' | 'idea' | 'question';
 type ThemeOption = 'light' | 'dark' | 'system';
 type SidebarScope = 'main' | 'profile';
+type AccountPanelView = 'menu' | 'report' | 'faq';
 
 const SIDEBAR_WIDTH = 344;
 
 const SHIMMER_CSS = [
-  '@keyframes cb-robo-bubble-in {',
-  '  0% { transform: translateY(5px) scale(0.96); opacity: 0; }',
-  '  100% { transform: translateY(0) scale(1); opacity: 1; }',
-  '}',
-  '',
-  '@keyframes cb-robo-dot-one {',
-  '  0%, 100% { opacity: 0.28; transform: translateY(0); }',
-  '  50% { opacity: 1; transform: translateY(-2px); }',
-  '}',
-  '',
-  '@keyframes cb-robo-dot-two {',
-  '  0%, 100% { opacity: 0.28; transform: translateY(0); }',
-  '  55% { opacity: 1; transform: translateY(-2px); }',
-  '}',
-  '',
-  '@keyframes cb-robo-dot-three {',
-  '  0%, 100% { opacity: 0.28; transform: translateY(0); }',
-  '  60% { opacity: 1; transform: translateY(-2px); }',
-  '}',
-  '',
   '@keyframes cb-robo-soft-pulse {',
   '  0%, 100% { opacity: 0.42; transform: scale(1); }',
   '  50% { opacity: 0.78; transform: scale(1.14); }',
   '}',
   '',
-  '@keyframes cb-faq-mark-spin {',
-  '  0%, 76% { transform: rotate(0deg) scale(1); }',
-  '  82% { transform: rotate(28deg) scale(1.04); }',
-  '  88% { transform: rotate(-22deg) scale(1.06); }',
-  '  94% { transform: rotate(180deg) scale(1.06); }',
-  '  100% { transform: rotate(360deg) scale(1); }',
-  '}',
-  '',
-  '@keyframes cb-settings-gear-spin {',
-  '  0%, 78% { transform: rotate(0deg) scale(1); }',
-  '  84% { transform: rotate(20deg) scale(1.04); }',
-  '  89% { transform: rotate(-16deg) scale(1.05); }',
-  '  94% { transform: rotate(90deg) scale(1.05); }',
-  '  100% { transform: rotate(0deg) scale(1); }',
-  '}',
-  '',
   '.cb-robo-soft-glow {',
   '  animation: cb-robo-soft-pulse 3.8s ease-in-out infinite;',
-  '}',
-  '',
-  '.cb-robo-popover {',
-  '  animation: cb-robo-bubble-in 180ms ease-out both;',
-  '}',
-  '',
-  '.cb-robo-dot-1 {',
-  '  animation: cb-robo-dot-one 1.25s ease-in-out infinite;',
-  '}',
-  '',
-  '.cb-robo-dot-2 {',
-  '  animation: cb-robo-dot-two 1.25s ease-in-out infinite;',
-  '  animation-delay: 120ms;',
-  '}',
-  '',
-  '.cb-robo-dot-3 {',
-  '  animation: cb-robo-dot-three 1.25s ease-in-out infinite;',
-  '  animation-delay: 240ms;',
-  '}',
-  '',
-  '.cb-faq-mark {',
-  '  display: inline-flex;',
-  '  transform-origin: center;',
-  '  animation: cb-faq-mark-spin 4.8s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;',
-  '}',
-  '',
-  '.cb-settings-gear {',
-  '  display: inline-flex;',
-  '  transform-origin: center;',
-  '  animation: cb-settings-gear-spin 5.6s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;',
   '}',
 ].join('\n');
 
@@ -179,19 +114,6 @@ function isActive(pathname: string, href: string, exact = false) {
   if (exact) return pathname === cleanHref;
 
   return pathname === cleanHref || pathname.startsWith(cleanHref + '/');
-}
-
-function footerTriggerClass(open = false) {
-  return cn(
-    'group relative flex h-[44px] w-full items-center gap-2.5 rounded-[11px] border px-3 text-left',
-    'border-black/[0.07] bg-black/[0.022] text-black/68 backdrop-blur-[18px]',
-    'transition-[border-color,background-color,color,transform,box-shadow] duration-200 active:scale-[0.985]',
-    'hover:border-black/[0.12] hover:bg-black/[0.04] hover:text-black hover:shadow-[0_10px_30px_rgba(15,15,15,0.06)]',
-    'dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/64',
-    'dark:hover:border-white/[0.14] dark:hover:bg-white/[0.065] dark:hover:text-white dark:hover:shadow-[0_16px_44px_rgba(0,0,0,0.32)]',
-    open &&
-      'border-black/[0.14] bg-[#fbfbfa] text-black dark:border-white/[0.16] dark:bg-white/[0.085] dark:text-white',
-  );
 }
 
 function ActiveDot({ className }: { className?: string }) {
@@ -608,451 +530,197 @@ function ProfileScopeContent({
   );
 }
 
-function DropdownSurface({
-  open,
-  width = 258,
-  children,
+function getWorkspaceIdentity(profile: unknown, locale: 'ru' | 'en') {
+  const data = (profile ?? {}) as Record<string, unknown>;
+
+  const name =
+    (typeof data.name === 'string' && data.name.trim()) ||
+    (typeof data.masterName === 'string' && data.masterName.trim()) ||
+    (typeof data.title === 'string' && data.title.trim()) ||
+    (typeof data.displayName === 'string' && data.displayName.trim()) ||
+    (locale === 'ru' ? 'Кабинет' : 'Workspace');
+
+  const slug =
+    typeof data.slug === 'string' && data.slug.trim()
+      ? data.slug.trim()
+      : locale === 'ru'
+        ? 'рабочий профиль'
+        : 'working profile';
+
+  return {
+    name,
+    subtitle: slug.startsWith('@') ? slug : `@${slug}`,
+    initial: name.trim().slice(0, 1).toUpperCase() || 'К',
+  };
+}
+
+function AccountThemeIcon({ value }: { value: ThemeOption }) {
+  if (value === 'light') {
+    return <SunMedium className="size-[13px] stroke-[1.9]" />;
+  }
+
+  if (value === 'dark') {
+    return <Moon className="size-[13px] stroke-[1.9]" />;
+  }
+
+  return <MonitorSmartphone className="size-[13px] stroke-[1.9]" />;
+}
+
+function AccountInlineSegment<T extends string>({
+  value,
+  options,
+  onChange,
 }: {
-  open: boolean;
-  width?: number;
-  children: ReactNode;
+  value: T;
+  options: Array<{
+    value: T;
+    label: string;
+    icon?: ReactNode;
+  }>;
+  onChange: (value: T) => void;
 }) {
   return (
     <div
       className={cn(
-        'absolute bottom-[calc(100%+10px)] left-0 origin-bottom-left overflow-hidden rounded-[12px] border p-1 shadow-none outline-none transition duration-150',
-        'border-black/[0.08] bg-[#fbfbfa] text-slate-950',
-        'dark:border-white/[0.08] dark:bg-[#101010] dark:text-white',
-        open
-          ? 'pointer-events-auto translate-y-0 scale-100 opacity-100'
-          : 'pointer-events-none translate-y-1.5 scale-[0.98] opacity-0',
+        'inline-grid rounded-[10px] border p-0.5',
+        'border-black/[0.07] bg-black/[0.025]',
+        'dark:border-white/[0.08] dark:bg-white/[0.04]',
       )}
-      style={{ width, maxWidth: 'calc(100vw - 24px)' }}
+      style={{
+        gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))`,
+      }}
     >
-      {children}
+      {options.map((option) => {
+        const active = value === option.value;
+
+        return (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onChange(option.value)}
+            aria-pressed={active}
+            title={option.label}
+            className={cn(
+              'relative flex h-7 min-w-8 items-center justify-center gap-1 rounded-[8px] px-2 text-[10px] font-semibold transition active:scale-[0.96]',
+              active
+                ? 'bg-[#fbfbfa] text-black shadow-[0_8px_20px_rgba(15,15,15,0.07)] dark:bg-white/[0.115] dark:text-white dark:shadow-none'
+                : 'text-black/38 hover:bg-black/[0.035] hover:text-black dark:text-white/34 dark:hover:bg-white/[0.06] dark:hover:text-white',
+            )}
+          >
+            {option.icon ? (
+              <span className="flex shrink-0 items-center justify-center">
+                {option.icon}
+              </span>
+            ) : null}
+
+            <span>{option.label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
 
-function DropdownHeader({
-  icon,
-  title,
-  subtitle,
-}: {
-  icon: ReactNode;
-  title: string;
-  subtitle: string;
-}) {
-  return (
-    <div className="px-2.5 pb-2 pt-2">
-      <div className="flex items-center gap-2">
-        <span className="flex size-7 items-center justify-center rounded-[9px] border border-black/[0.07] bg-black/[0.025] text-black/42 dark:border-white/[0.08] dark:bg-white/[0.045] dark:text-white/46">
-          {icon}
-        </span>
-
-        <span className="min-w-0">
-          <span className="block text-[12px] font-semibold tracking-[-0.035em] text-black dark:text-white">
-            {title}
-          </span>
-
-          <span className="block truncate text-[10px] text-black/42 dark:text-white/32">
-            {subtitle}
-          </span>
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function ThemeIconInline({ value }: { value: ThemeOption }) {
-  if (value === 'light') {
-    return <SunMedium className="size-[12.5px] stroke-[1.85]" />;
-  }
-
-  if (value === 'dark') {
-    return <Moon className="size-[12.5px] stroke-[1.85]" />;
-  }
-
-  return <MonitorSmartphone className="size-[12.5px] stroke-[1.85]" />;
-}
-
-function SettingsOptionRow({
-  active,
-  icon,
+function AccountMenuRow({
+  icon: Icon,
   label,
   hint,
+  href,
+  external = false,
+  danger = false,
   onClick,
 }: {
-  active: boolean;
-  icon: ReactNode;
+  icon: LucideIcon;
   label: string;
-  hint: string;
-  onClick: () => void;
+  hint?: string;
+  href?: string;
+  external?: boolean;
+  danger?: boolean;
+  onClick?: () => void;
 }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'group flex w-full items-center justify-between gap-3 rounded-[10px] px-2.5 py-2 text-left outline-none',
-        'transition-[background-color,color,transform] duration-150 active:scale-[0.99]',
-        active
-          ? 'bg-black/[0.055] text-black dark:bg-white/[0.075] dark:text-white'
-          : 'text-black/62 hover:bg-black/[0.04] hover:text-black dark:text-white/56 dark:hover:bg-white/[0.06] dark:hover:text-white',
-      )}
-      role="menuitemradio"
-      aria-checked={active}
-    >
-      <span className="flex min-w-0 items-center gap-2.5">
+  const content = (
+    <>
+      <span
+        className={cn(
+          'flex size-8 shrink-0 items-center justify-center rounded-[10px] border transition',
+          'border-black/[0.06] bg-black/[0.025] text-black/42',
+          'group-hover:border-black/[0.08] group-hover:bg-black/[0.045] group-hover:text-black',
+          'dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-white/40',
+          'dark:group-hover:border-white/[0.11] dark:group-hover:bg-white/[0.065] dark:group-hover:text-white',
+          danger &&
+            'text-red-500/70 group-hover:text-red-600 dark:text-red-300/70 dark:group-hover:text-red-200',
+        )}
+      >
+        <Icon className="size-[14px] stroke-[1.85]" />
+      </span>
+
+      <span className="min-w-0 flex-1">
         <span
           className={cn(
-            'flex size-7 shrink-0 items-center justify-center rounded-[9px] border transition',
-            active
-              ? 'border-black/[0.08] bg-[#fbfbfa] text-black dark:border-white/[0.10] dark:bg-white/[0.09] dark:text-white'
-              : 'border-black/[0.06] bg-black/[0.025] text-black/42 group-hover:text-black/68 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-white/40 dark:group-hover:text-white/70',
+            'block truncate text-[12px] font-semibold leading-none tracking-[-0.03em]',
+            danger
+              ? 'text-red-600 dark:text-red-200'
+              : 'text-black/78 group-hover:text-black dark:text-white/76 dark:group-hover:text-white',
           )}
         >
-          {icon}
+          {label}
         </span>
 
-        <span className="min-w-0">
-          <span className="block truncate text-[11.5px] font-semibold leading-none tracking-[-0.025em]">
-            {label}
-          </span>
-
+        {hint ? (
           <span className="mt-1 block truncate text-[9.5px] font-medium leading-none text-black/38 dark:text-white/30">
             {hint}
           </span>
-        </span>
+        ) : null}
       </span>
 
-      <span
-        className={cn(
-          'flex size-5 shrink-0 items-center justify-center rounded-full transition',
-          active ? 'text-black dark:text-white' : 'text-transparent',
-        )}
+      {external ? (
+        <ExternalLink className="size-3 shrink-0 text-black/28 transition group-hover:text-black/50 dark:text-white/24 dark:group-hover:text-white/50" />
+      ) : (
+        <ChevronRight className="size-3 shrink-0 text-black/24 transition group-hover:translate-x-0.5 group-hover:text-black/50 dark:text-white/22 dark:group-hover:text-white/48" />
+      )}
+    </>
+  );
+
+  const className = cn(
+    'group flex w-full items-center gap-2 rounded-[11px] px-2 py-2 text-left outline-none',
+    'transition-[background-color,color,transform] duration-150 active:scale-[0.99]',
+    'hover:bg-black/[0.04] dark:hover:bg-white/[0.06]',
+  );
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        prefetch={false}
+        target={external ? '_blank' : undefined}
+        rel={external ? 'noreferrer' : undefined}
+        onClick={() => onClick?.()}
+        className={className}
       >
-        <Check className="size-[13.5px] stroke-[2.2]" />
-      </span>
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <button type="button" onClick={onClick} className={className}>
+      {content}
     </button>
   );
 }
 
-function SettingsMenu({
-  locale,
-  className,
-}: {
-  locale: 'ru' | 'en';
-  className?: string;
-}) {
-  const { locale: currentLocale, setLocale } = useLocale();
-  const { theme, setTheme } = useTheme();
-
-  const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const rootRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const onPointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-
-    const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
-    };
-
-    document.addEventListener('pointerdown', onPointerDown);
-    window.addEventListener('keydown', onKeyDown);
-
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown);
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [open]);
-
-  const safeLocale: 'ru' | 'en' = currentLocale === 'en' ? 'en' : 'ru';
-  const currentTheme = mounted ? ((theme || 'system') as ThemeOption) : 'system';
-
-  const labels =
-    locale === 'ru'
-      ? {
-          title: 'Настройки',
-          subtitle: 'Тема и язык кабинета',
-          button: 'Настройки',
-          language: 'Язык',
-          theme: 'Тема',
-          light: 'Светлая',
-          dark: 'Тёмная',
-          system: 'Авто',
-          lightHint: 'Всегда светлый интерфейс',
-          darkHint: 'Всегда тёмный интерфейс',
-          systemHint: 'Как в настройках устройства',
-          russian: 'Русский',
-          english: 'English',
-          russianHint: 'Интерфейс на русском',
-          englishHint: 'Интерфейс на английском',
-          signOut: 'Выйти',
-          signOutHint: 'Завершить текущую сессию',
-        }
-      : {
-          title: 'Settings',
-          subtitle: 'Theme and workspace language',
-          button: 'Settings',
-          language: 'Language',
-          theme: 'Theme',
-          light: 'Light',
-          dark: 'Dark',
-          system: 'Auto',
-          lightHint: 'Always use light mode',
-          darkHint: 'Always use dark mode',
-          systemHint: 'Follow device settings',
-          russian: 'Русский',
-          english: 'English',
-          russianHint: 'Russian interface',
-          englishHint: 'English interface',
-          signOut: 'Sign out',
-          signOutHint: 'End current session',
-        };
-
-  const themeOptions: Array<{
-    value: ThemeOption;
-    label: string;
-    hint: string;
-    shortLabel: string;
-    icon: ReactNode;
-  }> = [
-    {
-      value: 'light',
-      label: labels.light,
-      hint: labels.lightHint,
-      shortLabel: labels.light,
-      icon: <SunMedium className="size-[13.5px] stroke-[1.85]" />,
-    },
-    {
-      value: 'dark',
-      label: labels.dark,
-      hint: labels.darkHint,
-      shortLabel: labels.dark,
-      icon: <Moon className="size-[13.5px] stroke-[1.85]" />,
-    },
-    {
-      value: 'system',
-      label: labels.system,
-      hint: labels.systemHint,
-      shortLabel: labels.system,
-      icon: <MonitorSmartphone className="size-[13.5px] stroke-[1.85]" />,
-    },
-  ];
-
-  const languageOptions: Array<{
-    value: 'ru' | 'en';
-    label: string;
-    hint: string;
-    badge: string;
-  }> = [
-    {
-      value: 'ru',
-      label: labels.russian,
-      hint: labels.russianHint,
-      badge: 'RU',
-    },
-    {
-      value: 'en',
-      label: labels.english,
-      hint: labels.englishHint,
-      badge: 'EN',
-    },
-  ];
-
-  const activeTheme =
-    themeOptions.find((option) => option.value === currentTheme) ??
-    themeOptions[2];
-
-  const activeLanguage =
-    languageOptions.find((option) => option.value === safeLocale) ??
-    languageOptions[0];
-
-  return (
-    <div ref={rootRef} className={cn('relative', className)}>
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        aria-label={labels.button}
-        title={labels.button}
-        className={footerTriggerClass(open)}
-      >
-        <span
-          className={cn(
-            'flex size-8 shrink-0 items-center justify-center rounded-[9px] border',
-            'border-black/[0.07] bg-black/[0.04] text-black/54',
-            'dark:border-white/[0.08] dark:bg-white/[0.055] dark:text-white/52',
-            open && 'text-black dark:text-white',
-          )}
-        >
-          <Settings2 className="cb-settings-gear size-[14px] stroke-[1.9]" />
-        </span>
-
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[10.5px] font-semibold leading-none tracking-[-0.025em]">
-            {labels.title}
-          </span>
-          <span className="mt-1 block truncate text-[9px] leading-none text-black/40 dark:text-white/32">
-            {activeLanguage.badge} · {activeTheme.shortLabel}
-          </span>
-        </span>
-
-        <ChevronRight
-          className={cn(
-            'size-3 shrink-0 text-black/30 transition-transform duration-200 dark:text-white/30',
-            open && '-rotate-90 text-black/56 dark:text-white/58',
-          )}
-        />
-      </button>
-
-      <DropdownSurface open={open} width={420}>
-        <div className="px-2.5 pb-2 pt-2">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-[12.5px] font-semibold leading-none tracking-[-0.04em] text-black dark:text-white">
-                {labels.title}
-              </div>
-              <div className="mt-1.5 truncate text-[10px] font-medium leading-none text-black/42 dark:text-white/32">
-                {labels.subtitle}
-              </div>
-            </div>
-
-            <div
-              className={cn(
-                'flex h-7 shrink-0 items-center gap-1 rounded-[9px] border px-2',
-                'border-black/[0.07] bg-black/[0.025] text-black/52',
-                'dark:border-white/[0.08] dark:bg-white/[0.045] dark:text-white/54',
-              )}
-            >
-              <span className="text-[9.5px] font-bold tracking-[0.08em]">
-                {activeLanguage.badge}
-              </span>
-              <span className="h-3 w-px bg-black/[0.10] dark:bg-white/[0.12]" />
-              <ThemeIconInline value={currentTheme} />
-            </div>
-          </div>
-        </div>
-
-        <DropdownDivider />
-
-        <div className="grid gap-1 px-1.5 py-1.5 sm:grid-cols-2">
-          <div>
-            <div className="mb-1.5 flex items-center gap-1.5 px-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-black/34 dark:text-white/26">
-              <SunMedium className="size-3" />
-              {labels.theme}
-            </div>
-
-            <div className="grid gap-0.5">
-              {themeOptions.map((option) => (
-                <SettingsOptionRow
-                  key={option.value}
-                  active={currentTheme === option.value}
-                  icon={option.icon}
-                  label={option.label}
-                  hint={option.hint}
-                  onClick={() => {
-                    setTheme(option.value);
-                    setOpen(false);
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-1.5 flex items-center gap-1.5 px-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-black/34 dark:text-white/26">
-              <Languages className="size-3" />
-              {labels.language}
-            </div>
-
-            <div className="grid gap-0.5">
-              {languageOptions.map((option) => (
-                <SettingsOptionRow
-                  key={option.value}
-                  active={safeLocale === option.value}
-                  icon={
-                    <span className="text-[9.5px] font-bold leading-none tracking-[0.08em]">
-                      {option.badge}
-                    </span>
-                  }
-                  label={option.label}
-                  hint={option.hint}
-                  onClick={() => {
-                    setLocale(option.value);
-                    setOpen(false);
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <DropdownDivider />
-
-        <div className="p-1.5">
-          <Link
-            href="/auth/signout"
-            className={cn(
-              'group flex w-full items-center justify-between gap-3 rounded-[10px] px-2.5 py-2 text-left outline-none',
-              'transition-[background-color,color,transform] duration-150 active:scale-[0.99]',
-              'text-black/62 hover:bg-black/[0.04] hover:text-black dark:text-white/56 dark:hover:bg-white/[0.06] dark:hover:text-white',
-            )}
-          >
-            <span className="flex min-w-0 items-center gap-2.5">
-              <span
-                className={cn(
-                  'flex size-7 shrink-0 items-center justify-center rounded-[9px] border',
-                  'border-black/[0.06] bg-black/[0.025] text-black/42 group-hover:text-black/68',
-                  'dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-white/40 dark:group-hover:text-white/70',
-                )}
-              >
-                <LogOut className="size-[13.5px] stroke-[1.85]" />
-              </span>
-
-              <span className="min-w-0">
-                <span className="block truncate text-[11.5px] font-semibold leading-none tracking-[-0.025em]">
-                  {labels.signOut}
-                </span>
-                <span className="mt-1 block truncate text-[9.5px] font-medium leading-none text-black/38 dark:text-white/30">
-                  {labels.signOutHint}
-                </span>
-              </span>
-            </span>
-
-            <ChevronRight className="size-3 shrink-0 opacity-40 transition group-hover:opacity-70" />
-          </Link>
-        </div>
-      </DropdownSurface>
-    </div>
-  );
-}
-
-function HelpMenu({
-  locale,
-  className,
-}: {
-  locale: 'ru' | 'en';
-  className?: string;
-}) {
+function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
   const pathname = usePathname();
+  const searchParams = useBrowserSearchParams();
+  const { ownedProfile } = useApp();
+  const { theme, setTheme } = useTheme();
+  const { locale: currentLocale, setLocale } = useLocale();
+  const billing = useBillingStatus();
 
+  const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState<HelpView>('menu');
-  const [openFaqKey, setOpenFaqKey] = useState<string>('demo');
+  const [view, setView] = useState<AccountPanelView>('menu');
+  const [openFaqKey, setOpenFaqKey] = useState('start');
   const [reportCategory, setReportCategory] = useState<ReportCategory>('bug');
   const [reportText, setReportText] = useState('');
   const [contactText, setContactText] = useState('');
@@ -1062,7 +730,22 @@ function HelpMenu({
   const [reportError, setReportError] = useState('');
 
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const supportTelegramUrl = process.env.NEXT_PUBLIC_SUPPORT_TELEGRAM_URL || '';
+
+  const demoMode = isDashboardDemoEnabled(searchParams);
+  const identity = getWorkspaceIdentity(ownedProfile, locale);
+
+  const publicHref = demoMode
+    ? '/demo/' + SLOTY_DEMO_SLUG
+    : ownedProfile
+      ? '/m/' + ownedProfile.slug
+      : '/create-profile';
+
+  const currentTheme = mounted ? ((theme || 'system') as ThemeOption) : 'system';
+  const safeLocale: 'ru' | 'en' = currentLocale === 'en' ? 'en' : 'ru';
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -1093,161 +776,229 @@ function HelpMenu({
   const labels =
     locale === 'ru'
       ? {
-          title: 'FAQ',
-          subtitle: 'Быстрые ответы и поддержка',
-          button: 'FAQ',
+          account: 'Аккаунт',
+          workspace: 'рабочий кабинет',
+          billing: 'Тариф и доступ',
+          menu: 'Меню аккаунта',
+          feedback: 'Feedback',
+          feedbackHint: 'ошибка, идея или вопрос',
+          theme: 'Тема',
+          language: 'Язык',
+          light: 'Свет',
+          dark: 'Тёмн',
+          system: 'Авто',
+          home: 'Главная',
+          homeHint: 'вернуться в кабинет',
+          publicPage: 'Публичная',
+          publicHint: 'страница клиента',
+          changelog: 'Обновления',
+          changelogHint: 'что появилось в КликБук',
+          help: 'Помощь',
+          helpHint: 'быстрые ответы',
+          docs: 'Инструкции',
+          docsHint: 'как настроить кабинет',
+          logout: 'Выйти',
+          logoutHint: 'завершить сессию',
+          upgrade: 'Подключить Pro',
+          planFree: 'Бесплатный доступ',
+          planPaid: 'Подписка активна',
+          limitShort: 'лимиты тарифа',
+          status: 'Статус платформы',
+          statusText: 'Все системы работают.',
+          robo: 'Робо',
+          roboHint: 'помощник по кабинету',
           back: 'Назад',
-          contact: 'Связаться с поддержкой',
-          contactHint: 'Вопрос, идея или помощь по кабинету',
-          report: 'Сообщить о проблеме',
-          reportHint: 'Ошибка, идея или вопрос по работе сервиса',
-          faq: 'База ответов',
-          faqHint: 'Инструкции по платформе',
-          reportTitle: 'Отправить сообщение в поддержку',
-          reportSubtitle: 'Опишите ситуацию — сообщение уйдёт в Telegram поддержки.',
+          reportTitle: 'Отправить сообщение',
+          reportHint: 'Сообщение уйдёт в поддержку вместе с текущим экраном.',
           reportPlaceholder:
-            'Например: не сохраняется описание, не нажимается кнопка, некорректно отображается мобильная версия...',
-          contactPlaceholder: 'Telegram / телефон / email для ответа',
-          sendReport: 'Отправить',
+            'Например: не открывается запись, не сохраняется услуга, странно работает тема...',
+          contactPlaceholder: 'Контакт для ответа: Telegram / email / телефон',
+          send: 'Отправить',
           sending: 'Отправляю',
-          sent: 'Сообщение отправлено',
-          sentHint: 'Поддержка получила сообщение в Telegram.',
-          reportValidation: 'Опишите ситуацию чуть подробнее.',
-          reportError:
-            'Не удалось отправить сообщение. Проверьте настройки Telegram API.',
-          quickLabel: 'Быстрые ответы',
+          sent: 'Готово, сообщение отправлено',
+          sentHint: 'Поддержка получила обращение.',
+          validation: 'Опиши ситуацию чуть подробнее.',
+          error: 'Не удалось отправить. Проверь /api/support/report и env.',
           categories: {
             bug: 'Ошибка',
             idea: 'Идея',
             question: 'Вопрос',
           },
-          faqTitle: 'База ответов',
-          faqSubtitle: 'Короткие подсказки по кабинету.',
+          faqTitle: 'Помощь и инструкции',
+          faqHint: 'Коротко по основным действиям.',
         }
       : {
-          title: 'FAQ',
-          subtitle: 'Quick help and support',
-          button: 'FAQ',
+          account: 'Account',
+          workspace: 'workspace',
+          billing: 'Plan and access',
+          menu: 'Account menu',
+          feedback: 'Feedback',
+          feedbackHint: 'bug, idea or question',
+          theme: 'Theme',
+          language: 'Language',
+          light: 'Light',
+          dark: 'Dark',
+          system: 'Auto',
+          home: 'Home Page',
+          homeHint: 'return to workspace',
+          publicPage: 'Public',
+          publicHint: 'client page',
+          changelog: 'Changelog',
+          changelogHint: 'latest ClickBook updates',
+          help: 'Help',
+          helpHint: 'quick answers',
+          docs: 'Docs',
+          docsHint: 'workspace guides',
+          logout: 'Log Out',
+          logoutHint: 'end current session',
+          upgrade: 'Upgrade to Pro',
+          planFree: 'Free access',
+          planPaid: 'Subscription active',
+          limitShort: 'plan limits',
+          status: 'Platform Status',
+          statusText: 'All systems normal.',
+          robo: 'Robo',
+          roboHint: 'workspace assistant',
           back: 'Back',
-          contact: 'Contact support',
-          contactHint: 'Question, idea, or workspace help',
-          report: 'Report an issue',
-          reportHint: 'Bug, idea, or workspace question',
-          faq: 'Knowledge base',
-          faqHint: 'Platform guides',
-          reportTitle: 'Send a support message',
-          reportSubtitle:
-            'Describe the situation — it will be sent to support in Telegram.',
+          reportTitle: 'Send feedback',
+          reportHint: 'The message will include your current screen.',
           reportPlaceholder:
-            'For example: profile description is not saved, button does not work, demo theme resets...',
-          contactPlaceholder: 'Telegram / phone / email for reply',
-          sendReport: 'Send',
+            'For example: booking does not open, service is not saved, theme behaves incorrectly...',
+          contactPlaceholder: 'Contact for reply: Telegram / email / phone',
+          send: 'Send',
           sending: 'Sending',
-          sent: 'Report sent',
-          sentHint: 'Message was sent to Telegram.',
-          reportValidation: 'Describe the issue in more detail.',
-          reportError: 'Could not send. Check API route and env.',
-          quickLabel: 'Quick help',
+          sent: 'Done, message sent',
+          sentHint: 'Support received your message.',
+          validation: 'Describe the situation in more detail.',
+          error: 'Could not send. Check /api/support/report and env.',
           categories: {
             bug: 'Bug',
             idea: 'Idea',
             question: 'Question',
           },
-          faqTitle: 'Knowledge base',
-          faqSubtitle: 'Short workspace guides.',
+          faqTitle: 'Help and docs',
+          faqHint: 'Short guides for core actions.',
         };
+
+  const themeOptions = useMemo<
+    Array<{
+      value: ThemeOption;
+      label: string;
+      icon: ReactNode;
+    }>
+  >(
+    () => [
+      {
+        value: 'light',
+        label: labels.light,
+        icon: <AccountThemeIcon value="light" />,
+      },
+      {
+        value: 'dark',
+        label: labels.dark,
+        icon: <AccountThemeIcon value="dark" />,
+      },
+      {
+        value: 'system',
+        label: labels.system,
+        icon: <AccountThemeIcon value="system" />,
+      },
+    ],
+    [labels.dark, labels.light, labels.system],
+  );
+
+  const localeOptions = useMemo(
+    () => [
+      {
+        value: 'ru' as const,
+        label: 'RU',
+      },
+      {
+        value: 'en' as const,
+        label: 'EN',
+      },
+    ],
+    [],
+  );
 
   const faqItems =
     locale === 'ru'
       ? [
           {
-            key: 'demo',
-            title: 'Как работает демо-режим?',
+            key: 'start',
+            title: 'С чего начать настройку?',
             text:
-              'Демо показывает тестовый профиль и записи. Можно безопасно смотреть интерфейс, проверять внешний вид и клиентскую страницу без влияния на рабочий профиль.',
-          },
-          {
-            key: 'profile',
-            title: 'Где редактировать профиль?',
-            text:
-              'Перейди в «Профиль». Там меняются имя мастера, описание, услуги, контакты и данные публичной страницы.',
-          },
-          {
-            key: 'appearance',
-            title: 'Как изменить внешний вид?',
-            text:
-              'Открой «Внешний вид». Там настраиваются тема, акцент, плотность, радиусы и визуальный стиль публичной страницы.',
+              'Открой «Профиль», заполни имя, описание, контакты и адрес. Потом перейди в «Услуги» и добавь позиции, по которым клиенты смогут записываться.',
           },
           {
             key: 'public',
-            title: 'Как проверить страницу клиента?',
+            title: 'Как посмотреть страницу клиента?',
             text:
-              'Нажми «Публичная» в меню. Откроется страница, которую видит клиент при онлайн-записи.',
+              'Нажми «Публичная». Это страница, которую получает клиент: услуги, свободное время и форма записи.',
           },
           {
-            key: 'report',
-            title: 'Как отправить ошибку?',
+            key: 'theme',
+            title: 'Где менять внешний вид?',
             text:
-              'Нажмите FAQ → «Сообщить о проблеме», выберите тип, опишите ситуацию и отправьте. Сообщение уйдёт в Telegram поддержки.',
+              'В разделе «Внешний вид» можно настроить тему, акцент, плотность интерфейса и оформление публичной страницы.',
+          },
+          {
+            key: 'robo',
+            title: 'Что делает Робо?',
+            text:
+              'Робо помогает по кабинету: подсказывает, куда перейти, что заполнить, как исправить ошибку и как настроить запись.',
           },
         ]
       : [
           {
-            key: 'demo',
-            title: 'How does demo mode work?',
+            key: 'start',
+            title: 'Where should I start?',
             text:
-              'Demo shows a test profile and bookings. You can safely preview the interface, appearance and client page without affecting the live profile.',
-          },
-          {
-            key: 'profile',
-            title: 'Where do I edit the profile?',
-            text:
-              'Open “Profile”. You can edit specialist name, description, services, contacts and public page data there.',
-          },
-          {
-            key: 'appearance',
-            title: 'How do I change appearance?',
-            text:
-              'Open “Appearance”. Theme, accent, density, radius and public page visual style are configured there.',
+              'Open “Profile”, fill in your name, description, contacts and address. Then add bookable items in “Services”.',
           },
           {
             key: 'public',
-            title: 'How do I preview client page?',
+            title: 'How do I preview the client page?',
             text:
-              'Click “Public” in the sidebar. It opens the page clients see when booking online.',
+              'Click “Public”. This is the page clients see: services, available slots and the booking form.',
           },
           {
-            key: 'report',
-            title: 'How do I report a bug?',
+            key: 'theme',
+            title: 'Where do I change appearance?',
             text:
-              'Click FAQ → “Report an issue”, choose a type, describe the situation, and send it. The message will go to support in Telegram.',
+              'Open “Appearance” to configure theme, accent, density and public page styling.',
+          },
+          {
+            key: 'robo',
+            title: 'What does Robo do?',
+            text:
+              'Robo helps with the workspace: where to click, what to fill in, how to fix issues and configure bookings.',
           },
         ];
 
-  const openMenu = () => {
-    setOpen((value) => {
-      const next = !value;
-      if (next) setView('menu');
-      return next;
-    });
-  };
+  const billingPlanName = billing.data?.plan.name ?? 'Start';
+  const billingIsPaid = Boolean(billing.data?.subscription.isPaid);
+  const billingStatusText = billing.loading
+    ? locale === 'ru' ? 'Проверяем подписку' : 'Checking subscription'
+    : billingIsPaid
+      ? labels.planPaid
+      : labels.planFree;
+  const billingLimitsText = billing.data
+    ? `${billing.data.limits.filter((limit) => limit.warning).length}/${billing.data.limits.length} ${labels.limitShort}`
+    : billing.error
+      ? locale === 'ru' ? 'подписка не загружена' : 'subscription unavailable'
+      : labels.limitShort;
 
-  const openReport = (category: ReportCategory = 'bug') => {
-    setReportCategory(category);
-    setReportStatus('idle');
-    setReportError('');
-    setView('report');
-  };
+  const openRobo = () => {
+    window.dispatchEvent(new CustomEvent('clickbook:open-robo'));
 
-  const handleContactClick = () => {
-    if (supportTelegramUrl) {
-      window.open(supportTelegramUrl, '_blank', 'noopener,noreferrer');
-      setOpen(false);
-      setView('menu');
-      return;
-    }
+    const trigger = document.querySelector<HTMLElement>(
+      '[data-workspace-assistant-trigger], [data-robo-trigger], #workspace-assistant-trigger',
+    );
 
-    openReport('question');
+    trigger?.click();
+    setOpen(false);
+    setView('menu');
   };
 
   const handleSendReport = async () => {
@@ -1255,7 +1006,7 @@ function HelpMenu({
 
     if (cleanText.length < 8) {
       setReportStatus('error');
-      setReportError(labels.reportValidation);
+      setReportError(labels.validation);
       return;
     }
 
@@ -1287,114 +1038,214 @@ function HelpMenu({
       setContactText('');
     } catch {
       setReportStatus('error');
-      setReportError(labels.reportError);
+      setReportError(labels.error);
     }
   };
 
-  const menuItems = [
-    {
-      label: labels.contact,
-      hint: labels.contactHint,
-      icon: Send,
-      onClick: handleContactClick,
-    },
-    {
-      label: labels.report,
-      hint: labels.reportHint,
-      icon: Bug,
-      onClick: () => openReport('bug'),
-    },
-    {
-      label: labels.faq,
-      hint: labels.faqHint,
-      icon: HelpCircle,
-      onClick: () => setView('faq'),
-    },
-  ];
-
   return (
-    <div ref={rootRef} className={cn('relative', className)}>
-      <button
-        type="button"
-        onClick={openMenu}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        aria-label={labels.button}
-        title={labels.button}
-        className={footerTriggerClass(open)}
+    <div ref={rootRef} className="relative">
+      <div
+        className={cn(
+          'absolute bottom-[calc(100%+10px)] left-0 z-50 w-[292px] origin-bottom-left overflow-hidden rounded-[15px] border p-1 backdrop-blur-[24px] transition duration-150',
+          'border-black/[0.09] bg-[#fbfbfa]/88 text-black shadow-[0_24px_80px_rgba(15,15,15,0.12)]',
+          'dark:border-white/[0.10] dark:bg-[#101010]/88 dark:text-white dark:shadow-[0_28px_90px_rgba(0,0,0,0.58)]',
+          open
+            ? 'pointer-events-auto translate-y-0 scale-100 opacity-100'
+            : 'pointer-events-none translate-y-1.5 scale-[0.985] opacity-0',
+        )}
       >
-        <span
-          className={cn(
-            'flex size-8 shrink-0 items-center justify-center rounded-[9px] border',
-            'border-black/[0.07] bg-black/[0.04] text-black/54',
-            'dark:border-white/[0.08] dark:bg-white/[0.055] dark:text-white/52',
-            open && 'text-black dark:text-white',
-          )}
-        >
-          <span className="cb-faq-mark text-[13px] font-bold leading-none">?</span>
-        </span>
-
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[10.5px] font-semibold leading-none tracking-[-0.025em]">
-            {labels.title}
-          </span>
-          <span className="mt-1 block truncate text-[9px] leading-none text-black/40 dark:text-white/32">
-            {labels.quickLabel}
-          </span>
-        </span>
-
-        <ChevronRight
-          className={cn(
-            'size-3 shrink-0 text-black/30 transition-transform duration-200 dark:text-white/30',
-            open && '-rotate-90 text-black/56 dark:text-white/58',
-          )}
-        />
-      </button>
-
-      <DropdownSurface open={open} width={252}>
         {view === 'menu' ? (
           <>
-            <DropdownHeader
-              icon={<LifeBuoy className="size-3.5" />}
-              title={labels.title}
-              subtitle={labels.subtitle}
-            />
+            <div className="px-2.5 pb-2 pt-2">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-2.5">
+                  <span
+                    className={cn(
+                      'relative flex size-9 shrink-0 items-center justify-center rounded-[11px] border text-[12px] font-bold',
+                      'border-black/[0.08] bg-black/[0.035] text-black/72',
+                      'dark:border-white/[0.09] dark:bg-white/[0.06] dark:text-white/78',
+                    )}
+                  >
+                    {identity.initial}
+
+                    <span
+                      aria-hidden="true"
+                      className="absolute -right-0.5 -top-0.5 size-2 rounded-full border-2 border-[#fbfbfa] bg-black/58 dark:border-[#101010] dark:bg-white/72"
+                    />
+                  </span>
+
+                  <span className="min-w-0 pt-0.5">
+                    <span className="block truncate text-[13px] font-semibold leading-none tracking-[-0.04em]">
+                      {identity.name}
+                    </span>
+
+                    <span className="mt-1.5 block truncate text-[10px] font-medium leading-none text-black/42 dark:text-white/32">
+                      {identity.subtitle} · {billingPlanName}
+                    </span>
+                  </span>
+                </div>
+
+                <Link
+                  href={withDashboardDemoParam('/dashboard/profile', demoMode)}
+                  prefetch={false}
+                  onClick={() => setOpen(false)}
+                  className="flex size-8 shrink-0 items-center justify-center rounded-[10px] text-black/40 transition hover:bg-black/[0.045] hover:text-black active:scale-[0.96] dark:text-white/36 dark:hover:bg-white/[0.07] dark:hover:text-white"
+                  title={labels.account}
+                >
+                  <Settings2 className="size-[15px] stroke-[1.85]" />
+                </Link>
+              </div>
+            </div>
 
             <DropdownDivider />
 
-            <div className="pt-1">
-              {menuItems.map((item) => {
-                const Icon = item.icon;
+            <div className="px-1 py-1">
+              <AccountMenuRow
+                icon={MessageCircleMore}
+                label={labels.feedback}
+                hint={labels.feedbackHint}
+                onClick={() => {
+                  setReportCategory('bug');
+                  setReportStatus('idle');
+                  setReportError('');
+                  setView('report');
+                }}
+              />
 
-                return (
-                  <button
-                    key={item.label}
-                    type="button"
-                    onClick={item.onClick}
-                    className={cn(
-                      'group flex w-full items-center gap-2 rounded-[9px] px-2.5 py-2 text-left outline-none transition-colors duration-150 active:scale-[0.99]',
-                      'text-black/68 hover:bg-black/[0.045] hover:text-black',
-                      'dark:text-white/68 dark:hover:bg-white/[0.075] dark:hover:text-white',
-                    )}
-                  >
-                    <span className="flex size-7 shrink-0 items-center justify-center rounded-[9px] text-black/38 transition group-hover:text-black dark:text-white/34 dark:group-hover:text-white">
-                      <Icon className="size-3.5" />
+              <div className="my-1 rounded-[12px] px-2 py-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-[10px] border border-black/[0.06] bg-black/[0.025] text-black/42 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-white/40">
+                      <SunMedium className="size-[14px] stroke-[1.85]" />
                     </span>
 
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[11.5px] font-semibold tracking-[-0.025em]">
-                        {item.label}
-                      </span>
+                    <span className="text-[12px] font-semibold tracking-[-0.03em] text-black/78 dark:text-white/76">
+                      {labels.theme}
+                    </span>
+                  </div>
 
-                      <span className="block truncate text-[9.5px] font-medium text-black/38 dark:text-white/30">
-                        {item.hint}
-                      </span>
+                  <AccountInlineSegment
+                    value={currentTheme}
+                    options={themeOptions}
+                    onChange={(value) => setTheme(value)}
+                  />
+                </div>
+              </div>
+
+              <div className="my-1 rounded-[12px] px-2 py-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-[10px] border border-black/[0.06] bg-black/[0.025] text-black/42 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-white/40">
+                      <Languages className="size-[14px] stroke-[1.85]" />
                     </span>
 
-                    <ChevronRight className="size-3 shrink-0 opacity-0 transition group-hover:opacity-50" />
-                  </button>
-                );
-              })}
+                    <span className="text-[12px] font-semibold tracking-[-0.03em] text-black/78 dark:text-white/76">
+                      {labels.language}
+                    </span>
+                  </div>
+
+                  <AccountInlineSegment
+                    value={safeLocale}
+                    options={localeOptions}
+                    onChange={(value) => setLocale(value)}
+                  />
+                </div>
+              </div>
+
+              <DropdownDivider />
+
+              <AccountMenuRow
+                icon={Home}
+                label={labels.home}
+                hint={labels.homeHint}
+                href={withDashboardDemoParam('/dashboard', demoMode)}
+                onClick={() => setOpen(false)}
+              />
+
+              <AccountMenuRow
+                icon={Globe2}
+                label={labels.publicPage}
+                hint={labels.publicHint}
+                href={publicHref}
+                onClick={() => setOpen(false)}
+              />
+
+              <AccountMenuRow
+                icon={Sparkles}
+                label={labels.changelog}
+                hint={labels.changelogHint}
+                onClick={() => {
+                  setOpenFaqKey('start');
+                  setView('faq');
+                }}
+              />
+
+              <AccountMenuRow
+                icon={LifeBuoy}
+                label={labels.help}
+                hint={labels.helpHint}
+                onClick={() => {
+                  setOpenFaqKey('start');
+                  setView('faq');
+                }}
+              />
+
+              <AccountMenuRow
+                icon={HelpCircle}
+                label={labels.docs}
+                hint={labels.docsHint}
+                onClick={() => {
+                  setOpenFaqKey('public');
+                  setView('faq');
+                }}
+              />
+
+              <DropdownDivider />
+
+              <AccountMenuRow
+                icon={LogOut}
+                label={labels.logout}
+                hint={labels.logoutHint}
+                href="/auth/signout"
+                danger
+              />
+            </div>
+
+            <div className="px-1.5 pb-1.5 pt-1">
+              <Link
+                href={withDashboardDemoParam('/dashboard/subscription', demoMode)}
+                prefetch={false}
+                onClick={() => setOpen(false)}
+                className={cn(
+                  'flex h-9 w-full items-center justify-center rounded-[10px] text-[12px] font-semibold tracking-[-0.03em] transition active:scale-[0.99]',
+                  'bg-black text-white hover:bg-black/88',
+                  'dark:bg-white dark:text-black dark:hover:bg-white/88',
+                )}
+              >
+                {billingIsPaid ? (locale === 'ru' ? 'Управлять подпиской' : 'Manage subscription') : labels.upgrade}
+              </Link>
+            </div>
+
+            <DropdownDivider />
+
+            <div className="px-3 py-2.5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-[11.5px] font-medium text-black/52 dark:text-white/46">
+                    {labels.billing}
+                  </div>
+
+                  <div className="mt-1 text-[12px] font-semibold tracking-[-0.035em] text-black dark:text-white">
+                    {billingPlanName} · {billingStatusText}
+                  </div>
+
+                  <div className="mt-1 text-[10px] font-medium leading-none text-black/38 dark:text-white/30">
+                    {billingLimitsText}
+                  </div>
+                </div>
+
+                <span className="mt-1.5 size-2 rounded-full bg-black/70 dark:bg-white/70" />
+              </div>
             </div>
           </>
         ) : null}
@@ -1405,19 +1256,19 @@ function HelpMenu({
               <button
                 type="button"
                 onClick={() => setView('menu')}
-                className="flex size-7 shrink-0 items-center justify-center rounded-[9px] text-black/42 transition hover:bg-black/[0.045] hover:text-black dark:text-white/36 dark:hover:bg-white/[0.075] dark:hover:text-white"
+                className="flex size-8 shrink-0 items-center justify-center rounded-[10px] text-black/42 transition hover:bg-black/[0.045] hover:text-black dark:text-white/36 dark:hover:bg-white/[0.075] dark:hover:text-white"
                 aria-label={labels.back}
               >
                 <ArrowLeft className="size-3.5" />
               </button>
 
               <span className="min-w-0">
-                <span className="block text-[12px] font-semibold tracking-[-0.035em] text-black dark:text-white">
+                <span className="block text-[13px] font-semibold leading-none tracking-[-0.04em] text-black dark:text-white">
                   {labels.reportTitle}
                 </span>
 
-                <span className="block truncate text-[10px] text-black/42 dark:text-white/32">
-                  {labels.reportSubtitle}
+                <span className="mt-1 block truncate text-[10px] text-black/42 dark:text-white/32">
+                  {labels.reportHint}
                 </span>
               </span>
             </div>
@@ -1482,13 +1333,13 @@ function HelpMenu({
               />
 
               {reportStatus === 'success' ? (
-                <div className="rounded-[10px] border border-emerald-500/15 bg-emerald-500/[0.06] px-3 py-2">
-                  <div className="flex items-center gap-2 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                <div className="rounded-[10px] border border-black/[0.08] bg-black/[0.025] px-3 py-2 dark:border-white/[0.08] dark:bg-white/[0.04]">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold text-black dark:text-white">
                     <CheckCircle2 className="size-3.5" />
                     {labels.sent}
                   </div>
 
-                  <div className="mt-0.5 text-[9.5px] text-emerald-700/70 dark:text-emerald-300/65">
+                  <div className="mt-0.5 text-[9.5px] text-black/42 dark:text-white/34">
                     {labels.sentHint}
                   </div>
                 </div>
@@ -1506,7 +1357,7 @@ function HelpMenu({
                 disabled={reportStatus === 'sending'}
                 className={cn(
                   'flex h-9 w-full items-center justify-center gap-2 rounded-[10px] text-[11px] font-semibold tracking-[-0.02em] transition active:scale-[0.99]',
-                  'cb-neutral-primary',
+                  'bg-black text-white hover:bg-black/88 dark:bg-white dark:text-black dark:hover:bg-white/88',
                   reportStatus === 'sending' && 'pointer-events-none opacity-70',
                 )}
               >
@@ -1515,7 +1366,8 @@ function HelpMenu({
                 ) : (
                   <Send className="size-3.5" />
                 )}
-                {reportStatus === 'sending' ? labels.sending : labels.sendReport}
+
+                {reportStatus === 'sending' ? labels.sending : labels.send}
               </button>
             </div>
           </div>
@@ -1527,19 +1379,19 @@ function HelpMenu({
               <button
                 type="button"
                 onClick={() => setView('menu')}
-                className="flex size-7 shrink-0 items-center justify-center rounded-[9px] text-black/42 transition hover:bg-black/[0.045] hover:text-black dark:text-white/36 dark:hover:bg-white/[0.075] dark:hover:text-white"
+                className="flex size-8 shrink-0 items-center justify-center rounded-[10px] text-black/42 transition hover:bg-black/[0.045] hover:text-black dark:text-white/36 dark:hover:bg-white/[0.075] dark:hover:text-white"
                 aria-label={labels.back}
               >
                 <ArrowLeft className="size-3.5" />
               </button>
 
               <span className="min-w-0">
-                <span className="block text-[12px] font-semibold tracking-[-0.035em] text-black dark:text-white">
+                <span className="block text-[13px] font-semibold leading-none tracking-[-0.04em] text-black dark:text-white">
                   {labels.faqTitle}
                 </span>
 
-                <span className="block truncate text-[10px] text-black/42 dark:text-white/32">
-                  {labels.faqSubtitle}
+                <span className="mt-1 block truncate text-[10px] text-black/42 dark:text-white/32">
+                  {labels.faqHint}
                 </span>
               </span>
             </div>
@@ -1551,18 +1403,18 @@ function HelpMenu({
                 const active = openFaqKey === item.key;
 
                 return (
-                  <div key={item.key} className="overflow-hidden rounded-[9px]">
+                  <div key={item.key} className="overflow-hidden rounded-[10px]">
                     <button
                       type="button"
                       onClick={() => setOpenFaqKey(active ? '' : item.key)}
                       className={cn(
-                        'flex w-full items-center justify-between gap-2 rounded-[9px] px-2.5 py-2 text-left transition',
+                        'flex w-full items-center justify-between gap-2 rounded-[10px] px-2.5 py-2 text-left transition',
                         active
                           ? 'bg-black/[0.045] text-black dark:bg-white/[0.075] dark:text-white'
                           : 'text-black/68 hover:bg-black/[0.035] hover:text-black dark:text-white/68 dark:hover:bg-white/[0.055] dark:hover:text-white',
                       )}
                     >
-                      <span className="text-[11px] font-semibold tracking-[-0.025em]">
+                      <span className="text-[11.5px] font-semibold tracking-[-0.025em]">
                         {item.title}
                       </span>
 
@@ -1575,7 +1427,7 @@ function HelpMenu({
                     </button>
 
                     {active ? (
-                      <div className="px-2.5 pb-2.5 pt-1 text-[10px] leading-4 text-black/42 dark:text-white/34">
+                      <div className="px-2.5 pb-2.5 pt-1 text-[10px] leading-4 text-black/44 dark:text-white/34">
                         {item.text}
                       </div>
                     ) : null}
@@ -1585,158 +1437,108 @@ function HelpMenu({
 
               <button
                 type="button"
-                onClick={() => openReport('question')}
+                onClick={() => {
+                  setReportCategory('question');
+                  setReportStatus('idle');
+                  setReportError('');
+                  setView('report');
+                }}
                 className="mt-1 flex h-8 w-full items-center justify-center gap-1.5 rounded-[9px] text-[10px] font-medium text-black/50 transition hover:bg-black/[0.045] hover:text-black dark:text-white/45 dark:hover:bg-white/[0.075] dark:hover:text-white"
               >
                 <Bug className="size-3" />
-                {labels.report}
+                {labels.feedback}
               </button>
             </div>
           </div>
         ) : null}
-      </DropdownSurface>
-    </div>
-  );
-}
+      </div>
 
-function RoboFooterButton({
-  locale,
-  className,
-}: {
-  locale: 'ru' | 'en';
-  className?: string;
-}) {
-  const label = locale === 'ru' ? 'Робо' : 'Robo';
-  const title = locale === 'ru' ? 'Чем помочь?' : 'How can I help?';
-  const subtitle = locale === 'ru' ? 'помощь по кабинету' : 'workspace help';
-
-  const handleOpenRobo = () => {
-    window.dispatchEvent(new CustomEvent('clickbook:open-robo'));
-
-    const trigger = document.querySelector<HTMLElement>(
-      '[data-workspace-assistant-trigger], [data-robo-trigger], #workspace-assistant-trigger',
-    );
-
-    trigger?.click();
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={handleOpenRobo}
-      className={cn('group relative', className)}
-      aria-label={label}
-      title={label}
-    >
-      <span
+      <div
         className={cn(
-          'pointer-events-none absolute bottom-[calc(100%+10px)] left-1/2 z-20 hidden w-[184px] -translate-x-1/2',
-          'group-hover:block',
+          'flex h-[52px] items-center gap-1.5 rounded-[14px] border p-1',
+          'border-black/[0.075] bg-black/[0.022] text-black backdrop-blur-[18px]',
+          'dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white',
         )}
       >
-        <span
+        <button
+          type="button"
+          onClick={() => {
+            setOpen((value) => {
+              const next = !value;
+              if (next) setView('menu');
+              return next;
+            });
+          }}
+          aria-expanded={open}
+          aria-haspopup="menu"
           className={cn(
-            'cb-robo-popover relative block overflow-hidden rounded-[13px] border px-3 py-2.5 text-left backdrop-blur-[22px]',
-            'border-black/[0.08] bg-[#fbfbfa]/86 text-black shadow-[0_18px_54px_rgba(15,15,15,0.13)]',
-            'dark:border-white/[0.10] dark:bg-[#101010]/86 dark:text-white dark:shadow-[0_24px_70px_rgba(0,0,0,0.52)]',
+            'group flex min-w-0 flex-1 items-center gap-2 rounded-[11px] px-2 py-1.5 text-left transition active:scale-[0.99]',
+            'hover:bg-black/[0.04] dark:hover:bg-white/[0.06]',
+            open && 'bg-black/[0.045] dark:bg-white/[0.07]',
           )}
         >
           <span
-            aria-hidden="true"
-            className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-black/18 to-transparent dark:via-white/24"
-          />
-
-          <span className="flex items-start gap-2.5">
-            <span
-              className={cn(
-                'relative mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-[9px]',
-                'border border-black/[0.07] bg-black/[0.035] text-black/70',
-                'dark:border-white/[0.09] dark:bg-white/[0.065] dark:text-white/78',
-              )}
-            >
-              <Bot className="size-3.5 stroke-[1.9]" />
-
-              <span
-                aria-hidden="true"
-                className={cn(
-                  'cb-robo-soft-glow absolute -right-[2px] -top-[2px] size-[5px] rounded-full',
-                  'bg-black/55 shadow-[0_0_0_2px_rgba(251,251,250,0.9)]',
-                  'dark:bg-white/72 dark:shadow-[0_0_0_2px_rgba(16,16,16,0.95)]',
-                )}
-              />
-            </span>
-
-            <span className="min-w-0">
-              <span className="block text-[12px] font-semibold leading-4 tracking-[-0.04em]">
-                {title}
-              </span>
-
-              <span className="mt-0.5 block text-[9.5px] font-medium leading-3 text-black/42 dark:text-white/34">
-                {subtitle}
-              </span>
-            </span>
-          </span>
-
-          <span
-            aria-hidden="true"
             className={cn(
-              'absolute -bottom-[5px] left-1/2 size-2.5 -translate-x-1/2 rotate-45 border-b border-r',
-              'border-black/[0.08] bg-[#fbfbfa]/86',
-              'dark:border-white/[0.10] dark:bg-[#101010]/86',
-            )}
-          />
-        </span>
-      </span>
-
-      <span className={cn(footerTriggerClass(false), 'justify-between')}>
-        <span className="flex min-w-0 items-center gap-2.5">
-          <span
-            className={cn(
-              'relative flex size-8 shrink-0 items-center justify-center rounded-[9px] border',
-              'border-black/[0.07] bg-black/[0.04] text-black/58',
-              'dark:border-white/[0.08] dark:bg-white/[0.055] dark:text-white/56',
+              'relative flex size-8 shrink-0 items-center justify-center rounded-[10px] border text-[11px] font-bold',
+              'border-black/[0.07] bg-[#fbfbfa] text-black/72',
+              'dark:border-white/[0.09] dark:bg-[#101010] dark:text-white/78',
             )}
           >
-            <Bot className="size-[14px] stroke-[1.9]" />
+            {identity.initial}
 
             <span
               aria-hidden="true"
-              className={cn(
-                'cb-robo-soft-glow absolute -right-[1px] -top-[1px] size-[4px] rounded-full',
-                'bg-black/55 shadow-[0_0_0_2px_rgba(251,251,250,0.9)]',
-                'dark:bg-white/72 dark:shadow-[0_0_0_2px_rgba(16,16,16,0.95)]',
-              )}
+              className="absolute -right-0.5 -top-0.5 size-2 rounded-full border-2 border-[#fbfbfa] bg-black/58 dark:border-[#101010] dark:bg-white/72"
             />
           </span>
 
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[10.5px] font-semibold leading-none tracking-[-0.025em]">
-              {label}
+            <span className="block truncate text-[11.5px] font-semibold leading-none tracking-[-0.03em] text-black dark:text-white">
+              {identity.name}
             </span>
+
             <span className="mt-1 block truncate text-[9px] leading-none text-black/40 dark:text-white/32">
-              {subtitle}
+              {billingPlanName} · {billingStatusText}
             </span>
           </span>
-        </span>
 
-        <span className="ml-2 flex items-end gap-[2px] pb-[1px] text-current/80">
-          <span className="cb-robo-dot-1 size-[3px] rounded-full bg-current" />
-          <span className="cb-robo-dot-2 size-[3px] rounded-full bg-current" />
-          <span className="cb-robo-dot-3 size-[3px] rounded-full bg-current" />
-        </span>
-      </span>
-    </button>
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-[9px] text-black/34 transition group-hover:bg-black/[0.045] group-hover:text-black dark:text-white/32 dark:group-hover:bg-white/[0.07] dark:group-hover:text-white">
+            <span className="translate-y-[-1px] text-[16px] leading-none">···</span>
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={openRobo}
+          title={labels.robo}
+          aria-label={labels.robo}
+          className={cn(
+            'group relative flex size-10 shrink-0 items-center justify-center rounded-[12px] border transition active:scale-[0.96]',
+            'border-black/[0.07] bg-black/[0.035] text-black/58 hover:border-black/[0.12] hover:bg-black/[0.055] hover:text-black',
+            'dark:border-white/[0.08] dark:bg-white/[0.055] dark:text-white/56 dark:hover:border-white/[0.14] dark:hover:bg-white/[0.08] dark:hover:text-white',
+          )}
+        >
+          <Bot className="size-[15px] stroke-[1.9]" />
+
+          <span
+            aria-hidden="true"
+            className="absolute right-2 top-2 size-1.5 rounded-full bg-black/55 dark:bg-white/70"
+          />
+
+          <span className="pointer-events-none absolute bottom-[calc(100%+9px)] right-0 hidden w-[158px] rounded-[12px] border border-black/[0.08] bg-[#fbfbfa]/90 px-3 py-2 text-left text-[10px] text-black/44 backdrop-blur-[22px] shadow-[0_18px_54px_rgba(15,15,15,0.12)] group-hover:block dark:border-white/[0.10] dark:bg-[#101010]/90 dark:text-white/36 dark:shadow-[0_24px_70px_rgba(0,0,0,0.50)]">
+            <span className="block text-[11.5px] font-semibold text-black dark:text-white">
+              {labels.robo}
+            </span>
+            <span className="mt-0.5 block">{labels.roboHint}</span>
+          </span>
+        </button>
+      </div>
+    </div>
   );
 }
 
 function FooterActions({ locale }: { locale: 'ru' | 'en' }) {
-  return (
-    <div className="grid grid-cols-2 gap-1.5">
-      <SettingsMenu locale={locale} />
-      <HelpMenu locale={locale} />
-      <RoboFooterButton locale={locale} className="col-span-2" />
-    </div>
-  );
+  return <AccountFooterMenu locale={locale} />;
 }
 
 function EmptySearch({ children }: { children: ReactNode }) {
@@ -2007,7 +1809,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
 
   useEffect(() => {
     document.documentElement.dataset.slotySidebar =
-      'linear-sidebar-minimal-v27-footer-grid';
+      'linear-sidebar-account-footer-v28';
   }, []);
 
   useEffect(() => {
@@ -2031,7 +1833,10 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
   })();
 
   const newBookings = profileBookings.filter(
-    (item) => item.date === todayIso && item.status !== 'cancelled' && item.status !== 'no_show',
+    (item) =>
+      item.date === todayIso &&
+      item.status !== 'cancelled' &&
+      item.status !== 'no_show',
   ).length;
 
   const labels =

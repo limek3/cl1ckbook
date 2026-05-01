@@ -33,6 +33,7 @@ import {
 import { WorkspaceShell } from '@/components/shared/workspace-shell';
 import { Button } from '@/components/ui/button';
 import { useOwnedWorkspaceData } from '@/hooks/use-owned-workspace-data';
+import { useBillingStatus } from '@/hooks/use-billing-status';
 import { useAppearance } from '@/lib/appearance-context';
 import { accentPalette } from '@/lib/appearance-palette';
 import { formatCurrency } from '@/lib/master-workspace';
@@ -1073,6 +1074,9 @@ function PaymentManageDialog({
   nextChargeValue,
   cardLabel,
   isSelectedCurrent,
+  onPrimaryAction,
+  primaryLoading,
+  primaryError,
 }: {
   open: boolean;
   onClose: () => void;
@@ -1085,6 +1089,9 @@ function PaymentManageDialog({
   nextChargeValue: string;
   cardLabel: string;
   isSelectedCurrent: boolean;
+  onPrimaryAction: () => void;
+  primaryLoading?: boolean;
+  primaryError?: string | null;
 }) {
   if (!open) return null;
 
@@ -1106,6 +1113,7 @@ function PaymentManageDialog({
           downloadInvoice: 'Скачать счёт',
           portal: isSelectedCurrent ? 'Открыть платёжный портал' : 'Подключить тариф',
           close: 'Закрыть',
+          actionError: 'Добавьте платёжную ссылку в env или подключите платёжный webhook.',
         }
       : {
           title: 'Manage payment',
@@ -1123,6 +1131,7 @@ function PaymentManageDialog({
           downloadInvoice: 'Download invoice',
           portal: isSelectedCurrent ? 'Open billing portal' : 'Activate plan',
           close: 'Close',
+          actionError: 'Add a payment link to env or connect payment webhook.',
         };
 
   function ModalRow({
@@ -1310,12 +1319,19 @@ function PaymentManageDialog({
             <ModalActionButton icon={ReceiptText} label={copy.invoices} />
             <ModalActionButton icon={Banknote} label={copy.downloadInvoice} />
 
+            {primaryError ? (
+              <div className="mt-3 rounded-[10px] border border-red-500/15 bg-red-500/[0.06] px-3 py-2 text-[10px] text-red-600 dark:text-red-300">
+                {copy.actionError}
+              </div>
+            ) : null}
+
             <button
               type="button"
-              onClick={onClose}
-              className={cn('mt-3 w-full', buttonBase(light, true))}
+              onClick={onPrimaryAction}
+              disabled={primaryLoading}
+              className={cn('mt-3 w-full disabled:pointer-events-none disabled:opacity-60', buttonBase(light, true))}
             >
-              {copy.portal}
+              {primaryLoading ? (locale === 'ru' ? 'Открываем…' : 'Opening…') : copy.portal}
               <ArrowRight className="size-4" />
             </button>
           </div>
@@ -1327,6 +1343,7 @@ function PaymentManageDialog({
 
 export default function SubscriptionPage() {
   const { hasHydrated, ownedProfile, dataset, locale } = useOwnedWorkspaceData();
+  const billingStatus = useBillingStatus();
   const { resolvedTheme } = useTheme();
   const { settings } = useAppearance();
 
@@ -1335,11 +1352,19 @@ export default function SubscriptionPage() {
   const [mounted, setMounted] = useState(false);
   const [billing, setBilling] = useState<BillingCycle>('monthly');
   const [selectedPlanId, setSelectedPlanId] = useState('pro');
+  const [billingActionStatus, setBillingActionStatus] = useState<'idle' | 'loading' | 'error'>('idle');
   const [paymentOpen, setPaymentOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (billingStatus.data?.subscription.planId) {
+      setSelectedPlanId(billingStatus.data.subscription.planId);
+      setBilling(billingStatus.data.subscription.period);
+    }
+  }, [billingStatus.data?.subscription.period, billingStatus.data?.subscription.planId]);
 
   const currentTheme: ThemeMode = mounted
     ? resolvedTheme === 'light'
@@ -1381,9 +1406,15 @@ export default function SubscriptionPage() {
           discount: 'Экономия',
           zeroSaving: 'Нет экономии',
           nextCharge: 'Следующее списание',
-          nextChargeValue: '1 мая 2026',
+          nextChargeValue: billingStatus.data?.subscription.currentPeriodEnd
+            ? new Date(billingStatus.data.subscription.currentPeriodEnd).toLocaleDateString('ru-RU')
+            : billingStatus.data?.subscription.isPaid
+              ? 'по данным провайдера'
+              : 'нет списаний',
           paymentMethod: 'Способ оплаты',
-          card: 'Visa •••• 3142',
+          card: billingStatus.data?.subscription.provider
+            ? billingStatus.data.subscription.provider
+            : 'платёжный провайдер не подключён',
           managePayment: 'Управлять оплатой',
           choosePlan: 'Выбрать тариф',
 
@@ -1445,9 +1476,15 @@ export default function SubscriptionPage() {
           discount: 'Savings',
           zeroSaving: 'No savings',
           nextCharge: 'Next charge',
-          nextChargeValue: 'May 1, 2026',
+          nextChargeValue: billingStatus.data?.subscription.currentPeriodEnd
+            ? new Date(billingStatus.data.subscription.currentPeriodEnd).toLocaleDateString('en-US')
+            : billingStatus.data?.subscription.isPaid
+              ? 'from provider'
+              : 'no charges',
           paymentMethod: 'Payment method',
-          card: 'Visa •••• 3142',
+          card: billingStatus.data?.subscription.provider
+            ? billingStatus.data.subscription.provider
+            : 'payment provider not connected',
           managePayment: 'Manage payment',
           choosePlan: 'Choose plan',
 
@@ -1486,10 +1523,11 @@ export default function SubscriptionPage() {
   const currentPlan = useMemo(() => {
     if (!dataset) return undefined;
 
-    return ((dataset.plans.find((plan) => plan.id === 'pro') ?? dataset.plans[0]) as
+    const activePlanId = billingStatus.data?.subscription.planId ?? 'start';
+    return ((dataset.plans.find((plan) => plan.id === activePlanId) ?? dataset.plans[0]) as
       | PlanLike
       | undefined);
-  }, [dataset]);
+  }, [billingStatus.data?.subscription.planId, dataset]);
 
   const selectedPlan = useMemo(() => {
     if (!dataset || !currentPlan) return undefined;
@@ -1500,6 +1538,33 @@ export default function SubscriptionPage() {
       (dataset.plans[0] as PlanLike | undefined)
     );
   }, [currentPlan, dataset, selectedPlanId]);
+
+  const handleBillingAction = async () => {
+    try {
+      setBillingActionStatus('loading');
+      const selectedIsCurrent = selectedPlan?.id === currentPlan?.id;
+      const response = await fetch('/api/billing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          action: selectedIsCurrent ? 'portal' : 'checkout',
+          planId: selectedPlan?.id,
+          period: billing,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as { url?: string };
+
+      if (!response.ok || !payload.url) {
+        throw new Error('billing_action_failed');
+      }
+
+      window.location.href = payload.url;
+    } catch {
+      setBillingActionStatus('error');
+    }
+  };
 
   if (!hasHydrated || !mounted) return null;
 
@@ -1812,13 +1877,13 @@ export default function SubscriptionPage() {
                 />
 
                 <div className="grid gap-2 p-4">
-                  {dataset.limits.length > 0 ? (
-                    dataset.limits.map((limit) => (
+                  {(billingStatus.data?.limits?.length ?? 0) > 0 ? (
+                    billingStatus.data!.limits.map((limit) => (
                       <LimitRow
                         key={limit.id}
-                        label={limit.label}
+                        label={appLocale === 'ru' ? limit.labelRu : limit.labelEn}
                         used={limit.used}
-                        total={limit.total}
+                        total={limit.total >= 9999 ? Math.max(limit.used, 9999) : limit.total}
                         accentColor={selectedAccent}
                         light={isLight}
                       />
@@ -2025,6 +2090,9 @@ export default function SubscriptionPage() {
         nextChargeValue={copy.nextChargeValue}
         cardLabel={copy.card}
         isSelectedCurrent={isSelectedCurrent}
+        onPrimaryAction={handleBillingAction}
+        primaryLoading={billingActionStatus === 'loading'}
+        primaryError={billingActionStatus === 'error' ? 'error' : null}
       />
     </WorkspaceShell>
   );

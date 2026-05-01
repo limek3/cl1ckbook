@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import { Suspense } from 'react';
 import Script from 'next/script';
+import { Golos_Text } from 'next/font/google';
 import './globals.css';
 import { Providers } from '@/components/app/providers';
 import { buildAppearancePreferenceScript } from '@/lib/appearance';
@@ -30,6 +31,12 @@ const shellPreferenceScript = `
   }
 `;
 
+const golosText = Golos_Text({
+  subsets: ['latin', 'cyrillic'],
+  variable: '--font-golos-text',
+  display: 'swap',
+});
+
 const appearancePreferenceScript = buildAppearancePreferenceScript();
 
 export default function RootLayout({
@@ -39,7 +46,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ru" suppressHydrationWarning>
-      <body className="min-h-screen bg-background font-sans text-foreground antialiased">
+      <body className={`${golosText.variable} min-h-screen bg-background font-sans text-foreground antialiased`}>
         <Script id="sloty-appearance-preferences" strategy="beforeInteractive">
           {appearancePreferenceScript}
         </Script>

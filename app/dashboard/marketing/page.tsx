@@ -610,9 +610,9 @@ export default function MarketingPage() {
   const copy =
     locale === 'ru'
       ? {
-          title: 'Маркетинг',
+          title: 'Продвижение',
           description:
-            'Публичная ссылка, QR-код, готовые тексты и источники переходов в одном спокойном рабочем экране.',
+            'Публичная ссылка, QR-код, готовые тексты, источники переходов и быстрые промо-кампании в одном рабочем экране.',
           publicPage: 'Публичная',
           createProfileTitle: 'Сначала настройте профиль мастера',
           createProfileDescription:
@@ -672,13 +672,13 @@ export default function MarketingPage() {
           hideQr: 'Скрыть',
           copyQrLink: 'Скопировать ссылку',
 
-          sources: 'Источники переходов',
-          sourcesDescription: 'Где ссылка работает лучше всего.',
+          sources: 'Источники и кампании',
+          sourcesDescription: 'Где ссылка работает лучше всего и какие каналы стоит усилить.',
         }
       : {
-          title: 'Marketing',
+          title: 'Promotion',
           description:
-            'Public link, QR code, ready-to-send copy, and traffic sources in one focused workspace.',
+            'Public link, QR code, ready-to-send copy, traffic sources, and quick promo campaigns in one focused workspace.',
           publicPage: 'Public',
           createProfileTitle: 'Create the master profile first',
           createProfileDescription:
@@ -738,8 +738,8 @@ export default function MarketingPage() {
           hideQr: 'Hide',
           copyQrLink: 'Copy link',
 
-          sources: 'Traffic sources',
-          sourcesDescription: 'Understand where the public link performs best.',
+          sources: 'Sources and campaigns',
+          sourcesDescription: 'Understand where the public link performs best and which channels to push next.',
         };
 
   const materials = useMemo(
