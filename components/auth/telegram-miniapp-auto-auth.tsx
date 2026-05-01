@@ -19,6 +19,16 @@ function normalizeRedirect(value: string | null) {
   }
 }
 
+function shouldForceTelegramSession(pathname: string) {
+  return (
+    pathname === '/login' ||
+    pathname === '/dashboard' ||
+    pathname.startsWith('/dashboard/') ||
+    pathname === '/create-profile' ||
+    pathname.startsWith('/create-profile/')
+  );
+}
+
 export function TelegramMiniAppAutoAuth() {
   const pathname = usePathname();
   const searchParams = useBrowserSearchParams();
@@ -30,7 +40,9 @@ export function TelegramMiniAppAutoAuth() {
     let cancelled = false;
 
     (async () => {
-      const result = await authorizeTelegramMiniAppSession();
+      const result = await authorizeTelegramMiniAppSession({
+        force: shouldForceTelegramSession(pathname),
+      });
       if (cancelled || !result.ok) return;
 
       if (pathname === '/login') {

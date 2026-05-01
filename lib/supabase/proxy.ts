@@ -2,14 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabasePublishableKey, getSupabaseUrl } from '@/lib/supabase/env';
 
-const PROTECTED_PREFIXES = ['/dashboard', '/create-profile'];
 const APP_SESSION_COOKIE = 'clickbook_auth_session';
-
-function isProtectedPath(pathname: string) {
-  return PROTECTED_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-  );
-}
 
 function decodeBase64Url(value: string) {
   try {
@@ -75,15 +68,13 @@ export async function updateSession(request: NextRequest) {
 
   const hasAppSession = hasLikelyActiveAppSession(request);
   const isAuthed = Boolean(user || hasAppSession);
-  const { pathname, search } = request.nextUrl;
+  const { pathname } = request.nextUrl;
 
-  if (!isAuthed && isProtectedPath(pathname)) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = '/login';
-    redirectUrl.searchParams.set('redirectTo', `${pathname}${search}`);
-    return NextResponse.redirect(redirectUrl);
-  }
-
+  // Important for Telegram Mini App:
+  // protected pages must be allowed to render first, because Telegram initData
+  // exists only in the browser WebApp SDK and is not visible to proxy.ts.
+  // API routes are still protected by requireAuthUser(); this proxy only keeps
+  // the login page from showing after a session is already present.
   if (isAuthed && pathname === '/login') {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = '/dashboard';
