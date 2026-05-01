@@ -877,7 +877,7 @@ export default function NotificationsPage() {
               : item.id === 'schedule-change'
                 ? 'two-hours'
                 : 'instant',
-        audience: item.id === 'visit-reminder' ? 'client' : 'master',
+        audience: item.id === 'visit-reminder' || item.id === 'chat-message' ? 'client' : 'master',
       })),
     [dataset?.notifications],
   );

@@ -29,14 +29,24 @@ function mergeWorkspaceDataForProfile(
       .map((service) => [String(service.name), service]),
   );
 
+  const mergedServices = seed.services.map((service) => ({
+    ...service,
+    ...(currentByName.get(service.name) ?? {}),
+    id: currentByName.get(service.name)?.id ?? service.id,
+    name: service.name,
+  }));
+
+  for (const service of currentServices) {
+    const name = typeof service.name === 'string' ? service.name.trim() : '';
+    if (!name) continue;
+    if (!mergedServices.some((item) => item.name.trim().toLowerCase() === name.toLowerCase())) {
+      mergedServices.push(service as typeof mergedServices[number]);
+    }
+  }
+
   return {
     ...data,
-    services: seed.services.map((service) => ({
-      ...service,
-      ...(currentByName.get(service.name) ?? {}),
-      id: currentByName.get(service.name)?.id ?? service.id,
-      name: service.name,
-    })),
+    services: mergedServices,
     availability: Array.isArray(data.availability) && data.availability.length > 0
       ? data.availability
       : seed.availability,

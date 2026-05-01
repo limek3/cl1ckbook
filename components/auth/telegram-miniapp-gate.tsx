@@ -100,10 +100,19 @@ export function TelegramMiniAppGate({
       }, 280);
     }
 
-    void authorizeMiniApp();
+    const watchdog = window.setTimeout(async () => {
+      if (cancelled) return;
+      const restored = await openFromStoredSession();
+      if (restored || cancelled) return;
+      setState('outside');
+      setMessage('Telegram долго не отдаёт сессию. Нажмите «Открыть кабинет», если вы уже входили, или откройте Mini App из бота ещё раз.');
+    }, 6200);
+
+    void authorizeMiniApp().finally(() => window.clearTimeout(watchdog));
 
     return () => {
       cancelled = true;
+      window.clearTimeout(watchdog);
     };
   }, [redirectTo]);
 
@@ -153,8 +162,16 @@ export function TelegramMiniAppGate({
         {message}
       </p>
 
-      {state === 'outside' ? (
+      {state === 'outside' || state === 'error' ? (
         <div className="mt-4 grid gap-2">
+          <button
+            type="button"
+            onClick={() => window.location.replace(redirectTo)}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border border-black/[0.08] bg-black px-4 text-[12px] font-semibold text-white transition hover:bg-black/88 active:scale-[0.99] dark:border-white/[0.10] dark:bg-white dark:text-black"
+          >
+            Открыть кабинет
+          </button>
+
           {botUrl ? (
             <a
               href={botUrl}

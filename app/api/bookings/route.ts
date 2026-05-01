@@ -5,6 +5,8 @@ import { buildWorkspaceSeed } from '@/lib/workspace-store';
 import type { Booking } from '@/lib/types';
 import { requireAuthUser } from '@/lib/server/require-auth-user';
 import { createClientTelegramBookingLink, notifyWorkspaceOwnerAboutBooking } from '@/lib/server/booking-telegram';
+import { sendClientTelegramMessage } from '@/lib/server/client-telegram';
+import { isNotificationEnabled } from '@/lib/server/notification-settings';
 import { createBookingRecord, listBookingsByWorkspace, updateBookingStatusRecord } from '@/lib/server/supabase-bookings';
 import {
   createChatMessage,
@@ -202,15 +204,24 @@ export async function POST(request: Request) {
       telegramBookingLink = null;
     }
 
-    try {
-      await notifyWorkspaceOwnerAboutBooking({
-        ownerId: workspace.ownerId ?? null,
-        workspaceSlug: workspace.slug,
-        profile: workspace.profile,
-        booking: persistedBooking,
-      });
-    } catch {
-      // Booking must stay successful even if Telegram notification fails.
+    if (
+      isNotificationEnabled(workspace, {
+        id: 'new-request',
+        titleIncludes: 'новая',
+        audience: 'master',
+        fallback: true,
+      })
+    ) {
+      try {
+        await notifyWorkspaceOwnerAboutBooking({
+          ownerId: workspace.ownerId ?? null,
+          workspaceSlug: workspace.slug,
+          profile: workspace.profile,
+          booking: persistedBooking,
+        });
+      } catch {
+        // Booking must stay successful even if Telegram notification fails.
+      }
     }
 
     try {
@@ -231,6 +242,7 @@ export async function POST(request: Request) {
           isPriority: false,
           lastMessagePreview: bookingSummary,
           lastMessageAt: persistedBooking.createdAt,
+          metadata: { bookingId: persistedBooking.id, bookingIds: [persistedBooking.id] },
         }));
 
       if (thread) {
@@ -262,6 +274,20 @@ export async function POST(request: Request) {
           });
         }
 
+        const sentToClientTelegram = isNotificationEnabled(workspace, {
+          id: 'visit-reminder',
+          titleIncludes: 'напомин',
+          audience: 'client',
+          fallback: true,
+        })
+          ? await sendClientTelegramMessage({
+              workspaceId: workspace.id,
+              bookingId: persistedBooking.id,
+              clientPhone: persistedBooking.clientPhone,
+              text: `Ваша заявка принята. ${persistedBooking.service} · ${persistedBooking.date} ${persistedBooking.time}`,
+            }).catch(() => false)
+          : false;
+
         await updateChatThread(workspace.id, thread.id, {
           clientName: persistedBooking.clientName,
           clientPhone: persistedBooking.clientPhone,
@@ -270,6 +296,18 @@ export async function POST(request: Request) {
           lastMessagePreview: persistedBooking.comment || bookingSummary,
           lastMessageAt: persistedBooking.createdAt,
           unreadCount: (existingThread?.unreadCount ?? 0) + 1,
+          botConnected: sentToClientTelegram || thread.botConnected,
+          metadata: {
+            ...(thread.metadata ?? {}),
+            bookingId: persistedBooking.id,
+            bookingIds: [
+              ...new Set([
+                ...((Array.isArray(thread.metadata?.bookingIds) ? thread.metadata?.bookingIds : []) as string[]),
+                persistedBooking.id,
+              ]),
+            ],
+            lastClientTelegramDelivery: sentToClientTelegram ? 'delivered' : 'pending_link',
+          },
         });
       }
     } catch {

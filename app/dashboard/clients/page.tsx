@@ -29,6 +29,7 @@ import {
 
 import { WorkspaceShell } from '@/components/shared/workspace-shell';
 import { useOwnedWorkspaceData } from '@/hooks/use-owned-workspace-data';
+import { useWorkspaceSection } from '@/hooks/use-workspace-section';
 import { useAppearance } from '@/lib/appearance-context';
 import { accentPalette } from '@/lib/appearance-palette';
 import { type ClientInsight, formatCurrency } from '@/lib/master-workspace';
@@ -37,6 +38,10 @@ import { cn } from '@/lib/utils';
 type ThemeMode = 'light' | 'dark';
 type ClientFilter = 'all' | 'new' | 'regular' | 'sleeping' | 'favorite';
 type ClientSort = 'recent' | 'spent' | 'name';
+type ClientReminderState = { text?: string; remindAt?: string; updatedAt?: string };
+
+const EMPTY_CLIENT_NOTES: Record<string, string> = {};
+const EMPTY_CLIENT_REMINDERS: Record<string, ClientReminderState> = {};
 
 type ClientTimelineItem = {
   id: string;
@@ -822,6 +827,10 @@ function MobileClientCard({
   light,
   accentColor,
   publicAccentColor,
+  noteValue,
+  reminderValue,
+  onSaveNote,
+  onSaveReminder,
 }: {
   client: ClientInsight;
   locale: 'ru' | 'en';
@@ -829,6 +838,10 @@ function MobileClientCard({
   light: boolean;
   accentColor: string;
   publicAccentColor: string;
+  noteValue?: string;
+  reminderValue?: ClientReminderState;
+  onSaveNote?: (clientId: string, note: string) => void;
+  onSaveReminder?: (clientId: string, reminder: ClientReminderState) => void;
 }) {
   const color = segmentColor(
     client.segment,
@@ -919,6 +932,10 @@ function ClientTableRow({
   light,
   accentColor,
   publicAccentColor,
+  noteValue,
+  reminderValue,
+  onSaveNote,
+  onSaveReminder,
 }: {
   client: ClientInsight;
   locale: 'ru' | 'en';
@@ -926,6 +943,10 @@ function ClientTableRow({
   light: boolean;
   accentColor: string;
   publicAccentColor: string;
+  noteValue?: string;
+  reminderValue?: ClientReminderState;
+  onSaveNote?: (clientId: string, note: string) => void;
+  onSaveReminder?: (clientId: string, reminder: ClientReminderState) => void;
 }) {
   const color = segmentColor(
     client.segment,
@@ -1022,6 +1043,10 @@ function ClientCrmDialog({
   onClose,
   accentColor,
   publicAccentColor,
+  noteValue,
+  reminderValue,
+  onSaveNote,
+  onSaveReminder,
 }: {
   open: boolean;
   client: ClientInsight | null;
@@ -1030,6 +1055,10 @@ function ClientCrmDialog({
   onClose: () => void;
   accentColor: string;
   publicAccentColor: string;
+  noteValue?: string;
+  reminderValue?: ClientReminderState;
+  onSaveNote?: (clientId: string, note: string) => void;
+  onSaveReminder?: (clientId: string, reminder: ClientReminderState) => void;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -1051,6 +1080,17 @@ function ClientCrmDialog({
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [onClose, open]);
+
+  const [draftNote, setDraftNote] = useState(noteValue ?? client?.note ?? '');
+  const [draftReminderText, setDraftReminderText] = useState(reminderValue?.text ?? '');
+  const [draftReminderAt, setDraftReminderAt] = useState(reminderValue?.remindAt ?? '');
+
+  useEffect(() => {
+    if (!client) return;
+    setDraftNote(noteValue ?? client.note ?? '');
+    setDraftReminderText(reminderValue?.text ?? '');
+    setDraftReminderAt(reminderValue?.remindAt ?? '');
+  }, [client, noteValue, reminderValue?.remindAt, reminderValue?.text]);
 
   if (!open || !client || typeof document === 'undefined') return null;
 
@@ -1322,14 +1362,31 @@ function ClientCrmDialog({
                     <NotebookPen className={cn('size-4', mutedText(light))} />
                   </div>
 
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className={cn('text-[13px] font-semibold', pageText(light))}>
                       {copy.note}
                     </div>
 
-                    <p className={cn('mt-1 text-[11.5px] leading-5', mutedText(light))}>
-                      {client.note}
-                    </p>
+                    <textarea
+                      value={draftNote}
+                      onChange={(event) => setDraftNote(event.target.value)}
+                      rows={3}
+                      className={cn(
+                        'mt-2 w-full resize-none rounded-[10px] border px-3 py-2 text-[12px] leading-5 outline-none transition-colors',
+                        light
+                          ? 'border-black/[0.08] bg-white text-black placeholder:text-black/28 focus:border-black/[0.16]'
+                          : 'border-white/[0.08] bg-white/[0.045] text-white placeholder:text-white/28 focus:border-white/[0.16]',
+                      )}
+                      placeholder={locale === 'ru' ? 'Что важно помнить о клиенте...' : 'What should be remembered about this client...'}
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => onSaveNote?.(client.id, draftNote)}
+                      className={cn('mt-2 h-8 rounded-[9px] px-3 text-[11px]', buttonBase(light, false))}
+                    >
+                      {locale === 'ru' ? 'Сохранить заметку' : 'Save note'}
+                    </button>
                   </div>
                 </div>
               </Panel>
@@ -1386,6 +1443,48 @@ function ClientCrmDialog({
                 />
               </Panel>
 
+              <Panel light={light} className="p-4">
+                <div className={cn('text-[12.5px] font-semibold', pageText(light))}>
+                  {copy.remind}
+                </div>
+                <input
+                  type="datetime-local"
+                  value={draftReminderAt}
+                  onChange={(event) => setDraftReminderAt(event.target.value)}
+                  className={cn(
+                    'mt-2 h-10 w-full rounded-[10px] border px-3 text-[12px] outline-none',
+                    light
+                      ? 'border-black/[0.08] bg-white text-black'
+                      : 'border-white/[0.08] bg-white/[0.045] text-white',
+                  )}
+                />
+                <textarea
+                  value={draftReminderText}
+                  onChange={(event) => setDraftReminderText(event.target.value)}
+                  rows={2}
+                  className={cn(
+                    'mt-2 w-full resize-none rounded-[10px] border px-3 py-2 text-[12px] leading-5 outline-none',
+                    light
+                      ? 'border-black/[0.08] bg-white text-black placeholder:text-black/28'
+                      : 'border-white/[0.08] bg-white/[0.045] text-white placeholder:text-white/28',
+                  )}
+                  placeholder={locale === 'ru' ? 'Например: напомнить о повторной записи' : 'Example: remind about the next booking'}
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    onSaveReminder?.(client.id, {
+                      text: draftReminderText,
+                      remindAt: draftReminderAt,
+                      updatedAt: new Date().toISOString(),
+                    })
+                  }
+                  className={cn('mt-2 h-8 rounded-[9px] px-3 text-[11px]', buttonBase(light, false))}
+                >
+                  {locale === 'ru' ? 'Сохранить напоминание' : 'Save reminder'}
+                </button>
+              </Panel>
+
               <div className="space-y-2">
                 <a
                   href={`tel:${client.phone.replace(/\s+/g, '')}`}
@@ -1419,13 +1518,19 @@ function ClientCrmDialog({
                 <ModalActionButton
                   icon={<NotebookPen className="size-4" />}
                   label={copy.addNote}
-                  onClick={() => undefined}
+                  onClick={() => onSaveNote?.(client.id, draftNote)}
                 />
 
                 <ModalActionButton
                   icon={<Sparkles className="size-4" />}
                   label={copy.remind}
-                  onClick={() => undefined}
+                  onClick={() =>
+                    onSaveReminder?.(client.id, {
+                      text: draftReminderText,
+                      remindAt: draftReminderAt,
+                      updatedAt: new Date().toISOString(),
+                    })
+                  }
                 />
 
                 <button
@@ -1450,6 +1555,14 @@ export default function ClientsPage() {
   const { hasHydrated, ownedProfile, dataset, locale } = useOwnedWorkspaceData();
   const { resolvedTheme } = useTheme();
   const { settings } = useAppearance();
+  const [clientNotes, setClientNotes] = useWorkspaceSection<Record<string, string>>(
+    'clientNotes',
+    EMPTY_CLIENT_NOTES,
+  );
+  const [clientReminders, setClientReminders] = useWorkspaceSection<Record<string, ClientReminderState>>(
+    'clientReminders',
+    EMPTY_CLIENT_REMINDERS,
+  );
 
   const [mounted, setMounted] = useState(false);
   const [query, setQuery] = useState('');
@@ -1477,7 +1590,12 @@ export default function ClientsPage() {
 
     const normalized = query.trim().toLowerCase();
 
-    const filtered = dataset.clients.filter((client) => {
+    const sourceClients = dataset.clients.map((client) => ({
+      ...client,
+      note: clientNotes[client.id] ?? clientNotes[client.phone] ?? client.note,
+    }));
+
+    const filtered = sourceClients.filter((client) => {
       const matchesQuery =
         !normalized ||
         [client.name, client.phone, client.note, client.service, client.source].some((value) =>
@@ -1505,11 +1623,11 @@ export default function ClientsPage() {
 
       return new Date(right.lastVisit).getTime() - new Date(left.lastVisit).getTime();
     });
-  }, [dataset, filter, locale, query, sortBy]);
+  }, [clientNotes, dataset, filter, locale, query, sortBy]);
 
   const selectedClient = useMemo(
-    () => dataset?.clients.find((client) => client.id === selectedClientId) ?? null,
-    [dataset, selectedClientId],
+    () => clients.find((client) => client.id === selectedClientId) ?? null,
+    [clients, selectedClientId],
   );
 
   const allClients = dataset?.clients ?? [];
@@ -2131,6 +2249,32 @@ export default function ClientsPage() {
         light={isLight}
         accentColor={accentColor}
         publicAccentColor={publicAccentColor}
+        noteValue={
+          selectedClient
+            ? clientNotes[selectedClient.id] ?? clientNotes[selectedClient.phone] ?? selectedClient.note
+            : ''
+        }
+        reminderValue={
+          selectedClient
+            ? clientReminders[selectedClient.id] ?? clientReminders[selectedClient.phone]
+            : undefined
+        }
+        onSaveNote={(clientId, note) => {
+          if (!selectedClient) return;
+          setClientNotes((current) => ({
+            ...current,
+            [clientId]: note,
+            [selectedClient.phone]: note,
+          }));
+        }}
+        onSaveReminder={(clientId, reminder) => {
+          if (!selectedClient) return;
+          setClientReminders((current) => ({
+            ...current,
+            [clientId]: reminder,
+            [selectedClient.phone]: reminder,
+          }));
+        }}
         onClose={() => setSelectedClientId(null)}
       />
     </WorkspaceShell>

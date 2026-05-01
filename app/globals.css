@@ -11083,3 +11083,43 @@ html[data-sloty-mobile-scale='standard'] .workspace-main-shell {
     max-width: calc(100vw - 0.76rem) !important;
   }
 }
+
+/* ClickBook mobile repair: compact 2x2 dashboard cards without breaking calendars/tables. */
+@media (max-width: 640px) {
+  .workspace-main-shell main {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+
+  .workspace-main-shell [class*='sm:grid-cols-2'],
+  .workspace-main-shell [class*='md:grid-cols-2'],
+  .workspace-main-shell [class*='md:grid-cols-3'],
+  .workspace-main-shell [class*='lg:grid-cols-3'],
+  .workspace-main-shell [class*='xl:grid-cols-4'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .workspace-main-shell [class*='grid-cols-7'],
+  .workspace-main-shell [class*='grid-cols-[7'],
+  .workspace-main-shell [class*='grid-cols-[repeat(7'],
+  .workspace-main-shell [class*='grid-cols-[4px_'],
+  .workspace-main-shell [class*='grid-cols-[minmax'],
+  .workspace-main-shell [class*='grid-cols-[auto'] {
+    grid-template-columns: revert !important;
+  }
+
+  .workspace-main-shell [class*='md:col-span-2'],
+  .workspace-main-shell [class*='lg:col-span-2'],
+  .workspace-main-shell [class*='xl:col-span-2'],
+  .workspace-main-shell [class*='col-span-full'] {
+    grid-column: 1 / -1 !important;
+  }
+
+  .workspace-main-shell input,
+  .workspace-main-shell textarea,
+  .workspace-main-shell select,
+  .workspace-main-shell button,
+  .workspace-main-shell a {
+    min-width: 0;
+  }
+}

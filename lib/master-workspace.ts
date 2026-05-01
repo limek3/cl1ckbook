@@ -517,14 +517,16 @@ function buildNotifications(locale: Locale): NotificationInsight[] {
   return locale === 'ru'
     ? [
         { id: 'new-request', title: 'Новая заявка', description: 'Уведомлять сразу после отправки формы в Телеграм и кабинете.', channel: 'telegram', enabled: true, critical: true },
-        { id: 'visit-reminder', title: 'Напоминание клиенту', description: 'Отправка в MAX за день и за 2 часа до визита.', channel: 'max', enabled: true },
+        { id: 'visit-reminder', title: 'Напоминание клиенту', description: 'Отправлять клиенту подтверждение и напоминания через Telegram.', channel: 'telegram', enabled: true },
+        { id: 'chat-message', title: 'Сообщение клиенту', description: 'Доставлять исходящие сообщения из чата клиенту через бота.', channel: 'telegram', enabled: true },
         { id: 'cancellation', title: 'Отмена или перенос', description: 'Сразу сообщать об изменении записи в Телеграм.', channel: 'telegram', enabled: true, critical: true },
         { id: 'schedule-change', title: 'Изменение графика', description: 'Отправлять себе сводку в MAX о блокировках и спецдатах.', channel: 'max', enabled: false },
         { id: 'weekly-digest', title: 'Недельная сводка', description: 'Доход, конверсия и загрузка по неделе.', channel: 'email', enabled: true },
       ]
     : [
         { id: 'new-request', title: 'New request', description: 'Notify in Telegram and inside the workspace right after the form is sent.', channel: 'telegram', enabled: true, critical: true },
-        { id: 'visit-reminder', title: 'Client reminder', description: 'Send in MAX one day and two hours before the visit.', channel: 'max', enabled: true },
+        { id: 'visit-reminder', title: 'Client reminder', description: 'Send confirmations and reminders to the client via Telegram.', channel: 'telegram', enabled: true },
+        { id: 'chat-message', title: 'Client chat message', description: 'Deliver outgoing chat messages to the client through the bot.', channel: 'telegram', enabled: true },
         { id: 'cancellation', title: 'Cancellation or reschedule', description: 'Alert immediately in Telegram when an appointment changes.', channel: 'telegram', enabled: true, critical: true },
         { id: 'schedule-change', title: 'Schedule changes', description: 'Send a MAX summary about blocked time and special dates.', channel: 'max', enabled: false },
         { id: 'weekly-digest', title: 'Weekly digest', description: 'Revenue, conversion, and load summary for the week.', channel: 'email', enabled: true },

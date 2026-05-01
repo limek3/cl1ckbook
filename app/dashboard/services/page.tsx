@@ -1244,6 +1244,12 @@ export default function ServicesPage() {
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    if (!hasHydrated) return;
+    if (services.length > 0 || initialServices.length === 0) return;
+    setServices(initialServices);
+  }, [hasHydrated, initialServices, services.length, setServices]);
+
   const currentTheme: ThemeMode = mounted
     ? resolvedTheme === 'light'
       ? 'light'

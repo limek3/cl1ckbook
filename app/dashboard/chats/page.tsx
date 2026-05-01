@@ -366,12 +366,14 @@ function deliveryLabel(value: ChatDeliveryState | null | undefined, locale: 'ru'
           sent: 'Отправлено',
           delivered: 'Доставлено',
           read: 'Прочитано',
+          failed: 'Не доставлено',
         }
       : {
           queued: 'Queued',
           sent: 'Sent',
           delivered: 'Delivered',
           read: 'Read',
+          failed: 'Failed',
         };
 
   return labels[value];

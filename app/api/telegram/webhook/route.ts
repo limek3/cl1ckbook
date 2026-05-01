@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/server/supabase-admin';
 import { ensureTelegramAuthUser, upsertTelegramAccount } from '@/lib/server/telegram-user';
+import { isNotificationEnabled } from '@/lib/server/notification-settings';
+import { createChatMessage, createChatThread, fetchChatThreadByPhone, updateChatThread } from '@/lib/server/supabase-chats';
 import {
   getAppUrl,
   sendClientBookingConfirmation,
@@ -273,7 +275,7 @@ async function handleBookingStart(params: {
 
   const { data: workspaceRow } = await admin
     .from('sloty_workspaces')
-    .select('profile,slug')
+    .select('profile,slug,data')
     .eq('id', link.workspace_id)
     .maybeSingle();
 
@@ -297,6 +299,8 @@ async function handleBookingStart(params: {
     return;
   }
 
+  const confirmedAt = new Date().toISOString();
+
   await admin
     .from('sloty_booking_telegram_links')
     .update({
@@ -306,17 +310,170 @@ async function handleBookingStart(params: {
       username: params.from.username ?? null,
       first_name: params.from.first_name ?? null,
       last_name: params.from.last_name ?? null,
-      confirmed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      confirmed_at: confirmedAt,
+      updated_at: confirmedAt,
     })
     .eq('token', params.token)
     .eq('status', 'pending');
 
-  await sendClientBookingConfirmation({
-    chatId: params.chatId,
-    booking,
-    profile,
-  });
+  await admin
+    .from('sloty_bookings')
+    .update({ status: 'confirmed', updated_at: confirmedAt })
+    .eq('id', booking.id)
+    .eq('workspace_id', link.workspace_id)
+    .then(() => undefined, () => undefined);
+
+  const workspaceData = (workspaceRow?.data && typeof workspaceRow.data === 'object'
+    ? (workspaceRow.data as Record<string, unknown>)
+    : {}) as Record<string, unknown>;
+  const jsonBookings = Array.isArray(workspaceData.bookings) ? (workspaceData.bookings as Booking[]) : [];
+  const nextBookings = jsonBookings.map((item) =>
+    item.id === booking.id
+      ? { ...item, status: 'confirmed' as Booking['status'], clientTelegramConnected: true }
+      : item,
+  );
+
+  if (nextBookings.length > 0) {
+    await admin
+      .from('sloty_workspaces')
+      .update({ data: { ...workspaceData, bookings: nextBookings } })
+      .eq('id', link.workspace_id)
+      .then(() => undefined, () => undefined);
+  }
+
+  const existingThread = booking.clientPhone
+    ? await fetchChatThreadByPhone(link.workspace_id, booking.clientPhone).catch(() => null)
+    : null;
+  const thread = existingThread
+    ? await updateChatThread(link.workspace_id, existingThread.id, {
+        botConnected: true,
+        metadata: {
+          ...(existingThread.metadata ?? {}),
+          bookingId: booking.id,
+          clientTelegramChatId: params.chatId,
+          clientTelegramId: params.from.id,
+        },
+      }).catch(() => existingThread)
+    : await createChatThread(link.workspace_id, {
+        clientName: booking.clientName,
+        clientPhone: booking.clientPhone,
+        channel: 'Telegram',
+        segment: 'active',
+        source: 'Публичная страница',
+        nextVisit: booking.date,
+        botConnected: true,
+        lastMessagePreview: 'Клиент подключил Telegram для подтверждений и напоминаний.',
+        lastMessageAt: confirmedAt,
+        unreadCount: 0,
+        metadata: {
+          bookingId: booking.id,
+          clientTelegramChatId: params.chatId,
+          clientTelegramId: params.from.id,
+        },
+      }).catch(() => null);
+
+  if (thread?.id) {
+    await createChatMessage(link.workspace_id, {
+      threadId: thread.id,
+      author: 'system',
+      body: 'Клиент подключил Telegram. Теперь ему можно отправлять сообщения и напоминания из чата.',
+      deliveryState: 'delivered',
+      viaBot: true,
+      metadata: { bookingId: booking.id, kind: 'telegram_connected' },
+    }).catch(() => null);
+  }
+
+  if (
+    isNotificationEnabled({ data: workspaceData }, {
+      id: 'visit-reminder',
+      titleIncludes: 'напомин',
+      audience: 'client',
+      fallback: true,
+    })
+  ) {
+    await sendClientBookingConfirmation({
+      chatId: params.chatId,
+      booking,
+      profile,
+    });
+  }
+}
+
+
+async function handleClientChatMessage(params: {
+  from: TelegramFrom;
+  chatId: number;
+  text?: string;
+}) {
+  const text = params.text?.trim();
+  if (!text || text.startsWith('/')) return;
+
+  const admin = createSupabaseAdminClient();
+
+  const { data: linkRows } = await admin
+    .from('sloty_booking_telegram_links')
+    .select('*')
+    .eq('chat_id', params.chatId)
+    .eq('status', 'confirmed')
+    .order('confirmed_at', { ascending: false })
+    .limit(1);
+
+  const link = Array.isArray(linkRows) ? (linkRows[0] as BookingLinkRow | undefined) : null;
+  if (!link) return;
+
+  const { data: bookingRow } = await admin
+    .from('sloty_bookings')
+    .select('*')
+    .eq('id', link.booking_id)
+    .maybeSingle();
+
+  const booking = bookingRow ? mapBookingRow(bookingRow as BookingRow) : link.booking_snapshot;
+  if (!booking) return;
+
+  const existingThread = booking.clientPhone
+    ? await fetchChatThreadByPhone(link.workspace_id, booking.clientPhone).catch(() => null)
+    : null;
+  const thread = existingThread
+    ? await updateChatThread(link.workspace_id, existingThread.id, {
+        botConnected: true,
+        lastMessagePreview: text,
+        lastMessageAt: new Date().toISOString(),
+        unreadCount: (existingThread.unreadCount ?? 0) + 1,
+        metadata: {
+          ...(existingThread.metadata ?? {}),
+          bookingId: booking.id,
+          clientTelegramChatId: params.chatId,
+          clientTelegramId: params.from.id,
+        },
+      }).catch(() => existingThread)
+    : await createChatThread(link.workspace_id, {
+        clientName: booking.clientName,
+        clientPhone: booking.clientPhone,
+        channel: 'Telegram',
+        segment: 'active',
+        source: 'Telegram',
+        nextVisit: booking.date,
+        botConnected: true,
+        lastMessagePreview: text,
+        lastMessageAt: new Date().toISOString(),
+        unreadCount: 1,
+        metadata: {
+          bookingId: booking.id,
+          clientTelegramChatId: params.chatId,
+          clientTelegramId: params.from.id,
+        },
+      }).catch(() => null);
+
+  if (!thread?.id) return;
+
+  await createChatMessage(link.workspace_id, {
+    threadId: thread.id,
+    author: 'client',
+    body: text,
+    deliveryState: null,
+    viaBot: true,
+    metadata: { bookingId: booking.id, source: 'telegram_inbox' },
+  }).catch(() => null);
 }
 
 export async function POST(request: Request) {
@@ -361,7 +518,14 @@ export async function POST(request: Request) {
     if (isPlainStart(message.text)) {
       await rememberTelegramUser({ from: message.from, chatId: message.chat.id });
       await sendMasterMenu(message.chat.id);
+      return NextResponse.json({ ok: true });
     }
+
+    await handleClientChatMessage({
+      from: message.from,
+      chatId: message.chat.id,
+      text: message.text,
+    });
 
     return NextResponse.json({ ok: true });
   } catch (error) {

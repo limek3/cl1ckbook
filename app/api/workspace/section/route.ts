@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 
+import type { Booking } from '@/lib/types';
 import { requireAuthUser } from '@/lib/server/require-auth-user';
 import { syncAvailabilityDays, syncMessageTemplates, syncServices } from '@/lib/server/supabase-workspace-sections';
 import { fetchWorkspaceForUser, updateWorkspace } from '@/lib/server/supabase-workspaces';
+import { buildWorkspaceSeed } from '@/lib/workspace-store';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -26,22 +28,37 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'forbidden' }, { status: 403 });
     }
 
+    let sectionValue = body.value;
+
+    if (body.section === 'services' && Array.isArray(sectionValue) && sectionValue.length === 0) {
+      const existingServices = Array.isArray(workspace.data?.services) ? workspace.data.services : [];
+      const seed = buildWorkspaceSeed(
+        workspace.profile,
+        Array.isArray(workspace.data?.bookings) ? (workspace.data.bookings as Booking[]) : [],
+        'ru',
+      );
+
+      // Do not accidentally wipe the service catalog when a stale client snapshot
+      // sends an empty array. The user can still hide services individually.
+      sectionValue = existingServices.length > 0 ? existingServices : seed.services;
+    }
+
     const nextData = {
       ...(workspace.data ?? {}),
-      [body.section]: body.value,
+      [body.section]: sectionValue,
     };
 
     const updated = await updateWorkspace(workspace.id, { data: nextData });
 
     try {
       if (body.section === 'availability') {
-        await syncAvailabilityDays(workspace.id, body.value);
+        await syncAvailabilityDays(workspace.id, sectionValue);
       }
       if (body.section === 'services') {
-        await syncServices(workspace.id, body.value);
+        await syncServices(workspace.id, sectionValue);
       }
       if (body.section === 'templates') {
-        await syncMessageTemplates(workspace.id, body.value);
+        await syncMessageTemplates(workspace.id, sectionValue);
       }
     } catch {
       // The JSON workspace remains the MVP source of truth. Normalized tables

@@ -1,6 +1,6 @@
 export type ChatChannel = 'Telegram' | 'MAX';
 export type ChatAuthor = 'client' | 'master' | 'system';
-export type ChatDeliveryState = 'queued' | 'sent' | 'delivered' | 'read';
+export type ChatDeliveryState = 'queued' | 'sent' | 'delivered' | 'read' | 'failed';
 export type ChatSegment = 'new' | 'active' | 'followup';
 
 export interface ChatMessageRecord {
