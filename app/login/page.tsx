@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ArrowRight, Chrome, Loader2, MessageCircleMore, Send } from 'lucide-react';
 
 import { TelegramLoginButton } from '@/components/auth/telegram-login-button';
@@ -9,6 +9,7 @@ import { BrandLogo } from '@/components/brand/brand-logo';
 import { Button } from '@/components/ui/button';
 import { useBrowserSearchParams } from '@/hooks/use-browser-search-params';
 import { createClient } from '@/lib/supabase/client';
+import { clearTelegramAppSessionToken } from '@/lib/telegram-miniapp-auth-client';
 import { cn } from '@/lib/utils';
 
 const authConfigured = Boolean(
@@ -95,6 +96,12 @@ function ProviderButton({
 
 export default function LoginPage() {
   const searchParams = useBrowserSearchParams();
+
+  useEffect(() => {
+    // When the user intentionally opens /login, drop old local Telegram app
+    // tokens so they cannot override a fresh Google/VK/Supabase session.
+    clearTelegramAppSessionToken();
+  }, []);
   const [loadingProvider, setLoadingProvider] = useState<OAuthProvider | null>(null);
   const [oauthError, setOauthError] = useState<string | null>(null);
 

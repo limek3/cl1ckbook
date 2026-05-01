@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Check, Copy, ExternalLink, Loader2, Send, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { authorizeTelegramMiniAppSession, storeTelegramAppSessionToken } from '@/lib/telegram-miniapp-auth-client';
+import { authorizeTelegramMiniAppSession, clearTelegramAppSessionToken, storeTelegramAppSessionToken } from '@/lib/telegram-miniapp-auth-client';
 import { cn } from '@/lib/utils';
 
 type TelegramStartResponse = {
@@ -164,6 +164,7 @@ export function TelegramLoginButton({
 
   const startLogin = async () => {
     clearPoll();
+    clearTelegramAppSessionToken();
     setState('opening');
     setMessage(null);
     setToken(null);

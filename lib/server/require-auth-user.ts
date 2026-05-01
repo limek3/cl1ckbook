@@ -42,12 +42,9 @@ export async function requireAuthUser(): Promise<User> {
   // that token directly through Supabase Auth.
   const { bearerToken: token, appSessionToken } = await getRequestAuthHeaders();
 
-  const headerTelegramUser = getTelegramAppSessionUserFromToken(appSessionToken);
-
-  if (headerTelegramUser) {
-    return headerTelegramUser;
-  }
-
+  // Prefer a real Supabase bearer token over the Telegram app-session fallback.
+  // This prevents an old Telegram token in localStorage from overriding a new
+  // Google/VK/Supabase session after the previous account was deleted.
   if (token) {
     const tokenSupabase = createSupabaseClient(
       getSupabaseUrl(),
@@ -66,6 +63,12 @@ export async function requireAuthUser(): Promise<User> {
     if (!tokenError && tokenData.user) {
       return tokenData.user;
     }
+  }
+
+  const headerTelegramUser = getTelegramAppSessionUserFromToken(appSessionToken);
+
+  if (headerTelegramUser) {
+    return headerTelegramUser;
   }
 
   const telegramUser = await getTelegramAppSessionUser();
