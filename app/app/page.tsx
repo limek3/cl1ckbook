@@ -6,7 +6,26 @@ import { TelegramMiniAppGate } from '@/components/auth/telegram-miniapp-gate';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export default function TelegramMiniAppEntryPage() {
+function normalizeRedirect(value: unknown) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (typeof raw !== 'string' || !raw) return '/dashboard';
+
+  try {
+    const decoded = decodeURIComponent(raw);
+    return decoded.startsWith('/') && !decoded.startsWith('//') ? decoded : '/dashboard';
+  } catch {
+    return raw.startsWith('/') && !raw.startsWith('//') ? raw : '/dashboard';
+  }
+}
+
+export default async function TelegramMiniAppEntryPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = searchParams ? await searchParams : {};
+  const redirectTo = normalizeRedirect(params.redirectTo ?? params.to);
+
   return (
     <main className="relative grid min-h-screen place-items-center overflow-hidden bg-[#f4f4f2] px-4 py-8 text-[#0e0e0e] dark:bg-[#090909] dark:text-white">
       <div className="pointer-events-none absolute inset-x-0 top-[-220px] mx-auto h-[440px] max-w-[720px] rounded-full bg-black/[0.035] blur-3xl dark:bg-white/[0.045]" />
@@ -44,7 +63,7 @@ export default function TelegramMiniAppEntryPage() {
             </p>
           </div>
 
-          <TelegramMiniAppGate redirectTo="/dashboard" />
+          <TelegramMiniAppGate redirectTo={redirectTo} />
 
           <Link
             href="/"

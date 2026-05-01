@@ -86,6 +86,11 @@ function overlaps(left: Interval, right: Interval) {
   return left.start < right.end && right.start < left.end;
 }
 
+function isShortExplicitSlot(interval: Interval) {
+  // Dashboard selected 1-hour cells are concrete booking starts.
+  return interval.end - interval.start <= 60;
+}
+
 function getMondayIndex(date: Date) {
   return (date.getDay() + 6) % 7;
 }
@@ -266,6 +271,20 @@ export function getAvailableTimesForDate({
     .filter(Boolean) as Interval[];
 
   const times = new Set<string>();
+  const explicitStartMode = workIntervals.length > 0 && workIntervals.every(isShortExplicitSlot);
+
+  if (explicitStartMode) {
+    for (const interval of workIntervals) {
+      const candidate = { start: interval.start, end: interval.start + duration };
+
+      if (breakIntervals.some((item) => overlaps(candidate, item))) continue;
+      if (bookedIntervals.some((item) => overlaps(candidate, item))) continue;
+
+      times.add(minutesToTime(interval.start));
+    }
+
+    return Array.from(times).sort((left, right) => (timeToMinutes(left) ?? 0) - (timeToMinutes(right) ?? 0));
+  }
 
   for (const interval of workIntervals) {
     for (let start = interval.start; start + duration <= interval.end; start += duration) {

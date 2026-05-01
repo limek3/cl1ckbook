@@ -63,7 +63,7 @@ export function buildMasterMenuReplyMarkup() {
         {
           text: 'Открыть кабинет',
           web_app: {
-            url: `${appUrl}/app`,
+            url: `${appUrl}/app?redirectTo=${encodeURIComponent('/dashboard')}`,
           },
         },
       ],
@@ -129,7 +129,7 @@ export async function sendMasterBookingNotification(params: {
           {
             text: 'Открыть записи',
             web_app: {
-              url: `${appUrl}/app`,
+              url: `${appUrl}/app?redirectTo=${encodeURIComponent('/dashboard/today')}`,
             },
           },
         ],
@@ -177,7 +177,7 @@ export async function setTelegramMenuButton() {
       type: 'web_app',
       text: 'Кабинет',
       web_app: {
-        url: `${appUrl}/app`,
+        url: `${appUrl}/app?redirectTo=${encodeURIComponent('/dashboard')}`,
       },
     },
   });

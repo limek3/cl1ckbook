@@ -175,15 +175,19 @@ export async function authorizeTelegramMiniAppSession(options?: { force?: boolea
   }
 
   cachedAuthPromise = (async () => {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 8000);
+
     const response = await fetch('/api/auth/telegram-miniapp', {
       method: 'POST',
       credentials: 'include',
       cache: 'no-store',
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ initData }),
-    });
+    }).finally(() => window.clearTimeout(timeout));
 
     const payload = await readJsonSafe(response);
 

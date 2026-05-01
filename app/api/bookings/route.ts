@@ -37,6 +37,64 @@ function buildClientBooking(masterSlug: string, values: Omit<Booking, 'id' | 'ma
   };
 }
 
+function mergeBookings(tableBookings: Booking[], jsonBookings: Booking[]) {
+  const map = new Map<string, Booking>();
+
+  for (const booking of [...jsonBookings, ...tableBookings]) {
+    if (!booking?.id) continue;
+    map.set(booking.id, booking);
+  }
+
+  return Array.from(map.values()).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+}
+
+function getAvailabilityKey(item: unknown) {
+  if (!item || typeof item !== 'object') return crypto.randomUUID();
+  const day = item as Record<string, unknown>;
+
+  if (typeof day.date === 'string' && day.date) return `date:${day.date}`;
+  if (typeof day.weekdayIndex === 'number') return `weekday:${day.weekdayIndex}`;
+  if (typeof day.weekday_index === 'number') return `weekday:${day.weekday_index}`;
+  if (typeof day.id === 'string' && day.id) return `id:${day.id}`;
+
+  return crypto.randomUUID();
+}
+
+function mergeAvailability(...sources: unknown[][]) {
+  const map = new Map<string, unknown>();
+
+  for (const source of sources) {
+    for (const item of source) {
+      if (!item || typeof item !== 'object') continue;
+      map.set(getAvailabilityKey(item), item);
+    }
+  }
+
+  return Array.from(map.values());
+}
+
+function resolveAvailability(params: {
+  seedAvailability: unknown[];
+  storedAvailability: unknown[];
+  normalizedAvailability: unknown[];
+}) {
+  const seed = normalizeAvailabilityDays(params.seedAvailability);
+  const stored = normalizeAvailabilityDays(params.storedAvailability);
+  const normalized = normalizeAvailabilityDays(params.normalizedAvailability);
+
+  if (stored.length > 0) {
+    return normalizeAvailabilityDays(mergeAvailability(seed.filter((day) => !day.date), stored));
+  }
+
+  if (normalized.length > 0) {
+    return normalizeAvailabilityDays(mergeAvailability(seed.filter((day) => !day.date), normalized));
+  }
+
+  return seed;
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
@@ -54,9 +112,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'master_not_found' }, { status: 404 });
     }
 
-    const currentBookings = await listBookingsByWorkspace(workspace.id).catch(() => {
-      return Array.isArray(workspace.data?.bookings) ? (workspace.data.bookings as Booking[]) : [];
-    });
+    const jsonBookings = Array.isArray(workspace.data?.bookings)
+      ? (workspace.data.bookings as Booking[])
+      : [];
+    const tableBookings = await listBookingsByWorkspace(workspace.id).catch(() => [] as Booking[]);
+    const currentBookings = mergeBookings(tableBookings, jsonBookings);
 
     const requestedService = body.values.service.trim();
     const profileServices = Array.isArray(workspace.profile?.services) ? workspace.profile.services : [];
@@ -84,11 +144,11 @@ export async function POST(request: Request) {
       ? workspace.data.availability
       : [];
     const normalizedAvailability = await listAvailabilityDays(workspace.id).catch(() => []);
-    const availability = normalizeAvailabilityDays([
-      ...seed.availability,
-      ...normalizedAvailability,
-      ...storedAvailability,
-    ]);
+    const availability = resolveAvailability({
+      seedAvailability: seed.availability,
+      storedAvailability,
+      normalizedAvailability,
+    });
     const bookedSlots = currentBookings.map((item) => ({
       id: item.id,
       date: item.date,
@@ -117,7 +177,8 @@ export async function POST(request: Request) {
 
     try {
       persistedBooking = (await createBookingRecord(workspace.id, booking)) ?? booking;
-      nextBookings = await listBookingsByWorkspace(workspace.id);
+      const refreshedTableBookings = await listBookingsByWorkspace(workspace.id).catch(() => [] as Booking[]);
+      nextBookings = mergeBookings(refreshedTableBookings, [persistedBooking, ...jsonBookings]);
     } catch {
       nextBookings = [persistedBooking, ...currentBookings];
     }
@@ -154,7 +215,7 @@ export async function POST(request: Request) {
 
     try {
       const existingThread = await fetchChatThreadByPhone(workspace.id, persistedBooking.clientPhone);
-      const bookingSummary = `Booking: ${persistedBooking.service} · ${persistedBooking.date} ${persistedBooking.time}`;
+      const bookingSummary = `Новая запись: ${persistedBooking.service} · ${persistedBooking.date} ${persistedBooking.time}`;
 
       const thread =
         existingThread ??
@@ -212,7 +273,7 @@ export async function POST(request: Request) {
         });
       }
     } catch {
-      // Keep public booking flow resilient even if inbox tables are not migrated yet.
+      // /api/chats can synthesize chat rows from bookings if normalized chat tables fail.
     }
 
     return NextResponse.json({ booking: persistedBooking, workspaceId: workspace.id, telegram: telegramBookingLink });
@@ -239,17 +300,20 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'not_found' }, { status: 404 });
     }
 
-    const currentBookings = Array.isArray(workspace.data?.bookings) ? (workspace.data.bookings as Booking[]) : [];
+    const jsonBookings = Array.isArray(workspace.data?.bookings) ? (workspace.data.bookings as Booking[]) : [];
+    const tableBookings = await listBookingsByWorkspace(workspace.id).catch(() => [] as Booking[]);
+    const currentBookings = mergeBookings(tableBookings, jsonBookings);
     let updatedBooking: Booking | null = null;
-    let nextBookings = currentBookings.map((booking) =>
-      booking.id === body.bookingId ? { ...booking, status: body.status } : booking,
+    let nextBookings = currentBookings.map((bookingItem) =>
+      bookingItem.id === body.bookingId ? { ...bookingItem, status: body.status } : bookingItem,
     );
 
     try {
       updatedBooking = await updateBookingStatusRecord(workspace.id, body.bookingId, body.status);
-      nextBookings = await listBookingsByWorkspace(workspace.id);
+      const refreshedTableBookings = await listBookingsByWorkspace(workspace.id).catch(() => [] as Booking[]);
+      nextBookings = mergeBookings(refreshedTableBookings, nextBookings);
     } catch {
-      updatedBooking = nextBookings.find((booking) => booking.id === body.bookingId) ?? null;
+      updatedBooking = nextBookings.find((bookingItem) => bookingItem.id === body.bookingId) ?? null;
     }
 
     if (!updatedBooking) {

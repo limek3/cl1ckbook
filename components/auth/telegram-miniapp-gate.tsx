@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { CheckCircle2, ExternalLink, Loader2, Send, ShieldCheck } from 'lucide-react';
-import { authorizeTelegramMiniAppSession } from '@/lib/telegram-miniapp-auth-client';
+import { authorizeTelegramMiniAppSession, getTelegramAppSessionHeaders } from '@/lib/telegram-miniapp-auth-client';
 import { cn } from '@/lib/utils';
 
 type MiniAppAuthState = 'checking' | 'success' | 'outside' | 'error';
@@ -48,20 +48,45 @@ export function TelegramMiniAppGate({
   useEffect(() => {
     let cancelled = false;
 
+    async function openFromStoredSession() {
+      const fallbackHeaders = getTelegramAppSessionHeaders();
+
+      if (Object.keys(fallbackHeaders).length === 0) return false;
+
+      try {
+        const response = await fetch('/api/workspace', {
+          credentials: 'include',
+          cache: 'no-store',
+          headers: fallbackHeaders,
+        });
+
+        if (!response.ok) return false;
+        if (cancelled) return true;
+
+        setState('success');
+        setMessage('Сессия найдена. Открываем кабинет...');
+        window.setTimeout(() => window.location.replace(redirectTo), 180);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
     async function authorizeMiniApp() {
       const payload = await authorizeTelegramMiniAppSession({ force: true, waitMs: 2400 });
-
-      if (!payload.ok && payload.error === 'telegram_init_data_empty') {
-        if (!cancelled) {
-          setState('outside');
-          setMessage('Откройте кабинет через Telegram-бота. В браузере можно пользоваться веб-входом через кнопку ниже.');
-        }
-        return;
-      }
 
       if (cancelled) return;
 
       if (!payload.ok) {
+        const restored = await openFromStoredSession();
+        if (restored) return;
+
+        if (payload.error === 'telegram_init_data_empty') {
+          setState('outside');
+          setMessage('Откройте кабинет через Telegram-бота. В браузере можно пользоваться веб-входом через кнопку ниже.');
+          return;
+        }
+
         setState('error');
         setMessage(normalizeTelegramMiniAppError(payload.error));
         return;

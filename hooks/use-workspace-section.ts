@@ -143,7 +143,7 @@ export function useWorkspaceSection<T>(
     saveTimerRef.current = window.setTimeout(() => {
       saveTimerRef.current = null;
       void runSaveQueue();
-    }, 280);
+    }, 80);
   }, [demoMode, demoStorageKey, hasHydrated, ownedProfile, runSaveQueue, state]);
 
   return [state, setState, hasHydrated];

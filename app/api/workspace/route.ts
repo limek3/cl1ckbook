@@ -3,9 +3,25 @@ import { NextResponse } from 'next/server';
 import { requireAuthUser } from '@/lib/server/require-auth-user';
 import { listBookingsByWorkspace } from '@/lib/server/supabase-bookings';
 import { fetchWorkspaceForUser } from '@/lib/server/supabase-workspaces';
+import type { Booking } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+function mergeBookings(tableBookings: Booking[], jsonBookings: Booking[]) {
+  const map = new Map<string, Booking>();
+
+  // JSON bookings are the resilient fallback. Table rows win when the same id
+  // exists there, because they may contain a confirmed status updated later.
+  for (const booking of [...jsonBookings, ...tableBookings]) {
+    if (!booking?.id) continue;
+    map.set(booking.id, booking);
+  }
+
+  return Array.from(map.values()).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+}
 
 export async function GET() {
   try {
@@ -16,9 +32,11 @@ export async function GET() {
       return NextResponse.json({ error: 'not_found' }, { status: 404 });
     }
 
-    const bookings = await listBookingsByWorkspace(workspace.id).catch(() => {
-      return Array.isArray(workspace.data?.bookings) ? workspace.data.bookings : [];
-    });
+    const jsonBookings = Array.isArray(workspace.data?.bookings)
+      ? (workspace.data.bookings as Booking[])
+      : [];
+    const tableBookings = await listBookingsByWorkspace(workspace.id).catch(() => [] as Booking[]);
+    const bookings = mergeBookings(tableBookings, jsonBookings);
 
     return NextResponse.json({
       ...workspace,

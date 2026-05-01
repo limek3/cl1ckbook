@@ -85,9 +85,9 @@ export async function listChatThreads(workspaceId: string) {
 export async function listChatMessages(workspaceId: string, threadIds: string[]) {
   if (threadIds.length === 0) return [];
 
-  const encoded = threadIds.join(',');
+  const encoded = threadIds.map((id) => id.replaceAll(',', '')).join(',');
   const response = await supabaseRestRequest(
-    `/rest/v1/sloty_chat_messages?workspace_id=eq.${encodeURIComponent(workspaceId)}&thread_id=in.(${encodeURIComponent(encoded)})&select=*&order=created_at.asc`,
+    `/rest/v1/sloty_chat_messages?workspace_id=eq.${encodeURIComponent(workspaceId)}&thread_id=in.(${encoded})&select=*&order=created_at.asc`,
   );
   const rows = (await response.json()) as ChatMessageRow[];
   return rows.map(mapMessage);
