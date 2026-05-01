@@ -53,11 +53,19 @@ export function getStoredTelegramAppSessionToken() {
   }
 }
 
-function storeTelegramAppSessionToken(token?: string | null) {
+export function storeTelegramAppSessionToken(token?: string | null) {
   if (!token || typeof window === 'undefined') return;
 
   try {
     window.localStorage.setItem(APP_SESSION_STORAGE_KEY, token);
+  } catch {}
+}
+
+export function clearTelegramAppSessionToken() {
+  if (typeof window === 'undefined') return;
+
+  try {
+    window.localStorage.removeItem(APP_SESSION_STORAGE_KEY);
   } catch {}
 }
 

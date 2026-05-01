@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import type { User } from '@supabase/supabase-js';
 import { createSupabaseAdminClient } from '@/lib/server/supabase-admin';
-import { setTelegramAppSessionCookie } from '@/lib/server/app-session';
+import { createTelegramAppSessionToken, setTelegramAppSessionCookie } from '@/lib/server/app-session';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -274,9 +274,18 @@ export async function GET(request: Request) {
       })
       .eq('token', token);
 
+    const appSessionToken = createTelegramAppSessionToken({
+      userId: user.id,
+      telegramId,
+      username: loginRequest.username,
+      firstName: loginRequest.first_name,
+      lastName: loginRequest.last_name,
+    });
+
     const response = NextResponse.json({
       status: 'confirmed',
       app_session: true,
+      appSessionToken,
       user: {
         id: user.id,
         email: user.email,
@@ -291,6 +300,7 @@ export async function GET(request: Request) {
       username: loginRequest.username,
       firstName: loginRequest.first_name,
       lastName: loginRequest.last_name,
+      token: appSessionToken,
     });
   } catch (error) {
     const message = normalizeReason(error);

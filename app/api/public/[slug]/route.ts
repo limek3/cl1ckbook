@@ -14,7 +14,7 @@ function mergeAvailability(base: unknown[], stored: unknown[], normalized: unkno
   const seen = new Set<string>();
   const result: unknown[] = [];
 
-  for (const item of [...base, ...stored, ...normalized]) {
+  for (const item of [...base, ...normalized, ...stored]) {
     if (!item || typeof item !== 'object') continue;
     const day = item as Record<string, unknown>;
     const key = typeof day.date === 'string'

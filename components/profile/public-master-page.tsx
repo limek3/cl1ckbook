@@ -1486,7 +1486,7 @@ export function PublicMasterPage({
     };
   }, [bookings, fallbackProfile, isDemo, locale, workspaceData.availability, workspaceData.services]);
 
-  const profile = isDemo ? getDemoProfileBySlug(slug) : remoteProfile ?? fallbackProfile;
+  const profile = isDemo ? getDemoProfileBySlug(slug) : fallbackProfile ?? remoteProfile;
 
   const services = profile?.services ?? [];
   const reviews = profile?.reviews ?? [];
@@ -1729,14 +1729,14 @@ export function PublicMasterPage({
 
   const bookingAvailability = isDemo
     ? demoDataset?.availability ?? []
-    : remoteAvailability.length > 0
-      ? remoteAvailability
-      : fallbackDataset?.availability ?? [];
+    : (fallbackDataset?.availability?.length ?? 0) > 0
+      ? fallbackDataset?.availability ?? []
+      : remoteAvailability;
   const bookingServiceDetails = isDemo
     ? demoDataset?.services ?? []
-    : remoteServiceDetails.length > 0
-      ? remoteServiceDetails
-      : fallbackDataset?.services ?? [];
+    : (fallbackDataset?.services?.length ?? 0) > 0
+      ? fallbackDataset?.services ?? []
+      : remoteServiceDetails;
   const bookingBookedSlots = isDemo
     ? demoBookings.map((booking) => ({
         id: booking.id,
@@ -1745,9 +1745,9 @@ export function PublicMasterPage({
         service: booking.service,
         status: booking.status,
       }))
-    : remoteBookedSlots.length > 0
-      ? remoteBookedSlots
-      : fallbackDataset?.bookedSlots ?? [];
+    : (fallbackDataset?.bookedSlots?.length ?? 0) > 0
+      ? fallbackDataset?.bookedSlots ?? []
+      : remoteBookedSlots;
 
   const bookingProfile = useMemo<MasterProfile | null>(() => {
     if (!profile) return null;

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Check, Copy, ExternalLink, Loader2, Send, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { authorizeTelegramMiniAppSession } from '@/lib/telegram-miniapp-auth-client';
+import { authorizeTelegramMiniAppSession, storeTelegramAppSessionToken } from '@/lib/telegram-miniapp-auth-client';
 import { cn } from '@/lib/utils';
 
 type TelegramStartResponse = {
@@ -17,6 +17,7 @@ type TelegramStartResponse = {
 type TelegramStatusResponse = {
   status: 'pending' | 'confirmed' | 'expired' | 'consumed' | 'invalid' | 'not_found' | 'error';
   app_session?: boolean;
+  appSessionToken?: string;
   access_token?: string;
   refresh_token?: string;
   error?: string;
@@ -87,6 +88,7 @@ export function TelegramLoginButton({
     // No Supabase browser session is required here. This avoids failing on
     // Supabase password/magic-link token creation.
     if (payload.app_session) {
+      storeTelegramAppSessionToken(payload.appSessionToken);
       setState('success');
       setMessage('Готово. Открываем кабинет...');
 

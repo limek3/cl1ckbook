@@ -467,11 +467,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     async <T,>(section: string, value: T) => {
       if (!workspaceId) return false;
 
-      const optimistic = {
-        ...workspaceData,
+      setWorkspaceData((current) => ({
+        ...current,
         [section]: value,
-      };
-      setWorkspaceData(optimistic);
+      }));
 
       if (section === 'bookings' && Array.isArray(value)) {
         setStoredBookings(value as Booking[]);
@@ -494,14 +493,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
           throw new Error('section_update_failed');
         }
 
-        const snapshot = await parseJson<WorkspaceSnapshot>(response);
-        applySnapshot(snapshot);
+        // Do not apply the full returned snapshot here. Multiple quick saves
+        // can finish out of order and older snapshots used to overwrite the
+        // latest slots/services on screen. The optimistic state above remains
+        // the client source; /api/workspace/section persists the same value.
         return true;
       } catch {
         return false;
       }
     },
-    [applySnapshot, workspaceData, workspaceId],
+    [workspaceId],
   );
 
   const updateBookingStatus = useCallback(
