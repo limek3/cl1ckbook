@@ -59,7 +59,7 @@ function normalizeNotificationItems(
       id,
       title: String(candidate.title ?? fallbackItem?.title ?? ''),
       description: String(candidate.description ?? fallbackItem?.description ?? ''),
-      channel: (candidate.channel === 'push' || candidate.channel === 'email' || candidate.channel === 'telegram' || candidate.channel === 'max'
+      channel: (candidate.channel === 'push' || candidate.channel === 'email' || candidate.channel === 'telegram' || candidate.channel === 'vk'
         ? candidate.channel
         : fallbackItem?.channel ?? 'telegram') as NotificationInsight['channel'],
       enabled: typeof candidate.enabled === 'boolean' ? candidate.enabled : fallbackItem?.enabled ?? true,
@@ -83,6 +83,42 @@ function normalizeClientTextMap(value: unknown): Record<string, string> {
       .filter(([key, item]) => key && typeof item === 'string')
       .map(([key, item]) => [key, item as string]),
   );
+}
+
+
+function parsePriceFromName(name: string, fallback = 0) {
+  const match = name.match(/(?:от|from)?\s*([\d\s]{3,})\s*(?:₽|р|rub)/i);
+  if (!match?.[1]) return fallback;
+  const value = Number(match[1].replace(/\s+/g, ''));
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function countsAsRevenue(status: string) {
+  return status !== 'cancelled' && status !== 'no_show';
+}
+
+function sourceLabel(value: unknown, locale: Locale) {
+  const raw = String(value ?? '').toLowerCase();
+  const ru = locale === 'ru';
+  if (raw.includes('инст') || raw.includes('insta') || raw.includes('instagram')) return ru ? 'Инстаграм' : 'Instagram';
+  if (raw.includes('вк') || raw.includes('vk') || raw.includes('max') || raw.includes('макс')) return ru ? 'ВК' : 'VK';
+  return ru ? 'ТГ' : 'Telegram';
+}
+
+function rebuildStoredServiceMetrics(services: ServiceInsight[], bookings: Booking[]) {
+  const total = Math.max(1, bookings.length);
+  return services.map((service) => {
+    const related = bookings.filter((booking) => booking.service === service.name);
+    const price = service.price || parsePriceFromName(service.name, 0);
+    const revenue = related.filter((booking) => countsAsRevenue(booking.status)).reduce((sum, booking) => sum + (booking.priceAmount ?? price), 0);
+    return {
+      ...service,
+      price,
+      bookings: related.length,
+      revenue,
+      popularity: Math.round((related.length / total) * 100),
+    };
+  });
 }
 
 function overlayClientExtras(clients: ClientInsight[], sections: WorkspaceSections): ClientInsight[] {
@@ -124,12 +160,62 @@ export function buildWorkspaceDatasetFromStored(
   const base = buildWorkspaceDataset(profile, bookings, locale);
   const source = sections ?? {};
 
+  const effectiveServices = Array.isArray(source.services) && source.services.length > 0
+    ? rebuildStoredServiceMetrics(source.services as ServiceInsight[], bookings)
+    : base.services;
+  const serviceMap = new Map(effectiveServices.map((service) => [service.name, service]));
+  const daily = base.daily.map((day) => {
+    const dayBookings = bookings.filter((booking) => booking.date === day.date);
+    const confirmed = dayBookings.filter((booking) => booking.status === 'confirmed' || booking.status === 'completed').length;
+    const revenue = dayBookings
+      .filter((booking) => countsAsRevenue(booking.status))
+      .reduce((sum, booking) => sum + (booking.priceAmount ?? serviceMap.get(booking.service)?.price ?? parsePriceFromName(booking.service, 0)), 0);
+    return { ...day, visitors: day.requests, confirmed, revenue, pageViews: day.requests };
+  });
+  const channelMap = new Map<string, { visitors: number; bookings: number; revenue: number }>();
+  for (const booking of bookings) {
+    const label = sourceLabel(booking.source ?? booking.channel, locale);
+    const next = channelMap.get(label) ?? { visitors: 0, bookings: 0, revenue: 0 };
+    next.visitors += 1;
+    next.bookings += booking.status === 'confirmed' || booking.status === 'completed' ? 1 : 0;
+    next.revenue += countsAsRevenue(booking.status) ? (booking.priceAmount ?? serviceMap.get(booking.service)?.price ?? parsePriceFromName(booking.service, 0)) : 0;
+    channelMap.set(label, next);
+  }
+  const channels = ['ТГ', 'Инстаграм', 'ВК'].map((label) => {
+    const item = channelMap.get(locale === 'ru' ? label : label === 'ТГ' ? 'Telegram' : label === 'ВК' ? 'VK' : 'Instagram') ?? { visitors: 0, bookings: 0, revenue: 0 };
+    const display = locale === 'ru' ? label : label === 'ТГ' ? 'Telegram' : label === 'ВК' ? 'VK' : 'Instagram';
+    return {
+      id: profile.slug + '-channel-' + display.toLowerCase(),
+      label: display,
+      visitors: item.visitors,
+      bookings: item.bookings,
+      revenue: item.revenue,
+      conversion: item.visitors > 0 ? Number(((item.bookings / item.visitors) * 100).toFixed(1)) : 0,
+    };
+  });
+  const visitors = daily.reduce((sum, item) => sum + item.visitors, 0);
+  const confirmed = bookings.filter((booking) => booking.status === 'confirmed' || booking.status === 'completed').length;
+  const activeBookings = bookings.filter((booking) => booking.status !== 'cancelled' && booking.status !== 'no_show');
+  const revenue = activeBookings.filter((booking) => countsAsRevenue(booking.status)).reduce((sum, booking) => sum + (booking.priceAmount ?? serviceMap.get(booking.service)?.price ?? parsePriceFromName(booking.service, 0)), 0);
+
   return {
     ...base,
-    services: Array.isArray(source.services) && source.services.length > 0 ? (source.services as ServiceInsight[]) : base.services,
+    services: effectiveServices,
+    daily,
+    channels,
     availability: Array.isArray(source.availability) && source.availability.length > 0 ? (source.availability as AvailabilityDayInsight[]) : base.availability,
     templates: Array.isArray(source.templates) && source.templates.length > 0 ? (source.templates as MessageTemplateInsight[]) : base.templates,
     notifications: normalizeNotificationItems(source.notifications as unknown[] | undefined, base.notifications),
     clients: overlayClientExtras(base.clients, source),
+    totals: {
+      ...base.totals,
+      confirmed,
+      completed: bookings.filter((booking) => booking.status === 'completed').length,
+      cancelled: bookings.filter((booking) => booking.status === 'cancelled' || booking.status === 'no_show').length,
+      revenue,
+      visitors,
+      conversion: visitors > 0 ? Number(((confirmed / visitors) * 100).toFixed(1)) : 0,
+      averageCheck: activeBookings.length > 0 ? Math.round(revenue / activeBookings.length) : 0,
+    },
   };
 }

@@ -32,7 +32,7 @@ import { cn } from '@/lib/utils';
 import { useMobile } from '@/hooks/use-mobile';
 
 type ThemeMode = 'light' | 'dark';
-type TimelineStage = 'next' | 'queue' | 'done' | 'new';
+type TimelineStage = 'next' | 'queue' | 'done' | 'new' | 'no_show';
 type TimelinePeriod = 'morning' | 'day' | 'evening';
 type TimelineFilter = 'all' | TimelinePeriod;
 type TimelineSource = 'booking';
@@ -179,7 +179,9 @@ function mapBookingToTimelineItem(
   const stage: TimelineStage =
     booking.status === 'completed'
       ? 'done'
-      : booking.status === 'new'
+      : booking.status === 'no_show' || booking.status === 'cancelled'
+        ? 'no_show'
+        : booking.status === 'new'
         ? 'new'
         : diff <= 45 * 60 * 1000
           ? 'next'
@@ -301,6 +303,7 @@ function stageColor(
   if (stage === 'next') return accentColor;
   if (stage === 'new') return publicAccentColor;
   if (stage === 'queue') return light ? 'rgba(0,0,0,0.42)' : 'rgba(255,255,255,0.46)';
+  if (stage === 'no_show') return light ? 'rgba(120,40,40,0.72)' : 'rgba(255,130,130,0.72)';
   return light ? 'rgba(0,0,0,0.26)' : 'rgba(255,255,255,0.28)';
 }
 
@@ -849,6 +852,15 @@ export default function DashboardTodayPage() {
 
   const hasRealBookings = todayBookings.length > 0;
 
+  const upcomingBookings = useMemo(
+    () =>
+      bookings
+        .filter((booking) => booking.date > todayIso && booking.status !== 'cancelled' && booking.status !== 'no_show')
+        .sort((left, right) => (left.date + 'T' + left.time).localeCompare(right.date + 'T' + right.time))
+        .slice(0, 5),
+    [bookings, todayIso],
+  );
+
   const todayItems = useMemo(
     () => todayBookings.map((booking) => mapBookingToTimelineItem(booking, now, locale)),
     [locale, now, todayBookings],
@@ -913,13 +925,15 @@ export default function DashboardTodayPage() {
           stages: {
             next: 'Скоро',
             queue: 'В очереди',
-            done: 'Завершено',
+            done: 'Пришёл',
+            no_show: 'Не пришёл',
             new: 'Новая',
           },
           stageHints: {
             next: 'следующая',
             queue: 'ожидает',
-            done: 'готово',
+            done: 'пришёл',
+            no_show: 'не пришёл',
             new: 'новая',
           },
           filters: {
@@ -936,7 +950,8 @@ export default function DashboardTodayPage() {
           liveDayText: 'Контакт, заметка и статус выбранной записи.',
           sampleBadge: 'Пока нет записей',
           confirm: 'Подтвердить',
-          complete: 'Завершить',
+          complete: 'Клиент пришёл',
+          noShow: 'Клиент не пришёл',
           activeBooking: 'Активная запись',
           sampleCopy: 'Выберите реальную запись из ленты, когда она появится.',
           note: 'Комментарий',
@@ -983,13 +998,15 @@ export default function DashboardTodayPage() {
           stages: {
             next: 'Soon',
             queue: 'In queue',
-            done: 'Done',
+            done: 'Arrived',
+            no_show: 'No-show',
             new: 'New',
           },
           stageHints: {
             next: 'next',
             queue: 'waiting',
-            done: 'done',
+            done: 'arrived',
+            no_show: 'no-show',
             new: 'new',
           },
           filters: {
@@ -1006,7 +1023,8 @@ export default function DashboardTodayPage() {
           liveDayText: 'Contact, note, and current status for the selected booking.',
           sampleBadge: 'No bookings yet',
           confirm: 'Confirm',
-          complete: 'Complete',
+          complete: 'Client arrived',
+          noShow: 'Client no-show',
           activeBooking: 'Active booking',
           sampleCopy: 'Select a real booking from the timeline when it appears.',
           note: 'Note',
@@ -1299,28 +1317,9 @@ export default function DashboardTodayPage() {
           <div className="grid gap-4">
             <Card light={isLight} className="overflow-hidden">
               <div className="p-5 md:p-6">
-                <div className="flex flex-wrap items-center gap-2">
-                  <MicroLabel light={isLight} active accentColor={accentColor}>
-                    <StatusDot light={isLight} active accentColor={accentColor} />
-                    {hasRealBookings ? labels.preview : labels.sampleBadge}
-                  </MicroLabel>
-
-                  <MicroLabel light={isLight}>
-                    <StatusDot light={isLight} />
-                    {labels.timelineTitle}
-                  </MicroLabel>
-
-                  {demoMode ? (
-                    <MicroLabel light={isLight}>
-                      <StatusDot light={isLight} />
-                      {locale === 'ru' ? 'Демо' : 'Demo'}
-                    </MicroLabel>
-                  ) : null}
-                </div>
-
                 <div
                   className={cn(
-                    'mt-8 text-[32px] font-semibold tracking-[-0.08em] md:text-[44px]',
+                    'mt-2 text-[32px] font-semibold tracking-[-0.08em] md:text-[44px]',
                     pageText(isLight),
                   )}
                 >
@@ -1532,6 +1531,20 @@ export default function DashboardTodayPage() {
                           );
                         })}
                       </ListBox>
+                    ) : upcomingBookings.length ? (
+                        <ListBox light={isLight}>
+                          {upcomingBookings.map((booking) => (
+                            <ListRow key={booking.id}>
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className={cn('truncate text-[12.5px] font-semibold', pageText(isLight))}>{booking.clientName}</div>
+                                  <div className={cn('mt-1 truncate text-[11px]', mutedText(isLight))}>{booking.service}</div>
+                                </div>
+                                <div className={cn('shrink-0 text-right text-[11px] font-medium', mutedText(isLight))}>{booking.date} · {booking.time}</div>
+                              </div>
+                            </ListRow>
+                          ))}
+                        </ListBox>
                     ) : (
                       <EmptyState light={isLight}>{labels.emptyFilter}</EmptyState>
                     )}
@@ -1654,7 +1667,7 @@ export default function DashboardTodayPage() {
                               </Button>
                             ) : null}
 
-                            {activeBooking.status !== 'completed' ? (
+                            {activeBooking.status !== 'completed' && activeBooking.status !== 'no_show' && activeBooking.status !== 'cancelled' ? (
                               <Button
                                 type="button"
                                 className={cn('justify-start', buttonBase(isLight, true))}
@@ -1663,6 +1676,18 @@ export default function DashboardTodayPage() {
                               >
                                 <CheckCircle2 className="size-3.5" />
                                 {actionLoading === 'completed' ? '…' : labels.complete}
+                              </Button>
+                            ) : null}
+
+                            {activeBooking.status !== 'completed' && activeBooking.status !== 'no_show' && activeBooking.status !== 'cancelled' ? (
+                              <Button
+                                type="button"
+                                className={cn('justify-start', buttonBase(isLight))}
+                                onClick={() => void handleStatusChange('no_show')}
+                                disabled={actionLoading !== null}
+                              >
+                                <CheckCircle2 className="size-3.5" />
+                                {actionLoading === 'no_show' ? '…' : labels.noShow}
                               </Button>
                             ) : null}
                           </div>

@@ -5,6 +5,7 @@ import { isNotificationEnabled } from '@/lib/server/notification-settings';
 import { createChatMessage, createChatThread, fetchChatThreadByPhone, updateChatThread } from '@/lib/server/supabase-chats';
 import {
   getAppUrl,
+  answerTelegramCallbackQuery,
   sendClientBookingConfirmation,
   sendMasterMenu,
   sendTelegramMessage,
@@ -34,6 +35,15 @@ type TelegramUpdate = {
       type: string;
     };
     from?: TelegramFrom;
+  };
+  callback_query?: {
+    id: string;
+    data?: string;
+    from?: TelegramFrom;
+    message?: {
+      chat?: { id: number; type?: string };
+      message_id?: number;
+    };
   };
 };
 
@@ -113,6 +123,81 @@ function mapBookingRow(row: BookingRow): Booking {
     status: row.status,
     createdAt: row.created_at,
   };
+}
+
+
+function extractVisitCallback(data?: string) {
+  const match = data?.match(/^visit:([a-f0-9-]+):(completed|no_show)$/i);
+  return match ? { bookingId: match[1], status: match[2] as Booking['status'] } : null;
+}
+
+async function syncWorkspaceBookingStatus(admin: ReturnType<typeof createSupabaseAdminClient>, workspaceId: string, bookingId: string, status: Booking['status']) {
+  const { data: workspace } = await admin
+    .from('sloty_workspaces')
+    .select('data')
+    .eq('id', workspaceId)
+    .maybeSingle();
+
+  const workspaceData = workspace?.data && typeof workspace.data === 'object' ? (workspace.data as Record<string, unknown>) : {};
+  const jsonBookings = Array.isArray(workspaceData.bookings) ? (workspaceData.bookings as Booking[]) : [];
+  const nextBookings = jsonBookings.map((item) =>
+    item.id === bookingId
+      ? {
+          ...item,
+          status,
+          ...(status === 'completed' ? { completedAt: new Date().toISOString() } : {}),
+          ...(status === 'no_show' ? { noShowAt: new Date().toISOString() } : {}),
+        }
+      : item,
+  );
+
+  if (nextBookings.length > 0) {
+    await admin
+      .from('sloty_workspaces')
+      .update({ data: { ...workspaceData, bookings: nextBookings } })
+      .eq('id', workspaceId)
+      .then(() => undefined, () => undefined);
+  }
+}
+
+async function handleVisitCallback(params: { callbackQueryId: string; data?: string }) {
+  const parsed = extractVisitCallback(params.data);
+  if (!parsed) return false;
+
+  const admin = createSupabaseAdminClient();
+  const now = new Date().toISOString();
+
+  const { data: bookingRow } = await admin
+    .from('sloty_bookings')
+    .select('id,workspace_id')
+    .eq('id', parsed.bookingId)
+    .maybeSingle();
+
+  const workspaceId = bookingRow?.workspace_id as string | undefined;
+  if (!workspaceId) {
+    await answerTelegramCallbackQuery({ callbackQueryId: params.callbackQueryId, text: 'Запись не найдена' });
+    return true;
+  }
+
+  await admin
+    .from('sloty_bookings')
+    .update({
+      status: parsed.status,
+      updated_at: now,
+      ...(parsed.status === 'completed' ? { completed_at: now } : {}),
+      ...(parsed.status === 'no_show' ? { no_show_at: now } : {}),
+    })
+    .eq('id', parsed.bookingId)
+    .then(() => undefined, () => undefined);
+
+  await syncWorkspaceBookingStatus(admin, workspaceId, parsed.bookingId, parsed.status);
+
+  await answerTelegramCallbackQuery({
+    callbackQueryId: params.callbackQueryId,
+    text: parsed.status === 'completed' ? 'Отмечено: клиент пришёл' : 'Отмечено: клиент не пришёл',
+  });
+
+  return true;
 }
 
 async function rememberTelegramUser(params: {
@@ -534,6 +619,17 @@ export async function POST(request: Request) {
 
   try {
     const update = (await request.json()) as TelegramUpdate;
+    const callbackQuery = update.callback_query;
+
+    if (callbackQuery?.id) {
+      const handled = await handleVisitCallback({
+        callbackQueryId: callbackQuery.id,
+        data: callbackQuery.data,
+      });
+
+      if (handled) return NextResponse.json({ ok: true });
+    }
+
     const message = update.message;
 
     if (!message || !message.from || message.from.is_bot) {

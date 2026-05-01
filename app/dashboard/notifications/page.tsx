@@ -33,7 +33,7 @@ import { menuContentClass, menuTriggerClass } from '@/lib/menu-styles';
 
 type ThemeMode = 'light' | 'dark';
 
-type ChannelKey = 'telegram' | 'max' | 'email';
+type ChannelKey = 'telegram' | 'vk' | 'email';
 type TimingKey = 'instant' | 'day-before' | 'two-hours' | 'weekly';
 
 type NotificationViewItem = Omit<NotificationInsight, 'channel'> & {
@@ -48,7 +48,7 @@ type ChannelMeta = {
   icon: LucideIcon;
 };
 
-const CHANNEL_ORDER: ChannelKey[] = ['telegram', 'max', 'email'];
+const CHANNEL_ORDER: ChannelKey[] = ['telegram', 'vk', 'email'];
 
 function pageBg(light: boolean) {
   return light ? 'bg-[#f4f4f2]' : 'bg-[#090909]';
@@ -868,7 +868,7 @@ export default function NotificationsPage() {
     () =>
       (dataset?.notifications ?? []).map((item) => ({
         ...item,
-        channel: (item.channel === 'push' ? 'telegram' : item.channel) as ChannelKey,
+        channel: (item.channel === 'push' ? 'telegram' : item.channel === 'max' ? 'vk' : item.channel) as ChannelKey,
         timing:
           item.id === 'visit-reminder'
             ? 'day-before'
@@ -1024,7 +1024,7 @@ export default function NotificationsPage() {
             : 'New requests, important replies, and quick statuses.',
         icon: Send,
       },
-      max: {
+      vk: {
         title: 'ВК',
         description:
           locale === 'ru'
@@ -1121,7 +1121,7 @@ export default function NotificationsPage() {
     const destination =
       channel === 'telegram'
         ? '@master.telegram'
-        : channel === 'max'
+        : channel === 'vk'
           ? 'vk.com/master'
           : 'master@klikbuk.app';
 
@@ -1527,7 +1527,7 @@ export default function NotificationsPage() {
                           Telegram
                         </ActionButton>
 
-                        <ActionButton light={isLight} onClick={() => sendTest('max')}>
+                        <ActionButton light={isLight} onClick={() => sendTest('vk')}>
                           ВК
                         </ActionButton>
 

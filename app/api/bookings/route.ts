@@ -36,6 +36,8 @@ function buildClientBooking(masterSlug: string, values: Omit<Booking, 'id' | 'ma
     comment: values.comment?.trim() || undefined,
     status: 'new',
     createdAt: new Date().toISOString(),
+    source: 'ТГ',
+    channel: 'telegram',
   };
 }
 
@@ -130,12 +132,13 @@ export async function POST(request: Request) {
       : normalizedServices.length > 0
         ? normalizedServices
         : seed.services;
-    const hasServiceInDetails = effectiveServiceDetails.some(
+    const selectedServiceDetail = effectiveServiceDetails.find(
       (service) =>
         service.name === requestedService &&
         service.visible !== false &&
         service.status !== 'draft',
     );
+    const hasServiceInDetails = Boolean(selectedServiceDetail);
     const hasServiceInProfile = profileServices.includes(requestedService);
 
     if (!hasServiceInDetails && !hasServiceInProfile) {
@@ -172,7 +175,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'slot_unavailable' }, { status: 409 });
     }
 
-    const booking = buildClientBooking(body.masterSlug, body.values);
+    const booking = {
+      ...buildClientBooking(body.masterSlug, body.values),
+      durationMinutes: selectedServiceDetail?.duration,
+      priceAmount: selectedServiceDetail?.price,
+      source: 'ТГ',
+      channel: 'telegram',
+    };
 
     let persistedBooking = booking;
     let nextBookings = [booking, ...currentBookings];

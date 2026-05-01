@@ -408,14 +408,16 @@ function bookingStatusLabel(status: string, locale: 'ru' | 'en') {
   if (locale === 'ru') {
     if (status === 'new') return 'Новая';
     if (status === 'confirmed') return 'Подтверждена';
-    if (status === 'completed') return 'Завершена';
+    if (status === 'completed') return 'Пришёл';
+    if (status === 'no_show') return 'Не пришёл';
     if (status === 'cancelled') return 'Отменена';
     return status;
   }
 
   if (status === 'new') return 'New';
   if (status === 'confirmed') return 'Confirmed';
-  if (status === 'completed') return 'Completed';
+  if (status === 'completed') return 'Arrived';
+  if (status === 'no_show') return 'No-show';
   if (status === 'cancelled') return 'Cancelled';
 
   return status;
@@ -425,14 +427,16 @@ function bookingStatusHint(status: string, locale: 'ru' | 'en') {
   if (locale === 'ru') {
     if (status === 'new') return 'ожидает';
     if (status === 'confirmed') return 'в работе';
-    if (status === 'completed') return 'готово';
+    if (status === 'completed') return 'пришёл';
+    if (status === 'no_show') return 'не пришёл';
     if (status === 'cancelled') return 'снята';
     return 'статус';
   }
 
   if (status === 'new') return 'waiting';
   if (status === 'confirmed') return 'active';
-  if (status === 'completed') return 'done';
+  if (status === 'completed') return 'arrived';
+  if (status === 'no_show') return 'no-show';
   if (status === 'cancelled') return 'cancelled';
 
   return 'status';
@@ -451,7 +455,7 @@ function statusColor(
     return light ? 'rgba(0,0,0,0.34)' : 'rgba(255,255,255,0.38)';
   }
 
-  if (status === 'cancelled') {
+  if (status === 'cancelled' || status === 'no_show') {
     return light ? 'rgba(120,40,40,0.72)' : 'rgba(255,130,130,0.72)';
   }
 

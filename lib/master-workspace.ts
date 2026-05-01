@@ -91,7 +91,7 @@ export interface NotificationInsight {
   id: string;
   title: string;
   description: string;
-  channel: 'push' | 'email' | 'telegram' | 'max';
+  channel: 'push' | 'email' | 'telegram' | 'vk';
   enabled: boolean;
   critical?: boolean;
 }
@@ -217,6 +217,41 @@ function sum(values: number[]) {
   return values.reduce((total, current) => total + current, 0);
 }
 
+function normalizeSourceLabel(value: unknown, locale: Locale): string {
+  const raw = String(value ?? '').trim().toLowerCase();
+  const ru = locale === 'ru';
+  if (raw.includes('инст') || raw.includes('insta') || raw.includes('instagram')) return ru ? 'Инстаграм' : 'Instagram';
+  if (raw.includes('вк') || raw.includes('vk') || raw.includes('max') || raw.includes('макс')) return ru ? 'ВК' : 'VK';
+  if (raw.includes('tg') || raw.includes('тг') || raw.includes('telegram') || raw.includes('телеграм') || raw.includes('публич')) return ru ? 'ТГ' : 'Telegram';
+  return ru ? 'ТГ' : 'Telegram';
+}
+
+function serviceDurationFromName(service: string, fallback: number) {
+  const match = service.match(/(\d{2,3})\s*(?:мин|min)/i);
+  return match ? Number(match[1]) : fallback;
+}
+
+function servicePriceFromName(service: string, fallback: number) {
+  const match = service.match(/(?:от|from)?\s*([\d\s]{3,})\s*(?:₽|р|rub)/i);
+  if (!match?.[1]) return fallback;
+  const parsed = Number(match[1].replace(/\s+/g, ''));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function bookingPrice(booking: Booking, services: ServiceInsight[]) {
+  if (typeof booking.priceAmount === 'number' && booking.priceAmount > 0) return Math.round(booking.priceAmount);
+  const service = services.find((item) => item.name === booking.service);
+  return service?.price ?? servicePriceFromName(booking.service, 0);
+}
+
+function countsAsRevenue(booking: Booking) {
+  return booking.status !== 'cancelled' && booking.status !== 'no_show';
+}
+
+function countsAsActiveBooking(booking: Booking) {
+  return booking.status !== 'cancelled' && booking.status !== 'no_show';
+}
+
 function servicePriceByName(service: string, serviceIndex: number) {
   const seed = hashSeed(`${service}-${serviceIndex}`);
   return 1800 + (seed % 8) * 350 + serviceIndex * 250;
@@ -233,13 +268,13 @@ function buildServices(profile: MasterProfile, bookings: Booking[], locale: Loca
   const totalBookings = Math.max(1, bookings.length);
 
   return profile.services.map((service, index) => {
-    const price = servicePriceByName(service, index);
-    const duration = serviceDurationByName(service, index);
+    const price = servicePriceFromName(service, servicePriceByName(service, index));
+    const duration = serviceDurationFromName(service, serviceDurationByName(service, index));
     const related = bookings.filter((booking) => booking.service === service);
     const bookingsCount = related.length;
     const revenue = related
-      .filter((booking) => booking.status === 'confirmed' || booking.status === 'completed')
-      .reduce((total) => total + price, 0);
+      .filter(countsAsRevenue)
+      .reduce((total, booking) => total + (booking.priceAmount ?? price), 0);
 
     return {
       id: `${profile.slug}-service-${index}`,
@@ -276,23 +311,23 @@ function buildClients(bookings: Booking[], services: ServiceInsight[], locale: L
       const pastItems = sorted.filter((booking) => getBookingDateTime(booking).getTime() <= now);
       const nextBooking = futureItems[0];
       const lastVisit = pastItems[0] ?? sortedAsc[0] ?? sorted[0];
-      const revenueBookings = sorted.filter((booking) => booking.status !== 'cancelled');
+      const revenueBookings = sorted.filter(countsAsActiveBooking);
       const totalRevenue = revenueBookings.reduce((total, booking) => {
         const service = serviceMap.get(booking.service);
-        return total + (service?.price ?? 2400);
+        return total + (booking.priceAmount ?? service?.price ?? servicePriceFromName(booking.service, 2400));
       }, 0);
       const averageCheck = revenueBookings.length > 0 ? Math.round(totalRevenue / revenueBookings.length) : 0;
       const daysSince = pastItems[0]
         ? Math.round((now - getBookingDateTime(pastItems[0]).getTime()) / 86400000)
         : 0;
+      const hasNoShow = sorted.some((booking) => booking.status === 'no_show' || booking.status === 'cancelled');
       const segment: ClientInsight['segment'] =
-        !nextBooking && pastItems[0] && daysSince > 45
+        !nextBooking && (hasNoShow || (pastItems[0] && daysSince > 45))
           ? 'sleeping'
           : pastItems.length >= 2
             ? 'regular'
             : 'new';
-      const sourcePool = SOURCE_LABELS[locale];
-      const source = sourcePool[index % sourcePool.length];
+      const source = normalizeSourceLabel(sorted[0].source ?? sorted[0].channel, locale);
 
       return {
         id: key,
@@ -317,6 +352,17 @@ function buildDaily(profile: MasterProfile, bookings: Booking[], services: Servi
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  const latestBookingDate = bookings.reduce<Date | null>((latest, booking) => {
+    const date = new Date(booking.date + 'T00:00:00');
+    if (Number.isNaN(date.getTime())) return latest;
+    return !latest || date > latest ? date : latest;
+  }, null);
+
+  const rangeStart = new Date(today);
+  if (!latestBookingDate || latestBookingDate <= today) {
+    rangeStart.setDate(today.getDate() - 29);
+  }
+
   const serviceMap = new Map(services.map((service) => [service.name, service]));
   const firstClientVisit = new Map<string, string>();
 
@@ -330,16 +376,16 @@ function buildDaily(profile: MasterProfile, bookings: Booking[], services: Servi
     });
 
   return Array.from({ length: 30 }, (_, offset) => {
-    const date = new Date(today);
-    date.setDate(today.getDate() - (29 - offset));
+    const date = new Date(rangeStart);
+    date.setDate(rangeStart.getDate() + offset);
     const iso = normalizeDate(date);
     const dayBookings = bookings.filter((booking) => booking.date === iso);
     const createdBookings = bookings.filter((booking) => booking.createdAt.slice(0, 10) === iso);
     const requests = createdBookings.length;
     const confirmed = dayBookings.filter((booking) => booking.status === 'confirmed' || booking.status === 'completed').length;
     const revenue = dayBookings
-      .filter((booking) => booking.status === 'confirmed' || booking.status === 'completed')
-      .reduce((total, booking) => total + (serviceMap.get(booking.service)?.price ?? 0), 0);
+      .filter(countsAsRevenue)
+      .reduce((total, booking) => total + bookingPrice(booking, services), 0);
     const newClients = createdBookings.filter((booking) => {
       const key = booking.clientPhone || booking.clientName;
       return firstClientVisit.get(key) === iso;
@@ -358,25 +404,35 @@ function buildDaily(profile: MasterProfile, bookings: Booking[], services: Servi
   });
 }
 
-function buildChannels(profile: MasterProfile, daily: DailyInsight[], locale: Locale): ChannelInsight[] {
-  const visitors = sum(daily.map((item) => item.visitors));
-  const bookings = sum(daily.map((item) => item.confirmed));
-  const revenue = sum(daily.map((item) => item.revenue));
+function buildChannels(profile: MasterProfile, daily: DailyInsight[], locale: Locale, bookings: Booking[], services: ServiceInsight[]): ChannelInsight[] {
+  void daily;
 
-  if (visitors === 0 && bookings === 0 && revenue === 0) {
-    return [];
+  const sourceLabels = SOURCE_LABELS[locale];
+  const grouped = new Map<string, { visitors: number; bookings: number; revenue: number }>();
+
+  for (const label of sourceLabels) {
+    grouped.set(label, { visitors: 0, bookings: 0, revenue: 0 });
   }
 
-  return [
-    {
-      id: `${profile.slug}-channel-public`,
-      label: locale === 'ru' ? 'Публичная страница' : 'Public page',
-      visitors,
-      bookings,
-      revenue,
-      conversion: visitors > 0 ? Number(((bookings / visitors) * 100).toFixed(1)) : 0,
-    },
-  ];
+  for (const booking of bookings) {
+    const label = normalizeSourceLabel(booking.source ?? booking.channel, locale);
+    const item = grouped.get(label) ?? { visitors: 0, bookings: 0, revenue: 0 };
+    item.visitors += 1;
+    item.bookings += booking.status === 'confirmed' || booking.status === 'completed' ? 1 : 0;
+    item.revenue += countsAsRevenue(booking) ? bookingPrice(booking, services) : 0;
+    grouped.set(label, item);
+  }
+
+  return Array.from(grouped.entries())
+    .map(([label, item]) => ({
+      id: `${profile.slug}-channel-${label.toLowerCase()}`,
+      label,
+      visitors: item.visitors,
+      bookings: item.bookings,
+      revenue: item.revenue,
+      conversion: item.visitors > 0 ? Number(((item.bookings / item.visitors) * 100).toFixed(1)) : 0,
+    }))
+    .sort((left, right) => right.bookings - left.bookings || right.visitors - left.visitors);
 }
 
 function buildWeeklyLoad(profile: MasterProfile, daily: DailyInsight[]): WeeklyLoadInsight[] {
@@ -532,7 +588,7 @@ function buildNotifications(locale: Locale): NotificationInsight[] {
         { id: 'visit-reminder', title: 'Напоминание клиенту', description: 'Отправлять клиенту подтверждение и напоминания через Telegram.', channel: 'telegram', enabled: true },
         { id: 'chat-message', title: 'Сообщение клиенту', description: 'Доставлять исходящие сообщения из чата клиенту через бота.', channel: 'telegram', enabled: true },
         { id: 'cancellation', title: 'Отмена или перенос', description: 'Сразу сообщать об изменении записи в Телеграм.', channel: 'telegram', enabled: true, critical: true },
-        { id: 'schedule-change', title: 'Изменение графика', description: 'Отправлять себе сводку в ВК о блокировках и спецдатах.', channel: 'max', enabled: false },
+        { id: 'schedule-change', title: 'Изменение графика', description: 'Отправлять себе сводку в ВК о блокировках и спецдатах.', channel: 'vk', enabled: false },
         { id: 'weekly-digest', title: 'Недельная сводка', description: 'Доход, конверсия и загрузка по неделе.', channel: 'email', enabled: true },
       ]
     : [
@@ -540,7 +596,7 @@ function buildNotifications(locale: Locale): NotificationInsight[] {
         { id: 'visit-reminder', title: 'Client reminder', description: 'Send confirmations and reminders to the client via Telegram.', channel: 'telegram', enabled: true },
         { id: 'chat-message', title: 'Client chat message', description: 'Deliver outgoing chat messages to the client through the bot.', channel: 'telegram', enabled: true },
         { id: 'cancellation', title: 'Cancellation or reschedule', description: 'Alert immediately in Telegram when an appointment changes.', channel: 'telegram', enabled: true, critical: true },
-        { id: 'schedule-change', title: 'Schedule changes', description: 'Send a VK summary about blocked time and special dates.', channel: 'max', enabled: false },
+        { id: 'schedule-change', title: 'Schedule changes', description: 'Send a VK summary about blocked time and special dates.', channel: 'vk', enabled: false },
         { id: 'weekly-digest', title: 'Weekly digest', description: 'Revenue, conversion, and load summary for the week.', channel: 'email', enabled: true },
       ];
 }
@@ -663,22 +719,20 @@ export function buildWorkspaceDataset(
   const services = buildServices(profile, bookings, locale);
   const clients = buildClients(bookings, services, locale);
   const daily = buildDaily(profile, bookings, services, locale);
-  const channels = buildChannels(profile, daily, locale);
+  const channels = buildChannels(profile, daily, locale, bookings, services);
   const weeklyLoad = buildWeeklyLoad(profile, daily);
   const peakHours = buildPeakHours(profile, bookings);
-  const paidBookings = bookings.filter((booking) => booking.status !== 'cancelled');
-  const totalsRevenue = sum(
-    paidBookings.map((booking) => services.find((service) => service.name === booking.service)?.price ?? 0),
-  );
+  const paidBookings = bookings.filter(countsAsActiveBooking);
+  const totalsRevenue = sum(paidBookings.filter(countsAsRevenue).map((booking) => bookingPrice(booking, services)));
   const visitors = sum(daily.map((item) => item.visitors));
-  const confirmed = bookings.filter((booking) => booking.status === 'confirmed').length;
+  const confirmed = bookings.filter((booking) => booking.status === 'confirmed' || booking.status === 'completed').length;
   const completed = bookings.filter((booking) => booking.status === 'completed').length;
 
   const totals = {
     bookings: bookings.length,
     confirmed,
     completed,
-    cancelled: bookings.filter((booking) => booking.status === 'cancelled').length,
+    cancelled: bookings.filter((booking) => booking.status === 'cancelled' || booking.status === 'no_show').length,
     revenue: totalsRevenue,
     visitors,
     conversion: visitors > 0 ? Number(((sum(daily.map((item) => item.confirmed)) / visitors) * 100).toFixed(1)) : 0,
@@ -710,7 +764,8 @@ export function bookingStatusLabel(status: BookingStatus, locale: Locale) {
     return {
       new: 'Новая',
       confirmed: 'Подтверждена',
-      completed: 'Завершена',
+      completed: 'Пришёл',
+      no_show: 'Не пришёл',
       cancelled: 'Отменена',
     }[status];
   }
@@ -718,7 +773,8 @@ export function bookingStatusLabel(status: BookingStatus, locale: Locale) {
   return {
     new: 'New',
     confirmed: 'Confirmed',
-    completed: 'Completed',
+    completed: 'Arrived',
+    no_show: 'No-show',
     cancelled: 'Cancelled',
   }[status];
 }

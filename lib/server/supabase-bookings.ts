@@ -16,6 +16,15 @@ interface BookingRow {
   status: BookingStatus;
   created_at: string;
   updated_at: string;
+  duration_minutes?: number | null;
+  price_amount?: number | null;
+  source?: string | null;
+  channel?: string | null;
+  confirmed_at?: string | null;
+  completed_at?: string | null;
+  no_show_at?: string | null;
+  cancelled_at?: string | null;
+  status_check_sent_at?: string | null;
 }
 
 function mapRow(row: BookingRow): Booking {
@@ -30,6 +39,15 @@ function mapRow(row: BookingRow): Booking {
     comment: row.comment ?? undefined,
     status: row.status,
     createdAt: row.created_at,
+    source: row.source ?? undefined,
+    channel: row.channel ?? undefined,
+    priceAmount: typeof row.price_amount === 'number' ? row.price_amount : undefined,
+    durationMinutes: typeof row.duration_minutes === 'number' ? row.duration_minutes : undefined,
+    confirmedAt: row.confirmed_at ?? undefined,
+    completedAt: row.completed_at ?? undefined,
+    noShowAt: row.no_show_at ?? undefined,
+    cancelledAt: row.cancelled_at ?? undefined,
+    statusCheckSentAt: row.status_check_sent_at ?? undefined,
   };
 }
 
@@ -59,6 +77,10 @@ export async function createBookingRecord(workspaceId: string, booking: Booking)
         booking_time: booking.time,
         comment: booking.comment ?? null,
         status: booking.status,
+        duration_minutes: booking.durationMinutes ?? null,
+        price_amount: booking.priceAmount ?? null,
+        source: booking.source ?? 'ТГ',
+        channel: booking.channel ?? 'telegram',
       },
     ]),
   });
@@ -75,7 +97,13 @@ export async function updateBookingStatusRecord(workspaceId: string, bookingId: 
       headers: {
         Prefer: 'return=representation',
       },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({
+        status,
+        ...(status === 'confirmed' ? { confirmed_at: new Date().toISOString() } : {}),
+        ...(status === 'completed' ? { completed_at: new Date().toISOString() } : {}),
+        ...(status === 'no_show' ? { no_show_at: new Date().toISOString() } : {}),
+        ...(status === 'cancelled' ? { cancelled_at: new Date().toISOString() } : {}),
+      }),
     },
   );
 

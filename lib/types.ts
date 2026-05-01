@@ -1,4 +1,4 @@
-export type BookingStatus = 'new' | 'confirmed' | 'completed' | 'cancelled';
+export type BookingStatus = 'new' | 'confirmed' | 'completed' | 'no_show' | 'cancelled';
 
 export interface ReviewItem {
   id: string;
@@ -52,6 +52,15 @@ export interface Booking {
   comment?: string;
   status: BookingStatus;
   createdAt: string;
+  source?: 'ТГ' | 'Инстаграм' | 'ВК' | string;
+  channel?: 'telegram' | 'instagram' | 'vk' | string;
+  priceAmount?: number;
+  durationMinutes?: number;
+  confirmedAt?: string;
+  completedAt?: string;
+  noShowAt?: string;
+  cancelledAt?: string;
+  statusCheckSentAt?: string;
 }
 
 export interface MasterProfileFormValues {

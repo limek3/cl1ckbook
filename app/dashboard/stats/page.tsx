@@ -483,14 +483,16 @@ function bookingStatusLabel(status: string, locale: 'ru' | 'en') {
   if (locale === 'ru') {
     if (status === 'new') return 'Новая';
     if (status === 'confirmed') return 'Подтверждена';
-    if (status === 'completed') return 'Завершена';
+    if (status === 'completed') return 'Пришёл';
+    if (status === 'no_show') return 'Не пришёл';
     if (status === 'cancelled') return 'Отменена';
     return status;
   }
 
   if (status === 'new') return 'New';
   if (status === 'confirmed') return 'Confirmed';
-  if (status === 'completed') return 'Completed';
+  if (status === 'completed') return 'Arrived';
+  if (status === 'no_show') return 'No-show';
   if (status === 'cancelled') return 'Cancelled';
 
   return status;
@@ -500,14 +502,16 @@ function bookingStatusHint(status: string, locale: 'ru' | 'en') {
   if (locale === 'ru') {
     if (status === 'new') return 'ожидает';
     if (status === 'confirmed') return 'в работе';
-    if (status === 'completed') return 'готово';
+    if (status === 'completed') return 'пришёл';
+    if (status === 'no_show') return 'не пришёл';
     if (status === 'cancelled') return 'снята';
     return 'статус';
   }
 
   if (status === 'new') return 'waiting';
   if (status === 'confirmed') return 'active';
-  if (status === 'completed') return 'done';
+  if (status === 'completed') return 'arrived';
+  if (status === 'no_show') return 'no-show';
   if (status === 'cancelled') return 'cancelled';
 
   return 'status';
@@ -526,7 +530,7 @@ function statusColor(
     return light ? 'rgba(0,0,0,0.34)' : 'rgba(255,255,255,0.38)';
   }
 
-  if (status === 'cancelled') {
+  if (status === 'cancelled' || status === 'no_show') {
     return light ? 'rgba(120,40,40,0.72)' : 'rgba(255,130,130,0.72)';
   }
 
@@ -994,7 +998,7 @@ export default function DashboardStatsPage() {
   const topServices = dataset.services.slice(0, 5);
   const topChannels = dataset.channels.slice(0, 5);
   const recentBookings = getRecentBookings(bookings).slice(0, isMobile ? 4 : 6);
-  const totalRevenue = dataset.daily.reduce((total, item) => total + item.revenue, 0);
+  const totalRevenue = dataset.totals.revenue;
 
   const kpis = [
     {
@@ -1094,28 +1098,9 @@ export default function DashboardStatsPage() {
             <Card light={isLight} className="overflow-hidden">
               <div className="p-5 md:p-6">
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <MicroLabel light={isLight} active accentColor={accentColor}>
-                      <StatusDot light={isLight} active accentColor={accentColor} />
-                      {copy.dataReady}
-                    </MicroLabel>
-
-                    <MicroLabel light={isLight}>
-                      <StatusDot light={isLight} />
-                      {copy.livePage}
-                    </MicroLabel>
-
-                    {demoMode ? (
-                      <MicroLabel light={isLight}>
-                        <StatusDot light={isLight} />
-                        {copy.demo}
-                      </MicroLabel>
-                    ) : null}
-                  </div>
-
                   <div
                     className={cn(
-                      'mt-8 text-[32px] font-semibold tracking-[-0.08em] md:text-[44px]',
+                      'mt-2 text-[32px] font-semibold tracking-[-0.08em] md:text-[44px]',
                       pageText(isLight),
                     )}
                   >

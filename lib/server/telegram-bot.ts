@@ -54,6 +54,16 @@ export async function sendTelegramMessage(params: {
   });
 }
 
+export async function answerTelegramCallbackQuery(params: {
+  callbackQueryId: string;
+  text?: string;
+}) {
+  return telegramApi('answerCallbackQuery', {
+    callback_query_id: params.callbackQueryId,
+    ...(params.text ? { text: params.text } : {}),
+  });
+}
+
 export function buildMasterMenuReplyMarkup() {
   const appUrl = getAppUrl();
 
@@ -166,6 +176,36 @@ export async function sendClientBookingConfirmation(params: {
     ]
       .filter(Boolean)
       .join('\n'),
+  });
+}
+
+export async function sendMasterVisitCheck(params: {
+  chatId: number | string;
+  booking: Booking;
+  profile?: MasterProfile | null;
+}) {
+  const masterName = params.profile?.name || 'мастер';
+
+  return sendTelegramMessage({
+    chatId: params.chatId,
+    text: [
+      'Проверка визита ⏱',
+      '',
+      `Мастер: ${masterName}`,
+      `Клиент: ${params.booking.clientName}`,
+      `Услуга: ${params.booking.service}`,
+      `Время: ${bookingDateLabel(params.booking)}`,
+      '',
+      'Клиент пришёл?',
+    ].join('\n'),
+    replyMarkup: {
+      inline_keyboard: [
+        [
+          { text: 'Да, пришёл', callback_data: `visit:${params.booking.id}:completed` },
+          { text: 'Нет, не пришёл', callback_data: `visit:${params.booking.id}:no_show` },
+        ],
+      ],
+    },
   });
 }
 

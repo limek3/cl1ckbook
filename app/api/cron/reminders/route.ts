@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/server/supabase-admin';
-import { sendTelegramMessage } from '@/lib/server/telegram-bot';
+import { sendMasterVisitCheck, sendTelegramMessage } from '@/lib/server/telegram-bot';
 import type { Booking, MasterProfile } from '@/lib/types';
 
 export const runtime = 'nodejs';
@@ -14,6 +14,7 @@ type ReminderLinkRow = {
   chat_id: number | null;
   reminder_24h_sent_at: string | null;
   reminder_2h_sent_at: string | null;
+  status_check_sent_at?: string | null;
 };
 
 type BookingRow = {
@@ -27,6 +28,8 @@ type BookingRow = {
   comment: string | null;
   status: Booking['status'];
   created_at: string;
+  duration_minutes?: number | null;
+  status_check_sent_at?: string | null;
 };
 
 function isCronAllowed(request: Request) {
@@ -49,12 +52,49 @@ function mapBookingRow(row: BookingRow): Booking {
     comment: row.comment ?? undefined,
     status: row.status,
     createdAt: row.created_at,
+    durationMinutes: row.duration_minutes ?? undefined,
+    statusCheckSentAt: row.status_check_sent_at ?? undefined,
   };
 }
 
 function bookingStartsAt(booking: Booking) {
   const [hours = '0', minutes = '0'] = booking.time.split(':');
   return new Date(`${booking.date}T${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}:00`);
+}
+
+
+function bookingEndsAt(booking: Booking) {
+  const startsAt = bookingStartsAt(booking).getTime();
+  const duration = typeof booking.durationMinutes === 'number' && booking.durationMinutes > 0 ? booking.durationMinutes : 60;
+  return new Date(startsAt + duration * 60 * 1000);
+}
+
+function shouldAskMasterForVisitResult(booking: Booking) {
+  if (booking.status === 'completed' || booking.status === 'no_show' || booking.status === 'cancelled') return false;
+  return Date.now() >= bookingEndsAt(booking).getTime() + 15 * 60 * 1000;
+}
+
+async function resolveOwnerChatId(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  workspaceId: string,
+) {
+  const { data: workspace } = await admin
+    .from('sloty_workspaces')
+    .select('owner_id')
+    .eq('id', workspaceId)
+    .maybeSingle();
+
+  const ownerId = workspace?.owner_id as string | undefined;
+  if (!ownerId) return null;
+
+  const { data: account } = await admin
+    .from('sloty_telegram_accounts')
+    .select('chat_id')
+    .eq('user_id', ownerId)
+    .maybeSingle();
+
+  const chatId = account?.chat_id;
+  return typeof chatId === 'number' || typeof chatId === 'string' ? chatId : null;
 }
 
 function shouldSendReminder(booking: Booking, hoursBefore: number) {
@@ -144,9 +184,23 @@ export async function GET(request: Request) {
 
     try {
       const booking = await resolveBooking(admin, row);
-      if (!booking || booking.status === 'cancelled' || booking.status === 'completed') continue;
+      if (!booking || booking.status === 'cancelled' || booking.status === 'completed' || booking.status === 'no_show') continue;
 
       const profile = await resolveProfile(admin, row.workspace_id);
+
+      if (!booking.statusCheckSentAt && shouldAskMasterForVisitResult(booking)) {
+        const masterChatId = await resolveOwnerChatId(admin, row.workspace_id);
+        if (masterChatId) {
+          await sendMasterVisitCheck({ chatId: masterChatId, booking, profile });
+          await admin
+            .from('sloty_bookings')
+            .update({ status_check_sent_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+            .eq('id', booking.id)
+            .then(() => undefined, () => undefined);
+          sent.push(row.id + ':visit-check');
+          continue;
+        }
+      }
 
       if (!row.reminder_24h_sent_at && shouldSendReminder(booking, 24)) {
         await sendReminder({ chatId: row.chat_id, booking, profile, hoursBefore: 24 });
@@ -168,6 +222,34 @@ export async function GET(request: Request) {
       }
     } catch {
       failed.push(row.id);
+    }
+  }
+
+  const { data: activeBookingRows } = await admin
+    .from('sloty_bookings')
+    .select('*')
+    .in('status', ['new', 'confirmed'])
+    .is('status_check_sent_at', null)
+    .limit(100);
+
+  for (const bookingRowRaw of activeBookingRows ?? []) {
+    const bookingRow = bookingRowRaw as BookingRow & { workspace_id: string };
+    try {
+      const booking = mapBookingRow(bookingRow);
+      if (!shouldAskMasterForVisitResult(booking)) continue;
+      const workspaceId = bookingRow.workspace_id;
+      const masterChatId = await resolveOwnerChatId(admin, workspaceId);
+      if (!masterChatId) continue;
+      const profile = await resolveProfile(admin, workspaceId);
+      await sendMasterVisitCheck({ chatId: masterChatId, booking, profile });
+      await admin
+        .from('sloty_bookings')
+        .update({ status_check_sent_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq('id', booking.id)
+        .then(() => undefined, () => undefined);
+      sent.push(booking.id + ':visit-check');
+    } catch {
+      failed.push((bookingRowRaw as { id?: string }).id ?? 'booking');
     }
   }
 

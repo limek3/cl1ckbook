@@ -2024,8 +2024,14 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
     ? getBookingsBySlug(ownedProfile.slug)
     : [];
 
+  const todayIso = (() => {
+    const now = new Date();
+    const timezoneOffset = now.getTimezoneOffset() * 60000;
+    return new Date(now.getTime() - timezoneOffset).toISOString().slice(0, 10);
+  })();
+
   const newBookings = profileBookings.filter(
-    (item) => item.status === 'new',
+    (item) => item.date === todayIso && item.status === 'new',
   ).length;
 
   const labels =
