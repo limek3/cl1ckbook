@@ -3,18 +3,12 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabasePublishableKey, getSupabaseUrl } from '@/lib/supabase/env';
 
 const PROTECTED_PREFIXES = ['/dashboard', '/create-profile'];
-
-// Поддерживаем оба имени, чтобы не сломаться, если в app-session.ts уже стоит одно из них.
 const APP_SESSION_COOKIES = ['clickbook_app_session', 'clickbook_auth_session'];
 
 function isProtectedPath(pathname: string) {
   return PROTECTED_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
-}
-
-function isLoginPath(pathname: string) {
-  return pathname === '/login';
 }
 
 function decodeBase64Url(value: string) {
@@ -36,7 +30,7 @@ function decodeBase64Url(value: string) {
   }
 }
 
-function readLikelyAppSession(request: NextRequest) {
+function hasLikelyActiveAppSession(request: NextRequest) {
   for (const cookieName of APP_SESSION_COOKIES) {
     const raw = request.cookies.get(cookieName)?.value;
 
@@ -50,26 +44,18 @@ function readLikelyAppSession(request: NextRequest) {
 
     if (!payload?.exp) continue;
 
-    const hasUserId = Boolean(payload.userId || payload.sub);
+    const hasUser = Boolean(payload.userId || payload.sub);
     const isActive = payload.exp > Math.floor(Date.now() / 1000);
 
-    if (hasUserId && isActive) {
-      return {
-        cookieName,
-        payload,
-      };
-    }
+    if (hasUser && isActive) return true;
   }
 
-  return null;
+  return false;
 }
 
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
-
-  let supabaseUserExists = false;
+  let supabaseResponse = NextResponse.next({ request });
+  let hasSupabaseUser = false;
 
   try {
     const supabase = createServerClient(
@@ -85,9 +71,7 @@ export async function updateSession(request: NextRequest) {
               request.cookies.set(name, value);
             });
 
-            supabaseResponse = NextResponse.next({
-              request,
-            });
+            supabaseResponse = NextResponse.next({ request });
 
             cookiesToSet.forEach(({ name, value, options }) => {
               supabaseResponse.cookies.set(name, value, options);
@@ -101,16 +85,13 @@ export async function updateSession(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser();
 
-    supabaseUserExists = Boolean(user);
+    hasSupabaseUser = Boolean(user);
   } catch {
-    // Если Supabase env временно не доступен или Supabase session нет,
-    // всё равно проверяем нашу Telegram app-session cookie ниже.
-    supabaseUserExists = false;
+    hasSupabaseUser = false;
   }
 
-  const appSession = readLikelyAppSession(request);
-  const isAuthed = Boolean(supabaseUserExists || appSession);
-
+  const hasAppSession = hasLikelyActiveAppSession(request);
+  const isAuthed = Boolean(hasSupabaseUser || hasAppSession);
   const { pathname, search } = request.nextUrl;
 
   if (!isAuthed && isProtectedPath(pathname)) {
@@ -122,7 +103,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (isAuthed && isLoginPath(pathname)) {
+  if (isAuthed && pathname === '/login') {
     const redirectUrl = request.nextUrl.clone();
 
     redirectUrl.pathname = '/dashboard';

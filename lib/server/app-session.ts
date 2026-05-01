@@ -5,12 +5,20 @@ import { cookies } from 'next/headers';
 import type { NextResponse } from 'next/server';
 
 export const APP_SESSION_COOKIE_NAME = 'clickbook_app_session';
+
+// Совместимость со старыми файлами проекта
 export const CLICKBOOK_AUTH_COOKIE = APP_SESSION_COOKIE_NAME;
 export const CLICKBOOK_AUTH_COOKIE_LEGACY = 'clickbook_auth_session';
+
+const APP_SESSION_COOKIE_NAMES = [
+  APP_SESSION_COOKIE_NAME,
+  CLICKBOOK_AUTH_COOKIE_LEGACY,
+] as const;
 
 const APP_SESSION_MAX_AGE = 60 * 60 * 24 * 30;
 
 export type TelegramAppSession = {
+  sub: string;
   userId: string;
   telegramId: number;
   username?: string | null;
@@ -41,9 +49,19 @@ function getSecret() {
 function base64url(input: Buffer | string) {
   return Buffer.from(input)
     .toString('base64')
-    .replaceAll('+', '-')
-    .replaceAll('/', '_')
-    .replaceAll('=', '');
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
+function decodeBase64url(value: string) {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized.padEnd(
+    normalized.length + ((4 - (normalized.length % 4)) % 4),
+    '=',
+  );
+
+  return Buffer.from(padded, 'base64').toString('utf8');
 }
 
 function sign(value: string) {
@@ -81,15 +99,24 @@ export function readTelegramAppSessionToken(
   }
 
   try {
-    const session = JSON.parse(
-      Buffer.from(payload.replaceAll('-', '+').replaceAll('_', '/'), 'base64').toString('utf8'),
-    ) as TelegramAppSession;
+    const parsed = JSON.parse(decodeBase64url(payload)) as Partial<TelegramAppSession>;
 
-    if (!session.userId || !session.telegramId || !session.exp) return null;
+    const userId = parsed.userId || parsed.sub;
 
-    if (session.exp < Math.floor(Date.now() / 1000)) return null;
+    if (!userId || !parsed.telegramId || !parsed.exp) return null;
 
-    return session;
+    if (parsed.exp < Math.floor(Date.now() / 1000)) return null;
+
+    return {
+      sub: userId,
+      userId,
+      telegramId: parsed.telegramId,
+      username: parsed.username ?? null,
+      firstName: parsed.firstName ?? null,
+      lastName: parsed.lastName ?? null,
+      iat: parsed.iat ?? Math.floor(Date.now() / 1000),
+      exp: parsed.exp,
+    };
   } catch {
     return null;
   }
@@ -98,9 +125,13 @@ export function readTelegramAppSessionToken(
 export async function getTelegramAppSession() {
   const cookieStore = await cookies();
 
-  return readTelegramAppSessionToken(
-    cookieStore.get(APP_SESSION_COOKIE_NAME)?.value,
-  );
+  for (const cookieName of APP_SESSION_COOKIE_NAMES) {
+    const session = readTelegramAppSessionToken(cookieStore.get(cookieName)?.value);
+
+    if (session) return session;
+  }
+
+  return null;
 }
 
 export function setTelegramAppSessionCookie(
@@ -110,6 +141,7 @@ export function setTelegramAppSessionCookie(
   const now = Math.floor(Date.now() / 1000);
 
   const token = encodeSession({
+    sub: input.userId,
     userId: input.userId,
     telegramId: input.telegramId,
     username: input.username ?? null,
@@ -119,13 +151,15 @@ export function setTelegramAppSessionCookie(
     exp: now + APP_SESSION_MAX_AGE,
   });
 
-  response.cookies.set(APP_SESSION_COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'lax',
-    path: '/',
-    maxAge: APP_SESSION_MAX_AGE,
-  });
+  for (const cookieName of APP_SESSION_COOKIE_NAMES) {
+    response.cookies.set(cookieName, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: APP_SESSION_MAX_AGE,
+    });
+  }
 
   return response;
 }

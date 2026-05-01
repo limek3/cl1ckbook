@@ -4,16 +4,20 @@ import type { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { getTelegramAppSession } from '@/lib/server/app-session';
 
-function buildTelegramUser(session: NonNullable<Awaited<ReturnType<typeof getTelegramAppSession>>>): User {
+function buildTelegramUser(
+  session: NonNullable<Awaited<ReturnType<typeof getTelegramAppSession>>>,
+): User {
+  const now = new Date().toISOString();
+
   return {
     id: session.userId,
     aud: 'authenticated',
     role: 'authenticated',
     email: `telegram+${session.telegramId}@auth.clickbook.app`,
-    email_confirmed_at: new Date().toISOString(),
+    email_confirmed_at: now,
     phone: '',
-    confirmed_at: new Date().toISOString(),
-    last_sign_in_at: new Date().toISOString(),
+    confirmed_at: now,
+    last_sign_in_at: now,
     app_metadata: {
       provider: 'telegram',
       providers: ['telegram'],
@@ -26,8 +30,8 @@ function buildTelegramUser(session: NonNullable<Awaited<ReturnType<typeof getTel
       telegram_last_name: session.lastName ?? null,
     },
     identities: [],
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: now,
+    updated_at: now,
     is_anonymous: false,
   } as User;
 }
@@ -41,7 +45,7 @@ export async function requireAuthUser(): Promise<User> {
       return data.user;
     }
   } catch {
-    // fallback ниже
+    // Telegram Mini App session fallback ниже.
   }
 
   const appSession = await getTelegramAppSession();
