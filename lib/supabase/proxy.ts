@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabasePublishableKey, getSupabaseUrl } from '@/lib/supabase/env';
 
 const PROTECTED_PREFIXES = ['/dashboard', '/create-profile'];
-const APP_SESSION_COOKIES = ['clickbook_app_session', 'clickbook_auth_session'];
+const APP_SESSION_COOKIE = 'clickbook_auth_session';
 
 function isProtectedPath(pathname: string) {
   return PROTECTED_PREFIXES.some(
@@ -18,97 +18,76 @@ function decodeBase64Url(value: string) {
       normalized.length + ((4 - (normalized.length % 4)) % 4),
       '=',
     );
-
-    return JSON.parse(atob(padded)) as {
-      sub?: string;
-      userId?: string;
-      telegramId?: number;
-      exp?: number;
-    };
+    return JSON.parse(atob(padded)) as { sub?: string; exp?: number };
   } catch {
     return null;
   }
 }
 
 function hasLikelyActiveAppSession(request: NextRequest) {
-  for (const cookieName of APP_SESSION_COOKIES) {
-    const raw = request.cookies.get(cookieName)?.value;
+  const raw = request.cookies.get(APP_SESSION_COOKIE)?.value;
+  if (!raw) return false;
 
-    if (!raw) continue;
+  const payloadPart = raw.split('.')[0];
+  if (!payloadPart) return false;
 
-    const payloadPart = raw.split('.')[0];
+  const payload = decodeBase64Url(payloadPart);
+  if (!payload?.sub || !payload.exp) return false;
 
-    if (!payloadPart) continue;
-
-    const payload = decodeBase64Url(payloadPart);
-
-    if (!payload?.exp) continue;
-
-    const hasUser = Boolean(payload.userId || payload.sub);
-    const isActive = payload.exp > Math.floor(Date.now() / 1000);
-
-    if (hasUser && isActive) return true;
-  }
-
-  return false;
+  return payload.exp > Math.floor(Date.now() / 1000);
 }
 
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request });
-  let hasSupabaseUser = false;
+  let url: string;
+  let publishableKey: string;
 
   try {
-    const supabase = createServerClient(
-      getSupabaseUrl(),
-      getSupabasePublishableKey(),
-      {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll();
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value }) => {
-              request.cookies.set(name, value);
-            });
-
-            supabaseResponse = NextResponse.next({ request });
-
-            cookiesToSet.forEach(({ name, value, options }) => {
-              supabaseResponse.cookies.set(name, value, options);
-            });
-          },
-        },
-      },
-    );
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    hasSupabaseUser = Boolean(user);
+    url = getSupabaseUrl();
+    publishableKey = getSupabasePublishableKey();
   } catch {
-    hasSupabaseUser = false;
+    return NextResponse.next({ request });
   }
 
+  let supabaseResponse = NextResponse.next({ request });
+
+  const supabase = createServerClient(url, publishableKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) => {
+          request.cookies.set(name, value);
+        });
+
+        supabaseResponse = NextResponse.next({ request });
+
+        cookiesToSet.forEach(({ name, value, options }) => {
+          supabaseResponse.cookies.set(name, value, options);
+        });
+      },
+    },
+  });
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   const hasAppSession = hasLikelyActiveAppSession(request);
-  const isAuthed = Boolean(hasSupabaseUser || hasAppSession);
+  const isAuthed = Boolean(user || hasAppSession);
   const { pathname, search } = request.nextUrl;
 
   if (!isAuthed && isProtectedPath(pathname)) {
     const redirectUrl = request.nextUrl.clone();
-
     redirectUrl.pathname = '/login';
     redirectUrl.searchParams.set('redirectTo', `${pathname}${search}`);
-
     return NextResponse.redirect(redirectUrl);
   }
 
   if (isAuthed && pathname === '/login') {
     const redirectUrl = request.nextUrl.clone();
-
     redirectUrl.pathname = '/dashboard';
     redirectUrl.search = '';
-
     return NextResponse.redirect(redirectUrl);
   }
 

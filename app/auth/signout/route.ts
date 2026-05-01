@@ -1,23 +1,17 @@
 import { NextResponse } from 'next/server';
+
 import { createClient } from '@/lib/supabase/server';
-import { clearTelegramAppSessionCookies } from '@/lib/server/app-session';
+import { clearTelegramAppSessionCookie } from '@/lib/server/app-session';
 
 export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
+export const revalidate = 0;
 
 export async function GET(request: Request) {
-  const url = new URL(request.url);
+  const supabase = await createClient();
+  await supabase.auth.signOut();
 
-  try {
-    const supabase = await createClient();
-    await supabase.auth.signOut();
-  } catch {}
+  const url = new URL('/login', request.url);
+  const response = NextResponse.redirect(url);
 
-  const response = NextResponse.redirect(new URL('/login', url.origin));
-  return clearTelegramAppSessionCookies(response);
-}
-
-export async function POST() {
-  const response = NextResponse.json({ ok: true });
-  return clearTelegramAppSessionCookies(response);
+  return clearTelegramAppSessionCookie(response);
 }

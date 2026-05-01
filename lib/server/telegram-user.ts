@@ -18,10 +18,6 @@ type EnsureTelegramUserParams = TelegramUserInput & {
 };
 
 export function telegramSyntheticEmail(telegramId: number) {
-  return `telegram+${telegramId}@auth.clickbook.app`;
-}
-
-function oldSyntheticEmail(telegramId: number) {
   return `telegram_${telegramId}@auth.clickbook.app`;
 }
 
@@ -32,13 +28,11 @@ function legacyTelegramEmail(telegramId: number) {
 function userMatchesTelegram(user: User, telegramId: number) {
   const email = user.email?.toLowerCase();
   const syntheticEmail = telegramSyntheticEmail(telegramId).toLowerCase();
-  const oldEmail = oldSyntheticEmail(telegramId).toLowerCase();
   const legacyEmail = legacyTelegramEmail(telegramId).toLowerCase();
   const metadataTelegramId = Number(user.user_metadata?.telegram_id);
 
   return (
     email === syntheticEmail ||
-    email === oldEmail ||
     email === legacyEmail ||
     metadataTelegramId === telegramId
   );
@@ -83,8 +77,8 @@ export async function findTelegramAuthUser(
   return null;
 }
 
-function buildTelegramMetadata(params: TelegramUserInput) {
-  return {
+export async function ensureTelegramAuthUser(params: EnsureTelegramUserParams) {
+  const userMetadata = {
     provider: 'telegram',
     telegram_id: params.telegramId,
     telegram_username: params.username ?? null,
@@ -93,25 +87,6 @@ function buildTelegramMetadata(params: TelegramUserInput) {
     telegram_photo_url: params.photoUrl ?? null,
     telegram_chat_id: params.chatId ?? null,
   };
-}
-
-function isDuplicateUserError(error: unknown) {
-  if (!error || typeof error !== 'object') return false;
-
-  const message = 'message' in error ? String(error.message ?? '').toLowerCase() : '';
-  const code = 'code' in error ? String(error.code ?? '').toLowerCase() : '';
-
-  return (
-    code.includes('email_exists') ||
-    message.includes('already') ||
-    message.includes('registered') ||
-    message.includes('duplicate') ||
-    message.includes('exists')
-  );
-}
-
-export async function ensureTelegramAuthUser(params: EnsureTelegramUserParams) {
-  const userMetadata = buildTelegramMetadata(params);
 
   const existing = await findTelegramAuthUser(
     params.admin,
@@ -120,83 +95,55 @@ export async function ensureTelegramAuthUser(params: EnsureTelegramUserParams) {
   );
 
   if (existing) {
-    const { data, error } = await params.admin.auth.admin.updateUserById(existing.id, {
+    const { data } = await params.admin.auth.admin.updateUserById(existing.id, {
       user_metadata: {
         ...(existing.user_metadata ?? {}),
         ...userMetadata,
       },
+      app_metadata: {
+        ...(existing.app_metadata ?? {}),
+        provider: 'telegram',
+        providers: ['telegram'],
+      },
     });
-
-    if (error) {
-      console.error('[telegram-user] update existing user failed, using existing user', {
-        message: error.message,
-        code: error.code,
-      });
-
-      return existing;
-    }
 
     return data.user ?? existing;
   }
 
-  const password = crypto.randomBytes(24).toString('hex');
-
-  const createAttempts = [
-    {
-      email: telegramSyntheticEmail(params.telegramId),
-      password,
-      email_confirm: true,
-      user_metadata: userMetadata,
+  const { data, error } = await params.admin.auth.admin.createUser({
+    email: telegramSyntheticEmail(params.telegramId),
+    password: crypto.randomBytes(48).toString('hex'),
+    email_confirm: true,
+    user_metadata: userMetadata,
+    app_metadata: {
+      provider: 'telegram',
+      providers: ['telegram'],
     },
-    {
-      email: oldSyntheticEmail(params.telegramId),
-      password,
-      email_confirm: true,
-      user_metadata: userMetadata,
-    },
-    {
-      email: telegramSyntheticEmail(params.telegramId),
-      password,
-      email_confirm: true,
-    },
-  ];
+  });
 
-  let lastError: unknown = null;
+  if (error || !data.user) {
+    const raced = await findTelegramAuthUser(params.admin, params.telegramId);
+    if (raced) return raced;
 
-  for (const attempt of createAttempts) {
-    const { data, error } = await params.admin.auth.admin.createUser(attempt);
-
-    if (data.user) {
-      return data.user;
-    }
-
-    if (error) {
-      lastError = error;
-
-      const raced = await findTelegramAuthUser(params.admin, params.telegramId);
-      if (raced) return raced;
-
-      if (!isDuplicateUserError(error)) {
-        console.error('[telegram-user] create user attempt failed', {
-          email: attempt.email,
-          message: error.message,
-          code: error.code,
-        });
-      }
-    }
+    throw error ?? new Error('telegram_user_create_failed');
   }
 
-  const raced = await findTelegramAuthUser(params.admin, params.telegramId);
-  if (raced) return raced;
-
-  throw lastError ?? new Error('telegram_user_create_failed');
+  return data.user;
 }
 
 export async function upsertTelegramAccount(
   admin: SupabaseClient,
   params: TelegramUserInput & { userId: string; authDate?: string | null },
 ) {
-  const metadata = buildTelegramMetadata(params);
+  const metadata = {
+    provider: 'telegram',
+    telegram_id: params.telegramId,
+    telegram_username: params.username ?? null,
+    telegram_first_name: params.firstName ?? null,
+    telegram_last_name: params.lastName ?? null,
+    telegram_photo_url: params.photoUrl ?? null,
+    telegram_chat_id: params.chatId ?? null,
+  };
 
   const payload: Record<string, unknown> = {
     telegram_id: params.telegramId,

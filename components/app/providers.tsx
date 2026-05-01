@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { TelegramMiniAppAutoAuth } from '@/components/auth/telegram-miniapp-auto-auth';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { AppProvider } from '@/lib/app-context';
@@ -13,6 +14,7 @@ export function Providers({ children }: { children: ReactNode }) {
       <LocaleProvider>
         <AppProvider>
           <AppearanceProvider>
+            <TelegramMiniAppAutoAuth />
             {children}
             <Toaster richColors position="top-center" />
           </AppearanceProvider>

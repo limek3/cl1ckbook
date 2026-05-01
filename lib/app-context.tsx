@@ -11,6 +11,10 @@ import {
 } from 'react';
 import { useLocale } from '@/lib/locale-context';
 import { createClient as createSupabaseBrowserClient } from '@/lib/supabase/client';
+import {
+  CLICKBOOK_AUTH_SESSION_READY_EVENT,
+  authorizeTelegramMiniAppSession,
+} from '@/lib/telegram-miniapp-auth-client';
 import { parseServices, slugify } from '@/lib/utils';
 import { buildWorkspaceSeed, type WorkspaceSections, type WorkspaceSnapshot } from '@/lib/workspace-store';
 import { getDemoBookings, getDemoProfile, saveStoredDemoProfile, SLOTY_DEMO_SLUG } from '@/lib/demo-data';
@@ -132,10 +136,26 @@ async function getAuthHeaders(includeJson = false) {
       headers.Authorization = `Bearer ${session.access_token}`;
     }
   } catch {
-    // Cookie-based auth can still work without the fallback header.
+    // Cookie-based Telegram app auth can still work without the fallback header.
   }
 
   return headers;
+}
+
+async function fetchWithTelegramMiniAppRetry(input: RequestInfo | URL, init?: RequestInit) {
+  const response = await fetch(input, init);
+
+  if (response.status !== 401) {
+    return response;
+  }
+
+  const auth = await authorizeTelegramMiniAppSession({ force: true });
+
+  if (!auth.ok) {
+    return response;
+  }
+
+  return fetch(input, init);
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -163,7 +183,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const refreshWorkspace = useCallback(async () => {
     try {
-      const response = await fetch('/api/workspace', {
+      const response = await fetchWithTelegramMiniAppRetry('/api/workspace', {
         credentials: 'include',
         cache: 'no-store',
         headers: await getAuthHeaders(),
@@ -197,6 +217,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     return () => {
       active = false;
+    };
+  }, [refreshWorkspace]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleAuthReady = () => {
+      void refreshWorkspace();
+    };
+
+    window.addEventListener(CLICKBOOK_AUTH_SESSION_READY_EVENT, handleAuthReady);
+
+    return () => {
+      window.removeEventListener(CLICKBOOK_AUTH_SESSION_READY_EVENT, handleAuthReady);
     };
   }, [refreshWorkspace]);
 
@@ -291,7 +325,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        const response = await fetch('/api/profile', {
+        const response = await fetchWithTelegramMiniAppRetry('/api/profile', {
           method: 'POST',
           credentials: 'include',
           cache: 'no-store',
@@ -414,7 +448,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        const response = await fetch('/api/workspace/section', {
+        const response = await fetchWithTelegramMiniAppRetry('/api/workspace/section', {
           method: 'PATCH',
           credentials: 'include',
           cache: 'no-store',
@@ -452,7 +486,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }));
 
       try {
-        const response = await fetch('/api/bookings', {
+        const response = await fetchWithTelegramMiniAppRetry('/api/bookings', {
           method: 'PATCH',
           credentials: 'include',
           cache: 'no-store',

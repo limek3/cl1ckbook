@@ -3,27 +3,34 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { CheckCircle2, ExternalLink, Loader2, Send, ShieldCheck } from 'lucide-react';
+import {
+  authorizeTelegramMiniAppSession,
+  hasTelegramMiniAppInitData,
+} from '@/lib/telegram-miniapp-auth-client';
 import { cn } from '@/lib/utils';
-
-type TelegramWebApp = {
-  initData?: string;
-  ready?: () => void;
-  expand?: () => void;
-  close?: () => void;
-};
-
-declare global {
-  interface Window {
-    Telegram?: {
-      WebApp?: TelegramWebApp;
-    };
-  }
-}
 
 type MiniAppAuthState = 'checking' | 'success' | 'outside' | 'error';
 
 function getBotUsername() {
   return process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME?.replace(/^@/, '').trim() || '';
+}
+
+function normalizeTelegramMiniAppError(error?: string) {
+  if (!error) return 'Не удалось войти через Telegram Mini App.';
+
+  if (error.includes('telegram_init_data_expired')) {
+    return 'Telegram-сессия устарела. Закройте Mini App и откройте кабинет заново из бота.';
+  }
+
+  if (error.includes('telegram_init_hash_invalid')) {
+    return 'Telegram не подтвердил подпись входа. Проверьте TELEGRAM_BOT_TOKEN в Vercel.';
+  }
+
+  if (error.includes('sloty_telegram_accounts')) {
+    return 'Не найдена таблица Telegram-аккаунтов. Выполните свежий SQL из архива в Supabase.';
+  }
+
+  return error;
 }
 
 export function TelegramMiniAppGate({
@@ -38,68 +45,37 @@ export function TelegramMiniAppGate({
 
   const botUrl = useMemo(() => {
     const botUsername = getBotUsername();
-    return botUsername ? `https://t.me/${botUsername}` : null;
+    return botUsername ? `https://t.me/${botUsername}?startapp=dashboard` : null;
   }, []);
 
   useEffect(() => {
     let cancelled = false;
 
     async function authorizeMiniApp() {
-      const webApp = window.Telegram?.WebApp;
-      const initData = webApp?.initData;
-
-      try {
-        webApp?.ready?.();
-        webApp?.expand?.();
-      } catch {
-        // Telegram WebApp API is optional outside Telegram.
-      }
-
-      if (!initData) {
+      if (!hasTelegramMiniAppInitData()) {
         if (!cancelled) {
           setState('outside');
-          setMessage('Откройте кабинет через Telegram-бота. В браузере можно пользоваться публичными страницами и веб-входом.');
+          setMessage('Откройте кабинет через Telegram-бота. В браузере можно пользоваться веб-входом через кнопку ниже.');
         }
         return;
       }
 
-      try {
-        const response = await fetch('/api/auth/telegram-miniapp', {
-          method: 'POST',
-          credentials: 'include',
-          cache: 'no-store',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ initData }),
-        });
+      const payload = await authorizeTelegramMiniAppSession({ force: true });
 
-        const payload = (await response.json().catch(() => ({}))) as {
-          ok?: boolean;
-          error?: string;
-        };
+      if (cancelled) return;
 
-        if (!response.ok || !payload.ok) {
-          throw new Error(payload.error || 'telegram_miniapp_auth_failed');
-        }
-
-        if (cancelled) return;
-
-        setState('success');
-        setMessage('Готово. Открываем кабинет...');
-
-        window.setTimeout(() => {
-          window.location.assign(redirectTo);
-        }, 280);
-      } catch (error) {
-        if (cancelled) return;
+      if (!payload.ok) {
         setState('error');
-        setMessage(
-          error instanceof Error
-            ? error.message
-            : 'Не удалось войти через Telegram Mini App.',
-        );
+        setMessage(normalizeTelegramMiniAppError(payload.error));
+        return;
       }
+
+      setState('success');
+      setMessage('Готово. Открываем кабинет...');
+
+      window.setTimeout(() => {
+        window.location.replace(redirectTo);
+      }, 280);
     }
 
     void authorizeMiniApp();
@@ -165,7 +141,7 @@ export function TelegramMiniAppGate({
               className="inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border border-[#2692d8] bg-[#2ea6ff] px-4 text-[12px] font-semibold text-white transition hover:bg-[#2299f0] active:scale-[0.99]"
             >
               <Send className="size-4" />
-              Открыть бота
+              Открыть Mini App в Telegram
             </a>
           ) : null}
 

@@ -3,176 +3,187 @@ import 'server-only';
 import crypto from 'node:crypto';
 import { cookies } from 'next/headers';
 import type { NextResponse } from 'next/server';
+import type { User } from '@supabase/supabase-js';
 
-export const APP_SESSION_COOKIE_NAME = 'clickbook_app_session';
+export const CLICKBOOK_AUTH_COOKIE = 'clickbook_auth_session';
+const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 
-// Совместимость со старым кодом проекта
-export const CLICKBOOK_AUTH_COOKIE = APP_SESSION_COOKIE_NAME;
-export const CLICKBOOK_AUTH_COOKIE_LEGACY = 'clickbook_auth_session';
+function shouldUseSecureCookies() {
+  return process.env.NODE_ENV === 'production' ||
+    process.env.VERCEL === '1' ||
+    process.env.NEXT_PUBLIC_APP_URL?.startsWith('https://');
+}
 
-const APP_SESSION_COOKIE_NAMES = [
-  APP_SESSION_COOKIE_NAME,
-  CLICKBOOK_AUTH_COOKIE_LEGACY,
-] as const;
-
-const APP_SESSION_MAX_AGE = 60 * 60 * 24 * 30;
-
-export type TelegramAppSession = {
+type AppSessionPayload = {
   sub: string;
-  userId: string;
-  telegramId: number;
+  provider: 'telegram';
+  telegram_id?: number;
   username?: string | null;
-  firstName?: string | null;
-  lastName?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
   iat: number;
   exp: number;
 };
 
-type SetTelegramAppSessionInput = {
+function getSessionSecret() {
+  const value =
+    process.env.KEY_VAULTS_SECRET ||
+    process.env.TELEGRAM_WEBHOOK_SECRET ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!value) {
+    throw new Error('Missing KEY_VAULTS_SECRET for app session signing.');
+  }
+
+  return value;
+}
+
+function base64url(value: Buffer | string) {
+  return Buffer.from(value)
+    .toString('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+}
+
+function fromBase64url(value: string) {
+  const padded = value.padEnd(value.length + ((4 - (value.length % 4)) % 4), '=');
+  return Buffer.from(padded.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+}
+
+function sign(payloadPart: string) {
+  return base64url(
+    crypto.createHmac('sha256', getSessionSecret()).update(payloadPart).digest(),
+  );
+}
+
+function safeEqual(left: string, right: string) {
+  const a = Buffer.from(left);
+  const b = Buffer.from(right);
+
+  if (a.length !== b.length) return false;
+
+  return crypto.timingSafeEqual(a, b);
+}
+
+export function createTelegramAppSessionToken(params: {
   userId: string;
   telegramId: number;
   username?: string | null;
   firstName?: string | null;
   lastName?: string | null;
-};
+}) {
+  const now = Math.floor(Date.now() / 1000);
+  const payload: AppSessionPayload = {
+    sub: params.userId,
+    provider: 'telegram',
+    telegram_id: params.telegramId,
+    username: params.username ?? null,
+    first_name: params.firstName ?? null,
+    last_name: params.lastName ?? null,
+    iat: now,
+    exp: now + SESSION_TTL_SECONDS,
+  };
 
-function getSecret() {
-  const secret = process.env.APP_SESSION_SECRET;
+  const payloadPart = base64url(JSON.stringify(payload));
+  const signaturePart = sign(payloadPart);
 
-  if (!secret || secret.length < 24) {
-    throw new Error('Missing APP_SESSION_SECRET');
-  }
-
-  return secret;
+  return `${payloadPart}.${signaturePart}`;
 }
 
-function base64url(input: Buffer | string) {
-  return Buffer.from(input)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
-}
-
-function decodeBase64url(value: string) {
-  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
-  const padded = normalized.padEnd(
-    normalized.length + ((4 - (normalized.length % 4)) % 4),
-    '=',
-  );
-
-  return Buffer.from(padded, 'base64').toString('utf8');
-}
-
-function sign(value: string) {
-  return base64url(
-    crypto.createHmac('sha256', getSecret()).update(value).digest(),
-  );
-}
-
-function encodeSession(session: TelegramAppSession) {
-  const payload = base64url(JSON.stringify(session));
-  const signature = sign(payload);
-
-  return `${payload}.${signature}`;
-}
-
-export function readTelegramAppSessionToken(
-  token?: string | null,
-): TelegramAppSession | null {
+export function verifyTelegramAppSessionToken(token?: string | null) {
   if (!token) return null;
 
-  const [payload, signature] = token.split('.');
+  const [payloadPart, signaturePart] = token.split('.');
+  if (!payloadPart || !signaturePart) return null;
 
-  if (!payload || !signature) return null;
+  const expectedSignature = sign(payloadPart);
+  if (!safeEqual(signaturePart, expectedSignature)) return null;
 
-  const expected = sign(payload);
-
-  const signatureBuffer = Buffer.from(signature);
-  const expectedBuffer = Buffer.from(expected);
-
-  if (
-    signatureBuffer.length !== expectedBuffer.length ||
-    !crypto.timingSafeEqual(signatureBuffer, expectedBuffer)
-  ) {
-    return null;
-  }
+  let payload: AppSessionPayload;
 
   try {
-    const parsed = JSON.parse(decodeBase64url(payload)) as Partial<TelegramAppSession>;
-    const userId = parsed.userId || parsed.sub;
-
-    if (!userId || !parsed.telegramId || !parsed.exp) return null;
-
-    if (parsed.exp < Math.floor(Date.now() / 1000)) return null;
-
-    return {
-      sub: userId,
-      userId,
-      telegramId: parsed.telegramId,
-      username: parsed.username ?? null,
-      firstName: parsed.firstName ?? null,
-      lastName: parsed.lastName ?? null,
-      iat: parsed.iat ?? Math.floor(Date.now() / 1000),
-      exp: parsed.exp,
-    };
+    payload = JSON.parse(fromBase64url(payloadPart)) as AppSessionPayload;
   } catch {
     return null;
   }
-}
 
-export async function getTelegramAppSession() {
-  const cookieStore = await cookies();
+  if (!payload.sub || payload.provider !== 'telegram') return null;
+  if (!payload.exp || payload.exp <= Math.floor(Date.now() / 1000)) return null;
 
-  for (const cookieName of APP_SESSION_COOKIE_NAMES) {
-    const session = readTelegramAppSessionToken(cookieStore.get(cookieName)?.value);
-
-    if (session) return session;
-  }
-
-  return null;
+  return payload;
 }
 
 export function setTelegramAppSessionCookie(
   response: NextResponse,
-  input: SetTelegramAppSessionInput,
+  params: {
+    userId: string;
+    telegramId: number;
+    username?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+  },
 ) {
-  const now = Math.floor(Date.now() / 1000);
+  const token = createTelegramAppSessionToken(params);
 
-  const token = encodeSession({
-    sub: input.userId,
-    userId: input.userId,
-    telegramId: input.telegramId,
-    username: input.username ?? null,
-    firstName: input.firstName ?? null,
-    lastName: input.lastName ?? null,
-    iat: now,
-    exp: now + APP_SESSION_MAX_AGE,
+  const secureCookie = shouldUseSecureCookies();
+
+  response.cookies.set(CLICKBOOK_AUTH_COOKIE, token, {
+    httpOnly: true,
+    secure: secureCookie,
+    sameSite: secureCookie ? 'none' : 'lax',
+    path: '/',
+    maxAge: SESSION_TTL_SECONDS,
   });
-
-  for (const cookieName of APP_SESSION_COOKIE_NAMES) {
-    response.cookies.set(cookieName, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'none',
-      path: '/',
-      maxAge: APP_SESSION_MAX_AGE,
-    });
-  }
 
   return response;
 }
 
-export function clearTelegramAppSessionCookies(response: NextResponse) {
-  for (const cookieName of APP_SESSION_COOKIE_NAMES) {
-    response.cookies.set(cookieName, '', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'none',
-      path: '/',
-      maxAge: 0,
-    });
-  }
+export function clearTelegramAppSessionCookie(response: NextResponse) {
+  const secureCookie = shouldUseSecureCookies();
+
+  response.cookies.set(CLICKBOOK_AUTH_COOKIE, '', {
+    httpOnly: true,
+    secure: secureCookie,
+    sameSite: secureCookie ? 'none' : 'lax',
+    path: '/',
+    maxAge: 0,
+  });
 
   return response;
+}
+
+export async function getTelegramAppSessionUser(): Promise<User | null> {
+  try {
+    const cookieStore = await cookies();
+    const session = verifyTelegramAppSessionToken(
+      cookieStore.get(CLICKBOOK_AUTH_COOKIE)?.value,
+    );
+
+    if (!session) return null;
+
+    return {
+      id: session.sub,
+      aud: 'authenticated',
+      role: 'authenticated',
+      email: session.telegram_id
+        ? `telegram_${session.telegram_id}@auth.clickbook.app`
+        : undefined,
+      app_metadata: {
+        provider: 'telegram',
+        providers: ['telegram'],
+      },
+      user_metadata: {
+        provider: 'telegram',
+        telegram_id: session.telegram_id,
+        telegram_username: session.username,
+        telegram_first_name: session.first_name,
+        telegram_last_name: session.last_name,
+      },
+      created_at: new Date(session.iat * 1000).toISOString(),
+      updated_at: new Date(session.iat * 1000).toISOString(),
+    } as User;
+  } catch {
+    return null;
+  }
 }

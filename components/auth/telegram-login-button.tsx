@@ -4,6 +4,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Check, Copy, ExternalLink, Loader2, Send, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import {
+  authorizeTelegramMiniAppSession,
+  hasTelegramMiniAppInitData,
+} from '@/lib/telegram-miniapp-auth-client';
 import { cn } from '@/lib/utils';
 
 type TelegramStartResponse = {
@@ -166,6 +170,19 @@ export function TelegramLoginButton({
     setToken(null);
     setBotUrl(null);
     setCopiedCommand(false);
+
+    if (hasTelegramMiniAppInitData()) {
+      const miniAppAuth = await authorizeTelegramMiniAppSession({ force: true });
+
+      if (miniAppAuth.ok) {
+        await finishLogin({ status: 'confirmed', app_session: true });
+        return;
+      }
+
+      setState('error');
+      setMessage(humanTelegramError(miniAppAuth.error || 'telegram_miniapp_auth_failed'));
+      return;
+    }
 
     try {
       const response = await fetch('/api/auth/telegram/start', {

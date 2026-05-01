@@ -96,7 +96,7 @@ export default function LoginPage() {
 
   const botUrl = useMemo(() => {
     const username = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME?.replace(/^@/, '').trim();
-    return username ? `https://t.me/${username}` : null;
+    return username ? `https://t.me/${username}?startapp=dashboard` : null;
   }, []);
 
   if (!authConfigured) {
@@ -205,7 +205,7 @@ export default function LoginPage() {
                 className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[11px] border border-[#2692d8] bg-[#2ea6ff] px-4 text-[13px] font-semibold text-white transition hover:bg-[#2299f0] active:scale-[0.99]"
               >
                 <Send className="size-4" />
-                Открыть кабинет в Telegram
+                Открыть Mini App в Telegram
               </a>
             ) : null}
 
