@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/server/supabase-admin';
-import { setTelegramAppSessionCookie } from '@/lib/server/app-session';
+import { createTelegramAppSessionToken, setTelegramAppSessionCookie } from '@/lib/server/app-session';
 import { verifyTelegramMiniAppInitData } from '@/lib/server/telegram-miniapp';
 import { ensureTelegramAuthUser, upsertTelegramAccount } from '@/lib/server/telegram-user';
 
@@ -47,9 +47,18 @@ export async function POST(request: Request) {
       authDate: verified.authDate.toISOString(),
     });
 
+    const appSessionToken = createTelegramAppSessionToken({
+      userId: user.id,
+      telegramId: verified.user.id,
+      username: verified.user.username ?? null,
+      firstName: verified.user.first_name ?? null,
+      lastName: verified.user.last_name ?? null,
+    });
+
     const response = NextResponse.json({
       ok: true,
       app_session: true,
+      appSessionToken,
       user: {
         id: user.id,
         telegramId: verified.user.id,
@@ -65,6 +74,7 @@ export async function POST(request: Request) {
       username: verified.user.username ?? null,
       firstName: verified.user.first_name ?? null,
       lastName: verified.user.last_name ?? null,
+      token: appSessionToken,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'telegram_miniapp_auth_failed';

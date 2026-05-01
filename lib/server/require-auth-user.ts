@@ -4,7 +4,7 @@ import { headers } from 'next/headers';
 import { createClient as createSupabaseClient, type User } from '@supabase/supabase-js';
 import { createClient as createServerSupabaseClient } from '@/lib/supabase/server';
 import { getSupabasePublishableKey, getSupabaseUrl } from '@/lib/supabase/env';
-import { getTelegramAppSessionUser } from '@/lib/server/app-session';
+import { getTelegramAppSessionUser, getTelegramAppSessionUserFromToken } from '@/lib/server/app-session';
 
 function parseBearerToken(value: string | null) {
   if (!value) return null;
@@ -13,12 +13,18 @@ function parseBearerToken(value: string | null) {
   return match?.[1]?.trim() || null;
 }
 
-async function getRequestBearerToken() {
+async function getRequestAuthHeaders() {
   try {
     const headerStore = await headers();
-    return parseBearerToken(headerStore.get('authorization'));
+    return {
+      bearerToken: parseBearerToken(headerStore.get('authorization')),
+      appSessionToken: headerStore.get('x-clickbook-app-session'),
+    };
   } catch {
-    return null;
+    return {
+      bearerToken: null,
+      appSessionToken: null,
+    };
   }
 }
 
@@ -34,7 +40,13 @@ export async function requireAuthUser(): Promise<User> {
   // API route does not receive/refesh the auth cookie yet on Vercel.
   // Client requests send Authorization: Bearer <access_token>, and we validate
   // that token directly through Supabase Auth.
-  const token = await getRequestBearerToken();
+  const { bearerToken: token, appSessionToken } = await getRequestAuthHeaders();
+
+  const headerTelegramUser = getTelegramAppSessionUserFromToken(appSessionToken);
+
+  if (headerTelegramUser) {
+    return headerTelegramUser;
+  }
 
   if (token) {
     const tokenSupabase = createSupabaseClient(

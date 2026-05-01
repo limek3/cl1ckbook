@@ -173,13 +173,23 @@ export function normalizeAvailabilityDays(items?: unknown): BookingAvailabilityD
   });
 }
 
+function isRealDateOverride(day: BookingAvailabilityDay) {
+  // A generated month row with custom=false and no slots is only a calendar shell.
+  // It must not close the public booking page if a weekly template exists.
+  if (day.custom === false && (day.slots?.length ?? 0) === 0 && (day.breaks?.length ?? 0) === 0) {
+    return day.status === 'day-off';
+  }
+
+  return true;
+}
+
 export function findAvailabilityDay(
   availability: BookingAvailabilityDay[],
   dateIso: string,
 ) {
   const date = new Date(`${dateIso}T00:00:00`);
   const weekdayIndex = getMondayIndex(date);
-  const exactDay = [...availability].reverse().find((day) => day.date === dateIso);
+  const exactDay = [...availability].reverse().find((day) => day.date === dateIso && isRealDateOverride(day));
 
   if (exactDay) return exactDay;
 
@@ -189,7 +199,6 @@ export function findAvailabilityDay(
     ) ?? null
   );
 }
-
 export function normalizeServiceDetails(items?: unknown): BookingServiceDetails[] {
   if (!Array.isArray(items)) return [];
 

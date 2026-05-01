@@ -85,8 +85,9 @@ export async function POST(request: Request) {
       : [];
     const normalizedAvailability = await listAvailabilityDays(workspace.id).catch(() => []);
     const availability = normalizeAvailabilityDays([
-      ...normalizedAvailability,
+      ...seed.availability,
       ...storedAvailability,
+      ...normalizedAvailability,
     ]);
     const bookedSlots = currentBookings.map((item) => ({
       id: item.id,

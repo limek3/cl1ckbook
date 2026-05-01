@@ -80,7 +80,7 @@ export async function GET(
       ? workspace.data.availability
       : [];
     const normalizedAvailability = await listAvailabilityDays(workspace.id).catch(() => []);
-    const availability = mergeAvailability([], normalizedAvailability, storedAvailability);
+    const availability = mergeAvailability(seed.availability, storedAvailability, normalizedAvailability);
     const publicServiceNames = serviceDetails
       .filter((service) => {
         if (!service || typeof service !== 'object') return false;

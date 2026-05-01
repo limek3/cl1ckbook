@@ -122,9 +122,10 @@ export function setTelegramAppSessionCookie(
     username?: string | null;
     firstName?: string | null;
     lastName?: string | null;
+    token?: string;
   },
 ) {
-  const token = createTelegramAppSessionToken(params);
+  const token = params.token ?? createTelegramAppSessionToken(params);
 
   const secureCookie = shouldUseSecureCookies();
 
@@ -153,36 +154,45 @@ export function clearTelegramAppSessionCookie(response: NextResponse) {
   return response;
 }
 
+function appSessionPayloadToUser(session: AppSessionPayload): User {
+  return {
+    id: session.sub,
+    aud: 'authenticated',
+    role: 'authenticated',
+    email: session.telegram_id
+      ? `telegram_${session.telegram_id}@auth.clickbook.app`
+      : undefined,
+    app_metadata: {
+      provider: 'telegram',
+      providers: ['telegram'],
+    },
+    user_metadata: {
+      provider: 'telegram',
+      telegram_id: session.telegram_id,
+      telegram_username: session.username,
+      telegram_first_name: session.first_name,
+      telegram_last_name: session.last_name,
+    },
+    created_at: new Date(session.iat * 1000).toISOString(),
+    updated_at: new Date(session.iat * 1000).toISOString(),
+  } as User;
+}
+
+export function getTelegramAppSessionUserFromToken(token?: string | null): User | null {
+  try {
+    const session = verifyTelegramAppSessionToken(token);
+    return session ? appSessionPayloadToUser(session) : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getTelegramAppSessionUser(): Promise<User | null> {
   try {
     const cookieStore = await cookies();
-    const session = verifyTelegramAppSessionToken(
+    return getTelegramAppSessionUserFromToken(
       cookieStore.get(CLICKBOOK_AUTH_COOKIE)?.value,
     );
-
-    if (!session) return null;
-
-    return {
-      id: session.sub,
-      aud: 'authenticated',
-      role: 'authenticated',
-      email: session.telegram_id
-        ? `telegram_${session.telegram_id}@auth.clickbook.app`
-        : undefined,
-      app_metadata: {
-        provider: 'telegram',
-        providers: ['telegram'],
-      },
-      user_metadata: {
-        provider: 'telegram',
-        telegram_id: session.telegram_id,
-        telegram_username: session.username,
-        telegram_first_name: session.first_name,
-        telegram_last_name: session.last_name,
-      },
-      created_at: new Date(session.iat * 1000).toISOString(),
-      updated_at: new Date(session.iat * 1000).toISOString(),
-    } as User;
   } catch {
     return null;
   }

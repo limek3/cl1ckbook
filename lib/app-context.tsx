@@ -14,6 +14,7 @@ import { createClient as createSupabaseBrowserClient } from '@/lib/supabase/clie
 import {
   CLICKBOOK_AUTH_SESSION_READY_EVENT,
   authorizeTelegramMiniAppSession,
+  getTelegramAppSessionHeaders,
 } from '@/lib/telegram-miniapp-auth-client';
 import { parseServices, slugify } from '@/lib/utils';
 import { buildWorkspaceSeed, type WorkspaceSections, type WorkspaceSnapshot } from '@/lib/workspace-store';
@@ -139,6 +140,19 @@ async function getAuthHeaders(includeJson = false) {
     // Cookie-based Telegram app auth can still work without the fallback header.
   }
 
+  Object.assign(headers, getTelegramAppSessionHeaders());
+
+  return headers;
+}
+
+function mergeHeaders(...sources: Array<HeadersInit | undefined>) {
+  const headers = new Headers();
+
+  for (const source of sources) {
+    if (!source) continue;
+    new Headers(source).forEach((value, key) => headers.set(key, value));
+  }
+
   return headers;
 }
 
@@ -149,13 +163,18 @@ async function fetchWithTelegramMiniAppRetry(input: RequestInfo | URL, init?: Re
     return response;
   }
 
-  const auth = await authorizeTelegramMiniAppSession({ force: true, waitMs: 2200 });
+  const auth = await authorizeTelegramMiniAppSession({ force: true, waitMs: 2600 });
 
-  if (!auth.ok) {
+  if (!auth.ok && Object.keys(getTelegramAppSessionHeaders()).length === 0) {
     return response;
   }
 
-  return fetch(input, init);
+  return fetch(input, {
+    ...init,
+    credentials: init?.credentials ?? 'include',
+    cache: init?.cache ?? 'no-store',
+    headers: mergeHeaders(init?.headers, await getAuthHeaders(false)),
+  });
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {

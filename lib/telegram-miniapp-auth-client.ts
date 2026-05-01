@@ -5,6 +5,7 @@ export const CLICKBOOK_AUTH_SESSION_READY_EVENT = 'clickbook:auth-session-ready'
 export type TelegramMiniAppAuthPayload = {
   ok?: boolean;
   app_session?: boolean;
+  appSessionToken?: string;
   user?: {
     id?: string;
     telegramId?: number;
@@ -37,8 +38,33 @@ function getTelegramWebApp() {
   return (window as TelegramWindow).Telegram?.WebApp;
 }
 
+const APP_SESSION_STORAGE_KEY = 'clickbook_app_session_token';
+
 let cachedAuthPromise: Promise<TelegramMiniAppAuthPayload> | null = null;
 let hasSuccessfulAuth = false;
+
+export function getStoredTelegramAppSessionToken() {
+  if (typeof window === 'undefined') return '';
+
+  try {
+    return window.localStorage.getItem(APP_SESSION_STORAGE_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+function storeTelegramAppSessionToken(token?: string | null) {
+  if (!token || typeof window === 'undefined') return;
+
+  try {
+    window.localStorage.setItem(APP_SESSION_STORAGE_KEY, token);
+  } catch {}
+}
+
+export function getTelegramAppSessionHeaders() {
+  const token = getStoredTelegramAppSessionToken();
+  return token ? { 'X-ClickBook-App-Session': token } : {};
+}
 
 export function getTelegramMiniAppInitData() {
   if (typeof window === 'undefined') return '';
@@ -129,6 +155,7 @@ export async function authorizeTelegramMiniAppSession(options?: { force?: boolea
     const payload = {
       ok: true,
       app_session: true,
+      appSessionToken: getStoredTelegramAppSessionToken() || undefined,
     } satisfies TelegramMiniAppAuthPayload;
 
     dispatchAuthReady(payload);
@@ -157,6 +184,7 @@ export async function authorizeTelegramMiniAppSession(options?: { force?: boolea
       throw new Error(message);
     }
 
+    storeTelegramAppSessionToken(payload.appSessionToken);
     hasSuccessfulAuth = true;
     dispatchAuthReady(payload);
     return payload;
