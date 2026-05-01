@@ -6,7 +6,7 @@ import type { NextResponse } from 'next/server';
 
 export const APP_SESSION_COOKIE_NAME = 'clickbook_app_session';
 
-// Совместимость со старыми файлами проекта
+// Совместимость со старым кодом проекта
 export const CLICKBOOK_AUTH_COOKIE = APP_SESSION_COOKIE_NAME;
 export const CLICKBOOK_AUTH_COOKIE_LEGACY = 'clickbook_auth_session';
 
@@ -100,7 +100,6 @@ export function readTelegramAppSessionToken(
 
   try {
     const parsed = JSON.parse(decodeBase64url(payload)) as Partial<TelegramAppSession>;
-
     const userId = parsed.userId || parsed.sub;
 
     if (!userId || !parsed.telegramId || !parsed.exp) return null;
@@ -155,9 +154,23 @@ export function setTelegramAppSessionCookie(
     response.cookies.set(cookieName, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'none',
       path: '/',
       maxAge: APP_SESSION_MAX_AGE,
+    });
+  }
+
+  return response;
+}
+
+export function clearTelegramAppSessionCookies(response: NextResponse) {
+  for (const cookieName of APP_SESSION_COOKIE_NAMES) {
+    response.cookies.set(cookieName, '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'none',
+      path: '/',
+      maxAge: 0,
     });
   }
 
