@@ -26,6 +26,7 @@ export interface WorkspaceSections {
   fallbackEmail?: boolean;
   clientNotes?: Record<string, string>;
   clientReminders?: Record<string, { text?: string; remindAt?: string; updatedAt?: string }>;
+  clientFavorites?: Record<string, boolean>;
   [key: string]: unknown;
 }
 
@@ -85,6 +86,16 @@ function normalizeClientTextMap(value: unknown): Record<string, string> {
   );
 }
 
+function normalizeClientBooleanMap(value: unknown): Record<string, boolean> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([key, item]) => key && typeof item === 'boolean')
+      .map(([key, item]) => [key, item as boolean]),
+  );
+}
+
 
 function parsePriceFromName(name: string, fallback = 0) {
   const match = name.match(/(?:от|from)?\s*([\d\s]{3,})\s*(?:₽|р|rub)/i);
@@ -127,12 +138,19 @@ function rebuildStoredServiceMetrics(services: ServiceInsight[], bookings: Booki
 
 function overlayClientExtras(clients: ClientInsight[], sections: WorkspaceSections): ClientInsight[] {
   const notes = normalizeClientTextMap(sections.clientNotes);
+  const favorites = normalizeClientBooleanMap(sections.clientFavorites);
 
-  if (Object.keys(notes).length === 0) return clients;
+  if (Object.keys(notes).length === 0 && Object.keys(favorites).length === 0) return clients;
 
   return clients.map((client) => {
     const note = notes[client.id] ?? notes[client.phone];
-    return note !== undefined ? { ...client, note } : client;
+    const favorite = favorites[client.id] ?? favorites[client.phone];
+
+    return {
+      ...client,
+      ...(note !== undefined ? { note } : {}),
+      ...(favorite !== undefined ? { favorite } : {}),
+    };
   });
 }
 

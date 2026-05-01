@@ -613,6 +613,18 @@ on storage.objects for all
 using (bucket_id = 'sloty-public' and auth.role() = 'service_role')
 with check (bucket_id = 'sloty-public' and auth.role() = 'service_role');
 
+
+-- 20260501_0015_clickbook_analytics_clients_font_repair.sql
+-- Normalize old MAX source values into VK and make legacy new statuses scheduled.
+update public.sloty_bookings
+set source = 'ВК', channel = 'vk'
+where lower(coalesce(source, '')) in ('max', 'макс')
+   or lower(coalesce(channel, '')) in ('max', 'макс');
+
+update public.sloty_bookings
+set status = 'confirmed'
+where status = 'new';
+
 commit;
 -- ClickBook Telegram bot auth flow
 -- Run after the main ClickBook schema.
@@ -685,6 +697,18 @@ with check (auth.role() = 'service_role');
 grant select on public.sloty_telegram_accounts to authenticated;
 grant all on public.sloty_telegram_accounts to service_role;
 grant all on public.sloty_telegram_login_requests to service_role;
+
+
+-- 20260501_0015_clickbook_analytics_clients_font_repair.sql
+-- Normalize old MAX source values into VK and make legacy new statuses scheduled.
+update public.sloty_bookings
+set source = 'ВК', channel = 'vk'
+where lower(coalesce(source, '')) in ('max', 'макс')
+   or lower(coalesce(channel, '')) in ('max', 'макс');
+
+update public.sloty_bookings
+set status = 'confirmed'
+where status = 'new';
 
 commit;
 -- ClickBook — Telegram Mini App auth + client booking reminders
@@ -809,6 +833,18 @@ grant all on public.sloty_telegram_accounts to service_role;
 grant all on public.sloty_telegram_login_requests to service_role;
 grant all on public.sloty_booking_telegram_links to service_role;
 
+
+-- 20260501_0015_clickbook_analytics_clients_font_repair.sql
+-- Normalize old MAX source values into VK and make legacy new statuses scheduled.
+update public.sloty_bookings
+set source = 'ВК', channel = 'vk'
+where lower(coalesce(source, '')) in ('max', 'макс')
+   or lower(coalesce(channel, '')) in ('max', 'макс');
+
+update public.sloty_bookings
+set status = 'confirmed'
+where status = 'new';
+
 commit;
 -- ClickBook Telegram session hardening
 -- Safe to run after 20260430_0007. It only adds missing columns/indexes/policies.
@@ -919,6 +955,18 @@ with check (auth.role() = 'service_role');
 grant select on public.sloty_telegram_accounts to authenticated;
 grant all on public.sloty_telegram_accounts to service_role;
 grant all on public.sloty_telegram_login_requests to service_role;
+
+
+-- 20260501_0015_clickbook_analytics_clients_font_repair.sql
+-- Normalize old MAX source values into VK and make legacy new statuses scheduled.
+update public.sloty_bookings
+set source = 'ВК', channel = 'vk'
+where lower(coalesce(source, '')) in ('max', 'макс')
+   or lower(coalesce(channel, '')) in ('max', 'макс');
+
+update public.sloty_bookings
+set status = 'confirmed'
+where status = 'new';
 
 commit;
 -- ClickBook real-data hardening
@@ -1097,6 +1145,18 @@ grant select, insert, update, delete on public.sloty_services to authenticated, 
 grant select, insert, update, delete on public.sloty_availability_days to authenticated, service_role;
 grant select, insert, update, delete on public.sloty_message_templates to authenticated, service_role;
 
+
+-- 20260501_0015_clickbook_analytics_clients_font_repair.sql
+-- Normalize old MAX source values into VK and make legacy new statuses scheduled.
+update public.sloty_bookings
+set source = 'ВК', channel = 'vk'
+where lower(coalesce(source, '')) in ('max', 'макс')
+   or lower(coalesce(channel, '')) in ('max', 'макс');
+
+update public.sloty_bookings
+set status = 'confirmed'
+where status = 'new';
+
 commit;
 -- ClickBook availability/service sync hardening
 -- Safe to run repeatedly. It keeps the normalized live tables ready for public booking.
@@ -1196,6 +1256,18 @@ create unique index if not exists sloty_availability_days_date_unique
 grant select, insert, update, delete on public.sloty_services to authenticated, service_role;
 grant select, insert, update, delete on public.sloty_availability_days to authenticated, service_role;
 
+
+-- 20260501_0015_clickbook_analytics_clients_font_repair.sql
+-- Normalize old MAX source values into VK and make legacy new statuses scheduled.
+update public.sloty_bookings
+set source = 'ВК', channel = 'vk'
+where lower(coalesce(source, '')) in ('max', 'макс')
+   or lower(coalesce(channel, '')) in ('max', 'макс');
+
+update public.sloty_bookings
+set status = 'confirmed'
+where status = 'new';
+
 commit;
 
 -- 20260501_0011_clickbook_notifications_clients_repair.sql
@@ -1234,6 +1306,18 @@ create index if not exists sloty_booking_telegram_links_workspace_booking_idx
   on public.sloty_booking_telegram_links(workspace_id, booking_id)
   where booking_id is not null;
 
+
+-- 20260501_0015_clickbook_analytics_clients_font_repair.sql
+-- Normalize old MAX source values into VK and make legacy new statuses scheduled.
+update public.sloty_bookings
+set source = 'ВК', channel = 'vk'
+where lower(coalesce(source, '')) in ('max', 'макс')
+   or lower(coalesce(channel, '')) in ('max', 'макс');
+
+update public.sloty_bookings
+set status = 'confirmed'
+where status = 'new';
+
 commit;
 -- 20260501_0012_clickbook_clients_chat_sources_repair.sql
 begin;
@@ -1255,6 +1339,18 @@ alter table if exists public.sloty_clients add column if not exists note text;
 alter table if exists public.sloty_clients add column if not exists reminder_text text;
 alter table if exists public.sloty_clients add column if not exists reminder_at timestamptz;
 alter table if exists public.sloty_clients add column if not exists source text;
+
+
+-- 20260501_0015_clickbook_analytics_clients_font_repair.sql
+-- Normalize old MAX source values into VK and make legacy new statuses scheduled.
+update public.sloty_bookings
+set source = 'ВК', channel = 'vk'
+where lower(coalesce(source, '')) in ('max', 'макс')
+   or lower(coalesce(channel, '')) in ('max', 'макс');
+
+update public.sloty_bookings
+set status = 'confirmed'
+where status = 'new';
 
 commit;
 begin;
@@ -1291,6 +1387,18 @@ where source is null
 
 create index if not exists sloty_bookings_status_check_idx
   on public.sloty_bookings (workspace_id, status, booking_date, booking_time);
+
+
+-- 20260501_0015_clickbook_analytics_clients_font_repair.sql
+-- Normalize old MAX source values into VK and make legacy new statuses scheduled.
+update public.sloty_bookings
+set source = 'ВК', channel = 'vk'
+where lower(coalesce(source, '')) in ('max', 'макс')
+   or lower(coalesce(channel, '')) in ('max', 'макс');
+
+update public.sloty_bookings
+set status = 'confirmed'
+where status = 'new';
 
 commit;
 
@@ -1363,5 +1471,17 @@ set
   content = replace(replace(content, 'klikbuk.ru/book', 'https://www.кликбук.рф/m/{{slug}}'), 'klikbuk.com/book', 'https://www.кликбук.рф/m/{{slug}}'),
   updated_at = timezone('utc', now())
 where true;
+
+
+-- 20260501_0015_clickbook_analytics_clients_font_repair.sql
+-- Normalize old MAX source values into VK and make legacy new statuses scheduled.
+update public.sloty_bookings
+set source = 'ВК', channel = 'vk'
+where lower(coalesce(source, '')) in ('max', 'макс')
+   or lower(coalesce(channel, '')) in ('max', 'макс');
+
+update public.sloty_bookings
+set status = 'confirmed'
+where status = 'new';
 
 commit;

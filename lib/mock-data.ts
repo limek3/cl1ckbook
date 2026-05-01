@@ -24,7 +24,7 @@ const createWorkImage = (accentA: string, accentB: string, label: string) =>
       <rect x="372" y="132" width="44" height="164" rx="22" fill="${accentB}" />
       <rect x="430" y="144" width="44" height="150" rx="22" fill="${accentA}" />
       <rect x="92" y="360" width="180" height="36" rx="18" fill="rgba(255,255,255,0.24)" />
-      <text x="112" y="384" font-family="Igra Sans, Arial, sans-serif" font-size="24" fill="white">${label}</text>
+      <text x="112" y="384" font-family="Golos UI, Golos Text, Arial, sans-serif" font-size="24" fill="white">${label}</text>
     </svg>`,
   )}`;
 

@@ -49,6 +49,46 @@ import { cn } from '@/lib/utils';
 type ThemeMode = 'light' | 'dark';
 type TrendMetric = 'revenue' | 'requests' | 'visitors';
 
+function toLocalIsoDate(date: Date) {
+  const timezoneOffset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 10);
+}
+
+function shortDayLabel(date: Date, locale: 'ru' | 'en') {
+  return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
+    day: 'numeric',
+    month: 'short',
+  }).format(date);
+}
+
+function buildCurrentWeekData<T extends { date: string; label: string; revenue: number; requests: number; visitors: number }>(
+  daily: T[],
+  locale: 'ru' | 'en',
+) {
+  const byDate = new Map(daily.map((item) => [item.date, item]));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const monday = new Date(today);
+  const day = monday.getDay();
+  monday.setDate(today.getDate() - ((day + 6) % 7));
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + index);
+    const iso = toLocalIsoDate(date);
+    const item = byDate.get(iso);
+
+    return {
+      date: iso,
+      label: shortDayLabel(date, locale),
+      revenue: item?.revenue ?? 0,
+      requests: item?.requests ?? 0,
+      visitors: item?.visitors ?? 0,
+      avgCheck: item?.confirmed ? Math.round(item.revenue / item.confirmed) : 0,
+    };
+  });
+}
+
 function pageBg(light: boolean) {
   return light ? 'bg-[#f4f4f2]' : 'bg-[#090909]';
 }
@@ -744,6 +784,7 @@ export default function DashboardPage() {
 
   const [mounted, setMounted] = useState(false);
   const [trendMetric, setTrendMetric] = useState<TrendMetric>('revenue');
+  const [selectedFavoriteClientId, setSelectedFavoriteClientId] = useState<string | null>(null);
   const [copiedPublicLink, setCopiedPublicLink] = useState(false);
 
   useEffect(() => {
@@ -928,12 +969,8 @@ export default function DashboardPage() {
   );
 
   const weekTrendData = useMemo(
-    () =>
-      dataset?.daily.slice(-7).map((item) => ({
-        ...item,
-        avgCheck: item.confirmed ? Math.round(item.revenue / item.confirmed) : 0,
-      })) ?? [],
-    [dataset],
+    () => (dataset ? buildCurrentWeekData(dataset.daily, locale) : []),
+    [dataset, locale],
   );
 
   const trendSummary = useMemo(() => {
@@ -984,6 +1021,11 @@ export default function DashboardPage() {
   const favoriteClients = useMemo(
     () => dataset?.clients.filter((item) => item.favorite).slice(0, 4) ?? [],
     [dataset],
+  );
+
+  const selectedFavoriteClient = useMemo(
+    () => favoriteClients.find((item) => item.id === selectedFavoriteClientId) ?? null,
+    [favoriteClients, selectedFavoriteClientId],
   );
 
   const topServices = useMemo(
@@ -1841,31 +1883,34 @@ export default function DashboardPage() {
                 {favoriteClients.length ? (
                   <div className="grid gap-3 md:grid-cols-2">
                     {favoriteClients.map((client) => (
-                      <Panel key={client.id} light={isLight} className="p-4">
+                      <button
+                        key={client.id}
+                        type="button"
+                        onClick={() => setSelectedFavoriteClientId(client.id)}
+                        className={cn(
+                          'rounded-[10px] border p-4 text-left transition-colors active:scale-[0.992]',
+                          insetTone(isLight),
+                          isLight ? 'hover:bg-black/[0.025]' : 'hover:bg-white/[0.055]',
+                        )}
+                      >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <div
-                              className={cn(
-                                'truncate text-[13px] font-semibold',
-                                pageText(isLight),
-                              )}
-                            >
+                            <div className={cn('truncate text-[13px] font-semibold', pageText(isLight))}>
                               {client.name}
                             </div>
 
                             <div className={cn('mt-1 text-[11px]', mutedText(isLight))}>
-                              {client.visits} {copy.visitsWord} ·{' '}
-                              {formatCurrency(client.averageCheck, locale)}
+                              {client.visits} {copy.visitsWord} · {formatCurrency(client.averageCheck, locale)}
                             </div>
                           </div>
 
                           <MicroLabel light={isLight}>{client.segment}</MicroLabel>
                         </div>
 
-                        <p className={cn('mt-3 text-[12px] leading-6', mutedText(isLight))}>
+                        <p className={cn('mt-3 line-clamp-2 text-[12px] leading-6', mutedText(isLight))}>
                           {client.note}
                         </p>
-                      </Panel>
+                      </button>
                     ))}
                   </div>
                 ) : (
@@ -1876,6 +1921,64 @@ export default function DashboardPage() {
           </div>
         </div>
       </main>
+
+      {selectedFavoriteClient ? (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center px-4 py-6"
+          onMouseDown={() => setSelectedFavoriteClientId(null)}
+        >
+          <div className="absolute inset-0 bg-black/35 backdrop-blur-[10px]" />
+          <div
+            onMouseDown={(event) => event.stopPropagation()}
+            className={cn(
+              'relative w-full max-w-[520px] overflow-hidden rounded-[18px] border p-5',
+              isLight
+                ? 'border-black/[0.09] bg-[#fbfbfa] text-[#0e0e0e] shadow-[0_34px_90px_rgba(0,0,0,0.18)]'
+                : 'border-white/[0.10] bg-[#101010] text-white shadow-[0_34px_90px_rgba(0,0,0,0.55)]',
+            )}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <MicroLabel light={isLight} active accentColor={accentColor}>VIP</MicroLabel>
+                <h2 className="mt-3 truncate text-[26px] font-semibold tracking-[-0.07em]">
+                  {selectedFavoriteClient.name}
+                </h2>
+                <p className={cn('mt-1 text-[12px]', mutedText(isLight))}>
+                  {selectedFavoriteClient.phone} · {selectedFavoriteClient.source}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedFavoriteClientId(null)}
+                className={cn(buttonBase(isLight), 'size-9 px-0')}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              <HeroStat label={copy.visitsWord} value={selectedFavoriteClient.visits} light={isLight} />
+              <HeroStat label={copy.revenue} value={formatCurrency(selectedFavoriteClient.totalRevenue, locale)} light={isLight} />
+            </div>
+
+            <Panel light={isLight} className="mt-4 p-4">
+              <div className={cn('text-[12.5px] font-semibold', pageText(isLight))}>Заметка</div>
+              <p className={cn('mt-2 text-[12px] leading-6', mutedText(isLight))}>
+                {selectedFavoriteClient.note}
+              </p>
+            </Panel>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <Button asChild className={buttonBase(isLight)}>
+                <Link href="/dashboard/clients">Открыть CRM</Link>
+              </Button>
+              <button type="button" onClick={() => setSelectedFavoriteClientId(null)} className={buttonBase(isLight, true)}>
+                Готово
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </WorkspaceShell>
   );
 }

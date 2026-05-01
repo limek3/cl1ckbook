@@ -42,6 +42,7 @@ type ClientReminderState = { text?: string; remindAt?: string; updatedAt?: strin
 
 const EMPTY_CLIENT_NOTES: Record<string, string> = {};
 const EMPTY_CLIENT_REMINDERS: Record<string, ClientReminderState> = {};
+const EMPTY_CLIENT_FAVORITES: Record<string, boolean> = {};
 
 type ClientTimelineItem = {
   id: string;
@@ -850,6 +851,7 @@ function MobileClientCard({
   reminderValue,
   onSaveNote,
   onSaveReminder,
+  onToggleFavorite,
 }: {
   client: ClientInsight;
   locale: 'ru' | 'en';
@@ -861,6 +863,7 @@ function MobileClientCard({
   reminderValue?: ClientReminderState;
   onSaveNote?: (clientId: string, note: string) => void;
   onSaveReminder?: (clientId: string, reminder: ClientReminderState) => void;
+  onToggleFavorite?: (clientId: string, favorite: boolean) => void;
 }) {
   const color = segmentColor(
     client.segment,
@@ -955,6 +958,7 @@ function ClientTableRow({
   reminderValue,
   onSaveNote,
   onSaveReminder,
+  onToggleFavorite,
 }: {
   client: ClientInsight;
   locale: 'ru' | 'en';
@@ -966,6 +970,7 @@ function ClientTableRow({
   reminderValue?: ClientReminderState;
   onSaveNote?: (clientId: string, note: string) => void;
   onSaveReminder?: (clientId: string, reminder: ClientReminderState) => void;
+  onToggleFavorite?: (clientId: string, favorite: boolean) => void;
 }) {
   const color = segmentColor(
     client.segment,
@@ -1066,6 +1071,7 @@ function ClientCrmDialog({
   reminderValue,
   onSaveNote,
   onSaveReminder,
+  onToggleFavorite,
 }: {
   open: boolean;
   client: ClientInsight | null;
@@ -1078,6 +1084,7 @@ function ClientCrmDialog({
   reminderValue?: ClientReminderState;
   onSaveNote?: (clientId: string, note: string) => void;
   onSaveReminder?: (clientId: string, reminder: ClientReminderState) => void;
+  onToggleFavorite?: (clientId: string, favorite: boolean) => void;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -1150,6 +1157,7 @@ function ClientCrmDialog({
           addNote: 'Заметка',
           remind: 'Напомнить',
           details: 'Данные клиента',
+          makeFavorite: client.favorite ? 'Убрать из VIP' : 'Сделать VIP',
         }
       : {
           title: 'CRM record',
@@ -1175,6 +1183,7 @@ function ClientCrmDialog({
           addNote: 'Note',
           remind: 'Remind',
           details: 'Client details',
+          makeFavorite: client.favorite ? 'Remove VIP' : 'Make VIP',
         };
 
   function ModalRow({
@@ -1456,6 +1465,12 @@ function ClientCrmDialog({
                   onClick={() => setActiveMiniDialog('reminder')}
                 />
 
+                <ModalActionButton
+                  icon={<Star className="size-4" />}
+                  label={copy.makeFavorite}
+                  onClick={() => onToggleFavorite?.(client.id, !client.favorite)}
+                />
+
                 <button
                   type="button"
                   onClick={onClose}
@@ -1596,6 +1611,10 @@ export default function ClientsPage() {
     'clientReminders',
     EMPTY_CLIENT_REMINDERS,
   );
+  const [clientFavorites, setClientFavorites] = useWorkspaceSection<Record<string, boolean>>(
+    'clientFavorites',
+    EMPTY_CLIENT_FAVORITES,
+  );
 
   const [mounted, setMounted] = useState(false);
   const [query, setQuery] = useState('');
@@ -1625,6 +1644,7 @@ export default function ClientsPage() {
 
     const sourceClients = dataset.clients.map((client) => ({
       ...client,
+      favorite: clientFavorites[client.id] ?? clientFavorites[client.phone] ?? client.favorite,
       note: clientNotes[client.id] ?? clientNotes[client.phone] ?? client.note,
     }));
 
@@ -1656,14 +1676,21 @@ export default function ClientsPage() {
 
       return new Date(right.lastVisit).getTime() - new Date(left.lastVisit).getTime();
     });
-  }, [clientNotes, dataset, filter, locale, query, sortBy]);
+  }, [clientFavorites, clientNotes, dataset, filter, locale, query, sortBy]);
 
   const selectedClient = useMemo(
     () => clients.find((client) => client.id === selectedClientId) ?? null,
     [clients, selectedClientId],
   );
 
-  const allClients = dataset?.clients ?? [];
+  const allClients = useMemo(() =>
+    (dataset?.clients ?? []).map((client) => ({
+      ...client,
+      favorite: clientFavorites[client.id] ?? clientFavorites[client.phone] ?? client.favorite,
+      note: clientNotes[client.id] ?? clientNotes[client.phone] ?? client.note,
+    })),
+    [clientFavorites, clientNotes, dataset?.clients],
+  );
   const totalClients = allClients.length;
   const regularClients = allClients.filter((item) => item.segment === 'regular').length;
   const newClients = allClients.filter((item) => item.segment === 'new').length;
@@ -2289,6 +2316,14 @@ export default function ClientsPage() {
             ...current,
             [clientId]: reminder,
             [selectedClient.phone]: reminder,
+          }));
+        }}
+        onToggleFavorite={(clientId, favorite) => {
+          if (!selectedClient) return;
+          setClientFavorites((current) => ({
+            ...current,
+            [clientId]: favorite,
+            [selectedClient.phone]: favorite,
           }));
         }}
         onClose={() => setSelectedClientId(null)}

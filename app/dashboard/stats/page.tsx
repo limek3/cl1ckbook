@@ -856,6 +856,28 @@ export default function DashboardStatsPage() {
     [activityDays, dataset],
   );
 
+  const analyticsBreakdownData = useMemo(() => {
+    if (!dataset) return [];
+
+    if (analyticsView === 'bookings') {
+      return dataset.services.slice(0, 8).map((service) => ({
+        label: service.name,
+        requests: service.bookings,
+        revenue: service.revenue,
+        visitors: service.bookings,
+        conversion: service.popularity,
+      }));
+    }
+
+    return dataset.channels.map((channel) => ({
+      label: channel.label,
+      requests: channel.bookings,
+      revenue: channel.revenue,
+      visitors: channel.visitors,
+      conversion: channel.conversion,
+    }));
+  }, [analyticsView, dataset]);
+
   if (!hasHydrated || !mounted) return null;
 
   if (!ownedProfile || !dataset) {
@@ -1039,6 +1061,7 @@ export default function DashboardStatsPage() {
       color: accentColor,
     },
   };
+
 
   const activityStats = [
     {
@@ -1512,7 +1535,7 @@ export default function DashboardStatsPage() {
                       className="h-[300px] w-full md:h-[360px]"
                     >
                       {analyticsView === 'bookings' ? (
-                        <BarChart data={chartData}>
+                        <BarChart data={analyticsBreakdownData}>
                           <CartesianGrid
                             vertical={false}
                             strokeDasharray="3 3"
@@ -1537,7 +1560,7 @@ export default function DashboardStatsPage() {
                       ) : null}
 
                       {analyticsView === 'revenue' ? (
-                        <LineChart data={chartData}>
+                        <LineChart data={analyticsBreakdownData}>
                           <CartesianGrid
                             vertical={false}
                             strokeDasharray="3 3"
@@ -1563,7 +1586,7 @@ export default function DashboardStatsPage() {
                       ) : null}
 
                       {analyticsView === 'visitors' ? (
-                        <AreaChart data={chartData}>
+                        <AreaChart data={analyticsBreakdownData}>
                           <defs>
                             <linearGradient
                               id="visitorsAreaStatsRef"
@@ -1610,7 +1633,7 @@ export default function DashboardStatsPage() {
                       ) : null}
 
                       {analyticsView === 'conversion' ? (
-                        <LineChart data={chartData}>
+                        <LineChart data={analyticsBreakdownData}>
                           <CartesianGrid
                             vertical={false}
                             strokeDasharray="3 3"

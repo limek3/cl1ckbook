@@ -35,8 +35,8 @@ function buildArtworkDataUri(title: string, subtitle: string, start: string, end
         <path d="M90 700c140-180 320-260 540-240" />
       </g>
       <g fill="#ffffff">
-        <text x="92" y="150" font-size="78" font-family="Igra Sans, Arial, sans-serif" font-weight="700">${title}</text>
-        <text x="96" y="214" font-size="30" font-family="Igra Sans, Arial, sans-serif" opacity="0.86">${subtitle}</text>
+        <text x="92" y="150" font-size="78" font-family="Golos UI, Golos Text, Arial, sans-serif" font-weight="700">${title}</text>
+        <text x="96" y="214" font-size="30" font-family="Golos UI, Golos Text, Arial, sans-serif" opacity="0.86">${subtitle}</text>
       </g>
     </svg>
   `.trim();

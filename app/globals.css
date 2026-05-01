@@ -2,14 +2,6 @@
 @import 'tw-animate-css';
 @custom-variant dark (&:is(.dark *));
 
-@font-face {
-  font-family: 'Igra Sans';
-  src: url('/fonts/IgraSans.otf') format('opentype');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-
 :root {
   --accent-hue: 214;
   --accent-sat: 99%;
@@ -464,7 +456,7 @@
 }
 
 @theme inline {
-  --font-sans: 'Igra Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: 'Golos UI', 'Golos Text', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);

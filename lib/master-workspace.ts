@@ -325,8 +325,9 @@ function buildClients(bookings: Booking[], services: ServiceInsight[], locale: L
         ? Math.round((now - getBookingDateTime(pastItems[0]).getTime()) / 86400000)
         : 0;
       const hasNoShow = sorted.some((booking) => booking.status === 'no_show' || booking.status === 'cancelled');
+      const latestStatus = sorted[0]?.status;
       const segment: ClientInsight['segment'] =
-        !nextBooking && (hasNoShow || (pastItems[0] && daysSince > 45))
+        latestStatus === 'no_show' || latestStatus === 'cancelled' || hasNoShow || (!nextBooking && pastItems[0] && daysSince > 45)
           ? 'sleeping'
           : pastItems.length >= 2
             ? 'regular'
@@ -352,30 +353,36 @@ function buildClients(bookings: Booking[], services: ServiceInsight[], locale: L
     .sort((a, b) => b.totalRevenue - a.totalRevenue);
 }
 
+function getRequestDate(booking: Booking, todayIso: string) {
+  const raw = typeof booking.createdAt === 'string' ? booking.createdAt.slice(0, 10) : '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return todayIso;
+
+  // A request cannot happen in the future. Old fallback data sometimes used
+  // the visit date as createdAt, which made analytics show future заявки/traffic.
+  return raw > todayIso ? todayIso : raw;
+}
+
 function buildDaily(profile: MasterProfile, bookings: Booking[], services: ServiceInsight[], locale: Locale): DailyInsight[] {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const todayIso = normalizeDate(today);
 
-  const latestBookingDate = bookings.reduce<Date | null>((latest, booking) => {
-    const date = new Date(booking.date + 'T00:00:00');
-    if (Number.isNaN(date.getTime())) return latest;
-    return !latest || date > latest ? date : latest;
-  }, null);
-
+  // Dashboard analytics are operational: last 30 calendar days ending today.
+  // Future visits belong to the schedule, not to factual traffic/request charts.
   const rangeStart = new Date(today);
-  if (!latestBookingDate || latestBookingDate <= today) {
-    rangeStart.setDate(today.getDate() - 29);
-  }
+  rangeStart.setDate(today.getDate() - 29);
 
-  const serviceMap = new Map(services.map((service) => [service.name, service]));
+  const requestDateByBookingId = new Map<string, string>();
   const firstClientVisit = new Map<string, string>();
 
   [...bookings]
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
     .forEach((booking) => {
+      const requestDate = getRequestDate(booking, todayIso);
+      requestDateByBookingId.set(booking.id, requestDate);
       const key = booking.clientPhone || booking.clientName;
       if (!firstClientVisit.has(key)) {
-        firstClientVisit.set(key, booking.createdAt.slice(0, 10));
+        firstClientVisit.set(key, requestDate);
       }
     });
 
@@ -384,7 +391,7 @@ function buildDaily(profile: MasterProfile, bookings: Booking[], services: Servi
     date.setDate(rangeStart.getDate() + offset);
     const iso = normalizeDate(date);
     const dayBookings = bookings.filter((booking) => booking.date === iso);
-    const createdBookings = bookings.filter((booking) => booking.createdAt.slice(0, 10) === iso);
+    const createdBookings = bookings.filter((booking) => requestDateByBookingId.get(booking.id) === iso);
     const requests = createdBookings.length;
     const confirmed = dayBookings.filter((booking) => countsAsScheduledBooking(booking)).length;
     const revenue = dayBookings

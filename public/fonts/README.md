@@ -1,9 +1,4 @@
-# Igra Sans
+# Fonts
 
-Put `IgraSans.otf` into this folder manually:
-
-```txt
-public/fonts/IgraSans.otf
-```
-
-The app already has `@font-face` configured in `app/globals.css`.
+Golos UI is configured as the primary font family in `app/globals.css`.
+Font binaries are intentionally not included here. Put your licensed Golos UI files into `public/fonts/golos-ui/` if you want local @font-face loading.
