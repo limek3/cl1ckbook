@@ -12,6 +12,7 @@ import {
   fetchChatThreadByPhone,
   updateChatThread,
 } from '@/lib/server/supabase-chats';
+import { listAvailabilityDays, listServices } from '@/lib/server/supabase-workspace-sections';
 import {
   fetchWorkspaceForUser,
   fetchWorkspaceBySlug,
@@ -59,8 +60,15 @@ export async function POST(request: Request) {
 
     const requestedService = body.values.service.trim();
     const profileServices = Array.isArray(workspace.profile?.services) ? workspace.profile.services : [];
-    const serviceDetails = normalizeServiceDetails(workspace.data?.services);
-    const hasServiceInDetails = serviceDetails.some(
+    const normalizedServices = await listServices(workspace.id).catch(() => []);
+    const storedServiceDetails = normalizeServiceDetails(workspace.data?.services);
+    const seed = buildWorkspaceSeed(workspace.profile, currentBookings, 'ru');
+    const effectiveServiceDetails = storedServiceDetails.length > 0
+      ? storedServiceDetails
+      : normalizedServices.length > 0
+        ? normalizedServices
+        : seed.services;
+    const hasServiceInDetails = effectiveServiceDetails.some(
       (service) =>
         service.name === requestedService &&
         service.visible !== false &&
@@ -72,16 +80,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'service_not_available' }, { status: 400 });
     }
 
-    const seed = buildWorkspaceSeed(workspace.profile, currentBookings, 'ru');
     const storedAvailability = Array.isArray(workspace.data?.availability)
       ? workspace.data.availability
       : [];
-    const availability = normalizeAvailabilityDays(
-      storedAvailability.length > 0
-        ? [...seed.availability, ...storedAvailability]
-        : seed.availability,
-    );
-    const effectiveServiceDetails = serviceDetails.length > 0 ? serviceDetails : seed.services;
+    const normalizedAvailability = await listAvailabilityDays(workspace.id).catch(() => []);
+    const availability = normalizeAvailabilityDays([
+      ...normalizedAvailability,
+      ...storedAvailability,
+    ]);
     const bookedSlots = currentBookings.map((item) => ({
       id: item.id,
       date: item.date,

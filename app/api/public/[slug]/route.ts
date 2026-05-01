@@ -1,12 +1,57 @@
 import { NextResponse } from 'next/server';
-import { buildWorkspaceSeed } from '@/lib/workspace-store';
+
+import { normalizeAvailabilityDays } from '@/lib/availability';
 import { listBookingsByWorkspace } from '@/lib/server/supabase-bookings';
+import { listAvailabilityDays, listServices } from '@/lib/server/supabase-workspace-sections';
 import { fetchWorkspaceBySlug } from '@/lib/server/supabase-workspaces';
 import type { Booking } from '@/lib/types';
-import { normalizeAvailabilityDays } from '@/lib/availability';
+import { buildWorkspaceSeed } from '@/lib/workspace-store';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+function mergeAvailability(base: unknown[], stored: unknown[], normalized: unknown[]) {
+  const seen = new Set<string>();
+  const result: unknown[] = [];
+
+  for (const item of [...base, ...stored, ...normalized]) {
+    if (!item || typeof item !== 'object') continue;
+    const day = item as Record<string, unknown>;
+    const key = typeof day.date === 'string'
+      ? `date:${day.date}`
+      : typeof day.weekdayIndex === 'number'
+        ? `weekday:${day.weekdayIndex}`
+        : typeof day.weekday_index === 'number'
+          ? `weekday:${day.weekday_index}`
+          : typeof day.id === 'string'
+            ? `id:${day.id}`
+            : crypto.randomUUID();
+
+    if (seen.has(key)) {
+      const index = result.findIndex((existing) => {
+        if (!existing || typeof existing !== 'object') return false;
+        const existingDay = existing as Record<string, unknown>;
+        const existingKey = typeof existingDay.date === 'string'
+          ? `date:${existingDay.date}`
+          : typeof existingDay.weekdayIndex === 'number'
+            ? `weekday:${existingDay.weekdayIndex}`
+            : typeof existingDay.weekday_index === 'number'
+              ? `weekday:${existingDay.weekday_index}`
+              : typeof existingDay.id === 'string'
+                ? `id:${existingDay.id}`
+                : '';
+        return existingKey === key;
+      });
+      if (index >= 0) result[index] = item;
+      continue;
+    }
+
+    seen.add(key);
+    result.push(item);
+  }
+
+  return result;
+}
 
 export async function GET(
   _request: Request,
@@ -24,16 +69,18 @@ export async function GET(
       return Array.isArray(workspace.data?.bookings) ? workspace.data.bookings : [];
     })) as Booking[];
     const seed = buildWorkspaceSeed(workspace.profile, bookings, 'ru');
-    const serviceDetails =
-      Array.isArray(workspace.data?.services) && workspace.data.services.length > 0
-        ? workspace.data.services
+    const storedServices = Array.isArray(workspace.data?.services) ? workspace.data.services : [];
+    const normalizedServices = await listServices(workspace.id).catch(() => []);
+    const serviceDetails = storedServices.length > 0
+      ? storedServices
+      : normalizedServices.length > 0
+        ? normalizedServices
         : seed.services;
     const storedAvailability = Array.isArray(workspace.data?.availability)
       ? workspace.data.availability
       : [];
-    const availability = storedAvailability.length > 0
-      ? [...seed.availability, ...storedAvailability]
-      : seed.availability;
+    const normalizedAvailability = await listAvailabilityDays(workspace.id).catch(() => []);
+    const availability = mergeAvailability([], normalizedAvailability, storedAvailability);
     const publicServiceNames = serviceDetails
       .filter((service) => {
         if (!service || typeof service !== 'object') return false;
@@ -56,6 +103,7 @@ export async function GET(
         time: booking.time,
         service: booking.service,
         status: booking.status,
+        durationMinutes: (booking as Booking & { durationMinutes?: number | null }).durationMinutes ?? null,
       })),
     });
   } catch (error) {

@@ -1065,7 +1065,7 @@ export function PublicMasterPage({
   slug: string;
   isDemo?: boolean;
 }) {
-  const { hasHydrated, getProfileBySlug, getDemoProfileBySlug } = useApp();
+  const { hasHydrated, getProfileBySlug, getDemoProfileBySlug, bookings, workspaceData } = useApp();
   const { locale } = useLocale();
   const { settings: localSettings } = useAppearance();
   const { resolvedTheme } = useTheme();
@@ -1465,6 +1465,27 @@ export function PublicMasterPage({
 
   void demoProfileRevision;
 
+  const fallbackDataset = useMemo(() => {
+    if (isDemo || !fallbackProfile) return null;
+    const base = buildWorkspaceDataset(fallbackProfile, bookings, locale);
+
+    return {
+      availability: Array.isArray(workspaceData.availability) && workspaceData.availability.length > 0
+        ? workspaceData.availability as BookingAvailabilityDay[]
+        : [],
+      services: Array.isArray(workspaceData.services) && workspaceData.services.length > 0
+        ? workspaceData.services as BookingServiceDetails[]
+        : base.services,
+      bookedSlots: bookings.map((booking) => ({
+        id: booking.id,
+        date: booking.date,
+        time: booking.time,
+        service: booking.service,
+        status: booking.status,
+      })),
+    };
+  }, [bookings, fallbackProfile, isDemo, locale, workspaceData.availability, workspaceData.services]);
+
   const profile = isDemo ? getDemoProfileBySlug(slug) : remoteProfile ?? fallbackProfile;
 
   const services = profile?.services ?? [];
@@ -1706,8 +1727,16 @@ export function PublicMasterPage({
     [demoBookings, isDemo, locale, profile],
   );
 
-  const bookingAvailability = isDemo ? demoDataset?.availability ?? [] : remoteAvailability;
-  const bookingServiceDetails = isDemo ? demoDataset?.services ?? [] : remoteServiceDetails;
+  const bookingAvailability = isDemo
+    ? demoDataset?.availability ?? []
+    : remoteAvailability.length > 0
+      ? remoteAvailability
+      : fallbackDataset?.availability ?? [];
+  const bookingServiceDetails = isDemo
+    ? demoDataset?.services ?? []
+    : remoteServiceDetails.length > 0
+      ? remoteServiceDetails
+      : fallbackDataset?.services ?? [];
   const bookingBookedSlots = isDemo
     ? demoBookings.map((booking) => ({
         id: booking.id,
@@ -1716,7 +1745,9 @@ export function PublicMasterPage({
         service: booking.service,
         status: booking.status,
       }))
-    : remoteBookedSlots;
+    : remoteBookedSlots.length > 0
+      ? remoteBookedSlots
+      : fallbackDataset?.bookedSlots ?? [];
 
   const bookingProfile = useMemo<MasterProfile | null>(() => {
     if (!profile) return null;

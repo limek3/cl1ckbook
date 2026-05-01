@@ -73,7 +73,10 @@ export function useWorkspaceSection<T>(
 
     if (!ownedProfile || serialized === lastRemoteRef.current) return;
 
-    const timeout = window.setTimeout(() => {
+    // Do not cancel this save on navigation. The previous debounce could be
+    // cleared when the master immediately opened another page after selecting
+    // slots, so the calendar looked saved on screen but was never persisted.
+    window.setTimeout(() => {
       void updateWorkspaceSection(key, state).then((success) => {
         if (success) {
           lastRemoteRef.current = serialized;
@@ -88,11 +91,7 @@ export function useWorkspaceSection<T>(
           });
         }, 1200);
       });
-    }, 250);
-
-    return () => {
-      window.clearTimeout(timeout);
-    };
+    }, 120);
   }, [demoMode, demoStorageKey, hasHydrated, key, ownedProfile, state, updateWorkspaceSection]);
 
   return [state, setState, hasHydrated];

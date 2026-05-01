@@ -93,11 +93,12 @@ function getMondayIndex(date: Date) {
 function isAvailabilityDay(value: unknown): value is BookingAvailabilityDay {
   if (!value || typeof value !== 'object') return false;
 
-  const candidate = value as BookingAvailabilityDay;
+  const candidate = value as BookingAvailabilityDay & { weekday_index?: unknown };
 
   return (
     typeof candidate.date === 'string' ||
     typeof candidate.weekdayIndex === 'number' ||
+    typeof candidate.weekday_index === 'number' ||
     Array.isArray(candidate.slots)
   );
 }
@@ -136,9 +137,13 @@ const WEEKDAY_LABEL_TO_INDEX: Record<string, number> = {
   'вс': 6,
 };
 
-function inferWeekdayIndex(day: BookingAvailabilityDay) {
+function inferWeekdayIndex(day: BookingAvailabilityDay & { weekday_index?: unknown }) {
   if (typeof day.weekdayIndex === 'number' && day.weekdayIndex >= 0 && day.weekdayIndex <= 6) {
     return day.weekdayIndex;
+  }
+
+  if (typeof day.weekday_index === 'number' && day.weekday_index >= 0 && day.weekday_index <= 6) {
+    return day.weekday_index;
   }
 
   const id = day.id?.toLowerCase().trim();
@@ -154,13 +159,18 @@ function inferWeekdayIndex(day: BookingAvailabilityDay) {
 export function normalizeAvailabilityDays(items?: unknown): BookingAvailabilityDay[] {
   if (!Array.isArray(items)) return [];
 
-  return items.filter(isAvailabilityDay).map((day) => ({
-    ...day,
-    weekdayIndex: inferWeekdayIndex(day),
-    status: day.status ?? 'workday',
-    slots: Array.isArray(day.slots) ? day.slots : [],
-    breaks: Array.isArray(day.breaks) ? day.breaks : [],
-  }));
+  return items.filter(isAvailabilityDay).map((day) => {
+    const candidate = day as BookingAvailabilityDay & { weekday_index?: unknown; month_key?: unknown; day_number?: unknown };
+    return {
+      ...day,
+      monthKey: typeof day.monthKey === 'string' ? day.monthKey : typeof candidate.month_key === 'string' ? candidate.month_key : undefined,
+      dayNumber: typeof day.dayNumber === 'number' ? day.dayNumber : typeof candidate.day_number === 'number' ? candidate.day_number : undefined,
+      weekdayIndex: inferWeekdayIndex(candidate),
+      status: day.status ?? 'workday',
+      slots: Array.isArray(day.slots) ? day.slots : [],
+      breaks: Array.isArray(day.breaks) ? day.breaks : [],
+    };
+  });
 }
 
 export function findAvailabilityDay(
@@ -169,12 +179,12 @@ export function findAvailabilityDay(
 ) {
   const date = new Date(`${dateIso}T00:00:00`);
   const weekdayIndex = getMondayIndex(date);
-  const exactDay = availability.find((day) => day.date === dateIso);
+  const exactDay = [...availability].reverse().find((day) => day.date === dateIso);
 
   if (exactDay) return exactDay;
 
   return (
-    availability.find(
+    [...availability].reverse().find(
       (day) => !day.date && typeof day.weekdayIndex === 'number' && day.weekdayIndex === weekdayIndex,
     ) ?? null
   );

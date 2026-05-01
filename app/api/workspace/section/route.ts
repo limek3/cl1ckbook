@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { requireAuthUser } from '@/lib/server/require-auth-user';
+import { syncAvailabilityDays, syncMessageTemplates, syncServices } from '@/lib/server/supabase-workspace-sections';
 import { fetchWorkspaceForUser, updateWorkspace } from '@/lib/server/supabase-workspaces';
 
 export const dynamic = 'force-dynamic';
@@ -31,6 +32,21 @@ export async function PATCH(request: Request) {
     };
 
     const updated = await updateWorkspace(workspace.id, { data: nextData });
+
+    try {
+      if (body.section === 'availability') {
+        await syncAvailabilityDays(workspace.id, body.value);
+      }
+      if (body.section === 'services') {
+        await syncServices(workspace.id, body.value);
+      }
+      if (body.section === 'templates') {
+        await syncMessageTemplates(workspace.id, body.value);
+      }
+    } catch {
+      // The JSON workspace remains the MVP source of truth. Normalized tables
+      // are synchronized for public booking, analytics and future API split.
+    }
 
     return NextResponse.json(updated);
   } catch (error) {
