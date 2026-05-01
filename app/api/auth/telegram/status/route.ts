@@ -15,6 +15,7 @@ type LoginRequestRow = {
   first_name: string | null;
   last_name: string | null;
   photo_url: string | null;
+  metadata: Record<string, unknown> | null;
   confirmed_at: string | null;
   consumed_at: string | null;
   expires_at: string;
@@ -229,6 +230,87 @@ export async function GET(request: Request) {
 
     if (accountError) throw accountError;
 
+    const userMetadata = {
+      provider: 'telegram',
+      telegram_id: telegramId,
+      telegram_username: loginRequest.username,
+      telegram_first_name: loginRequest.first_name,
+      telegram_last_name: loginRequest.last_name,
+      telegram_photo_url: loginRequest.photo_url,
+    };
+
+    const metadata = loginRequest.metadata ?? {};
+    const linkUserId =
+      metadata &&
+      metadata['purpose'] === 'link_account' &&
+      typeof metadata['link_user_id'] === 'string'
+        ? String(metadata['link_user_id'])
+        : null;
+
+    if (linkUserId) {
+      const linkedUser = await getAuthUserById(admin, linkUserId);
+
+      if (!linkedUser) {
+        return NextResponse.json({ status: 'invalid_link_user' }, { status: 400 });
+      }
+
+      const linkedMetadata = {
+        ...(linkedUser.user_metadata ?? {}),
+        ...userMetadata,
+        providers: Array.from(
+          new Set([
+            ...(Array.isArray(linkedUser.user_metadata?.providers)
+              ? linkedUser.user_metadata.providers.map(String)
+              : []),
+            'telegram',
+          ]),
+        ),
+      };
+
+      const { data: updatedLinkedUser, error: updateLinkedError } =
+        await admin.auth.admin.updateUserById(linkUserId, {
+          user_metadata: linkedMetadata,
+        });
+
+      if (updateLinkedError) throw updateLinkedError;
+
+      const { error: upsertLinkError } = await admin.from('sloty_telegram_accounts').upsert(
+        {
+          telegram_id: telegramId,
+          user_id: linkUserId,
+          username: loginRequest.username,
+          first_name: loginRequest.first_name,
+          last_name: loginRequest.last_name,
+          photo_url: loginRequest.photo_url,
+          auth_date: loginRequest.confirmed_at,
+          metadata: userMetadata,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'telegram_id' },
+      );
+
+      if (upsertLinkError) throw upsertLinkError;
+
+      await admin
+        .from('sloty_telegram_login_requests')
+        .update({
+          status: 'consumed',
+          consumed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('token', token);
+
+      return NextResponse.json({
+        status: 'linked',
+        provider: 'telegram',
+        user: {
+          id: updatedLinkedUser.user?.id ?? linkUserId,
+          email: updatedLinkedUser.user?.email ?? linkedUser.email,
+          user_metadata: updatedLinkedUser.user?.user_metadata ?? linkedMetadata,
+        },
+      });
+    }
+
     const user = await ensureTelegramAuthUser({
       admin,
       telegramId,
@@ -238,15 +320,6 @@ export async function GET(request: Request) {
       lastName: loginRequest.last_name,
       photoUrl: loginRequest.photo_url,
     });
-
-    const userMetadata = {
-      provider: 'telegram',
-      telegram_id: telegramId,
-      telegram_username: loginRequest.username,
-      telegram_first_name: loginRequest.first_name,
-      telegram_last_name: loginRequest.last_name,
-      telegram_photo_url: loginRequest.photo_url,
-    };
 
     const { error: upsertError } = await admin.from('sloty_telegram_accounts').upsert(
       {

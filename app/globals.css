@@ -456,7 +456,7 @@
 }
 
 @theme inline {
-  --font-sans: 'Golos UI', var(--font-golos-text), 'Golos Text', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: 'Golos UI', 'Golos Text', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -508,7 +508,7 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-sans);
-    letter-spacing: -0.02em;
+    letter-spacing: -0.005em;
     text-rendering: optimizeLegibility;
     overflow-x: hidden;
   }
@@ -11114,4 +11114,16 @@ html[data-sloty-mobile-scale='standard'] .workspace-main-shell {
   .workspace-main-shell a {
     min-width: 0;
   }
+}
+
+
+/* ClickBook profile/account readability pass: slightly wider tracking than the old dense dashboard. */
+.cb-profile-page,
+.cb-profile-page * {
+  letter-spacing: -0.005em !important;
+}
+
+.cb-profile-page [class*="uppercase"],
+.cb-profile-page .uppercase {
+  letter-spacing: 0.08em !important;
 }

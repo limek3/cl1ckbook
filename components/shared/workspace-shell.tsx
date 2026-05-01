@@ -52,7 +52,6 @@ import {
 import { useApp } from '@/lib/app-context';
 import { SLOTY_DEMO_SLUG } from '@/lib/demo-data';
 import { useBrowserSearchParams } from '@/hooks/use-browser-search-params';
-import { useBillingStatus } from '@/hooks/use-billing-status';
 import {
   isDashboardDemoEnabled,
   withDashboardDemoParam,
@@ -715,7 +714,6 @@ function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
   const { ownedProfile } = useApp();
   const { theme, setTheme } = useTheme();
   const { locale: currentLocale, setLocale } = useLocale();
-  const billing = useBillingStatus();
 
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
@@ -778,7 +776,6 @@ function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
       ? {
           account: 'Аккаунт',
           workspace: 'рабочий кабинет',
-          billing: 'Тариф и доступ',
           menu: 'Меню аккаунта',
           feedback: 'Feedback',
           feedbackHint: 'ошибка, идея или вопрос',
@@ -799,10 +796,7 @@ function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
           docsHint: 'как настроить кабинет',
           logout: 'Выйти',
           logoutHint: 'завершить сессию',
-          upgrade: 'Подключить Pro',
-          planFree: 'Бесплатный доступ',
-          planPaid: 'Подписка активна',
-          limitShort: 'лимиты тарифа',
+          upgrade: 'Upgrade to Pro',
           status: 'Статус платформы',
           statusText: 'Все системы работают.',
           robo: 'Робо',
@@ -830,7 +824,6 @@ function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
       : {
           account: 'Account',
           workspace: 'workspace',
-          billing: 'Plan and access',
           menu: 'Account menu',
           feedback: 'Feedback',
           feedbackHint: 'bug, idea or question',
@@ -852,9 +845,6 @@ function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
           logout: 'Log Out',
           logoutHint: 'end current session',
           upgrade: 'Upgrade to Pro',
-          planFree: 'Free access',
-          planPaid: 'Subscription active',
-          limitShort: 'plan limits',
           status: 'Platform Status',
           statusText: 'All systems normal.',
           robo: 'Robo',
@@ -976,19 +966,6 @@ function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
           },
         ];
 
-  const billingPlanName = billing.data?.plan.name ?? 'Start';
-  const billingIsPaid = Boolean(billing.data?.subscription.isPaid);
-  const billingStatusText = billing.loading
-    ? locale === 'ru' ? 'Проверяем подписку' : 'Checking subscription'
-    : billingIsPaid
-      ? labels.planPaid
-      : labels.planFree;
-  const billingLimitsText = billing.data
-    ? `${billing.data.limits.filter((limit) => limit.warning).length}/${billing.data.limits.length} ${labels.limitShort}`
-    : billing.error
-      ? locale === 'ru' ? 'подписка не загружена' : 'subscription unavailable'
-      : labels.limitShort;
-
   const openRobo = () => {
     window.dispatchEvent(new CustomEvent('clickbook:open-robo'));
 
@@ -1080,7 +1057,7 @@ function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
                     </span>
 
                     <span className="mt-1.5 block truncate text-[10px] font-medium leading-none text-black/42 dark:text-white/32">
-                      {identity.subtitle} · {billingPlanName}
+                      {identity.subtitle}
                     </span>
                   </span>
                 </div>
@@ -1222,7 +1199,7 @@ function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
                   'dark:bg-white dark:text-black dark:hover:bg-white/88',
                 )}
               >
-                {billingIsPaid ? (locale === 'ru' ? 'Управлять подпиской' : 'Manage subscription') : labels.upgrade}
+                {labels.upgrade}
               </Link>
             </div>
 
@@ -1232,15 +1209,11 @@ function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-[11.5px] font-medium text-black/52 dark:text-white/46">
-                    {labels.billing}
+                    {labels.status}
                   </div>
 
                   <div className="mt-1 text-[12px] font-semibold tracking-[-0.035em] text-black dark:text-white">
-                    {billingPlanName} · {billingStatusText}
-                  </div>
-
-                  <div className="mt-1 text-[10px] font-medium leading-none text-black/38 dark:text-white/30">
-                    {billingLimitsText}
+                    {labels.statusText}
                   </div>
                 </div>
 
@@ -1498,7 +1471,7 @@ function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
             </span>
 
             <span className="mt-1 block truncate text-[9px] leading-none text-black/40 dark:text-white/32">
-              {billingPlanName} · {billingStatusText}
+              {labels.workspace}
             </span>
           </span>
 

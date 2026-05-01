@@ -12,9 +12,13 @@ import {
 import { useTheme } from 'next-themes';
 import {
   Check,
+  Chrome,
   Copy,
   Globe2,
   Link2,
+  Loader2,
+  MessageCircleMore,
+  Send,
   Sparkles,
   SquarePen,
 } from 'lucide-react';
@@ -27,6 +31,7 @@ import { SLOTY_DEMO_SLUG } from '@/lib/demo-data';
 import { useAppearance } from '@/lib/appearance-context';
 import { accentPalette } from '@/lib/appearance-palette';
 import { useLocale } from '@/lib/locale-context';
+import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 
 type ThemeMode = 'light' | 'dark';
@@ -328,6 +333,376 @@ function CopyButton({
         <Copy className="size-3.5 shrink-0" />
       )}
     </button>
+  );
+}
+
+
+type ConnectedProvider = 'telegram' | 'google' | 'vk';
+
+type ConnectedAccountState = {
+  providers: Set<string>;
+  email: string | null;
+  loading: boolean;
+  action: ConnectedProvider | null;
+  message: string | null;
+};
+
+function providerConnected(providers: Set<string>, provider: ConnectedProvider) {
+  if (provider === 'vk') return providers.has('vk') || providers.has('vkontakte');
+  return providers.has(provider);
+}
+
+function ConnectedAccountsCard({
+  light,
+  locale,
+}: {
+  light: boolean;
+  locale: 'ru' | 'en';
+}) {
+  const [state, setState] = useState<ConnectedAccountState>({
+    providers: new Set(),
+    email: null,
+    loading: true,
+    action: null,
+    message: null,
+  });
+
+  const labels =
+    locale === 'ru'
+      ? {
+          title: 'Связанные аккаунты',
+          description:
+            'Подключите Google, Telegram и VK ID, чтобы входить в один кабинет разными способами.',
+          connected: 'Подключено',
+          connect: 'Подключить',
+          reconnect: 'Обновить связь',
+          google: 'Google',
+          googleHint: 'Вход через Google OAuth',
+          telegram: 'Telegram',
+          telegramHint: 'Вход через бота и Mini App',
+          vk: 'VK ID',
+          vkHint: 'Вход через аккаунт ВК',
+          ready: 'Аккаунты синхронизированы.',
+          setup:
+            'Если провайдер не открывается, включите его в Supabase Auth → Providers и добавьте redirect URL /auth/callback.',
+          telegramStarted:
+            'Открыл Telegram. Нажмите Start в боте, затем вернитесь сюда — связь обновится автоматически.',
+          telegramWaiting: 'Ждём подтверждение в Telegram...',
+          telegramLinked: 'Telegram подключён к текущему кабинету.',
+          error: 'Не удалось подключить аккаунт. Проверьте настройки OAuth или Telegram.',
+        }
+      : {
+          title: 'Connected accounts',
+          description:
+            'Connect Google, Telegram, and VK ID to use one workspace with different login methods.',
+          connected: 'Connected',
+          connect: 'Connect',
+          reconnect: 'Refresh link',
+          google: 'Google',
+          googleHint: 'Google OAuth login',
+          telegram: 'Telegram',
+          telegramHint: 'Bot and Mini App login',
+          vk: 'VK ID',
+          vkHint: 'VK account login',
+          ready: 'Accounts are synced.',
+          setup:
+            'If a provider does not open, enable it in Supabase Auth → Providers and add /auth/callback as redirect URL.',
+          telegramStarted:
+            'Telegram opened. Press Start in the bot, then return here — the link will refresh automatically.',
+          telegramWaiting: 'Waiting for Telegram confirmation...',
+          telegramLinked: 'Telegram is linked to the current workspace.',
+          error: 'Could not connect the account. Check OAuth or Telegram settings.',
+        };
+
+  const refreshUser = async () => {
+    try {
+      const response = await fetch('/api/auth/accounts', { cache: 'no-store' });
+
+      if (!response.ok) throw new Error('accounts_failed');
+
+      const payload = (await response.json()) as {
+        user?: {
+          email?: string | null;
+          providers?: string[];
+        };
+      };
+
+      setState((current) => ({
+        ...current,
+        providers: new Set(payload.user?.providers ?? []),
+        email: payload.user?.email ?? null,
+        loading: false,
+      }));
+    } catch {
+      try {
+        const supabase = createClient();
+        const { data } = await supabase.auth.getUser();
+        const user = data.user;
+        const nextProviders = new Set<string>();
+
+        user?.identities?.forEach((identity) => {
+          if (identity.provider) nextProviders.add(identity.provider);
+        });
+
+        if (user?.user_metadata?.telegram_id) {
+          nextProviders.add('telegram');
+        }
+
+        setState((current) => ({
+          ...current,
+          providers: nextProviders,
+          email: user?.email ?? null,
+          loading: false,
+        }));
+      } catch {
+        setState((current) => ({ ...current, loading: false }));
+      }
+    }
+  };
+
+  useEffect(() => {
+    void refreshUser();
+  }, []);
+
+  const connectOAuth = async (provider: 'google' | 'vk') => {
+    try {
+      setState((current) => ({ ...current, action: provider, message: null }));
+
+      const callbackUrl = new URL('/auth/callback', window.location.origin);
+      callbackUrl.searchParams.set('next', '/dashboard/profile');
+
+      const supabase = createClient();
+      const { error } = await supabase.auth.linkIdentity({
+        provider,
+        options: {
+          redirectTo: callbackUrl.toString(),
+          queryParams:
+            provider === 'google'
+              ? {
+                  access_type: 'offline',
+                  prompt: 'consent',
+                }
+              : undefined,
+        },
+      });
+
+      if (error) throw error;
+    } catch {
+      try {
+        const callbackUrl = new URL('/auth/callback', window.location.origin);
+        callbackUrl.searchParams.set('next', '/dashboard/profile');
+        const supabase = createClient();
+        await supabase.auth.signInWithOAuth({
+          provider,
+          options: { redirectTo: callbackUrl.toString() },
+        });
+      } catch {
+        setState((current) => ({
+          ...current,
+          action: null,
+          message: labels.error,
+        }));
+      }
+    }
+  };
+
+  const connectTelegram = async () => {
+    try {
+      setState((current) => ({
+        ...current,
+        action: 'telegram',
+        message: labels.telegramWaiting,
+      }));
+
+      const response = await fetch('/api/auth/telegram/link/start', {
+        method: 'POST',
+      });
+
+      if (!response.ok) throw new Error('telegram_link_start_failed');
+
+      const payload = (await response.json()) as {
+        token?: string;
+        botUrl?: string;
+      };
+
+      if (!payload.token || !payload.botUrl) throw new Error('telegram_link_start_failed');
+
+      window.open(payload.botUrl, '_blank', 'noopener,noreferrer');
+
+      setState((current) => ({
+        ...current,
+        message: labels.telegramStarted,
+      }));
+
+      let attempts = 0;
+      const interval = window.setInterval(async () => {
+        attempts += 1;
+
+        try {
+          const statusResponse = await fetch(
+            `/api/auth/telegram/status?token=${encodeURIComponent(payload.token ?? '')}`,
+            { cache: 'no-store' },
+          );
+
+          const statusPayload = (await statusResponse.json()) as { status?: string };
+
+          if (statusPayload.status === 'linked') {
+            window.clearInterval(interval);
+            await refreshUser();
+            setState((current) => ({
+              ...current,
+              action: null,
+              message: labels.telegramLinked,
+              providers: new Set([...Array.from(current.providers), 'telegram']),
+            }));
+          }
+
+          if (
+            statusPayload.status === 'expired' ||
+            statusPayload.status === 'invalid' ||
+            statusPayload.status === 'error' ||
+            attempts > 60
+          ) {
+            window.clearInterval(interval);
+            setState((current) => ({
+              ...current,
+              action: null,
+              message: labels.error,
+            }));
+          }
+        } catch {
+          if (attempts > 60) {
+            window.clearInterval(interval);
+            setState((current) => ({
+              ...current,
+              action: null,
+              message: labels.error,
+            }));
+          }
+        }
+      }, 2500);
+    } catch {
+      setState((current) => ({
+        ...current,
+        action: null,
+        message: labels.error,
+      }));
+    }
+  };
+
+  const rows: Array<{
+    provider: ConnectedProvider;
+    title: string;
+    hint: string;
+    icon: ReactNode;
+    onClick: () => void;
+  }> = [
+    {
+      provider: 'google',
+      title: labels.google,
+      hint: labels.googleHint,
+      icon: <Chrome className="size-3.5" />,
+      onClick: () => connectOAuth('google'),
+    },
+    {
+      provider: 'telegram',
+      title: labels.telegram,
+      hint: labels.telegramHint,
+      icon: <Send className="size-3.5" />,
+      onClick: connectTelegram,
+    },
+    {
+      provider: 'vk',
+      title: labels.vk,
+      hint: labels.vkHint,
+      icon: <MessageCircleMore className="size-3.5" />,
+      onClick: () => connectOAuth('vk'),
+    },
+  ];
+
+  return (
+    <Card light={light} className="cb-profile-linked-accounts overflow-hidden">
+      <CardTitle title={labels.title} description={labels.description} light={light} />
+
+      <div className="grid gap-3 p-4 xl:grid-cols-[minmax(0,1fr)_260px]">
+        <div className="grid gap-2 md:grid-cols-3">
+          {rows.map((row) => {
+            const connected = providerConnected(state.providers, row.provider);
+            const loading = state.loading || state.action === row.provider;
+
+            return (
+              <button
+                key={row.provider}
+                type="button"
+                disabled={loading && state.action !== row.provider}
+                onClick={connected ? refreshUser : row.onClick}
+                className={cn(
+                  'group flex min-h-[84px] flex-col items-start justify-between rounded-[10px] border p-3 text-left transition active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60',
+                  connected
+                    ? light
+                      ? 'border-black/[0.10] bg-black/[0.035]'
+                      : 'border-white/[0.12] bg-white/[0.06]'
+                    : light
+                      ? 'border-black/[0.08] bg-white hover:border-black/[0.13] hover:bg-black/[0.025]'
+                      : 'border-white/[0.08] bg-white/[0.035] hover:border-white/[0.13] hover:bg-white/[0.06]',
+                )}
+              >
+                <span className="flex w-full items-start justify-between gap-3">
+                  <span
+                    className={cn(
+                      'flex size-8 shrink-0 items-center justify-center rounded-[9px] border',
+                      light
+                        ? 'border-black/[0.07] bg-[#fbfbfa] text-black/56'
+                        : 'border-white/[0.08] bg-[#101010] text-white/54',
+                    )}
+                  >
+                    {state.action === row.provider ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      row.icon
+                    )}
+                  </span>
+
+                  <span
+                    className={cn(
+                      'inline-flex h-6 items-center gap-1.5 rounded-[8px] border px-2 text-[10px] font-semibold',
+                      connected
+                        ? light
+                          ? 'border-black/[0.10] bg-white text-black/70'
+                          : 'border-white/[0.10] bg-white/[0.07] text-white/72'
+                        : light
+                          ? 'border-black/[0.07] bg-black/[0.025] text-black/38'
+                          : 'border-white/[0.07] bg-white/[0.035] text-white/36',
+                    )}
+                  >
+                    {connected ? <Check className="size-3" /> : <Plus className="size-3" />}
+                    {connected ? labels.connected : labels.connect}
+                  </span>
+                </span>
+
+                <span className="mt-3 min-w-0">
+                  <span className={cn('block text-[12px] font-semibold tracking-[-0.005em]', pageText(light))}>
+                    {row.title}
+                  </span>
+                  <span className={cn('mt-1 block text-[10.5px] leading-4', mutedText(light))}>
+                    {row.hint}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <Panel light={light} className="p-3">
+          <div className={cn('text-[12px] font-semibold tracking-[-0.005em]', pageText(light))}>
+            {state.email ?? labels.ready}
+          </div>
+          <p className={cn('mt-1.5 text-[10.5px] leading-4', mutedText(light))}>
+            {state.message ?? labels.setup}
+          </p>
+        </Panel>
+      </div>
+    </Card>
   );
 }
 
@@ -794,7 +1169,7 @@ export default function DashboardProfilePage() {
       <WorkspaceShell>
         <main
           className={cn(
-            'min-h-[calc(100dvh-68px)] px-4 pb-12 pt-5 md:px-7 md:pt-6',
+            'cb-profile-page min-h-[calc(100dvh-68px)] px-4 pb-12 pt-5 md:px-7 md:pt-6',
             pageBg(isLight),
           )}
         >
@@ -884,17 +1259,10 @@ export default function DashboardProfilePage() {
     <WorkspaceShell>
       <main
         className={cn(
-          'min-h-[calc(100dvh-68px)] px-4 pb-12 pt-5 md:px-7 md:pt-6',
+          'cb-profile-page min-h-[calc(100dvh-68px)] px-4 pb-12 pt-5 md:px-7 md:pt-6',
           pageBg(isLight),
         )}
       >
-        <style jsx global>{`
-          .dashboard-profile-form-clean > section > div:first-child > div:nth-child(2),
-          .dashboard-profile-form-clean > div > section > div:first-child > div:nth-child(2) {
-            display: none !important;
-          }
-        `}</style>
-
         <div className="mx-auto w-full max-w-[var(--page-max-width)]">
           <div className="mb-6 md:mb-7">
             <h1
@@ -930,6 +1298,8 @@ export default function DashboardProfilePage() {
               whatsapp={ownedProfile.whatsapp}
               avatar={ownedProfile.avatar}
             />
+
+            <ConnectedAccountsCard light={isLight} locale={locale} />
 
             <div className="dashboard-profile-form-clean">
               <MasterProfileForm

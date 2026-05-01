@@ -17,6 +17,7 @@ import {
   ArrowLeft,
   BadgeCheck,
   Check,
+  ChevronRight,
   Clock3,
   Copy,
   ExternalLink,
@@ -916,10 +917,14 @@ function PreviewCard({
 }) {
   return (
     <Card light={light} className="overflow-hidden">
-      <CardTitle title={labels.publicPreview} description={labels.publicLink} light={light} />
+      <CardTitle
+        title={labels.publicPreview}
+        description={labels.publicLink}
+        light={light}
+      />
 
       <div className="p-4 md:p-5">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="grid gap-4">
           <Panel light={light} className="p-4">
             <div className="flex items-start gap-3">
               <MasterAvatar
@@ -959,7 +964,12 @@ function PreviewCard({
               </div>
             </div>
 
-            <p className={cn('mt-4 line-clamp-3 text-[12px] leading-5', mutedText(light))}>
+            <p
+              className={cn(
+                'mt-4 line-clamp-3 text-[12px] leading-5',
+                mutedText(light),
+              )}
+            >
               {profile.bio}
             </p>
 
@@ -1262,6 +1272,10 @@ export function MasterProfileForm({
           linkReady: 'Ссылка готова',
           done: 'OK',
           empty: '—',
+          next: 'Дальше',
+          quickActions: 'Быстрые действия',
+          quickActionsText:
+            'Сохраните профиль, откройте публичную страницу или перейдите к подробным услугам.',
         }
       : {
           badge: 'Profile editor',
@@ -1287,7 +1301,7 @@ export function MasterProfileForm({
           reviewsDesc: 'Client reviews for trust',
           contacts: 'Contacts',
           contactsShort: 'Contacts',
-          contactsDesc: 'Phone, Telegram, and ВК',
+          contactsDesc: 'Phone, Telegram, and VK',
           photo: 'Profile photo',
           photoHint: 'If no photo is uploaded, initials will be shown.',
           uploadPhoto: 'Upload',
@@ -1372,7 +1386,7 @@ export function MasterProfileForm({
           emptyReviews: 'No reviews yet. You can add real reviews manually.',
           phone: 'Phone',
           telegram: 'Telegram',
-          whatsapp: 'ВК',
+          whatsapp: 'VK',
           visible: 'Visible',
           hidden: 'Hidden',
           privacy: 'Privacy',
@@ -1395,6 +1409,10 @@ export function MasterProfileForm({
           linkReady: 'Link ready',
           done: 'OK',
           empty: '—',
+          next: 'Next',
+          quickActions: 'Quick actions',
+          quickActionsText:
+            'Save the profile, open the public page, or manage detailed services.',
         };
 
   const services = useMemo(
@@ -1597,6 +1615,79 @@ export function MasterProfileForm({
       showReviewSection,
     ],
   );
+
+  const activeNavItem = navItems.find((item) => item.id === activeSection) ?? navItems[0];
+  const activeIndex = Math.max(
+    0,
+    navItems.findIndex((item) => item.id === activeSection),
+  );
+  const nextNavItem = navItems[activeIndex + 1] ?? null;
+
+  const switchSection = (section: ProfileSection) => {
+    setActiveSection(section);
+
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(() => {
+        window.scrollTo({
+          top: 0,
+          behavior: 'smooth',
+        });
+      });
+    }
+  };
+
+  const checklistItems: Array<{
+    section: ProfileSection;
+    label: string;
+    hint: string;
+    done: boolean;
+    value: string | number;
+    visible?: boolean;
+  }> = [
+    {
+      section: 'base',
+      label: labels.profile,
+      hint: labels.profileDesc,
+      done: baseDone,
+      value: baseDone ? labels.done : labels.empty,
+    },
+    {
+      section: 'trust',
+      label: labels.publicDetails,
+      hint: labels.publicDetailsDesc,
+      done: trustDone,
+      value: trustDone ? labels.done : labels.empty,
+    },
+    {
+      section: 'services',
+      label: labels.offer,
+      hint: labels.offerDesc,
+      done: servicesDone,
+      value: services.length,
+    },
+    {
+      section: 'portfolio',
+      label: labels.gallery,
+      hint: labels.galleryDesc,
+      done: portfolioDone,
+      value: cleanWorks.length,
+    },
+    {
+      section: 'reviews',
+      label: labels.reviews,
+      hint: labels.reviewsDesc,
+      done: reviewsDone,
+      value: cleanReviews.length,
+      visible: showReviewSection,
+    },
+    {
+      section: 'contacts',
+      label: labels.contacts,
+      hint: labels.contactsDesc,
+      done: contactsDone,
+      value: contactCount,
+    },
+  ].filter((item) => item.visible !== false);
 
   const updateServices = (nextServices: string[]) => {
     setValues((current) => ({
@@ -2950,7 +3041,10 @@ export function MasterProfileForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="mx-auto w-full max-w-[1320px] space-y-4">
+    <form
+      onSubmit={handleSubmit}
+      className="cb-profile-editor mx-auto w-full max-w-[1320px] space-y-4 tracking-normal"
+    >
       {showHeader ? (
         <Card light={isLight} className="overflow-hidden">
           <div className="p-5 md:p-6">
@@ -2970,7 +3064,7 @@ export function MasterProfileForm({
                   active={completionPercent >= 90}
                   accentColor={publicAccentColor}
                 />
-                {completionPercent}%
+                {completionPercent}% {labels.filled}
               </MicroLabel>
 
               <MicroLabel light={isLight}>
@@ -2979,20 +3073,49 @@ export function MasterProfileForm({
               </MicroLabel>
             </div>
 
-            <div className="mt-8 grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-end">
+            <div className="mt-7 grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-end">
               <div className="min-w-0">
                 <h2
                   className={cn(
-                    'text-[31px] font-semibold tracking-[-0.075em] md:text-[42px]',
+                    'max-w-[820px] text-[30px] font-semibold leading-[0.98] tracking-[-0.035em] md:text-[42px]',
                     pageText(isLight),
                   )}
                 >
                   {labels.title}
                 </h2>
 
-                <p className={cn('mt-2 max-w-[760px] text-[13px] leading-5', mutedText(isLight))}>
+                <p className={cn('mt-3 max-w-[760px] text-[13px] leading-5', mutedText(isLight))}>
                   {labels.description}
                 </p>
+
+                <div className="mt-4 flex min-w-0 flex-wrap items-center gap-2">
+                  <div
+                    className={cn(
+                      'flex h-8 min-w-0 max-w-full items-center gap-2 rounded-[9px] border px-3',
+                      isLight
+                        ? 'border-black/[0.08] bg-white text-black/54'
+                        : 'border-white/[0.08] bg-white/[0.04] text-white/48',
+                    )}
+                  >
+                    <Link2 className="size-3.5 shrink-0" />
+                    <span className="truncate text-[11.5px] font-medium">
+                      {publicPath}
+                    </span>
+                  </div>
+
+                  <CopyIconButton
+                    light={isLight}
+                    copied={copied}
+                    onClick={handleCopyLink}
+                    copyLabel={labels.copy}
+                    copiedLabel={labels.copied}
+                  />
+
+                  <ActionLink href={publicPath} light={isLight}>
+                    <ExternalLink className="size-3.5" />
+                    {labels.preview}
+                  </ActionLink>
+                </div>
               </div>
 
               {showOverviewCards ? (
@@ -3032,100 +3155,297 @@ export function MasterProfileForm({
         </Card>
       ) : null}
 
-      <Card light={isLight} className="overflow-hidden">
-        <CardTitle
-          title={labels.formTitle}
-          description={labels.formDescription}
-          light={isLight}
-        />
+      <div
+        className={cn(
+          'grid gap-4',
+          showPreviewPanel
+            ? 'xl:grid-cols-[292px_minmax(0,1fr)_330px]'
+            : 'xl:grid-cols-[292px_minmax(0,1fr)]',
+        )}
+      >
+        <aside className="hidden min-w-0 xl:block">
+          <Card light={isLight} className="sticky top-4 overflow-hidden">
+            <CardTitle
+              title={labels.formTitle}
+              description={labels.formDescription}
+              light={isLight}
+            />
 
-        <div className={cn('border-b px-4 py-3 md:px-5', borderTone(isLight))}>
-          <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <ControlGroup light={isLight} className="overflow-x-auto">
-              {navItems.map((item) => (
-                <FilterChip
-                  key={item.id}
-                  label={item.shortTitle}
-                  icon={item.icon}
-                  active={activeSection === item.id}
-                  onClick={() => setActiveSection(item.id)}
-                  light={isLight}
-                  accentColor={accentColor}
-                  badge={item.badge}
-                />
-              ))}
-            </ControlGroup>
+            <div className="p-2">
+              {navItems.map((item) => {
+                const active = activeSection === item.id;
 
-            <div className="flex min-w-0 items-center gap-2">
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => switchSection(item.id)}
+                    className={cn(
+                      'group relative flex w-full items-start gap-3 rounded-[10px] px-2.5 py-2.5 text-left transition active:scale-[0.99]',
+                      active
+                        ? isLight
+                          ? 'bg-black/[0.045] text-black'
+                          : 'bg-white/[0.075] text-white'
+                        : isLight
+                          ? 'text-black/54 hover:bg-black/[0.03] hover:text-black'
+                          : 'text-white/44 hover:bg-white/[0.055] hover:text-white',
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'flex size-8 shrink-0 items-center justify-center rounded-[9px] border transition',
+                        active
+                          ? isLight
+                            ? 'border-black/[0.10] bg-white text-black'
+                            : 'border-white/[0.12] bg-white/[0.09] text-white'
+                          : isLight
+                            ? 'border-black/[0.07] bg-white text-black/42'
+                            : 'border-white/[0.08] bg-white/[0.04] text-white/38',
+                      )}
+                    >
+                      {item.icon}
+                    </span>
+
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="truncate text-[12px] font-semibold tracking-[-0.005em]">
+                          {item.title}
+                        </span>
+
+                        {item.badge !== undefined ? (
+                          <span
+                            className={cn(
+                              'inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-[7px] border px-1.5 text-[9.5px] font-semibold',
+                              isLight
+                                ? 'border-black/[0.07] bg-white text-black/42'
+                                : 'border-white/[0.08] bg-white/[0.04] text-white/40',
+                            )}
+                          >
+                            {item.badge}
+                          </span>
+                        ) : null}
+                      </span>
+
+                      <span className={cn('mt-1 line-clamp-2 text-[10px] leading-4', mutedText(isLight))}>
+                        {item.description}
+                      </span>
+                    </span>
+
+                    {item.done ? (
+                      <span
+                        style={{ background: accentColor }}
+                        className="absolute right-2.5 top-2.5 size-1.5 rounded-full"
+                      />
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
+        </aside>
+
+        <main className="min-w-0 space-y-4">
+          <Card light={isLight} className="overflow-hidden xl:hidden">
+            <div className={cn('border-b p-3 md:p-4', borderTone(isLight))}>
+              <div className={cn('text-[12px] font-semibold', pageText(isLight))}>
+                {labels.formTitle}
+              </div>
+              <div className={cn('mt-1 text-[10.5px]', mutedText(isLight))}>
+                {labels.formDescription}
+              </div>
+            </div>
+
+            <div className="overflow-x-auto px-3 py-3">
+              <ControlGroup light={isLight}>
+                {navItems.map((item) => (
+                  <FilterChip
+                    key={item.id}
+                    label={item.shortTitle}
+                    icon={item.icon}
+                    active={activeSection === item.id}
+                    onClick={() => switchSection(item.id)}
+                    light={isLight}
+                    accentColor={accentColor}
+                    badge={item.badge}
+                  />
+                ))}
+              </ControlGroup>
+            </div>
+          </Card>
+
+          <Card light={isLight} className="overflow-hidden">
+            {renderActiveSection()}
+
+            {error ? (
               <div
                 className={cn(
-                  'flex h-8 min-w-0 items-center gap-2 rounded-[9px] border px-3',
-                  isLight
-                    ? 'border-black/[0.08] bg-white text-black/50'
-                    : 'border-white/[0.08] bg-white/[0.04] text-white/46',
+                  'border-t px-4 py-3 text-[12px] text-destructive',
+                  borderTone(isLight),
                 )}
               >
-                <Link2 className="size-3.5 shrink-0" />
-                <span className="truncate text-[11.5px] font-medium">{publicPath}</span>
+                {error}
               </div>
+            ) : null}
 
-              <CopyIconButton
+            <div className={cn('border-t p-4', borderTone(isLight))}>
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="flex min-w-0 flex-wrap gap-2">
+                  <ActionLink href="/dashboard" light={isLight}>
+                    <ArrowLeft className="size-3.5" />
+                    {labels.back}
+                  </ActionLink>
+
+                  <ActionLink href={servicesPageHref} light={isLight}>
+                    <Sparkles className="size-3.5" />
+                    {labels.openServicesHub}
+                  </ActionLink>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {nextNavItem ? (
+                    <ActionButton light={isLight} onClick={() => switchSection(nextNavItem.id)}>
+                      {labels.next}
+                      <ChevronRight className="size-3.5" />
+                    </ActionButton>
+                  ) : null}
+
+                  <ActionLink href={publicPath} light={isLight}>
+                    <Globe2 className="size-3.5" />
+                    {labels.preview}
+                  </ActionLink>
+
+                  <ActionButton light={isLight} active type="submit">
+                    <Save className="size-3.5" />
+                    {labels.save}
+                  </ActionButton>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </main>
+
+        {showPreviewPanel ? (
+          <aside className="min-w-0 space-y-4">
+            <div className="sticky top-4 space-y-4">
+              <Card light={isLight} className="overflow-hidden">
+                <CardTitle
+                  title={labels.readiness}
+                  description={`${completionPercent}% ${labels.filled}`}
+                  light={isLight}
+                />
+
+                <div className="p-3">
+                  <ProgressLine value={completionPercent} light={isLight} color={accentColor} />
+
+                  <div className="mt-3 space-y-1">
+                    {checklistItems.map((item) => (
+                      <button
+                        key={item.section}
+                        type="button"
+                        onClick={() => switchSection(item.section)}
+                        className={cn(
+                          'group flex w-full items-center justify-between gap-3 rounded-[10px] px-2.5 py-2 text-left transition active:scale-[0.99]',
+                          activeSection === item.section
+                            ? isLight
+                              ? 'bg-black/[0.045]'
+                              : 'bg-white/[0.07]'
+                            : isLight
+                              ? 'hover:bg-black/[0.03]'
+                              : 'hover:bg-white/[0.055]',
+                        )}
+                      >
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span
+                            className={cn(
+                              'flex size-6 shrink-0 items-center justify-center rounded-[8px] border',
+                              item.done
+                                ? isLight
+                                  ? 'border-black/[0.09] bg-black/[0.045] text-black'
+                                  : 'border-white/[0.10] bg-white/[0.08] text-white'
+                                : isLight
+                                  ? 'border-black/[0.07] bg-white text-black/34'
+                                  : 'border-white/[0.07] bg-white/[0.035] text-white/32',
+                            )}
+                          >
+                            {item.done ? (
+                              <Check className="size-3.5" />
+                            ) : (
+                              <span className="size-1.5 rounded-full bg-current opacity-45" />
+                            )}
+                          </span>
+
+                          <span className="min-w-0">
+                            <span
+                              className={cn(
+                                'block truncate text-[11.5px] font-semibold tracking-[-0.005em]',
+                                pageText(isLight),
+                              )}
+                            >
+                              {item.label}
+                            </span>
+
+                            <span className={cn('mt-0.5 block truncate text-[9.5px]', mutedText(isLight))}>
+                              {item.hint}
+                            </span>
+                          </span>
+                        </span>
+
+                        <span
+                          className={cn(
+                            'shrink-0 text-[10.5px] font-semibold',
+                            item.done ? pageText(isLight) : faintText(isLight),
+                          )}
+                        >
+                          {item.value}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </Card>
+
+              <PreviewCard
+                profile={previewProfile}
                 light={isLight}
+                labels={labels}
+                averageRating={averageRating}
+                publicPath={publicPath}
                 copied={copied}
-                onClick={handleCopyLink}
-                copyLabel={labels.copy}
-                copiedLabel={labels.copied}
+                onCopy={handleCopyLink}
               />
+
+              <Card light={isLight} className="overflow-hidden">
+                <div className="p-3">
+                  <div className={cn('text-[12px] font-semibold', pageText(isLight))}>
+                    {labels.quickActions}
+                  </div>
+
+                  <div className={cn('mt-1 text-[10.5px] leading-4', mutedText(isLight))}>
+                    {labels.quickActionsText}
+                  </div>
+
+                  <div className="mt-3 grid gap-2">
+                    <ActionButton light={isLight} active type="submit" className="w-full">
+                      <Save className="size-3.5" />
+                      {labels.save}
+                    </ActionButton>
+
+                    <ActionLink href={publicPath} light={isLight} className="w-full">
+                      <Globe2 className="size-3.5" />
+                      {labels.preview}
+                    </ActionLink>
+
+                    <ActionLink href={servicesPageHref} light={isLight} className="w-full">
+                      <Sparkles className="size-3.5" />
+                      {labels.openServicesHub}
+                    </ActionLink>
+                  </div>
+                </div>
+              </Card>
             </div>
-          </div>
-        </div>
-
-        {renderActiveSection()}
-
-        {error ? (
-          <div
-            className={cn(
-              'border-t px-4 py-3 text-[12px] text-destructive',
-              borderTone(isLight),
-            )}
-          >
-            {error}
-          </div>
+          </aside>
         ) : null}
-
-        <div className={cn('border-t p-4', borderTone(isLight))}>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <ActionLink href="/dashboard" light={isLight}>
-              <ArrowLeft className="size-3.5" />
-              {labels.back}
-            </ActionLink>
-
-            <div className="flex flex-wrap gap-2">
-              <ActionLink href={publicPath} light={isLight}>
-                <Globe2 className="size-3.5" />
-                {labels.preview}
-              </ActionLink>
-
-              <ActionButton light={isLight} active type="submit">
-                <Save className="size-3.5" />
-                {labels.save}
-              </ActionButton>
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      {showPreviewPanel ? (
-        <PreviewCard
-          profile={previewProfile}
-          light={isLight}
-          labels={labels}
-          averageRating={averageRating}
-          publicPath={publicPath}
-          copied={copied}
-          onCopy={handleCopyLink}
-        />
-      ) : null}
+      </div>
     </form>
   );
 }
