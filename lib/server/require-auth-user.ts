@@ -1,65 +1,53 @@
 import 'server-only';
 
-import { headers } from 'next/headers';
-import { createClient as createSupabaseClient, type User } from '@supabase/supabase-js';
-import { createClient as createServerSupabaseClient } from '@/lib/supabase/server';
-import { getSupabasePublishableKey, getSupabaseUrl } from '@/lib/supabase/env';
-import { getTelegramAppSessionUser } from '@/lib/server/app-session';
+import type { User } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/server';
+import { getTelegramAppSession } from '@/lib/server/app-session';
 
-function parseBearerToken(value: string | null) {
-  if (!value) return null;
-
-  const match = value.match(/^Bearer\s+(.+)$/i);
-  return match?.[1]?.trim() || null;
-}
-
-async function getRequestBearerToken() {
-  try {
-    const headerStore = await headers();
-    return parseBearerToken(headerStore.get('authorization'));
-  } catch {
-    return null;
-  }
+function buildTelegramUser(session: NonNullable<Awaited<ReturnType<typeof getTelegramAppSession>>>): User {
+  return {
+    id: session.userId,
+    aud: 'authenticated',
+    role: 'authenticated',
+    email: `telegram+${session.telegramId}@auth.clickbook.app`,
+    email_confirmed_at: new Date().toISOString(),
+    phone: '',
+    confirmed_at: new Date().toISOString(),
+    last_sign_in_at: new Date().toISOString(),
+    app_metadata: {
+      provider: 'telegram',
+      providers: ['telegram'],
+    },
+    user_metadata: {
+      provider: 'telegram',
+      telegram_id: session.telegramId,
+      telegram_username: session.username ?? null,
+      telegram_first_name: session.firstName ?? null,
+      telegram_last_name: session.lastName ?? null,
+    },
+    identities: [],
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    is_anonymous: false,
+  } as User;
 }
 
 export async function requireAuthUser(): Promise<User> {
-  const serverSupabase = await createServerSupabaseClient();
-  const { data, error } = await serverSupabase.auth.getUser();
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.auth.getUser();
 
-  if (!error && data.user) {
-    return data.user;
-  }
-
-  // Fallback: sometimes the browser has a valid Supabase session, but the
-  // API route does not receive/refesh the auth cookie yet on Vercel.
-  // Client requests send Authorization: Bearer <access_token>, and we validate
-  // that token directly through Supabase Auth.
-  const token = await getRequestBearerToken();
-
-  if (token) {
-    const tokenSupabase = createSupabaseClient(
-      getSupabaseUrl(),
-      getSupabasePublishableKey(),
-      {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-          detectSessionInUrl: false,
-        },
-      },
-    );
-
-    const { data: tokenData, error: tokenError } = await tokenSupabase.auth.getUser(token);
-
-    if (!tokenError && tokenData.user) {
-      return tokenData.user;
+    if (!error && data.user) {
+      return data.user;
     }
+  } catch {
+    // fallback ниже
   }
 
-  const telegramUser = await getTelegramAppSessionUser();
+  const appSession = await getTelegramAppSession();
 
-  if (telegramUser) {
-    return telegramUser;
+  if (appSession) {
+    return buildTelegramUser(appSession);
   }
 
   throw new Error('unauthorized');
