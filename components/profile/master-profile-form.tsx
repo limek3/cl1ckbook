@@ -109,44 +109,68 @@ function clampRating(value: number) {
   return Math.min(5, Math.max(1, value));
 }
 
+function safeString(value: unknown) {
+  return typeof value === 'string' ? value : '';
+}
+
+function safeStringArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function safeWorkGallery(value: unknown): WorkGalleryItem[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .filter((item): item is Partial<WorkGalleryItem> => Boolean(item) && typeof item === 'object')
+    .map((item, index) => ({
+      id: safeString(item.id) || makeId(`work-${index}`),
+      title: safeString(item.title),
+      image: safeString(item.image),
+      note: safeString(item.note),
+    }));
+}
+
+function safeReviews(value: unknown): ProfileReview[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .filter((item): item is Partial<ProfileReview> => Boolean(item) && typeof item === 'object')
+    .map((review, index) => ({
+      id: safeString(review.id) || makeId(`review-${index}`),
+      author: safeString(review.author),
+      service: safeString(review.service),
+      text: safeString(review.text),
+      rating: clampRating(Number(review.rating ?? 5)),
+    }));
+}
+
 function createInitialValues(
   profile?: MasterProfile | null,
 ): ExtendedMasterProfileFormValues {
   return {
-    name: profile?.name ?? '',
-    profession: profile?.profession ?? '',
-    city: profile?.city ?? '',
-    bio: profile?.bio ?? '',
-    servicesText: profile?.services?.join('\n') ?? '',
-    phone: profile?.phone ?? '',
-    telegram: profile?.telegram ?? '',
-    whatsapp: profile?.whatsapp ?? '',
-    hidePhone: profile?.hidePhone ?? false,
-    hideTelegram: profile?.hideTelegram ?? false,
-    hideWhatsapp: profile?.hideWhatsapp ?? false,
-    slug: profile?.slug ?? '',
-    avatar: profile?.avatar ?? '',
+    name: safeString(profile?.name),
+    profession: safeString(profile?.profession),
+    city: safeString(profile?.city),
+    bio: safeString(profile?.bio),
+    servicesText: safeStringArray(profile?.services).join('\n'),
+    phone: safeString(profile?.phone),
+    telegram: safeString(profile?.telegram),
+    whatsapp: safeString(profile?.whatsapp),
+    hidePhone: Boolean(profile?.hidePhone),
+    hideTelegram: Boolean(profile?.hideTelegram),
+    hideWhatsapp: Boolean(profile?.hideWhatsapp),
+    slug: safeString(profile?.slug),
+    avatar: safeString(profile?.avatar),
 
-    priceHint: profile?.priceHint ?? '',
-    experienceLabel: profile?.experienceLabel ?? '',
-    responseTime: profile?.responseTime ?? '',
-    workGallery:
-      profile?.workGallery?.map((item, index) => ({
-        id: item.id || makeId(`work-${index}`),
-        title: item.title ?? '',
-        image: item.image ?? '',
-        note: item.note ?? '',
-      })) ?? [],
-    reviews:
-      profile?.reviews?.map((review, index) => ({
-        id: review.id || makeId(`review-${index}`),
-        author: review.author ?? '',
-        service: review.service ?? '',
-        text: review.text ?? '',
-        rating: clampRating(review.rating ?? 5),
-      })) ?? [],
-    rating: profile?.rating ?? 4.9,
-    reviewCount: profile?.reviewCount ?? profile?.reviews?.length ?? 0,
+    priceHint: safeString(profile?.priceHint),
+    experienceLabel: safeString(profile?.experienceLabel),
+    responseTime: safeString(profile?.responseTime),
+    workGallery: safeWorkGallery(profile?.workGallery),
+    reviews: safeReviews(profile?.reviews),
+    rating: Number.isFinite(Number(profile?.rating)) ? Number(profile?.rating) : 4.9,
+    reviewCount: Number.isFinite(Number(profile?.reviewCount))
+      ? Number(profile?.reviewCount)
+      : safeReviews(profile?.reviews).length,
   };
 }
 

@@ -1154,7 +1154,9 @@ export default function DashboardProfilePage() {
       ownedProfile.whatsapp,
     ].filter(Boolean).length;
 
-    const servicesCount = ownedProfile.services?.length ?? 0;
+    const servicesCount = Array.isArray(ownedProfile.services)
+      ? ownedProfile.services.length
+      : 0;
 
     return {
       contactCount,
