@@ -19,6 +19,7 @@ import {
   ChevronDown,
   ChevronLeft,
   Clock3,
+  MessageCircleMore,
   MessageSquareText,
   Search,
   Send,
@@ -707,6 +708,7 @@ function SuccessView({
   embedded,
   onNew,
   telegramUrl,
+  vkUrl,
 }: {
   booking: Booking;
   labels: {
@@ -715,8 +717,11 @@ function SuccessView({
     newRequest: string;
     telegramConfirm: string;
     telegramConfirmHint: string;
+    vkConfirm: string;
+    vkConfirmHint: string;
   };
   telegramUrl?: string | null;
+  vkUrl?: string | null;
   light: boolean;
   locale: string;
   embedded: boolean;
@@ -772,32 +777,57 @@ function SuccessView({
           )}
         </div>
 
-        {telegramUrl ? (
-          <a
-            href={telegramUrl}
-            target="_blank"
-            rel="noreferrer"
-            className={cn(
-              'mt-5 inline-flex h-10 w-full items-center justify-center gap-2 rounded-[10px] border px-4 text-[12px] font-semibold transition active:scale-[0.99]',
-              primaryButtonClass(light),
-            )}
-          >
-            <Send className="size-4" />
-            {labels.telegramConfirm}
-          </a>
+        {telegramUrl || vkUrl ? (
+          <div className="mt-5 grid gap-2 sm:grid-cols-2">
+            {telegramUrl ? (
+              <a
+                href={telegramUrl}
+                target="_blank"
+                rel="noreferrer"
+                className={cn(
+                  'inline-flex h-10 w-full items-center justify-center gap-2 rounded-[10px] border px-4 text-[12px] font-semibold transition active:scale-[0.99]',
+                  primaryButtonClass(light),
+                )}
+              >
+                <Send className="size-4" />
+                {labels.telegramConfirm}
+              </a>
+            ) : null}
+
+            {vkUrl ? (
+              <a
+                href={vkUrl}
+                target="_blank"
+                rel="noreferrer"
+                className={cn(
+                  'inline-flex h-10 w-full items-center justify-center gap-2 rounded-[10px] border px-4 text-[12px] font-semibold transition active:scale-[0.99]',
+                  light
+                    ? 'border-black/[0.08] bg-white text-black/72 hover:border-black/[0.14] hover:bg-black/[0.035] hover:text-black'
+                    : 'border-white/[0.08] bg-white/[0.04] text-white/72 hover:border-white/[0.14] hover:bg-white/[0.07] hover:text-white',
+                )}
+              >
+                <MessageCircleMore className="size-4" />
+                {labels.vkConfirm}
+              </a>
+            ) : null}
+          </div>
         ) : null}
 
-        {telegramUrl ? (
+        {telegramUrl || vkUrl ? (
           <p className={cn('mt-2 text-center text-[10.5px] leading-4', faintText(light))}>
-            {labels.telegramConfirmHint}
+            {telegramUrl && vkUrl
+              ? `${labels.telegramConfirmHint} ${labels.vkConfirmHint}`
+              : telegramUrl
+                ? labels.telegramConfirmHint
+                : labels.vkConfirmHint}
           </p>
         ) : null}
 
         <Button
           type="button"
           className={cn(
-            telegramUrl ? 'mt-3 w-full' : 'mt-5 w-full',
-            telegramUrl ? quietButtonClass(light) : primaryButtonClass(light),
+            telegramUrl || vkUrl ? 'mt-3 w-full' : 'mt-5 w-full',
+            telegramUrl || vkUrl ? quietButtonClass(light) : primaryButtonClass(light),
           )}
           onClick={onNew}
         >
@@ -852,6 +882,7 @@ export function BookingForm({
   const [serviceQuery, setServiceQuery] = useState('');
   const [submittedBooking, setSubmittedBooking] = useState<Booking | null>(null);
   const [submittedTelegramUrl, setSubmittedTelegramUrl] = useState<string | null>(null);
+  const [submittedVkUrl, setSubmittedVkUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -903,6 +934,8 @@ export function BookingForm({
           telegramConfirm: 'Получить в Telegram',
           telegramConfirmHint:
             'Бот отправит подтверждение и напомнит о записи ближе ко времени.',
+          vkConfirm: 'Получить в VK',
+          vkConfirmHint: 'VK-бот тоже сможет присылать подтверждения и напоминания.',
           newRequest: 'Новая заявка',
           nothingFound: 'Ничего не найдено.',
           step: 'Шаг',
@@ -942,6 +975,8 @@ export function BookingForm({
           telegramConfirm: 'Get in Telegram',
           telegramConfirmHint:
             'The bot will send confirmation and remind you before the booking.',
+          vkConfirm: 'Get in VK',
+          vkConfirmHint: 'The VK bot can also send confirmations and reminders.',
           newRequest: 'New request',
           nothingFound: 'Nothing found.',
           step: 'Step',
@@ -1060,6 +1095,7 @@ export function BookingForm({
     setError(null);
     setSubmittedBooking(result.booking);
     setSubmittedTelegramUrl(result.telegramConfirmationUrl ?? null);
+    setSubmittedVkUrl(result.vkConfirmationUrl ?? null);
     setValues(createInitialValues(selectedService || profileServices[0] || ''));
     setCurrentStep(0);
   };
@@ -1073,6 +1109,7 @@ export function BookingForm({
         locale={locale}
         embedded={embedded}
         telegramUrl={submittedTelegramUrl}
+        vkUrl={submittedVkUrl}
         onNew={() => {
           setSubmittedBooking(null);
           setSubmittedTelegramUrl(null);

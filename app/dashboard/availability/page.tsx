@@ -722,7 +722,7 @@ function ControlGroup({
   return (
     <div
       className={cn(
-        'inline-flex max-w-full shrink-0 items-center overflow-hidden rounded-[12px] border p-0',
+        'flex w-full max-w-full items-stretch overflow-hidden rounded-[12px] border p-0',
         light ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.045]',
         className,
       )}
@@ -750,7 +750,7 @@ function FilterChip({
       type="button"
       onClick={onClick}
       className={cn(
-        'group relative inline-flex h-10 min-w-[72px] shrink-0 items-center justify-center border-r px-4 text-[11px] font-semibold tracking-[-0.015em] transition-colors duration-150 last:border-r-0 active:scale-[0.985]',
+        'group relative flex h-10 min-w-0 flex-1 items-center justify-center border-r px-3 text-[10.5px] font-semibold tracking-[-0.02em] transition-colors duration-150 last:border-r-0 active:scale-[0.985]',
         light ? 'border-black/[0.07]' : 'border-white/[0.07]',
         active
           ? light
@@ -1601,7 +1601,7 @@ function AvailabilityEditorDialog({
                   </div>
 
                   <div className="mt-3">
-                    <ControlGroup light={light} className="max-w-full overflow-x-auto">
+                    <ControlGroup light={light} className="w-full">
                       {statusOptions.map((option) => (
                         <FilterChip
                           key={option.value}

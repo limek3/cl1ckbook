@@ -6,6 +6,7 @@ import type { Booking } from '@/lib/types';
 import { requireAuthUser } from '@/lib/server/require-auth-user';
 import { createClientTelegramBookingLink, notifyWorkspaceOwnerAboutBooking } from '@/lib/server/booking-telegram';
 import { notifyWorkspaceOwnerAboutBookingVk } from '@/lib/server/booking-vk';
+import { getVkBotDeepLink, getVkBotDialogLink } from '@/lib/server/vk-bot';
 import { sendClientTelegramMessage } from '@/lib/server/client-telegram';
 import { isNotificationEnabled } from '@/lib/server/notification-settings';
 import { createBookingRecord, listBookingsByWorkspace, updateBookingStatusRecord } from '@/lib/server/supabase-bookings';
@@ -334,7 +335,8 @@ export async function POST(request: Request) {
       // /api/chats can synthesize chat rows from bookings if normalized chat tables fail.
     }
 
-    return NextResponse.json({ booking: persistedBooking, workspaceId: workspace.id, telegram: telegramBookingLink });
+    const vkConfirmationUrl = getVkBotDeepLink() || getVkBotDialogLink() || null;
+    return NextResponse.json({ booking: persistedBooking, workspaceId: workspace.id, telegram: telegramBookingLink, vkConfirmationUrl });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'unknown_error' }, { status: 500 });
   }

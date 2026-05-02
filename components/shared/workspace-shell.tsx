@@ -775,9 +775,9 @@ function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
     locale === 'ru'
       ? {
           account: 'Аккаунт',
-          workspace: 'рабочий кабинет',
+          workspace: 'кабинет',
           menu: 'Меню аккаунта',
-          feedback: 'Feedback',
+          feedback: 'Связь',
           feedbackHint: 'ошибка, идея или вопрос',
           theme: 'Тема',
           language: 'Язык',
@@ -786,8 +786,8 @@ function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
           system: 'Авто',
           home: 'Главная',
           homeHint: 'вернуться в кабинет',
-          publicPage: 'Публичная',
-          publicHint: 'страница клиента',
+          publicPage: 'Публичная страница',
+          publicHint: 'как страницу будут видеть клиенты',
           changelog: 'Обновления',
           changelogHint: 'что появилось в КликБук',
           help: 'Помощь',
@@ -825,7 +825,7 @@ function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
           account: 'Account',
           workspace: 'workspace',
           menu: 'Account menu',
-          feedback: 'Feedback',
+          feedback: 'Связь',
           feedbackHint: 'bug, idea or question',
           theme: 'Theme',
           language: 'Language',
@@ -834,7 +834,7 @@ function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
           system: 'Auto',
           home: 'Home Page',
           homeHint: 'return to workspace',
-          publicPage: 'Public',
+          publicPage: 'Public page',
           publicHint: 'client page',
           changelog: 'Changelog',
           changelogHint: 'latest ClickBook updates',
@@ -1056,7 +1056,7 @@ function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
                       {identity.name}
                     </span>
 
-                    <span className="mt-1.5 block truncate text-[10px] font-medium leading-none text-black/42 dark:text-white/32">
+                    <span className="mt-1.5 block text-[10px] font-medium leading-none text-black/42 dark:text-white/32 break-all">
                       {identity.subtitle}
                     </span>
                   </span>
@@ -1466,12 +1466,12 @@ function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
           </span>
 
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[11.5px] font-semibold leading-none tracking-[-0.03em] text-black dark:text-white">
+            <span className="block truncate text-[11.5px] font-semibold leading-none tracking-[-0.03em] text-black dark:text-white" title={identity.name}>
               {identity.name}
             </span>
 
-            <span className="mt-1 block truncate text-[9px] leading-none text-black/40 dark:text-white/32">
-              {labels.workspace}
+            <span className="mt-1 block truncate text-[9px] leading-none text-black/40 dark:text-white/32" title={identity.subtitle}>
+              {identity.subtitle}
             </span>
           </span>
 
@@ -1854,7 +1854,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
             payments: 'Оплата',
             subscription: 'Подписка',
             limits: 'Лимиты',
-            publicPage: 'Публичная',
+            publicPage: 'Публичная страница',
           },
         }
       : {
@@ -1897,7 +1897,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
             payments: 'Payments',
             subscription: 'Subscription',
             limits: 'Limits',
-            publicPage: 'Public',
+            publicPage: 'Public page',
           },
         };
 

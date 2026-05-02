@@ -156,6 +156,14 @@ function extractVisitCallback(data?: string) {
     : null;
 }
 
+function extractClientReminderCallback(data?: string) {
+  const match = data?.match(/^client_booking:([a-f0-9-]+):(confirm|reschedule)$/i);
+
+  return match
+    ? { bookingId: match[1], action: match[2] as 'confirm' | 'reschedule' }
+    : null;
+}
+
 async function syncWorkspaceBookingStatus(
   admin: ReturnType<typeof createSupabaseAdminClient>,
   workspaceId: string,
@@ -192,6 +200,12 @@ async function syncWorkspaceBookingStatus(
             : {}),
           ...(status === 'no_show'
             ? { noShowAt: new Date().toISOString() }
+            : {}),
+          ...(status === 'cancelled'
+            ? { cancelledAt: new Date().toISOString() }
+            : {}),
+          ...(status === 'confirmed'
+            ? { confirmedAt: new Date().toISOString() }
             : {}),
         }
       : item,
@@ -270,6 +284,70 @@ async function handleVisitCallback(params: {
         parsed.status === 'completed'
           ? 'Отмечено: клиент пришёл'
           : 'Отмечено: клиент не пришёл',
+    }),
+  );
+
+  return true;
+}
+
+
+async function handleClientReminderCallback(params: {
+  callbackQueryId: string;
+  data?: string;
+}) {
+  const parsed = extractClientReminderCallback(params.data);
+  if (!parsed) return false;
+
+  const admin = createSupabaseAdminClient();
+  const now = new Date().toISOString();
+
+  const { data: bookingRow, error: bookingError } = await admin
+    .from('sloty_bookings')
+    .select('id,workspace_id,status')
+    .eq('id', parsed.bookingId)
+    .maybeSingle();
+
+  if (bookingError) {
+    logWebhookError('handleClientReminderCallback booking read failed', bookingError);
+  }
+
+  const workspaceId = bookingRow?.workspace_id as string | undefined;
+
+  if (!workspaceId) {
+    await safeTask('answer client reminder callback booking not found', () =>
+      answerTelegramCallbackQuery({
+        callbackQueryId: params.callbackQueryId,
+        text: 'Запись не найдена',
+      }),
+    );
+
+    return true;
+  }
+
+  const nextStatus: Booking['status'] = parsed.action === 'confirm' ? 'confirmed' : 'cancelled';
+
+  const { error: updateError } = await admin
+    .from('sloty_bookings')
+    .update({
+      status: nextStatus,
+      updated_at: now,
+      ...(nextStatus === 'confirmed' ? { confirmed_at: now } : {}),
+      ...(nextStatus === 'cancelled' ? { cancelled_at: now } : {}),
+    })
+    .eq('id', parsed.bookingId);
+
+  if (updateError) {
+    logWebhookError('handleClientReminderCallback booking update failed', updateError);
+  }
+
+  await syncWorkspaceBookingStatus(admin, workspaceId, parsed.bookingId, nextStatus);
+
+  await safeTask('answer client reminder callback', () =>
+    answerTelegramCallbackQuery({
+      callbackQueryId: params.callbackQueryId,
+      text: parsed.action === 'confirm'
+        ? 'Отлично, запись подтверждена'
+        : 'Поняли. Запись снята, слот снова свободен',
     }),
   );
 

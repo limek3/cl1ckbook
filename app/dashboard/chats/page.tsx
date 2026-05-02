@@ -31,6 +31,7 @@ import {
   GripVertical,
   MessageSquareQuote,
   MoreHorizontal,
+  MoreVertical,
   Pin,
   Plus,
   Search,
@@ -1041,6 +1042,7 @@ export default function DashboardChatsPage() {
           send: 'Отправить',
           export: 'Экспорт',
           deleteChat: 'Удалить чат',
+          moreActions: 'Ещё',
           confirm: 'Детали записи',
           reschedule: 'Перенос',
           followup: 'Повторный контакт',
@@ -1112,6 +1114,7 @@ export default function DashboardChatsPage() {
           send: 'Send',
           export: 'Export',
           deleteChat: 'Delete chat',
+          moreActions: 'More',
           confirm: 'Confirm',
           reschedule: 'Reschedule',
           followup: 'Follow-up',
@@ -2135,9 +2138,6 @@ export default function DashboardChatsPage() {
                     {thread.clientName}
                   </div>
 
-                  {pinned ? (
-                    <Pin className="size-3 shrink-0 fill-current" style={{ color: accentColor }} />
-                  ) : null}
 
                   {thread.isPriority ? (
                     <Star className="size-3 shrink-0 fill-current" style={{ color: accentColor }} />
@@ -2154,31 +2154,25 @@ export default function DashboardChatsPage() {
               </div>
 
               <div className="flex shrink-0 items-center gap-1.5">
-                <button
-                  type="button"
-                  title={pinned ? labels.unpinThread : labels.pinThread}
-                  aria-label={pinned ? labels.unpinThread : labels.pinThread}
-                  aria-pressed={pinned}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    toggleThreadPin(thread.id);
-                  }}
-                  className={cn(
-                    'flex size-8 items-center justify-center rounded-[9px] border transition',
-                    pinned
-                      ? 'cb-accent-pill-active'
-                      : isLight
-                        ? 'border-black/[0.07] bg-white/70 text-black/34 hover:border-black/[0.12] hover:text-black/64'
-                        : 'border-white/[0.07] bg-white/[0.035] text-white/30 hover:border-white/[0.12] hover:text-white/62',
-                  )}
-                >
-                  <Pin className={cn('size-3.5', pinned && 'fill-current')} />
-                </button>
-
                 <MicroLabel light={isLight} className="h-7 px-2 py-0 text-[9px]">
                   {segmentBadgeLabel(thread.segment, locale)}
                 </MicroLabel>
+
+                <button
+                  type="button"
+                  className={cn('flex size-8 items-center justify-center rounded-[9px] border transition', isLight ? 'border-black/[0.07] bg-white/70 text-black/34 hover:border-black/[0.12] hover:text-black/64' : 'border-white/[0.07] bg-white/[0.035] text-white/30 hover:border-white/[0.12] hover:text-white/62')}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const rect = (event.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                    setActiveThreadId(thread.id);
+                    setThreadContextMenu({ threadId: thread.id, x: rect.left, y: rect.bottom + 6 });
+                  }}
+                  aria-label={labels.moreActions}
+                  title={labels.moreActions}
+                >
+                  <MoreVertical className="size-3.5" />
+                </button>
               </div>
             </div>
 
@@ -2187,12 +2181,6 @@ export default function DashboardChatsPage() {
             </div>
 
             <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[9.5px]">
-              {pinned ? (
-                <MicroLabel light={isLight} active className="h-6 px-2 py-0 text-[9px]">
-                  <Pin className="size-3" />
-                  {labels.pinned}
-                </MicroLabel>
-              ) : null}
 
               {thread.botConnected ? (
                 <MicroLabel light={isLight} className="h-6 px-2 py-0 text-[9px]">
@@ -2929,7 +2917,7 @@ export default function DashboardChatsPage() {
           'grid items-center gap-2',
           mobile
             ? 'grid-cols-[minmax(0,1fr)_40px]'
-            : 'sm:grid-cols-[minmax(0,1fr)_112px] lg:grid-cols-1 xl:grid-cols-[minmax(0,1fr)_112px]',
+            : 'sm:grid-cols-[minmax(0,1fr)_112px_40px] lg:grid-cols-1 xl:grid-cols-[minmax(0,1fr)_112px_40px]',
         )}
       >
         <label
@@ -2964,6 +2952,24 @@ export default function DashboardChatsPage() {
           <Plus className="size-3.5" />
           {mobile ? null : showCreatePanel ? labels.closeCreate : labels.createThread}
         </button>
+
+        {mobile ? null : (
+          <button
+            type="button"
+            className={cn('h-10 w-10 shrink-0 px-0', buttonBase(isLight))}
+            onClick={(event) => {
+              const rect = (event.currentTarget as HTMLButtonElement).getBoundingClientRect();
+              const thread = activeThread ?? filteredThreads[0] ?? sortedThreads[0];
+              if (!thread) return;
+              setActiveThreadId(thread.id);
+              setThreadContextMenu({ threadId: thread.id, x: rect.left, y: rect.bottom + 6 });
+            }}
+            aria-label={labels.moreActions}
+            title={labels.moreActions}
+          >
+            <MoreVertical className="size-4" />
+          </button>
+        )}
       </div>
 
       <div className="space-y-1.5">
@@ -3210,7 +3216,7 @@ export default function DashboardChatsPage() {
                           type="button"
                           className={cn('size-10 px-0', buttonBase(isLight))}
                         >
-                          <MoreHorizontal className="size-4" />
+                          <MoreVertical className="size-4" />
                         </button>
                       </PopoverTrigger>
 

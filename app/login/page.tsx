@@ -271,99 +271,73 @@ export default function LoginPage() {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#f4f4f2] px-4 py-6 text-[#0e0e0e] dark:bg-[#090909] dark:text-white sm:py-8">
-      <div className="pointer-events-none absolute inset-x-0 top-[-240px] mx-auto h-[520px] max-w-[900px] rounded-full bg-black/[0.035] blur-3xl dark:bg-white/[0.045]" />
-      <div className="pointer-events-none absolute bottom-[-260px] right-[-180px] h-[520px] w-[520px] rounded-full bg-black/[0.025] blur-3xl dark:bg-white/[0.035]" />
+      <div className="pointer-events-none absolute inset-x-0 top-[-220px] mx-auto h-[520px] max-w-[860px] rounded-full bg-black/[0.035] blur-3xl dark:bg-white/[0.04]" />
+      <div className="pointer-events-none absolute bottom-[-240px] left-1/2 h-[420px] w-[720px] -translate-x-1/2 rounded-full bg-black/[0.025] blur-3xl dark:bg-white/[0.03]" />
 
-      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-48px)] w-full max-w-[1060px] items-center">
-        <ShellCard className="grid w-full lg:grid-cols-[0.92fr_1.08fr]">
-          <div className="border-b border-black/[0.08] p-5 dark:border-white/[0.08] lg:border-b-0 lg:border-r lg:p-6">
+      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-48px)] w-full max-w-[760px] items-center justify-center">
+        <ShellCard className="w-full max-w-[720px]">
+          <div className="border-b border-black/[0.08] p-5 dark:border-white/[0.08] sm:p-6">
             <div className="flex items-center justify-between gap-4">
-              <BrandLogo className="w-[78px] shrink-0" />
-              <span className="rounded-[9px] border border-black/[0.08] bg-white/56 px-2.5 py-1.5 text-[10.5px] font-semibold text-black/42 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/38">
-                КликБук Auth
+              <div className="flex items-center gap-3">
+                <BrandLogo className="w-[78px] shrink-0" />
+                <div className="min-w-0">
+                  <MicroLabel>КликБук / ClickBook</MicroLabel>
+                  <div className="mt-2 text-[30px] font-semibold leading-[0.95] tracking-[-0.07em] sm:text-[38px]">
+                    Вход в кабинет
+                  </div>
+                  <div className="mt-2 max-w-[460px] text-[12.5px] leading-5 text-black/50 dark:text-white/44">
+                    Выберите удобный канал входа. Telegram и VK работают как полноценные боты: вход, уведомления, быстрые действия и возврат в кабинет.
+                  </div>
+                </div>
+              </div>
+              <span className="hidden shrink-0 rounded-[9px] border border-black/[0.08] bg-white/56 px-2.5 py-1.5 text-[10.5px] font-semibold text-black/42 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/38 sm:inline-flex">
+                Auth
               </span>
-            </div>
-
-            <div className="mt-9">
-              <MicroLabel>Единый вход</MicroLabel>
-              <h1 className="mt-3 max-w-[420px] text-[42px] font-semibold leading-[0.92] tracking-[-0.075em] sm:text-[54px]">
-                Вход через бота, без лишних окон
-              </h1>
-              <p className="mt-5 max-w-[420px] text-[13px] leading-5 text-black/52 dark:text-white/46">
-                Telegram и VK работают как рабочие каналы КликБук: вход, подтверждения, уведомления и быстрые действия по записям.
-              </p>
-            </div>
-
-            <div className="mt-6 grid gap-2">
-              <FeatureLine
-                icon={<ShieldCheck className="size-3.5" />}
-                title="Без ручных кодов"
-                text="В VK достаточно нажать кнопку в боте. Кабинет откроется в этой же вкладке."
-              />
-              <FeatureLine
-                icon={<Bell className="size-3.5" />}
-                title="Уведомления там же"
-                text="Новые записи, переносы и важные события приходят в Telegram или VK."
-              />
-              <FeatureLine
-                icon={<Users2 className="size-3.5" />}
-                title="Для мастеров и студий"
-                text="Один вход для кабинета, публичного профиля, клиентов и аналитики."
-              />
             </div>
           </div>
 
-          <div className="p-4 sm:p-5 lg:p-6">
-            <div className="mb-4 flex items-start justify-between gap-4">
-              <div>
-                <MicroLabel>Вход и регистрация</MicroLabel>
-                <h2 className="mt-2 text-[28px] font-semibold leading-[0.98] tracking-[-0.06em] sm:text-[34px]">
-                  Выберите канал
-                </h2>
-                <p className="mt-2 max-w-[520px] text-[12.5px] leading-5 text-black/50 dark:text-white/44">
-                  VK откроется в этой же вкладке. После кнопки «Открыть кабинет» бот вернёт вас обратно в КликБук.
-                </p>
+          <div className="grid gap-3 p-4 sm:p-5 lg:grid-cols-2 lg:p-6">
+            <ChannelCard
+              icon={<Send className="size-4" />}
+              title="Telegram"
+              subtitle="Mini App, быстрый вход и уведомления"
+              badge="Bot"
+            >
+              {botUrl ? (
+                <a
+                  href={botUrl}
+                  className="mb-2 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-[11px] border border-[#2692d8] bg-[#2ea6ff] px-4 text-[12.5px] font-semibold text-white transition hover:bg-[#2299f0] active:scale-[0.99]"
+                >
+                  <Send className="size-4" />
+                  Открыть Telegram Mini App
+                </a>
+              ) : null}
+              <TelegramLoginButton redirectTo={redirectTo} />
+              <div className="mt-3 rounded-[11px] border border-black/[0.07] bg-white/48 px-3 py-2 text-[11px] leading-5 text-black/44 dark:border-white/[0.07] dark:bg-white/[0.04] dark:text-white/40">
+                Вход, подтверждения и напоминания остаются в одном Telegram-канале.
               </div>
-              <Sparkles className="mt-1 size-4 shrink-0 text-black/28 dark:text-white/26" />
-            </div>
+            </ChannelCard>
 
-            <div className="grid gap-3 lg:grid-cols-2">
-              <ChannelCard
-                icon={<Send className="size-4" />}
-                title="Telegram"
-                subtitle="Mini App и веб-вход через бота"
-                badge="Bot"
-              >
-                {botUrl ? (
-                  <a
-                    href={botUrl}
-                    className="mb-2 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-[11px] border border-[#2692d8] bg-[#2ea6ff] px-4 text-[12.5px] font-semibold text-white transition hover:bg-[#2299f0] active:scale-[0.99]"
-                  >
-                    <Send className="size-4" />
-                    Открыть Telegram Mini App
-                  </a>
-                ) : null}
-                <TelegramLoginButton redirectTo={redirectTo} />
-              </ChannelCard>
+            <ChannelCard
+              icon={<MessageCircleMore className="size-4" />}
+              title="VK"
+              subtitle="бот сообщества с меню, FAQ и уведомлениями"
+              badge="Bot"
+            >
+              <VkLoginButton redirectTo={redirectTo} />
+              <div className="mt-3 rounded-[11px] border border-black/[0.07] bg-white/48 px-3 py-2 text-[11px] leading-5 text-black/44 dark:border-white/[0.07] dark:bg-white/[0.04] dark:text-white/40">
+                VK откроется в этой же вкладке, а бот вернёт вас обратно в кабинет без лишних шагов.
+              </div>
+            </ChannelCard>
 
-              <ChannelCard
-                icon={<MessageCircleMore className="size-4" />}
-                title="VK"
-                subtitle="бот сообщества с меню и уведомлениями"
-                badge="Bot"
-              >
-                <VkLoginButton redirectTo={redirectTo} />
-              </ChannelCard>
-            </div>
-
-            <Panel className="mt-3 p-3">
+            <Panel className="p-3 lg:col-span-2">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
                   <div className="text-[12px] font-semibold text-black/72 dark:text-white/72">
-                    Остальные способы
+                    Резервный способ входа
                   </div>
                   <div className="mt-0.5 text-[10.5px] text-black/38 dark:text-white/35">
-                    запасной вход, если мессенджеры недоступны
+                    если мессенджеры временно недоступны
                   </div>
                 </div>
                 <Bot className="size-4 text-black/30 dark:text-white/28" />
@@ -372,20 +346,24 @@ export default function LoginPage() {
               <ProviderButton
                 icon={<Chrome className="size-3.5" />}
                 label="Google"
-                hint="войти через Google"
+                hint="резервный вход через Google"
                 loading={loadingProvider === 'google'}
                 onClick={() => startOAuth('google')}
               />
             </Panel>
 
             {(oauthError || incomingError) ? (
-              <div className="mt-3 rounded-[11px] border border-red-500/15 bg-red-500/[0.06] px-3 py-2 text-[11px] leading-4 text-red-600 dark:text-red-300">
+              <div className="lg:col-span-2 rounded-[11px] border border-red-500/15 bg-red-500/[0.06] px-3 py-2 text-[11px] leading-4 text-red-600 dark:text-red-300">
                 {oauthError || incomingError}
               </div>
             ) : null}
 
-            <div className="mt-4 flex items-center justify-between gap-3 border-t border-black/[0.08] pt-4 text-[11px] text-black/36 dark:border-white/[0.08] dark:text-white/34">
-              <span className="truncate">После входа: {redirectTo}</span>
+            <div className="lg:col-span-2 flex flex-wrap items-center justify-between gap-3 border-t border-black/[0.08] pt-4 text-[11px] text-black/36 dark:border-white/[0.08] dark:text-white/34">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="truncate">После входа: {redirectTo}</span>
+                <span>•</span>
+                <span>КликБук / ClickBook</span>
+              </div>
               <Link
                 href="/about"
                 className="shrink-0 font-semibold text-black/48 transition hover:text-black dark:text-white/44 dark:hover:text-white"

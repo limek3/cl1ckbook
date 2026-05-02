@@ -668,7 +668,7 @@ function CompactPreview({
   const previewCopy =
     locale === 'ru'
       ? {
-          dashboard: 'Кабинет',
+          dashboard: 'Мой кабинет',
           dashboardHint: 'Рабочий экран мастера',
           bookings: 'Записи',
           clients: 'Клиенты',
@@ -677,7 +677,7 @@ function CompactPreview({
           requests: 'Заявки',
           traffic: 'Трафик',
           public: 'Публичная',
-          publicHint: 'Страница клиента',
+          publicHint: 'Как страницу будут видеть клиенты',
           master: 'Алина Морозова',
           service: 'Маникюр и педикюр',
           book: 'Записаться',
@@ -887,10 +887,10 @@ export default function DashboardAppearancePage() {
           preview: 'Превью',
           previewHint: 'Короткая проверка влияния настроек.',
           theme: 'Тема',
-          cabinet: 'Кабинет',
+          cabinet: 'Мой кабинет',
           cabinetHint: 'Рабочие страницы мастера: ширина, плотность, карточки и переключатели.',
           public: 'Публичная страница',
-          publicHint: 'Страница клиента: hero, услуги, CTA, навигация и секции.',
+          publicHint: 'Как страницу будут видеть клиенты: hero, услуги, CTA, навигация и секции.',
           colorCabinet: 'Цвет кабинета',
           colorPublic: 'Цвет публичной страницы',
           layout: 'Макет',

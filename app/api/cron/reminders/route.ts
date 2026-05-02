@@ -152,11 +152,22 @@ async function sendReminder(params: {
       `Дата: ${params.booking.date}`,
       `Время: ${params.booking.time}`,
       params.profile?.city ? `Город: ${params.profile.city}` : null,
+      '',
+      'Подтвердите запись или выберите перенос. Если выбрать перенос, слот освободится.',
     ]
       .filter(Boolean)
       .join('\n'),
+    replyMarkup: {
+      inline_keyboard: [
+        [
+          { text: 'Подтвердить', callback_data: `client_booking:${params.booking.id}:confirm` },
+          { text: 'Перенос', callback_data: `client_booking:${params.booking.id}:reschedule` },
+        ],
+      ],
+    },
   });
 }
+
 
 export async function GET(request: Request) {
   if (!isCronAllowed(request)) {
