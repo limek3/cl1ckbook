@@ -5,6 +5,7 @@ import { buildWorkspaceSeed } from '@/lib/workspace-store';
 import type { Booking } from '@/lib/types';
 import { requireAuthUser } from '@/lib/server/require-auth-user';
 import { createClientTelegramBookingLink, notifyWorkspaceOwnerAboutBooking } from '@/lib/server/booking-telegram';
+import { notifyWorkspaceOwnerAboutBookingVk } from '@/lib/server/booking-vk';
 import { sendClientTelegramMessage } from '@/lib/server/client-telegram';
 import { isNotificationEnabled } from '@/lib/server/notification-settings';
 import { createBookingRecord, listBookingsByWorkspace, updateBookingStatusRecord } from '@/lib/server/supabase-bookings';
@@ -223,14 +224,22 @@ export async function POST(request: Request) {
       })
     ) {
       try {
-        await notifyWorkspaceOwnerAboutBooking({
-          ownerId: workspace.ownerId ?? null,
-          workspaceSlug: workspace.slug,
-          profile: workspace.profile,
-          booking: persistedBooking,
-        });
+        await Promise.allSettled([
+          notifyWorkspaceOwnerAboutBooking({
+            ownerId: workspace.ownerId ?? null,
+            workspaceSlug: workspace.slug,
+            profile: workspace.profile,
+            booking: persistedBooking,
+          }),
+          notifyWorkspaceOwnerAboutBookingVk({
+            ownerId: workspace.ownerId ?? null,
+            workspaceSlug: workspace.slug,
+            profile: workspace.profile,
+            booking: persistedBooking,
+          }),
+        ]);
       } catch {
-        // Booking must stay successful even if Telegram notification fails.
+        // Booking must stay successful even if bot notifications fail.
       }
     }
 

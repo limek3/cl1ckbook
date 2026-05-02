@@ -1,22 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
-import {
-  buildVkAuthorizeUrl,
-  createRandomToken,
-} from '@/lib/server/vk-id';
+import { createSupabaseAdminClient } from '@/lib/server/supabase-admin';
+import { requireAuthUser } from '@/lib/server/require-auth-user';
+import { buildVkLoginToken } from '@/lib/server/vk-bot-auth';
+import { getVkBotDeepLink, getVkBotPrefillLink } from '@/lib/server/vk-bot';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-const STATE_COOKIE = 'clickbook_vk_oauth_state';
-const NEXT_COOKIE = 'clickbook_vk_oauth_next';
-const MODE_COOKIE = 'clickbook_vk_oauth_mode';
-
-function shouldUseSecureCookies() {
-  return process.env.NODE_ENV === 'production' ||
-    process.env.VERCEL === '1' ||
-    process.env.NEXT_PUBLIC_APP_URL?.startsWith('https://');
-}
 
 function safeRelativePath(value: string | null) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return '/dashboard';
@@ -27,34 +17,75 @@ function safeMode(value: string | null) {
   return value === 'link' ? 'link' : 'login';
 }
 
+export async function POST(request: NextRequest) {
+  try {
+    const admin = createSupabaseAdminClient();
+    const token = buildVkLoginToken();
+    const next = safeRelativePath(request.nextUrl.searchParams.get('next'));
+    const mode = safeMode(request.nextUrl.searchParams.get('mode'));
+    const payload = `auth_${token}`;
+    const vkUrl = getVkBotDeepLink(payload);
+    const prefillUrl = getVkBotPrefillLink(payload);
+
+    if (!vkUrl) {
+      throw new Error('Missing VK_BOT_GROUP_ID or VK_BOT_SCREEN_NAME');
+    }
+
+    const { error } = await admin.from('sloty_vk_login_requests').insert({
+      token,
+      status: 'pending',
+      expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      metadata: { next, mode },
+    });
+
+    if (error) throw error;
+
+    return NextResponse.json({
+      token,
+      vkUrl,
+      prefillUrl,
+      command: payload,
+      expiresIn: 600,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'vk_bot_start_failed';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const state = createRandomToken(24);
-    const authUrl = buildVkAuthorizeUrl({ state });
+    const mode = safeMode(request.nextUrl.searchParams.get('mode'));
+    const next = safeRelativePath(request.nextUrl.searchParams.get('next'));
 
-    const response = NextResponse.redirect(authUrl);
-    const secure = shouldUseSecureCookies();
-    const cookieOptions = {
-      httpOnly: true,
-      secure,
-      sameSite: 'lax' as const,
-      path: '/',
-      maxAge: 60 * 10,
-    };
+    if (mode !== 'link') {
+      const url = new URL('/login', request.url);
+      url.searchParams.set('message', 'VK-вход теперь работает через бота сообщества. Нажмите кнопку VK на странице входа.');
+      return NextResponse.redirect(url);
+    }
 
-    response.cookies.set(STATE_COOKIE, state, cookieOptions);
-    response.cookies.set(NEXT_COOKIE, safeRelativePath(request.nextUrl.searchParams.get('next')), cookieOptions);
-    response.cookies.set(MODE_COOKIE, safeMode(request.nextUrl.searchParams.get('mode')), cookieOptions);
+    const user = await requireAuthUser();
+    const admin = createSupabaseAdminClient();
+    const token = buildVkLoginToken();
+    const payload = `auth_${token}`;
+    const vkUrl = getVkBotDeepLink(payload);
+    const prefillUrl = getVkBotPrefillLink(payload);
 
-    return response;
+    if (!vkUrl) throw new Error('Missing VK_BOT_GROUP_ID or VK_BOT_SCREEN_NAME');
+
+    const { error } = await admin.from('sloty_vk_login_requests').insert({
+      token,
+      status: 'pending',
+      expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      metadata: { next, mode, link_user_id: user.id },
+    });
+
+    if (error) throw error;
+
+    return NextResponse.redirect(prefillUrl || vkUrl);
   } catch (error) {
-    const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('error', 'vk_not_configured');
-    loginUrl.searchParams.set(
-      'message',
-      error instanceof Error ? error.message : 'VK OAuth authorization is not configured',
-    );
-
-    return NextResponse.redirect(loginUrl);
+    const url = new URL('/dashboard/profile', request.url);
+    url.searchParams.set('message', error instanceof Error ? error.message : 'vk_link_start_failed');
+    return NextResponse.redirect(url);
   }
 }

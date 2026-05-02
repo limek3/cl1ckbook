@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ArrowRight, Chrome, Loader2, MessageCircleMore, Send } from 'lucide-react';
+import { ArrowRight, Chrome, Loader2, Send } from 'lucide-react';
 
 import { TelegramLoginButton } from '@/components/auth/telegram-login-button';
+import { VkLoginButton } from '@/components/auth/vk-login-button';
 import { BrandLogo } from '@/components/brand/brand-logo';
 import { Button } from '@/components/ui/button';
 import { useBrowserSearchParams } from '@/hooks/use-browser-search-params';
@@ -18,7 +19,7 @@ const authConfigured = Boolean(
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
 );
 
-type OAuthProvider = 'google' | 'vk';
+type OAuthProvider = 'google';
 
 function MicroLabel({ children }: { children: ReactNode }) {
   return (
@@ -128,11 +129,6 @@ export default function LoginPage() {
   }, []);
 
   const startOAuth = async (provider: OAuthProvider) => {
-    if (provider === 'vk') {
-      startVkAuth();
-      return;
-    }
-
     try {
       setOauthError(null);
       setLoadingProvider(provider);
@@ -163,14 +159,6 @@ export default function LoginPage() {
     }
   };
 
-  const startVkAuth = () => {
-    setOauthError(null);
-    setLoadingProvider('vk');
-
-    const url = new URL('/api/auth/vk/start', window.location.origin);
-    url.searchParams.set('next', redirectTo);
-    window.location.assign(url.toString());
-  };
 
   if (!authConfigured) {
     return (
@@ -235,7 +223,7 @@ export default function LoginPage() {
                   Кабинет мастера
                 </div>
                 <div className="mt-0.5 text-[11px] text-black/42 dark:text-white/38">
-                  Telegram, Google и VK
+                  Telegram, Google и VK-бот
                 </div>
               </div>
             </div>
@@ -301,13 +289,7 @@ export default function LoginPage() {
               loading={loadingProvider === 'google'}
               onClick={() => startOAuth('google')}
             />
-            <ProviderButton
-              icon={<MessageCircleMore className="size-3.5" />}
-              label="VK"
-              hint="войти через ВК"
-              loading={loadingProvider === 'vk'}
-              onClick={() => startOAuth('vk')}
-            />
+            <VkLoginButton redirectTo={redirectTo} />
           </div>
 
           {(oauthError || incomingError) ? (
