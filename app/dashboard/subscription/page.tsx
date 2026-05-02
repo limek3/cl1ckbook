@@ -1107,7 +1107,7 @@ function PaymentManageDialog({
           nextCharge: 'Следующее списание',
           paymentMethod: 'Способ оплаты',
           secure: 'Платежи защищены',
-          secureText: 'Данные карты не хранятся в ClickBook.',
+          secureText: 'Данные карты не хранятся в КликБук.',
           changeCard: 'Изменить карту',
           invoices: 'История платежей',
           downloadInvoice: 'Скачать счёт',
@@ -1402,7 +1402,7 @@ export default function SubscriptionPage() {
           perYear: 'в год',
           free: 'Бесплатно',
 
-          cardTitle: 'Подписка ClickBook',
+          cardTitle: 'Подписка КликБук',
           currentPlan: 'Текущий тариф',
           selectedPlan: 'Выбранный тариф',
           planPrice: 'Стоимость тарифа',

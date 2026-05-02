@@ -101,7 +101,7 @@ export async function sendMasterMenu(chatId: number | string) {
   return sendTelegramMessage({
     chatId,
     text:
-      'ClickBook готов. Откройте кабинет как Telegram Mini App или войдите в веб-кабинет на сайте.',
+      'КликБук готов. Откройте кабинет как Telegram Mini App или войдите в веб-кабинет на сайте.',
     replyMarkup: buildMasterMenuReplyMarkup(),
   });
 }

@@ -36,7 +36,7 @@ export default async function TelegramMiniAppEntryPage({
               <BrandLogo className="w-[72px] shrink-0" />
               <div className="min-w-0">
                 <div className="truncate text-[14px] font-semibold tracking-[-0.02em]">
-                  ClickBook Mini App
+                  КликБук Mini App
                 </div>
                 <div className="mt-0.5 text-[11px] text-black/42 dark:text-white/38">
                   кабинет мастера в Telegram

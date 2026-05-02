@@ -12,6 +12,7 @@ import {
   sendVkMessage,
 } from '@/lib/server/vk-bot';
 import {
+  buildVkLoginToken,
   createVkBotVirtualUser,
   upsertVkBotAccount,
   upsertVkOauthAccountFromBot,
@@ -324,7 +325,7 @@ async function confirmVkLogin(params: {
   await sendVkReply({
     label: 'login_confirmed',
     peerId: params.peerId,
-    textPreview: 'Вход в ClickBook через VK подтверждён.',
+    textPreview: 'Вход в КликБук через VK подтверждён.',
     send: () => sendVkLoginConfirmedMessage({
       peerId: params.peerId,
       next,
@@ -332,6 +333,54 @@ async function confirmVkLogin(params: {
   });
 
   return true;
+}
+
+
+async function createDirectVkLoginLink(params: {
+  vkUserId: number | string;
+  peerId: number | string;
+  profile: Awaited<ReturnType<typeof getVkBotUserProfile>>;
+}) {
+  const admin = createSupabaseAdminClient();
+  const now = new Date().toISOString();
+  const token = buildVkLoginToken();
+  const user = createVkBotVirtualUser(params.profile);
+
+  await upsertVkBotAccount(admin, {
+    userId: user.id,
+    vkUserId: params.profile.vkId,
+    peerId: params.peerId,
+    profile: params.profile,
+    messagesAllowed: true,
+    metadata: { source: 'vk_start_no_code_direct_login' },
+  });
+
+  await upsertVkOauthAccountFromBot(admin, { userId: user.id, profile: params.profile }).catch((error) => {
+    logVkWebhookError('vk account mirror skipped', error);
+  });
+
+  const { error } = await admin.from('sloty_vk_login_requests').insert({
+    token,
+    status: 'confirmed',
+    vk_user_id: params.profile.vkId,
+    peer_id: Number(params.peerId),
+    first_name: params.profile.firstName,
+    last_name: params.profile.lastName,
+    screen_name: params.profile.screenName || params.profile.domain,
+    photo_url: params.profile.photoUrl,
+    confirmed_at: now,
+    expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+    metadata: {
+      next: '/dashboard',
+      mode: 'login',
+      source: 'vk_start_no_code_direct_login',
+      profile: params.profile.rawProfile ?? {},
+    },
+  });
+
+  if (error) throw error;
+
+  return `${getAppUrl()}/api/auth/vk/complete?token=${encodeURIComponent(token)}`;
 }
 
 async function handleMessageNew(payload: VkCallbackPayload) {
@@ -380,11 +429,29 @@ async function handleMessageNew(payload: VkCallbackPayload) {
   }).catch((error) => logVkWebhookError('remember vk user', error));
 
   if (isStartLikeText(message.text)) {
+    const directLoginUrl = await createDirectVkLoginLink({ vkUserId, peerId, profile });
+
     await sendVkReply({
-      label: 'welcome',
+      label: 'vk_start_direct_login',
       peerId,
-      textPreview: 'Привет! Я бот ClickBook.',
-      send: () => sendVkBotWelcomeMessage({ peerId, loginUrl: `${getAppUrl()}/login` }),
+      textPreview: 'КликБук готов к входу через VK.',
+      send: () => sendVkMessage({
+        peerId,
+        message: [
+          'Готово ✅',
+          '',
+          'VK подключён к КликБук.',
+          'Нажмите кнопку ниже — кабинет откроется без ручного кода.',
+        ].join('\n'),
+        keyboard: JSON.stringify({
+          one_time: false,
+          inline: true,
+          buttons: [[{
+            action: { type: 'open_link', label: 'Открыть кабинет', link: directLoginUrl },
+            color: 'primary',
+          }]],
+        }),
+      }),
     });
     return;
   }
@@ -427,7 +494,7 @@ async function handleMessageEvent(payload: VkCallbackPayload) {
       eventId,
       userId: vkUserId,
       peerId,
-      text: 'Откройте вход через VK на сайте ClickBook',
+      text: 'Откройте вход через VK на сайте КликБук',
     }).catch((error) => logVkWebhookError('answer empty event', error));
   }
 }
@@ -462,10 +529,10 @@ async function handleMessageAllow(payload: VkCallbackPayload) {
   await sendVkReply({
     label: 'message_allow_welcome',
     peerId: vkUserId,
-    textPreview: 'Сообщения VK подключены к ClickBook.',
+    textPreview: 'Сообщения VK подключены к КликБук.',
     send: () => sendVkMessage({
       peerId: vkUserId,
-      message: 'Сообщения VK подключены к ClickBook ✅\n\nТеперь через этот диалог можно подтверждать вход и получать уведомления о записях.',
+      message: 'Сообщения VK подключены к КликБук ✅\n\nТеперь через этот диалог можно подтверждать вход и получать уведомления о записях.',
     }),
   });
 }

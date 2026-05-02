@@ -24,9 +24,10 @@ export async function POST(request: NextRequest) {
     const next = safeRelativePath(request.nextUrl.searchParams.get('next'));
     const mode = safeMode(request.nextUrl.searchParams.get('mode'));
     const payload = `auth_${token}`;
-    const vkUrl = getVkBotDeepLink(payload);
     const dialogUrl = getVkBotDialogLink();
-    const prefillUrl = getVkBotPrefillLink(payload);
+    const usePayloadLink = mode === 'link' || request.nextUrl.searchParams.get('flow') === 'ref';
+    const vkUrl = usePayloadLink ? getVkBotDeepLink(payload) : dialogUrl || getVkBotDeepLink();
+    const prefillUrl = getVkBotPrefillLink(`/start ${payload}`);
 
     if (!vkUrl) {
       throw new Error('Missing VK_BOT_GROUP_ID or VK_BOT_SCREEN_NAME');
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
       token,
       status: 'pending',
       expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
-      metadata: { next, mode },
+      metadata: { next, mode, flow: usePayloadLink ? 'ref' : 'no_code_start' },
     });
 
     if (error) throw error;
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
       vkUrl,
       dialogUrl,
       prefillUrl,
-      command: payload,
+      command: mode === 'link' ? payload : '/start',
       expiresIn: 600,
     });
   } catch (error) {
@@ -70,9 +71,10 @@ export async function GET(request: NextRequest) {
     const admin = createSupabaseAdminClient();
     const token = buildVkLoginToken();
     const payload = `auth_${token}`;
-    const vkUrl = getVkBotDeepLink(payload);
     const dialogUrl = getVkBotDialogLink();
-    const prefillUrl = getVkBotPrefillLink(payload);
+    const usePayloadLink = mode === 'link' || request.nextUrl.searchParams.get('flow') === 'ref';
+    const vkUrl = usePayloadLink ? getVkBotDeepLink(payload) : dialogUrl || getVkBotDeepLink();
+    const prefillUrl = getVkBotPrefillLink(`/start ${payload}`);
 
     if (!vkUrl) throw new Error('Missing VK_BOT_GROUP_ID or VK_BOT_SCREEN_NAME');
 

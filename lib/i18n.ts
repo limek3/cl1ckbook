@@ -38,7 +38,7 @@ export const messages = {
       secondaryCta: 'Посмотреть демо',
       composerPlaceholder: 'Опишите мастера, услуги или нужный сценарий…',
       composerHint: 'Разделы кабинета, подсказки и поддержка помогают быстро запустить страницу и не терять заявки.',
-      aiAssistLabel: 'ClickBook AI',
+      aiAssistLabel: 'КликБук AI',
       aiResultBadge: 'Подсказка',
       aiPromptLabel: 'Запрос',
       aiScenarioLabel: 'Сценарии',

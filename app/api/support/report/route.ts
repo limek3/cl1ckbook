@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     }
 
     const telegramText = [
-      '<b>Новый репорт из ClickBook</b>',
+      '<b>Новый репорт из КликБук</b>',
       '',
       `<b>Тип:</b> ${escapeHtml(categoryLabel(category))}`,
       `<b>Страница:</b> ${escapeHtml(path || 'Не указана')}`,

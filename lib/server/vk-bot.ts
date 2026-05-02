@@ -263,7 +263,7 @@ export async function sendVkBotWelcomeMessage(params: {
   return sendVkMessage({
     peerId: params.peerId,
     message: [
-      'Привет! Я бот ClickBook.',
+      'Привет! Я бот КликБук.',
       '',
       'Я помогаю входить в кабинет через VK и присылаю уведомления о записях.',
       '',
@@ -340,7 +340,7 @@ export async function sendVkLoginConfirmedMessage(params: {
     message: [
       'Готово ✅',
       '',
-      'Вход в ClickBook через VK подтверждён.',
+      'Вход в КликБук через VK подтверждён.',
       'Вернитесь на сайт — кабинет откроется автоматически.',
     ].join('\n'),
     keyboard: buildVkKeyboard([[{ label: 'Открыть кабинет', link: `${appUrl}${next}`, color: 'primary' }]]),

@@ -238,7 +238,7 @@ export default function LoginPage() {
           <div className="mb-4">
             <MicroLabel>Вход и регистрация</MicroLabel>
             <h1 className="mt-2 text-[30px] font-semibold leading-[0.98] tracking-[-0.035em] sm:text-[34px]">
-              Войти в ClickBook
+              Войти в КликБук
             </h1>
             <p className="mt-3 text-[12.5px] leading-5 text-black/52 dark:text-white/48">
               Выберите удобный способ входа. После авторизации кабинет откроется автоматически.

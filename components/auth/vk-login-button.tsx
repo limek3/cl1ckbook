@@ -170,7 +170,7 @@ export function VkLoginButton({
       setPrefillUrl(payload.prefillUrl ?? null);
       setCommand(payload.command ?? `auth_${payload.token}`);
       setState('waiting');
-      setMessage('Открыл VK-диалог. Код входа уже зашит в ссылку. Просто отправьте любое сообщение, например «Начать». Если VK не передаст код, ниже есть запасная кнопка с готовым текстом.');
+      setMessage(mode === 'link' ? 'Открыл VK-диалог. Просто отправьте сообщение «Начать» — код подключения уже зашит в ссылку.' : 'Открыл VK-диалог. Отправьте /start или нажмите «Начать» — бот пришлёт кнопку входа в кабинет. Код вручную вводить не нужно.');
       startedAtRef.current = Date.now();
 
       window.open(payload.vkUrl, '_blank', 'noopener,noreferrer');
@@ -281,7 +281,7 @@ export function VkLoginButton({
               className="inline-flex h-8 items-center justify-center gap-2 rounded-[9px] border border-black/[0.08] bg-white text-[11px] font-semibold text-black/56 transition hover:bg-black/[0.035] hover:text-black dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/56 dark:hover:bg-white/[0.07] dark:hover:text-white"
             >
               <MessageCircleMore className="size-3.5" />
-              Запасной вариант с текстом
+              Запасной вариант /start
             </a>
           ) : null}
 
@@ -292,7 +292,7 @@ export function VkLoginButton({
               className="inline-flex min-h-8 items-center justify-center gap-2 rounded-[9px] border border-black/[0.08] bg-white px-2 text-[10.5px] font-semibold text-black/50 transition hover:bg-black/[0.035] hover:text-black dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/50 dark:hover:bg-white/[0.07] dark:hover:text-white"
             >
               {copiedCommand ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-              {copiedCommand ? 'Код скопирован' : 'Скопировать код вручную'}
+              {copiedCommand ? 'Команда скопирована' : 'Скопировать команду'}
             </button>
           ) : null}
         </div>
@@ -300,7 +300,7 @@ export function VkLoginButton({
 
       {token && state === 'waiting' ? (
         <div className="text-center text-[10.5px] text-black/34 dark:text-white/30">
-          Вход активен 10 минут. Уведомления и подтверждения будут приходить от сообщества ClickBook.
+          Вход активен 10 минут. Подтверждения и уведомления будут приходить от сообщества КликБук.
         </div>
       ) : null}
     </div>
