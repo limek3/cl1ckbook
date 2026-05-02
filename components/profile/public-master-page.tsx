@@ -52,6 +52,7 @@ import {
 import { useAppearance } from '@/lib/appearance-context';
 import { accentPalette } from '@/lib/appearance-palette';
 import { getMaxHref, getPhoneHref, getTelegramHref } from '@/lib/contact-links';
+import { getMasterAddress, getMasterLocationMode, getMasterRouteUrl } from '@/lib/location-links';
 import { useLocale } from '@/lib/locale-context';
 import { getDashboardDemoStorageKey } from '@/lib/dashboard-demo';
 import {
@@ -1294,6 +1295,9 @@ export function PublicMasterPage({
           statFormat: 'Формат',
           statExperience: 'Опыт',
           phoneLabel: 'Телефон',
+          addressLabel: 'Адрес',
+          route: 'Маршрут',
+          routeHint: 'После подтверждения пришлём адрес и маршрут в Яндекс.Картах.',
           drawerTitle: 'Онлайн-запись',
           close: 'Закрыть',
           emptyBio:
@@ -1353,6 +1357,9 @@ export function PublicMasterPage({
           statFormat: 'Format',
           statExperience: 'Experience',
           phoneLabel: 'Phone',
+          addressLabel: 'Address',
+          route: 'Route',
+          routeHint: 'After confirmation, we will send the address and a Yandex Maps route.',
           drawerTitle: 'Online booking',
           close: 'Close',
           emptyBio:
@@ -1496,6 +1503,9 @@ export function PublicMasterPage({
   const profession =
     profile?.profession?.trim() || (locale === 'ru' ? 'Специалист' : 'Specialist');
   const city = profile?.city?.trim() || labels.online;
+  const locationMode = getMasterLocationMode(profile);
+  const addressLabel = locationMode === 'address' ? getMasterAddress(profile) : labels.online;
+  const routeUrl = locationMode === 'address' ? getMasterRouteUrl(profile) : null;
   const bio = profile?.bio?.trim() || labels.emptyBio;
   const priceHint =
     profile?.priceHint?.trim() ||
@@ -1531,6 +1541,14 @@ export function PublicMasterPage({
             external: false,
           }
         : null,
+      routeUrl
+        ? {
+            label: labels.route,
+            href: routeUrl,
+            icon: <MapPin className="size-4" />,
+            external: true,
+          }
+        : null,
       profile.whatsapp && !profile.hideWhatsapp
         ? {
             label: labels.max,
@@ -1562,12 +1580,22 @@ export function PublicMasterPage({
         external: boolean;
       } => Boolean(item?.href),
     );
-  }, [profile, labels.call, labels.max, labels.telegram, locale, name]);
+  }, [profile, labels.call, labels.route, labels.max, labels.telegram, locale, name, routeUrl]);
 
   const contactItems = useMemo(() => {
     if (!profile) return [];
 
     return [
+      routeUrl && addressLabel !== labels.online
+        ? {
+            key: 'address',
+            label: labels.addressLabel,
+            value: addressLabel,
+            href: routeUrl,
+            hidden: false,
+            icon: <MapPin className="size-4" />,
+          }
+        : null,
       profile.phone
         ? {
             key: 'phone',
@@ -1613,7 +1641,7 @@ export function PublicMasterPage({
       hidden: boolean;
       icon: ReactNode;
     }>;
-  }, [profile, labels.phoneLabel, labels.max, labels.telegram, locale, name]);
+  }, [profile, labels.phoneLabel, labels.addressLabel, labels.max, labels.telegram, locale, name, addressLabel, routeUrl]);
 
   const jumpLinks = useMemo(
     () =>
@@ -1675,7 +1703,7 @@ export function PublicMasterPage({
     {
       icon: <BadgeCheck className="size-3.5" />,
       label: labels.statFormat,
-      value: labels.online,
+      value: addressLabel,
     },
     {
       icon: <Sparkles className="size-3.5" />,
@@ -1954,6 +1982,10 @@ export function PublicMasterPage({
 
                   <MiniPill light={isLight}>{priceHint}</MiniPill>
                   <MiniPill light={isLight}>{experienceLabel}</MiniPill>
+                  <MiniPill light={isLight}>
+                    <MapPin className="size-3.5" />
+                    {addressLabel}
+                  </MiniPill>
                 </div>
 
                 <div className={cn('mt-7 max-w-[820px]', heroCentered && 'mx-auto')}>

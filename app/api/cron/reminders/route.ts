@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/server/supabase-admin';
 import { sendMasterVisitCheck, sendTelegramMessage } from '@/lib/server/telegram-bot';
 import { sendClientVkBookingReminder } from '@/lib/server/vk-bot';
+import { getMasterAddress, getMasterLocationMode, getMasterRouteUrl } from '@/lib/location-links';
 import type { Booking, MasterProfile } from '@/lib/types';
 
 export const runtime = 'nodejs';
@@ -108,6 +109,18 @@ async function resolveOwnerChatId(
   return typeof chatId === 'number' || typeof chatId === 'string' ? chatId : null;
 }
 
+function buildVisitPlaceLines(profile: MasterProfile | null) {
+  if (!profile || getMasterLocationMode(profile) !== 'address') return ['Формат: онлайн'];
+
+  const address = getMasterAddress(profile);
+  const routeUrl = getMasterRouteUrl(profile);
+
+  return [
+    address ? `Адрес: ${address}` : null,
+    routeUrl ? `Маршрут Яндекс.Карты: ${routeUrl}` : null,
+  ].filter(Boolean) as string[];
+}
+
 function shouldSendReminder(booking: Booking, hoursBefore: number) {
   const startsAt = bookingStartsAt(booking).getTime();
   const now = Date.now();
@@ -152,6 +165,7 @@ async function sendReminder(params: {
 }) {
   const masterName = params.profile?.name || 'мастеру';
   const when = params.hoursBefore >= 24 ? 'завтра' : `через ${params.hoursBefore} часа`;
+  const placeLines = buildVisitPlaceLines(params.profile);
 
   await sendTelegramMessage({
     chatId: params.chatId,
@@ -162,9 +176,11 @@ async function sendReminder(params: {
       `Услуга: ${params.booking.service}`,
       `Дата: ${params.booking.date}`,
       `Время: ${params.booking.time}`,
-      params.profile?.city ? `Город: ${params.profile.city}` : null,
+      ...placeLines,
       '',
-      'Подтвердите запись или выберите перенос. Если выбрать перенос, слот освободится.',
+      params.hoursBefore <= 2
+        ? 'Хорошего визита! Подтвердите запись или выберите перенос. Если выбрать перенос, слот освободится.'
+        : 'Подтвердите запись или выберите перенос. Если выбрать перенос, слот освободится.',
     ]
       .filter(Boolean)
       .join('\n'),

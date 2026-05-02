@@ -156,6 +156,9 @@ function createInitialValues(
     phone: safeString(profile?.phone),
     telegram: safeString(profile?.telegram),
     whatsapp: safeString(profile?.whatsapp),
+    locationMode: profile?.locationMode === 'address' ? 'address' : 'online',
+    address: safeString(profile?.address),
+    mapUrl: safeString(profile?.mapUrl),
     hidePhone: Boolean(profile?.hidePhone),
     hideTelegram: Boolean(profile?.hideTelegram),
     hideWhatsapp: Boolean(profile?.hideWhatsapp),
@@ -1106,6 +1109,7 @@ export function MasterProfileForm({
   const [slugTouched, setSlugTouched] = useState(Boolean(initialProfile?.slug));
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [reviewCopied, setReviewCopied] = useState(false);
   const [customService, setCustomService] = useState('');
   const [serviceDraft, setServiceDraft] = useState<ServiceDraft>({
     title: '',
@@ -1188,7 +1192,7 @@ export function MasterProfileForm({
           reviewsDesc: 'Отзывы клиентов для доверия',
           contacts: 'Контакты',
           contactsShort: 'Контакты',
-          contactsDesc: 'Телефон, Telegram и ВК',
+          contactsDesc: 'Телефон, Telegram, ВК и адрес для визита',
           photo: 'Фото профиля',
           photoHint: 'Если фото не загрузить, покажем инициалы.',
           uploadPhoto: 'Загрузить',
@@ -1202,6 +1206,14 @@ export function MasterProfileForm({
           profession: 'Специализация',
           city: 'Город',
           slug: 'Ссылка',
+          visitFormat: 'Формат визита',
+          visitOnline: 'Онлайн',
+          visitAddress: 'По адресу',
+          address: 'Адрес',
+          addressPlaceholder: 'Например: Калининград, ул. Мира 10, кабинет 4',
+          mapUrl: 'Ссылка маршрута',
+          mapUrlPlaceholder: 'Необязательно: ссылка Яндекс.Карт, если хотите задать точку вручную',
+          routeHint: 'Если указан адрес, клиент получит маршрут в Яндекс.Картах в напоминании за 2 часа.',
           priceHint: 'Стоимость',
           pricePlaceholder: 'Например: от 2 500 ₽ / по запросу',
           experienceLabel: 'Опыт',
@@ -1291,6 +1303,7 @@ export function MasterProfileForm({
           reviewsCount: 'Отзывы',
           chars: 'симв.',
           publicPreview: 'Превью страницы',
+          reviewLink: 'Ссылка для отзыва',
           rating: 'Рейтинг',
           filled: 'заполнено',
           linkReady: 'Ссылка готова',
@@ -1325,7 +1338,7 @@ export function MasterProfileForm({
           reviewsDesc: 'Client reviews for trust',
           contacts: 'Contacts',
           contactsShort: 'Contacts',
-          contactsDesc: 'Phone, Telegram, and VK',
+          contactsDesc: 'Phone, Telegram, VK, and visit address',
           photo: 'Profile photo',
           photoHint: 'If no photo is uploaded, initials will be shown.',
           uploadPhoto: 'Upload',
@@ -1339,6 +1352,14 @@ export function MasterProfileForm({
           profession: 'Specialization',
           city: 'City',
           slug: 'Link',
+          visitFormat: 'Visit format',
+          visitOnline: 'Online',
+          visitAddress: 'At address',
+          address: 'Address',
+          addressPlaceholder: 'For example: 10 Main Street, office 4',
+          mapUrl: 'Route link',
+          mapUrlPlaceholder: 'Optional: custom Yandex Maps link',
+          routeHint: 'If address is set, the client receives a Yandex Maps route in the 2-hour reminder.',
           priceHint: 'Price',
           pricePlaceholder: 'For example: from €50 / on request',
           experienceLabel: 'Experience',
@@ -1428,6 +1449,7 @@ export function MasterProfileForm({
           reviewsCount: 'Reviews',
           chars: 'chars',
           publicPreview: 'Page preview',
+          reviewLink: 'Review link',
           rating: 'Rating',
           filled: 'filled',
           linkReady: 'Link ready',
@@ -1492,6 +1514,9 @@ export function MasterProfileForm({
       phone: values.phone || undefined,
       telegram: values.telegram || undefined,
       whatsapp: values.whatsapp || undefined,
+      locationMode: values.locationMode,
+      address: values.address || undefined,
+      mapUrl: values.mapUrl || undefined,
       hidePhone: values.hidePhone,
       hideTelegram: values.hideTelegram,
       hideWhatsapp: values.hideWhatsapp,
@@ -1531,6 +1556,8 @@ export function MasterProfileForm({
     ? '/dashboard/services?demo=1&source=profile'
     : '/dashboard/services?source=profile';
 
+  const reviewPath = `/m/${previewProfile.slug}/review`;
+
   const contactCount = [values.phone, values.telegram, values.whatsapp].filter((item) =>
     item.trim(),
   ).length;
@@ -1556,6 +1583,7 @@ export function MasterProfileForm({
     values.priceHint.trim(),
     values.experienceLabel.trim(),
     values.responseTime.trim(),
+    values.locationMode === 'online' || values.address.trim(),
     values.phone.trim() || values.telegram.trim() || values.whatsapp.trim(),
     cleanWorks.length > 0 ? 'works' : '',
     showReviewSection ? (cleanReviews.length > 0 ? 'reviews' : '') : 'reviews-hidden',
@@ -1994,6 +2022,20 @@ export function MasterProfileForm({
     } catch {}
   };
 
+  const handleCopyReviewLink = async () => {
+    try {
+      const absoluteValue =
+        typeof window === 'undefined'
+          ? reviewPath
+          : `${window.location.origin}${reviewPath}`;
+
+      await navigator.clipboard.writeText(absoluteValue);
+
+      setReviewCopied(true);
+      window.setTimeout(() => setReviewCopied(false), 1600);
+    } catch {}
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -2035,6 +2077,9 @@ export function MasterProfileForm({
       priceHint: values.priceHint.trim(),
       experienceLabel: values.experienceLabel.trim(),
       responseTime: values.responseTime.trim(),
+      locationMode: values.locationMode === 'address' && values.address.trim() ? 'address' : 'online',
+      address: values.address.trim(),
+      mapUrl: values.mapUrl.trim(),
       workGallery: cleanedWorks,
       reviews: cleanedReviews,
       rating: nextRating,
@@ -2190,6 +2235,83 @@ export function MasterProfileForm({
                     {publicPath}
                   </span>
                 </div>
+              </Panel>
+
+              <Panel light={isLight} className="space-y-3 p-3 sm:col-span-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <MapPin className={cn('size-3.5 shrink-0', faintText(isLight))} />
+                    <span className={cn('text-[12px] font-semibold', pageText(isLight))}>
+                      {labels.visitFormat}
+                    </span>
+                  </div>
+
+                  <div className="flex rounded-[10px] border p-1">
+                    {[
+                      { value: 'online', label: labels.visitOnline },
+                      { value: 'address', label: labels.visitAddress },
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() =>
+                          setValues((current) => ({
+                            ...current,
+                            locationMode: option.value as 'online' | 'address',
+                          }))
+                        }
+                        className={cn(
+                          'h-8 rounded-[8px] px-3 text-[11px] font-semibold transition active:scale-[0.985]',
+                          values.locationMode === option.value
+                            ? isLight
+                              ? 'bg-black text-white'
+                              : 'bg-white text-black'
+                            : isLight
+                              ? 'text-black/46 hover:bg-black/[0.04] hover:text-black'
+                              : 'text-white/42 hover:bg-white/[0.06] hover:text-white',
+                        )}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {values.locationMode === 'address' ? (
+                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                    <Field label={labels.address} light={isLight}>
+                      <Input
+                        value={values.address}
+                        className={inputCss(isLight)}
+                        onChange={(event) =>
+                          setValues((current) => ({
+                            ...current,
+                            address: event.target.value,
+                          }))
+                        }
+                        placeholder={labels.addressPlaceholder}
+                      />
+                    </Field>
+
+                    <Field label={labels.mapUrl} light={isLight}>
+                      <Input
+                        value={values.mapUrl}
+                        className={inputCss(isLight)}
+                        onChange={(event) =>
+                          setValues((current) => ({
+                            ...current,
+                            mapUrl: event.target.value,
+                          }))
+                        }
+                        placeholder={labels.mapUrlPlaceholder}
+                      />
+                    </Field>
+                  </div>
+                ) : null}
+
+                <p className={cn('text-[10.5px] leading-4', mutedText(isLight))}>
+                  {labels.routeHint}
+                </p>
               </Panel>
             </div>
           </div>
@@ -3139,6 +3261,19 @@ export function MasterProfileForm({
                     <ExternalLink className="size-3.5" />
                     {labels.preview}
                   </ActionLink>
+
+                  <ActionLink href={reviewPath} light={isLight}>
+                    <Quote className="size-3.5" />
+                    {labels.reviewLink}
+                  </ActionLink>
+
+                  <CopyIconButton
+                    light={isLight}
+                    copied={reviewCopied}
+                    onClick={handleCopyReviewLink}
+                    copyLabel={labels.copy}
+                    copiedLabel={labels.copied}
+                  />
                 </div>
               </div>
 

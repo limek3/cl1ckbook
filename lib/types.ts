@@ -16,6 +16,8 @@ export interface WorkGalleryItem {
   note?: string;
 }
 
+export type MasterLocationMode = 'online' | 'address';
+
 export interface MasterProfile {
   id: string;
   slug: string;
@@ -27,6 +29,9 @@ export interface MasterProfile {
   phone?: string;
   telegram?: string;
   whatsapp?: string;
+  locationMode?: MasterLocationMode;
+  address?: string;
+  mapUrl?: string;
   hidePhone?: boolean;
   hideTelegram?: boolean;
   hideWhatsapp?: boolean;
@@ -60,7 +65,14 @@ export interface Booking {
   completedAt?: string;
   noShowAt?: string;
   cancelledAt?: string;
+  cancelReason?: string;
   statusCheckSentAt?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface BookingReviewLink {
+  token: string;
+  url: string;
 }
 
 export interface MasterProfileFormValues {
@@ -72,6 +84,9 @@ export interface MasterProfileFormValues {
   phone: string;
   telegram: string;
   whatsapp: string;
+  locationMode: MasterLocationMode;
+  address: string;
+  mapUrl: string;
   hidePhone: boolean;
   hideTelegram: boolean;
   hideWhatsapp: boolean;

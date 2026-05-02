@@ -46,7 +46,7 @@ type SaveProfileValues = MasterProfileFormValues &
   Partial<
     Pick<
       MasterProfile,
-      'priceHint' | 'experienceLabel' | 'responseTime' | 'workGallery' | 'reviews' | 'rating' | 'reviewCount'
+      'priceHint' | 'experienceLabel' | 'responseTime' | 'workGallery' | 'reviews' | 'rating' | 'reviewCount' | 'locationMode' | 'address' | 'mapUrl'
     >
   >;
 
@@ -78,6 +78,9 @@ function buildProfile(values: SaveProfileValues, previous?: MasterProfile | null
   const responseTime = 'responseTime' in values ? values.responseTime?.trim() || undefined : previous?.responseTime;
   const workGallery = values.workGallery ?? previous?.workGallery;
   const reviews = values.reviews ?? previous?.reviews;
+  const locationMode = 'locationMode' in values ? values.locationMode ?? previous?.locationMode ?? 'online' : previous?.locationMode ?? 'online';
+  const address = 'address' in values ? values.address?.trim() || undefined : previous?.address;
+  const mapUrl = 'mapUrl' in values ? values.mapUrl?.trim() || undefined : previous?.mapUrl;
   const rating = typeof values.rating === 'number' ? values.rating : previous?.rating;
   const reviewCount = typeof values.reviewCount === 'number' ? values.reviewCount : previous?.reviewCount;
 
@@ -92,6 +95,9 @@ function buildProfile(values: SaveProfileValues, previous?: MasterProfile | null
     phone: values.phone.trim() || undefined,
     telegram: values.telegram.trim() || undefined,
     whatsapp: values.whatsapp.trim() || undefined,
+    locationMode,
+    address,
+    mapUrl,
     hidePhone: values.hidePhone,
     hideTelegram: values.hideTelegram,
     hideWhatsapp: values.hideWhatsapp,

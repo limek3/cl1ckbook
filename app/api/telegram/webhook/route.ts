@@ -7,6 +7,8 @@ import {
 } from '@/lib/server/telegram-user';
 import { isNotificationEnabled } from '@/lib/server/notification-settings';
 import { handleClientBookingAction } from '@/lib/server/booking-client-actions';
+import { createBookingReviewLink } from '@/lib/server/booking-reviews';
+import { sendVkMessage } from '@/lib/server/vk-bot';
 import {
   createChatMessage,
   createChatThread,
@@ -224,6 +226,72 @@ async function syncWorkspaceBookingStatus(
   }
 }
 
+async function sendReviewLinkAfterCompleted(params: {
+  admin: ReturnType<typeof createSupabaseAdminClient>;
+  booking: Booking;
+  workspaceId: string;
+}) {
+  const { data: workspace } = await params.admin
+    .from('sloty_workspaces')
+    .select('slug,profile')
+    .eq('id', params.workspaceId)
+    .maybeSingle();
+
+  const workspaceSlug = (workspace?.slug as string | undefined) || params.booking.masterSlug;
+  const profile = (workspace?.profile as MasterProfile | null | undefined) ?? null;
+  const reviewLink = await createBookingReviewLink({
+    workspaceId: params.workspaceId,
+    booking: params.booking,
+    masterSlug: workspaceSlug,
+  });
+
+  const message = [
+    'Спасибо за визит 💬',
+    '',
+    `Услуга: ${params.booking.service}`,
+    profile?.name ? `Мастер: ${profile.name}` : null,
+    '',
+    'Будем рады короткому отзыву — он появится в профиле мастера:',
+    reviewLink.url,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const tasks: Array<Promise<unknown>> = [];
+
+  const { data: tgLink } = await params.admin
+    .from('sloty_booking_telegram_links')
+    .select('chat_id')
+    .eq('booking_id', params.booking.id)
+    .eq('status', 'confirmed')
+    .not('chat_id', 'is', null)
+    .order('confirmed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const chatId = tgLink?.chat_id as number | string | null | undefined;
+  if (chatId) {
+    tasks.push(sendTelegramMessage({ chatId, text: message }));
+  }
+
+  const { data: vkLink } = await params.admin
+    .from('sloty_booking_vk_links')
+    .select('peer_id')
+    .eq('booking_id', params.booking.id)
+    .eq('status', 'confirmed')
+    .not('peer_id', 'is', null)
+    .order('confirmed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const peerId = vkLink?.peer_id as number | string | null | undefined;
+  if (peerId) {
+    tasks.push(sendVkMessage({ peerId, message }));
+  }
+
+  await Promise.allSettled(tasks);
+}
+
 async function handleVisitCallback(params: {
   callbackQueryId: string;
   data?: string;
@@ -236,7 +304,7 @@ async function handleVisitCallback(params: {
 
   const { data: bookingRow, error: bookingError } = await admin
     .from('sloty_bookings')
-    .select('id,workspace_id')
+    .select('*')
     .eq('id', parsed.bookingId)
     .maybeSingle();
 
@@ -277,6 +345,13 @@ async function handleVisitCallback(params: {
     parsed.bookingId,
     parsed.status,
   );
+
+  if (parsed.status === 'completed') {
+    const booking = mapBookingRow(bookingRow as BookingRow);
+    await safeTask('send client review link', () =>
+      sendReviewLinkAfterCompleted({ admin, booking, workspaceId }),
+    );
+  }
 
   await safeTask('answer visit callback', () =>
     answerTelegramCallbackQuery({

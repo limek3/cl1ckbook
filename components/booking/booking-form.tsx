@@ -714,6 +714,8 @@ function SuccessView({
   labels: {
     successTitle: string;
     successDescription: string;
+    connectTitle: string;
+    connectText: string;
     newRequest: string;
     telegramConfirm: string;
     telegramConfirmHint: string;
@@ -778,7 +780,25 @@ function SuccessView({
         </div>
 
         {telegramUrl || vkUrl ? (
-          <div className="mt-5 grid gap-2 sm:grid-cols-2">
+          <div
+            className={cn(
+              'mt-5 rounded-[12px] border p-3.5',
+              light
+                ? 'border-black/[0.09] bg-black/[0.025]'
+                : 'border-white/[0.09] bg-white/[0.045]',
+            )}
+          >
+            <div className={cn('text-[13px] font-semibold tracking-[-0.02em]', pageText(light))}>
+              {labels.connectTitle}
+            </div>
+            <p className={cn('mt-1 text-[11px] leading-4', mutedText(light))}>
+              {labels.connectText}
+            </p>
+          </div>
+        ) : null}
+
+        {telegramUrl || vkUrl ? (
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {telegramUrl ? (
               <a
                 href={telegramUrl}
@@ -930,12 +950,14 @@ export function BookingForm({
           submit: 'Отправить',
           successTitle: 'Заявка отправлена',
           successDescription:
-            'Мастер получил заявку. Подключите Telegram, чтобы получить подтверждение и напоминания.',
+            'Мастер получил заявку. Подключите Telegram или VK, чтобы не потерять запись: бот пришлёт подтверждение, напоминание, адрес и маршрут.',
+          connectTitle: 'Получите подтверждение в удобном канале',
+          connectText: 'Лучше нажать сразу: так бот сможет напомнить о записи, дать кнопки подтверждения/переноса и прислать маршрут.',
           telegramConfirm: 'Получить в Telegram',
           telegramConfirmHint:
-            'Бот отправит подтверждение и напомнит о записи ближе ко времени.',
+            'Telegram-бот отправит подтверждение, напоминание и маршрут.',
           vkConfirm: 'Получить в VK',
-          vkConfirmHint: 'VK-бот тоже сможет присылать подтверждения и напоминания.',
+          vkConfirmHint: 'VK-бот продублирует подтверждение, напоминание и маршрут.',
           newRequest: 'Новая заявка',
           nothingFound: 'Ничего не найдено.',
           step: 'Шаг',
@@ -971,12 +993,14 @@ export function BookingForm({
           submit: 'Send',
           successTitle: 'Request sent',
           successDescription:
-            'The master received your request. Connect Telegram to receive confirmation and reminders.',
+            'The master received your request. Connect Telegram or VK to get confirmation, reminders, address, and route.',
+          connectTitle: 'Get confirmation in a convenient channel',
+          connectText: 'Tap now so the bot can remind you, offer confirm/reschedule actions, and send the route.',
           telegramConfirm: 'Get in Telegram',
           telegramConfirmHint:
-            'The bot will send confirmation and remind you before the booking.',
+            'Telegram bot will send confirmation, reminder, and route.',
           vkConfirm: 'Get in VK',
-          vkConfirmHint: 'The VK bot can also send confirmations and reminders.',
+          vkConfirmHint: 'VK bot can also send confirmation, reminder, and route.',
           newRequest: 'New request',
           nothingFound: 'Nothing found.',
           step: 'Step',
@@ -1113,6 +1137,7 @@ export function BookingForm({
         onNew={() => {
           setSubmittedBooking(null);
           setSubmittedTelegramUrl(null);
+          setSubmittedVkUrl(null);
         }}
       />
     );

@@ -2,6 +2,7 @@ import 'server-only';
 
 import crypto from 'node:crypto';
 import type { Booking, MasterProfile } from '@/lib/types';
+import { getMasterAddress, getMasterLocationMode, getMasterRouteUrl } from '@/lib/location-links';
 
 const VK_API_VERSION = '5.199';
 
@@ -465,6 +466,18 @@ function bookingDateLabel(booking: Pick<Booking, 'date' | 'time'>) {
   return `${booking.date} · ${booking.time}`;
 }
 
+function buildVisitPlaceLines(profile?: MasterProfile | null) {
+  if (!profile || getMasterLocationMode(profile) !== 'address') return ['Формат: онлайн'];
+
+  const address = getMasterAddress(profile);
+  const routeUrl = getMasterRouteUrl(profile);
+
+  return [
+    address ? `Адрес: ${address}` : null,
+    routeUrl ? `Маршрут Яндекс.Карты: ${routeUrl}` : null,
+  ].filter(Boolean) as string[];
+}
+
 export async function sendMasterVkBookingNotification(params: {
   peerId: number | string;
   booking: Booking;
@@ -579,7 +592,7 @@ export async function sendClientVkBookingConfirmation(params: {
   profile?: MasterProfile | null;
 }) {
   const masterName = params.profile?.name || 'мастеру';
-  const address = params.profile?.city ? `\nГород: ${params.profile.city}` : '';
+  const placeLines = buildVisitPlaceLines(params.profile);
 
   return sendVkMessage({
     peerId: params.peerId,
@@ -589,9 +602,9 @@ export async function sendClientVkBookingConfirmation(params: {
       `Мастер: ${masterName}`,
       `Услуга: ${params.booking.service}`,
       `Время: ${bookingDateLabel(params.booking)}`,
-      address.trim() ? address.trim() : null,
+      ...placeLines,
       '',
-      'Ближе к записи я пришлю напоминание. В нём можно будет подтвердить визит или запросить перенос.',
+      'Ближе к записи я пришлю напоминание. В нём можно будет подтвердить визит, запросить перенос и открыть маршрут.',
     ]
       .filter(Boolean)
       .join('\n'),
@@ -607,6 +620,7 @@ export async function sendClientVkBookingReminder(params: {
 }) {
   const masterName = params.profile?.name || 'мастеру';
   const when = params.hoursBefore >= 24 ? 'завтра' : `через ${params.hoursBefore} часа`;
+  const placeLines = buildVisitPlaceLines(params.profile);
 
   return sendVkMessage({
     peerId: params.peerId,
@@ -617,9 +631,11 @@ export async function sendClientVkBookingReminder(params: {
       `Услуга: ${params.booking.service}`,
       `Дата: ${params.booking.date}`,
       `Время: ${params.booking.time}`,
-      params.profile?.city ? `Город: ${params.profile.city}` : null,
+      ...placeLines,
       '',
-      'Подтвердите запись или выберите перенос. Если выбрать перенос, слот освободится, а мастер получит предупреждение.',
+      params.hoursBefore <= 2
+        ? 'Хорошего визита! Подтвердите запись или выберите перенос. Если выбрать перенос, слот освободится, а мастер получит предупреждение.'
+        : 'Подтвердите запись или выберите перенос. Если выбрать перенос, слот освободится, а мастер получит предупреждение.',
     ]
       .filter(Boolean)
       .join('\n'),

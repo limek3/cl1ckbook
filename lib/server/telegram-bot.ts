@@ -1,6 +1,7 @@
 import 'server-only';
 
 import type { Booking, MasterProfile } from '@/lib/types';
+import { getMasterAddress, getMasterLocationMode, getMasterRouteUrl } from '@/lib/location-links';
 
 export function getAppUrl() {
   return (process.env.NEXT_PUBLIC_APP_URL || 'https://cl1ckbuk.vercel.app').replace(/\/$/, '');
@@ -110,6 +111,18 @@ function bookingDateLabel(booking: Pick<Booking, 'date' | 'time'>) {
   return `${booking.date} · ${booking.time}`;
 }
 
+function buildVisitPlaceLines(profile?: MasterProfile | null) {
+  if (!profile || getMasterLocationMode(profile) !== 'address') return ['Формат: онлайн'];
+
+  const address = getMasterAddress(profile);
+  const routeUrl = getMasterRouteUrl(profile);
+
+  return [
+    address ? `Адрес: ${address}` : null,
+    routeUrl ? `Маршрут Яндекс.Карты: ${routeUrl}` : null,
+  ].filter(Boolean) as string[];
+}
+
 export async function sendMasterBookingNotification(params: {
   chatId: number | string;
   booking: Booking;
@@ -160,7 +173,7 @@ export async function sendClientBookingConfirmation(params: {
   profile?: MasterProfile | null;
 }) {
   const masterName = params.profile?.name || 'мастеру';
-  const address = params.profile?.city ? `\nГород: ${params.profile.city}` : '';
+  const placeLines = buildVisitPlaceLines(params.profile);
 
   return sendTelegramMessage({
     chatId: params.chatId,
@@ -170,9 +183,9 @@ export async function sendClientBookingConfirmation(params: {
       `Мастер: ${masterName}`,
       `Услуга: ${params.booking.service}`,
       `Время: ${bookingDateLabel(params.booking)}`,
-      address.trim() ? address.trim() : null,
+      ...placeLines,
       '',
-      'Мы пришлём напоминание ближе к записи. Если нужно перенести или отменить — напишите мастеру.',
+      'Ближе к записи пришлём напоминание. Если визит офлайн — там же будет адрес и маршрут.',
     ]
       .filter(Boolean)
       .join('\n'),
