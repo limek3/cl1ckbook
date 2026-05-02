@@ -543,6 +543,12 @@ function ActionButton({
   );
 }
 
+function destructiveButtonClass(light: boolean) {
+  return light
+    ? 'border-red-500/20 bg-red-500/[0.08] text-red-600 hover:border-red-500/30 hover:bg-red-500/[0.12] hover:text-red-700'
+    : 'border-red-500/24 bg-red-500/[0.14] text-red-200 hover:border-red-400/36 hover:bg-red-500/[0.2] hover:text-red-100';
+}
+
 function CopyIconButton({
   light,
   copied,
@@ -2138,7 +2144,7 @@ export function MasterProfileForm({
           light={isLight}
         >
           <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
-            <Panel light={isLight} className="p-3">
+            <Panel light={isLight} className="flex min-h-[330px] items-center justify-center p-4">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -2150,7 +2156,7 @@ export function MasterProfileForm({
               <div className="grid place-items-center">
                 <div
                   className={cn(
-                    'flex h-24 w-24 items-center justify-center overflow-hidden rounded-[14px] border',
+                    'flex h-28 w-28 items-center justify-center overflow-hidden rounded-[16px] border',
                     isLight
                       ? 'border-black/[0.08] bg-[#fbfbfa]'
                       : 'border-white/[0.08] bg-white/[0.035]',
@@ -2160,7 +2166,7 @@ export function MasterProfileForm({
                     <img
                       src={values.avatar}
                       alt={previewProfile.name}
-                      className="h-full w-full object-contain object-center p-2"
+                      className="h-full w-full object-contain object-center p-3"
                     />
                   ) : (
                     <MasterAvatar
@@ -2645,7 +2651,7 @@ export function MasterProfileForm({
                             ↓
                           </button>
 
-                          <ActionButton light={isLight} onClick={() => removeService(service)}>
+                          <ActionButton light={isLight} onClick={() => removeService(service)} className={destructiveButtonClass(isLight)}>
                             <Trash2 className="size-3.5" />
                           </ActionButton>
                         </div>
@@ -2728,7 +2734,7 @@ export function MasterProfileForm({
 
                   <ActionButton light={isLight} type="submit" className="w-full">
                     <Save className="size-3.5" />
-                    {savedAt ? labels.saved : labels.save}
+                    {labels.save}
                   </ActionButton>
                 </div>
               </Panel>
@@ -2956,7 +2962,7 @@ export function MasterProfileForm({
                         <ActionButton
                           light={isLight}
                           onClick={() => removeWork(work.id)}
-                          className="md:w-full"
+                          className={cn('md:w-full', destructiveButtonClass(isLight))}
                         >
                           <Trash2 className="size-3.5" />
                           {labels.removeWork}
@@ -3065,7 +3071,7 @@ export function MasterProfileForm({
                         />
                       </Field>
 
-                      <ActionButton light={isLight} onClick={() => removeReview(review.id)}>
+                      <ActionButton light={isLight} onClick={() => removeReview(review.id)} className={destructiveButtonClass(isLight)}>
                         <Trash2 className="size-3.5" />
                       </ActionButton>
                     </div>
@@ -3421,8 +3427,13 @@ export function MasterProfileForm({
 
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center justify-between gap-2">
-                        <span className="truncate text-[12px] font-semibold tracking-[-0.005em]">
-                          {item.title}
+                        <span className="flex min-w-0 items-center gap-2">
+                          {item.done ? (
+                            <span className="inline-flex size-2 shrink-0 rounded-full bg-emerald-500 animate-pulse" />
+                          ) : null}
+                          <span className="truncate text-[12px] font-semibold tracking-[-0.005em]">
+                            {item.title}
+                          </span>
                         </span>
 
                         {item.badge !== undefined ? (
@@ -3444,12 +3455,6 @@ export function MasterProfileForm({
                       </span>
                     </span>
 
-                    {item.done ? (
-                      <span
-                        style={{ background: accentColor }}
-                        className="absolute right-2.5 top-2.5 size-1.5 rounded-full"
-                      />
-                    ) : null}
                   </button>
                 );
               })}
@@ -3500,38 +3505,6 @@ export function MasterProfileForm({
               </div>
             ) : null}
 
-            {savedAt ? (
-              <div
-                className={cn(
-                  'border-t px-4 py-3',
-                  isLight
-                    ? 'border-emerald-500/18 bg-emerald-500/[0.075] text-emerald-700'
-                    : 'border-emerald-400/18 bg-emerald-400/[0.09] text-emerald-200',
-                )}
-              >
-                <div className="flex items-start gap-2.5">
-                  <span
-                    className={cn(
-                      'mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full border',
-                      isLight
-                        ? 'border-emerald-500/25 bg-emerald-500/10'
-                        : 'border-emerald-300/25 bg-emerald-300/10',
-                    )}
-                  >
-                    <Check className="size-3.5" />
-                  </span>
-                  <div className="min-w-0">
-                    <div className="text-[12px] font-semibold tracking-[-0.015em]">
-                      {labels.savedSuccess}
-                    </div>
-                    <div className="mt-0.5 text-[11px] leading-4 opacity-75">
-                      {labels.savedSuccessText}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
             <div className={cn('border-t p-4', borderTone(isLight))}>
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="flex min-w-0 flex-wrap gap-2">
@@ -3561,7 +3534,7 @@ export function MasterProfileForm({
 
                   <ActionButton light={isLight} active type="submit">
                     <Save className="size-3.5" />
-                    {savedAt ? labels.saved : labels.save}
+                    {labels.save}
                   </ActionButton>
                 </div>
               </div>

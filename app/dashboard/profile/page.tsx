@@ -644,7 +644,7 @@ function ConnectedAccountsCard({
                 disabled={loading && state.action !== row.provider}
                 onClick={connected ? refreshUser : row.onClick}
                 className={cn(
-                  'group flex min-h-[84px] flex-col items-start justify-between rounded-[10px] border p-3 text-left transition active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60',
+                  'group flex min-h-[72px] flex-col items-start justify-between rounded-[10px] border p-3 text-left transition active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60',
                   connected
                     ? light
                       ? 'border-black/[0.10] bg-black/[0.035]'
@@ -687,7 +687,7 @@ function ConnectedAccountsCard({
                   </span>
                 </span>
 
-                <span className="mt-3 min-w-0">
+                <span className="mt-2.5 min-w-0">
                   <span className={cn('block text-[12px] font-semibold tracking-[-0.005em]', pageText(light))}>
                     {row.title}
                   </span>
@@ -703,7 +703,7 @@ function ConnectedAccountsCard({
         {(state.email || state.message) ? (
           <div
             className={cn(
-              'mt-3 flex min-h-10 items-start gap-3 rounded-[10px] border px-3 py-2.5',
+              'mt-2.5 flex items-start gap-3 rounded-[10px] border px-3 py-2',
               light
                 ? 'border-black/[0.07] bg-black/[0.025]'
                 : 'border-white/[0.08] bg-white/[0.035]',
@@ -711,8 +711,8 @@ function ConnectedAccountsCard({
           >
             <span
               className={cn(
-                'mt-1 size-1.5 shrink-0 rounded-full',
-                light ? 'bg-black/30' : 'bg-white/28',
+                'mt-[5px] size-2 shrink-0 rounded-full animate-pulse',
+                'bg-emerald-500',
               )}
             />
             <div className="min-w-0">
@@ -889,24 +889,33 @@ function ProfileOverviewCard({
       <div className="p-4">
         <div className="grid gap-4 xl:grid-cols-[260px_minmax(0,1fr)]">
           <Panel light={light} className="p-4">
-            <div className="flex items-center gap-3">
-              <MasterAvatar
-                name={name || labels.name}
-                avatar={avatar}
-                className="h-14 w-14 rounded-[11px]"
-              />
+            <div className="flex flex-col items-center text-center">
+              <div
+                className={cn(
+                  'flex size-[72px] items-center justify-center overflow-hidden rounded-[14px] border',
+                  light
+                    ? 'border-black/[0.08] bg-[#fbfbfa]'
+                    : 'border-white/[0.08] bg-white/[0.035]',
+                )}
+              >
+                <MasterAvatar
+                  name={name || labels.name}
+                  avatar={avatar}
+                  className="h-[60px] w-[60px] rounded-[12px] border-0 object-contain object-center"
+                />
+              </div>
 
-              <div className="min-w-0">
-                <div className={cn('truncate text-[15px] font-semibold', pageText(light))}>
+              <div className="mt-3 min-w-0">
+                <div className={cn('text-[17px] font-semibold tracking-[-0.03em]', pageText(light))}>
                   {name || '—'}
                 </div>
 
-                <div className={cn('mt-1 truncate text-[11px]', mutedText(light))}>
+                <div className={cn('mt-1 text-[11px]', mutedText(light))}>
                   {profession || '—'}
                 </div>
 
                 {city ? (
-                  <div className={cn('mt-1 truncate text-[10.5px]', faintText(light))}>
+                  <div className={cn('mt-1 text-[10.5px]', faintText(light))}>
                     {city}
                   </div>
                 ) : null}
@@ -1005,7 +1014,7 @@ function ProfileOverviewCard({
                 </div>
 
                 <div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">
-                  <ActionLink href={publicHref} light={light} active>
+                  <ActionLink href={publicHref} light={light} active className="w-[168px] justify-center">
                     <Globe2 className="size-3.5" />
                     {labels.openPublic}
                   </ActionLink>
@@ -1039,7 +1048,7 @@ function ProfileOverviewCard({
                 </div>
 
                 <div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">
-                  <ActionLink href={reviewHref} light={light} active>
+                  <ActionLink href={reviewHref} light={light} active className="w-[168px] justify-center">
                     <Quote className="size-3.5" />
                     {labels.openReview}
                   </ActionLink>

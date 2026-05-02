@@ -12,16 +12,23 @@ const Toaster = ({ ...props }: ToasterProps) => {
       className="toaster group"
       toastOptions={{
         classNames: {
-          toast: 'rounded-[16px] border shadow-[0_24px_70px_rgba(0,0,0,0.24)]',
+          toast: 'rounded-[16px] border backdrop-blur-[18px] px-1 shadow-[0_24px_70px_rgba(0,0,0,0.18)]',
           title: 'text-[12.5px] font-semibold tracking-[-0.02em]',
-          description: 'text-[11px] leading-4 opacity-80',
+          description: 'text-[11px] leading-4 opacity-75',
+          closeButton: 'rounded-[10px] border',
         },
       }}
       style={
         {
-          '--normal-bg': 'var(--popover)',
+          '--normal-bg': 'color-mix(in srgb, var(--popover) 92%, transparent)',
           '--normal-text': 'var(--popover-foreground)',
-          '--normal-border': 'var(--border)',
+          '--normal-border': 'color-mix(in srgb, var(--border) 82%, transparent)',
+          '--success-bg': 'color-mix(in srgb, var(--popover) 92%, transparent)',
+          '--success-text': 'var(--popover-foreground)',
+          '--success-border': 'color-mix(in srgb, var(--border) 82%, transparent)',
+          '--error-bg': 'color-mix(in srgb, var(--popover) 92%, transparent)',
+          '--error-text': 'var(--popover-foreground)',
+          '--error-border': 'color-mix(in srgb, var(--border) 82%, transparent)',
         } as React.CSSProperties
       }
       {...props}
