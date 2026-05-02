@@ -710,10 +710,8 @@ function ConnectedAccountsCard({
             )}
           >
             <span
-              className={cn(
-                'mt-[5px] size-2 shrink-0 rounded-full animate-pulse',
-                'bg-emerald-500',
-              )}
+              className="mt-[5px] size-2 shrink-0 rounded-full animate-pulse"
+              style={{ background: accentColor }}
             />
             <div className="min-w-0">
               <div className={cn('truncate text-[11.5px] font-semibold tracking-[-0.005em]', pageText(light))}>
@@ -892,7 +890,7 @@ function ProfileOverviewCard({
             <div className="flex flex-col items-center text-center">
               <div
                 className={cn(
-                  'flex size-[72px] items-center justify-center overflow-hidden rounded-[14px] border',
+                  'flex size-[92px] items-center justify-center overflow-hidden rounded-[16px] border',
                   light
                     ? 'border-black/[0.08] bg-[#fbfbfa]'
                     : 'border-white/[0.08] bg-white/[0.035]',
@@ -901,7 +899,7 @@ function ProfileOverviewCard({
                 <MasterAvatar
                   name={name || labels.name}
                   avatar={avatar}
-                  className="h-[60px] w-[60px] rounded-[12px] border-0 object-contain object-center"
+                  className="h-[76px] w-[76px] rounded-[14px] border-0 object-contain object-center"
                 />
               </div>
 
@@ -995,7 +993,7 @@ function ProfileOverviewCard({
             </div>
 
             <div className="mt-3 grid gap-2">
-              <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto]">
+              <div className="grid items-center gap-2 lg:grid-cols-[minmax(0,1fr)_auto]">
                 <div
                   className={cn(
                     'flex min-w-0 flex-1 items-center gap-2 rounded-[10px] border px-3 py-2.5',
@@ -1013,7 +1011,7 @@ function ProfileOverviewCard({
                   </div>
                 </div>
 
-                <div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">
+                <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
                   <ActionLink href={publicHref} light={light} active className="w-[168px] justify-center">
                     <Globe2 className="size-3.5" />
                     {labels.openPublic}
@@ -1029,7 +1027,7 @@ function ProfileOverviewCard({
                 </div>
               </div>
 
-              <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto]">
+              <div className="grid items-center gap-2 lg:grid-cols-[minmax(0,1fr)_auto]">
                 <div
                   className={cn(
                     'flex min-w-0 flex-1 items-center gap-2 rounded-[10px] border px-3 py-2.5',
@@ -1047,7 +1045,7 @@ function ProfileOverviewCard({
                   </div>
                 </div>
 
-                <div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">
+                <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
                   <ActionLink href={reviewHref} light={light} active className="w-[168px] justify-center">
                     <Quote className="size-3.5" />
                     {labels.openReview}

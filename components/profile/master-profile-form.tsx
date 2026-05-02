@@ -3429,7 +3429,7 @@ export function MasterProfileForm({
                       <span className="flex items-center justify-between gap-2">
                         <span className="flex min-w-0 items-center gap-2">
                           {item.done ? (
-                            <span className="inline-flex size-2 shrink-0 rounded-full bg-emerald-500 animate-pulse" />
+                            <span className="inline-flex size-2 shrink-0 rounded-full animate-pulse" style={{ background: accentColor }} />
                           ) : null}
                           <span className="truncate text-[12px] font-semibold tracking-[-0.005em]">
                             {item.title}

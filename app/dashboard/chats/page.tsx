@@ -2183,18 +2183,6 @@ export default function DashboardChatsPage() {
                   {thread.isPriority ? (
                     <Star className="size-3 shrink-0 fill-current" style={{ color: accentColor }} />
                   ) : null}
-
-                  {activeAlert ? (
-                    <span
-                      className={cn(
-                        'inline-flex h-5 shrink-0 items-center gap-1 rounded-[7px] border px-1.5 text-[8.5px] font-semibold uppercase tracking-[0.08em]',
-                        warningTone(isLight),
-                      )}
-                    >
-                      <AlertTriangle className="size-3" />
-                      {labels.rescheduleAlertShort}
-                    </span>
-                  ) : null}
                 </div>
 
                 <div className={cn('mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-[10px]', mutedText(isLight))}>
@@ -2994,7 +2982,7 @@ export default function DashboardChatsPage() {
           'grid items-center gap-2',
           mobile
             ? 'grid-cols-[minmax(0,1fr)_40px]'
-            : 'sm:grid-cols-[minmax(0,1fr)_112px_40px] lg:grid-cols-1 xl:grid-cols-[minmax(0,1fr)_112px_40px]',
+            : 'sm:grid-cols-[minmax(0,1fr)_112px] lg:grid-cols-1 xl:grid-cols-[minmax(0,1fr)_112px]',
         )}
       >
         <label
@@ -3029,24 +3017,6 @@ export default function DashboardChatsPage() {
           <Plus className="size-3.5" />
           {mobile ? null : showCreatePanel ? labels.closeCreate : labels.createThread}
         </button>
-
-        {mobile ? null : (
-          <button
-            type="button"
-            className={cn('h-10 w-10 shrink-0 px-0', buttonBase(isLight))}
-            onClick={(event) => {
-              const rect = (event.currentTarget as HTMLButtonElement).getBoundingClientRect();
-              const thread = activeThread ?? filteredThreads[0] ?? sortedThreads[0];
-              if (!thread) return;
-              setActiveThreadId(thread.id);
-              setThreadContextMenu({ threadId: thread.id, x: rect.left, y: rect.bottom + 6 });
-            }}
-            aria-label={labels.moreActions}
-            title={labels.moreActions}
-          >
-            <MoreVertical className="size-4" />
-          </button>
-        )}
       </div>
 
       <div className="space-y-1.5">

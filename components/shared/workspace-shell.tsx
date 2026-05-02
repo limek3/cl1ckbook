@@ -1034,7 +1034,7 @@ function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
         {view === 'menu' ? (
           <>
             <div className="px-2.5 pb-2 pt-2">
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-start gap-2.5">
                   <span
                     className={cn(
@@ -1047,7 +1047,7 @@ function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
 
                     <span
                       aria-hidden="true"
-                      className="absolute -right-0.5 -top-0.5 size-2 rounded-full border-2 border-[#fbfbfa] bg-black/58 dark:border-[#101010] dark:bg-white/72"
+                      className="absolute -right-0.5 -top-0.5 size-2 rounded-full border-2 border-[#fbfbfa] bg-emerald-500 animate-pulse dark:border-[#101010]"
                     />
                   </span>
 
@@ -1056,7 +1056,7 @@ function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
                       {identity.name}
                     </span>
 
-                    <span className="mt-1.5 block text-[10px] font-medium leading-none text-black/42 dark:text-white/32 break-all">
+                    <span className="mt-1.5 block text-[10px] font-medium leading-[1.2] text-black/42 dark:text-white/32">
                       {identity.subtitle}
                     </span>
                   </span>
@@ -1217,7 +1217,7 @@ function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
                   </div>
                 </div>
 
-                <span className="mt-1.5 size-2 rounded-full bg-black/70 dark:bg-white/70" />
+                <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
               </div>
             </div>
           </>
@@ -1461,7 +1461,7 @@ function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
 
             <span
               aria-hidden="true"
-              className="absolute -right-0.5 -top-0.5 size-2 rounded-full border-2 border-[#fbfbfa] bg-black/58 dark:border-[#101010] dark:bg-white/72"
+              className="absolute -right-0.5 -top-0.5 size-2 rounded-full border-2 border-[#fbfbfa] bg-emerald-500 animate-pulse dark:border-[#101010]"
             />
           </span>
 
@@ -1470,7 +1470,7 @@ function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
               {identity.name}
             </span>
 
-            <span className="mt-1 block truncate text-[9px] leading-none text-black/40 dark:text-white/32" title={identity.subtitle}>
+            <span className="mt-1 block truncate text-[9.5px] leading-[1.2] text-black/40 dark:text-white/32" title={identity.subtitle}>
               {identity.subtitle}
             </span>
           </span>
