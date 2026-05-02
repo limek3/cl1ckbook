@@ -1,8 +1,17 @@
 import { NextResponse } from 'next/server';
+
 import { createSupabaseAdminClient } from '@/lib/server/supabase-admin';
-import { ensureTelegramAuthUser, upsertTelegramAccount } from '@/lib/server/telegram-user';
+import {
+  ensureTelegramAuthUser,
+  upsertTelegramAccount,
+} from '@/lib/server/telegram-user';
 import { isNotificationEnabled } from '@/lib/server/notification-settings';
-import { createChatMessage, createChatThread, fetchChatThreadByPhone, updateChatThread } from '@/lib/server/supabase-chats';
+import {
+  createChatMessage,
+  createChatThread,
+  fetchChatThreadByPhone,
+  updateChatThread,
+} from '@/lib/server/supabase-chats';
 import {
   getAppUrl,
   answerTelegramCallbackQuery,
@@ -70,6 +79,20 @@ type BookingRow = {
   created_at: string;
 };
 
+function logWebhookError(label: string, error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+
+  console.error(`[telegram-webhook] ${label}:`, message, error);
+}
+
+async function safeTask(label: string, task: () => Promise<unknown>) {
+  try {
+    await task();
+  } catch (error) {
+    logWebhookError(label, error);
+  }
+}
+
 function extractAuthToken(text?: string) {
   const value = text?.trim();
   if (!value) return null;
@@ -125,61 +148,101 @@ function mapBookingRow(row: BookingRow): Booking {
   };
 }
 
-
 function extractVisitCallback(data?: string) {
   const match = data?.match(/^visit:([a-f0-9-]+):(completed|no_show)$/i);
-  return match ? { bookingId: match[1], status: match[2] as Booking['status'] } : null;
+
+  return match
+    ? { bookingId: match[1], status: match[2] as Booking['status'] }
+    : null;
 }
 
-async function syncWorkspaceBookingStatus(admin: ReturnType<typeof createSupabaseAdminClient>, workspaceId: string, bookingId: string, status: Booking['status']) {
-  const { data: workspace } = await admin
+async function syncWorkspaceBookingStatus(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  workspaceId: string,
+  bookingId: string,
+  status: Booking['status'],
+) {
+  const { data: workspace, error } = await admin
     .from('sloty_workspaces')
     .select('data')
     .eq('id', workspaceId)
     .maybeSingle();
 
-  const workspaceData = workspace?.data && typeof workspace.data === 'object' ? (workspace.data as Record<string, unknown>) : {};
-  const jsonBookings = Array.isArray(workspaceData.bookings) ? (workspaceData.bookings as Booking[]) : [];
+  if (error) {
+    logWebhookError('syncWorkspaceBookingStatus read failed', error);
+    return;
+  }
+
+  const workspaceData =
+    workspace?.data && typeof workspace.data === 'object'
+      ? (workspace.data as Record<string, unknown>)
+      : {};
+
+  const jsonBookings = Array.isArray(workspaceData.bookings)
+    ? (workspaceData.bookings as Booking[])
+    : [];
+
   const nextBookings = jsonBookings.map((item) =>
     item.id === bookingId
       ? {
           ...item,
           status,
-          ...(status === 'completed' ? { completedAt: new Date().toISOString() } : {}),
-          ...(status === 'no_show' ? { noShowAt: new Date().toISOString() } : {}),
+          ...(status === 'completed'
+            ? { completedAt: new Date().toISOString() }
+            : {}),
+          ...(status === 'no_show'
+            ? { noShowAt: new Date().toISOString() }
+            : {}),
         }
       : item,
   );
 
-  if (nextBookings.length > 0) {
-    await admin
-      .from('sloty_workspaces')
-      .update({ data: { ...workspaceData, bookings: nextBookings } })
-      .eq('id', workspaceId)
-      .then(() => undefined, () => undefined);
+  if (nextBookings.length === 0) return;
+
+  const { error: updateError } = await admin
+    .from('sloty_workspaces')
+    .update({ data: { ...workspaceData, bookings: nextBookings } })
+    .eq('id', workspaceId);
+
+  if (updateError) {
+    logWebhookError('syncWorkspaceBookingStatus update failed', updateError);
   }
 }
 
-async function handleVisitCallback(params: { callbackQueryId: string; data?: string }) {
+async function handleVisitCallback(params: {
+  callbackQueryId: string;
+  data?: string;
+}) {
   const parsed = extractVisitCallback(params.data);
   if (!parsed) return false;
 
   const admin = createSupabaseAdminClient();
   const now = new Date().toISOString();
 
-  const { data: bookingRow } = await admin
+  const { data: bookingRow, error: bookingError } = await admin
     .from('sloty_bookings')
     .select('id,workspace_id')
     .eq('id', parsed.bookingId)
     .maybeSingle();
 
+  if (bookingError) {
+    logWebhookError('handleVisitCallback booking read failed', bookingError);
+  }
+
   const workspaceId = bookingRow?.workspace_id as string | undefined;
+
   if (!workspaceId) {
-    await answerTelegramCallbackQuery({ callbackQueryId: params.callbackQueryId, text: 'Запись не найдена' });
+    await safeTask('answer visit callback booking not found', () =>
+      answerTelegramCallbackQuery({
+        callbackQueryId: params.callbackQueryId,
+        text: 'Запись не найдена',
+      }),
+    );
+
     return true;
   }
 
-  await admin
+  const { error: updateError } = await admin
     .from('sloty_bookings')
     .update({
       status: parsed.status,
@@ -187,15 +250,28 @@ async function handleVisitCallback(params: { callbackQueryId: string; data?: str
       ...(parsed.status === 'completed' ? { completed_at: now } : {}),
       ...(parsed.status === 'no_show' ? { no_show_at: now } : {}),
     })
-    .eq('id', parsed.bookingId)
-    .then(() => undefined, () => undefined);
+    .eq('id', parsed.bookingId);
 
-  await syncWorkspaceBookingStatus(admin, workspaceId, parsed.bookingId, parsed.status);
+  if (updateError) {
+    logWebhookError('handleVisitCallback booking update failed', updateError);
+  }
 
-  await answerTelegramCallbackQuery({
-    callbackQueryId: params.callbackQueryId,
-    text: parsed.status === 'completed' ? 'Отмечено: клиент пришёл' : 'Отмечено: клиент не пришёл',
-  });
+  await syncWorkspaceBookingStatus(
+    admin,
+    workspaceId,
+    parsed.bookingId,
+    parsed.status,
+  );
+
+  await safeTask('answer visit callback', () =>
+    answerTelegramCallbackQuery({
+      callbackQueryId: params.callbackQueryId,
+      text:
+        parsed.status === 'completed'
+          ? 'Отмечено: клиент пришёл'
+          : 'Отмечено: клиент не пришёл',
+    }),
+  );
 
   return true;
 }
@@ -206,11 +282,15 @@ async function rememberTelegramUser(params: {
 }) {
   const admin = createSupabaseAdminClient();
 
-  const { data: existingAccount } = await admin
+  const { data: existingAccount, error: existingError } = await admin
     .from('sloty_telegram_accounts')
     .select('user_id')
     .eq('telegram_id', params.from.id)
     .maybeSingle();
+
+  if (existingError) {
+    logWebhookError('rememberTelegramUser existing account read failed', existingError);
+  }
 
   const user = await ensureTelegramAuthUser({
     admin,
@@ -245,7 +325,9 @@ async function handleAuthStart(params: {
 }) {
   const admin = createSupabaseAdminClient();
 
-  await rememberTelegramUser({ from: params.from, chatId: params.chatId });
+  await safeTask('rememberTelegramUser auth start', () =>
+    rememberTelegramUser({ from: params.from, chatId: params.chatId }),
+  );
 
   const { data: loginRequest, error: findError } = await admin
     .from('sloty_telegram_login_requests')
@@ -254,33 +336,55 @@ async function handleAuthStart(params: {
     .eq('status', 'pending')
     .maybeSingle();
 
-  if (findError) throw findError;
+  if (findError) {
+    logWebhookError('handleAuthStart find request failed', findError);
+
+    await safeTask('send auth db error message', () =>
+      sendTelegramMessage({
+        chatId: params.chatId,
+        text: 'Не удалось проверить вход. Вернитесь на сайт и нажмите «Войти через Telegram» ещё раз.',
+      }),
+    );
+
+    return;
+  }
 
   if (!loginRequest) {
-    await sendTelegramMessage({
-      chatId: params.chatId,
-      text: 'Ссылка входа уже использована или устарела. Вернитесь на сайт и нажмите «Войти через Telegram» ещё раз.',
-    });
+    await safeTask('send auth expired message', () =>
+      sendTelegramMessage({
+        chatId: params.chatId,
+        text: 'Ссылка входа уже использована или устарела. Вернитесь на сайт и нажмите «Войти через Telegram» ещё раз.',
+      }),
+    );
+
     return;
   }
 
   const expired =
-    loginRequest.expires_at && new Date(loginRequest.expires_at).getTime() < Date.now();
+    loginRequest.expires_at &&
+    new Date(loginRequest.expires_at).getTime() < Date.now();
 
   if (expired) {
-    await admin
+    const { error: expireError } = await admin
       .from('sloty_telegram_login_requests')
       .update({ status: 'expired', updated_at: new Date().toISOString() })
       .eq('token', params.token);
 
-    await sendTelegramMessage({
-      chatId: params.chatId,
-      text: 'Ссылка входа устарела. Вернитесь на сайт и нажмите «Войти через Telegram» ещё раз.',
-    });
+    if (expireError) {
+      logWebhookError('handleAuthStart expire request failed', expireError);
+    }
+
+    await safeTask('send auth link expired message', () =>
+      sendTelegramMessage({
+        chatId: params.chatId,
+        text: 'Ссылка входа устарела. Вернитесь на сайт и нажмите «Войти через Telegram» ещё раз.',
+      }),
+    );
+
     return;
   }
 
-  await admin
+  const { error: updateError } = await admin
     .from('sloty_telegram_login_requests')
     .update({
       status: 'confirmed',
@@ -301,20 +405,35 @@ async function handleAuthStart(params: {
     .eq('token', params.token)
     .eq('status', 'pending');
 
-  await sendTelegramMessage({
-    chatId: params.chatId,
-    text: 'Готово. Вход в веб-кабинет подтверждён. Вернитесь на сайт — он откроется автоматически.',
-    replyMarkup: {
-      inline_keyboard: [
-        [
-          {
-            text: 'Вернуться на сайт',
-            url: `${getAppUrl()}/login`,
-          },
+  if (updateError) {
+    logWebhookError('handleAuthStart confirm request failed', updateError);
+
+    await safeTask('send auth confirm failed message', () =>
+      sendTelegramMessage({
+        chatId: params.chatId,
+        text: 'Не удалось подтвердить вход. Вернитесь на сайт и нажмите «Войти через Telegram» ещё раз.',
+      }),
+    );
+
+    return;
+  }
+
+  await safeTask('send auth success message', () =>
+    sendTelegramMessage({
+      chatId: params.chatId,
+      text: 'Готово. Вход в веб-кабинет подтверждён. Вернитесь на сайт — он откроется автоматически.',
+      replyMarkup: {
+        inline_keyboard: [
+          [
+            {
+              text: 'Вернуться на сайт',
+              url: `${getAppUrl()}/login`,
+            },
+          ],
         ],
-      ],
-    },
-  });
+      },
+    }),
+  );
 }
 
 async function handleBookingStart(params: {
@@ -331,62 +450,95 @@ async function handleBookingStart(params: {
     .eq('status', 'pending')
     .maybeSingle();
 
-  if (linkError) throw linkError;
+  if (linkError) {
+    logWebhookError('handleBookingStart link read failed', linkError);
+
+    await safeTask('send booking link error message', () =>
+      sendTelegramMessage({
+        chatId: params.chatId,
+        text: 'Не удалось проверить подтверждение записи. Попробуйте открыть ссылку ещё раз.',
+      }),
+    );
+
+    return;
+  }
 
   const link = linkRow as BookingLinkRow | null;
 
   if (!link) {
-    await sendTelegramMessage({
-      chatId: params.chatId,
-      text: 'Ссылка подтверждения уже использована или устарела. Вернитесь на страницу записи и создайте новую заявку.',
-    });
+    await safeTask('send booking link not found message', () =>
+      sendTelegramMessage({
+        chatId: params.chatId,
+        text: 'Ссылка подтверждения уже использована или устарела. Вернитесь на страницу записи и создайте новую заявку.',
+      }),
+    );
+
     return;
   }
 
-  const expired = link.expires_at && new Date(link.expires_at).getTime() < Date.now();
+  const expired =
+    link.expires_at && new Date(link.expires_at).getTime() < Date.now();
 
   if (expired) {
-    await admin
+    const { error: expireError } = await admin
       .from('sloty_booking_telegram_links')
       .update({ status: 'expired', updated_at: new Date().toISOString() })
       .eq('token', params.token);
 
-    await sendTelegramMessage({
-      chatId: params.chatId,
-      text: 'Ссылка подтверждения устарела. Но запись уже создана — мастер получил заявку.',
-    });
+    if (expireError) {
+      logWebhookError('handleBookingStart expire link failed', expireError);
+    }
+
+    await safeTask('send booking expired message', () =>
+      sendTelegramMessage({
+        chatId: params.chatId,
+        text: 'Ссылка подтверждения устарела. Но запись уже создана — мастер получил заявку.',
+      }),
+    );
+
     return;
   }
 
-  const { data: workspaceRow } = await admin
+  const { data: workspaceRow, error: workspaceError } = await admin
     .from('sloty_workspaces')
     .select('profile,slug,data')
     .eq('id', link.workspace_id)
     .maybeSingle();
 
+  if (workspaceError) {
+    logWebhookError('handleBookingStart workspace read failed', workspaceError);
+  }
+
   const profile = (workspaceRow?.profile as MasterProfile | undefined) ?? null;
 
-  const { data: bookingRow } = await admin
+  const { data: bookingRow, error: bookingError } = await admin
     .from('sloty_bookings')
     .select('*')
     .eq('id', link.booking_id)
     .maybeSingle();
+
+  if (bookingError) {
+    logWebhookError('handleBookingStart booking read failed', bookingError);
+  }
 
   const booking = bookingRow
     ? mapBookingRow(bookingRow as BookingRow)
     : link.booking_snapshot;
 
   if (!booking) {
-    await sendTelegramMessage({
-      chatId: params.chatId,
-      text: 'Запись не найдена. Мастер всё равно получил заявку, но напоминания подключить не удалось.',
-    });
+    await safeTask('send booking not found message', () =>
+      sendTelegramMessage({
+        chatId: params.chatId,
+        text: 'Запись не найдена. Мастер всё равно получил заявку, но напоминания подключить не удалось.',
+      }),
+    );
+
     return;
   }
 
   const confirmedAt = new Date().toISOString();
 
-  await admin
+  const { error: confirmLinkError } = await admin
     .from('sloty_booking_telegram_links')
     .update({
       status: 'confirmed',
@@ -401,34 +553,59 @@ async function handleBookingStart(params: {
     .eq('token', params.token)
     .eq('status', 'pending');
 
-  await admin
+  if (confirmLinkError) {
+    logWebhookError('handleBookingStart confirm link failed', confirmLinkError);
+  }
+
+  const { error: confirmBookingError } = await admin
     .from('sloty_bookings')
     .update({ status: 'confirmed', updated_at: confirmedAt })
     .eq('id', booking.id)
-    .eq('workspace_id', link.workspace_id)
-    .then(() => undefined, () => undefined);
+    .eq('workspace_id', link.workspace_id);
 
-  const workspaceData = (workspaceRow?.data && typeof workspaceRow.data === 'object'
-    ? (workspaceRow.data as Record<string, unknown>)
-    : {}) as Record<string, unknown>;
-  const jsonBookings = Array.isArray(workspaceData.bookings) ? (workspaceData.bookings as Booking[]) : [];
+  if (confirmBookingError) {
+    logWebhookError('handleBookingStart confirm booking failed', confirmBookingError);
+  }
+
+  const workspaceData =
+    workspaceRow?.data && typeof workspaceRow.data === 'object'
+      ? (workspaceRow.data as Record<string, unknown>)
+      : {};
+
+  const jsonBookings = Array.isArray(workspaceData.bookings)
+    ? (workspaceData.bookings as Booking[])
+    : [];
+
   const nextBookings = jsonBookings.map((item) =>
     item.id === booking.id
-      ? { ...item, status: 'confirmed' as Booking['status'], clientTelegramConnected: true }
+      ? {
+          ...item,
+          status: 'confirmed' as Booking['status'],
+          clientTelegramConnected: true,
+        }
       : item,
   );
 
   if (nextBookings.length > 0) {
-    await admin
+    const { error: workspaceUpdateError } = await admin
       .from('sloty_workspaces')
       .update({ data: { ...workspaceData, bookings: nextBookings } })
-      .eq('id', link.workspace_id)
-      .then(() => undefined, () => undefined);
+      .eq('id', link.workspace_id);
+
+    if (workspaceUpdateError) {
+      logWebhookError('handleBookingStart workspace booking update failed', workspaceUpdateError);
+    }
   }
 
   const existingThread = booking.clientPhone
-    ? await fetchChatThreadByPhone(link.workspace_id, booking.clientPhone).catch(() => null)
+    ? await fetchChatThreadByPhone(link.workspace_id, booking.clientPhone).catch(
+        (error) => {
+          logWebhookError('handleBookingStart fetch thread failed', error);
+          return null;
+        },
+      )
     : null;
+
   const thread = existingThread
     ? await updateChatThread(link.workspace_id, existingThread.id, {
         botConnected: true,
@@ -438,7 +615,10 @@ async function handleBookingStart(params: {
           clientTelegramChatId: params.chatId,
           clientTelegramId: params.from.id,
         },
-      }).catch(() => existingThread)
+      }).catch((error) => {
+        logWebhookError('handleBookingStart update thread failed', error);
+        return existingThread;
+      })
     : await createChatThread(link.workspace_id, {
         clientName: booking.clientName,
         clientPhone: booking.clientPhone,
@@ -447,7 +627,8 @@ async function handleBookingStart(params: {
         source: 'Публичная страница',
         nextVisit: booking.date,
         botConnected: true,
-        lastMessagePreview: 'Клиент подключил Telegram для подтверждений и напоминаний.',
+        lastMessagePreview:
+          'Клиент подключил Telegram для подтверждений и напоминаний.',
         lastMessageAt: confirmedAt,
         unreadCount: 0,
         metadata: {
@@ -455,7 +636,10 @@ async function handleBookingStart(params: {
           clientTelegramChatId: params.chatId,
           clientTelegramId: params.from.id,
         },
-      }).catch(() => null);
+      }).catch((error) => {
+        logWebhookError('handleBookingStart create thread failed', error);
+        return null;
+      });
 
   if (thread?.id) {
     await createChatMessage(link.workspace_id, {
@@ -465,25 +649,29 @@ async function handleBookingStart(params: {
       deliveryState: 'delivered',
       viaBot: true,
       metadata: { bookingId: booking.id, kind: 'telegram_connected' },
-    }).catch(() => null);
+    }).catch((error) => logWebhookError('handleBookingStart create message failed', error));
   }
 
   if (
-    isNotificationEnabled({ data: workspaceData }, {
-      id: 'visit-reminder',
-      titleIncludes: 'напомин',
-      audience: 'client',
-      fallback: true,
-    })
+    isNotificationEnabled(
+      { data: workspaceData },
+      {
+        id: 'visit-reminder',
+        titleIncludes: 'напомин',
+        audience: 'client',
+        fallback: true,
+      },
+    )
   ) {
-    await sendClientBookingConfirmation({
-      chatId: params.chatId,
-      booking,
-      profile,
-    });
+    await safeTask('sendClientBookingConfirmation', () =>
+      sendClientBookingConfirmation({
+        chatId: params.chatId,
+        booking,
+        profile,
+      }),
+    );
   }
 }
-
 
 async function handleClientChatMessage(params: {
   from: TelegramFrom;
@@ -495,7 +683,7 @@ async function handleClientChatMessage(params: {
 
   const admin = createSupabaseAdminClient();
 
-  const { data: linkRows } = await admin
+  const { data: linkRows, error: linkRowsError } = await admin
     .from('sloty_booking_telegram_links')
     .select('*')
     .eq('chat_id', params.chatId)
@@ -503,41 +691,68 @@ async function handleClientChatMessage(params: {
     .order('confirmed_at', { ascending: false })
     .limit(1);
 
-  const link = Array.isArray(linkRows) ? (linkRows[0] as BookingLinkRow | undefined) : null;
+  if (linkRowsError) {
+    logWebhookError('handleClientChatMessage link read failed', linkRowsError);
+  }
+
+  const link = Array.isArray(linkRows)
+    ? (linkRows[0] as BookingLinkRow | undefined)
+    : null;
+
   if (!link) {
-    const { data: threadRowsByNumber } = await admin
+    const { data: threadRowsByNumber, error: numberError } = await admin
       .from('sloty_chat_threads')
       .select('id,workspace_id,metadata,unread_count')
       .contains('metadata', { clientTelegramChatId: params.chatId })
       .order('last_message_at', { ascending: false })
       .limit(1);
 
-    const { data: threadRowsByString } = await admin
+    if (numberError) {
+      logWebhookError('handleClientChatMessage thread number read failed', numberError);
+    }
+
+    const { data: threadRowsByString, error: stringError } = await admin
       .from('sloty_chat_threads')
       .select('id,workspace_id,metadata,unread_count')
       .contains('metadata', { clientTelegramChatId: String(params.chatId) })
       .order('last_message_at', { ascending: false })
       .limit(1);
 
-    const threadRows = Array.isArray(threadRowsByNumber) && threadRowsByNumber.length > 0
-      ? threadRowsByNumber
-      : threadRowsByString;
+    if (stringError) {
+      logWebhookError('handleClientChatMessage thread string read failed', stringError);
+    }
+
+    const threadRows =
+      Array.isArray(threadRowsByNumber) && threadRowsByNumber.length > 0
+        ? threadRowsByNumber
+        : threadRowsByString;
 
     const thread = Array.isArray(threadRows)
-      ? (threadRows[0] as { id: string; workspace_id: string; metadata: Record<string, unknown> | null; unread_count: number } | undefined)
+      ? (threadRows[0] as
+          | {
+              id: string;
+              workspace_id: string;
+              metadata: Record<string, unknown> | null;
+              unread_count: number;
+            }
+          | undefined)
       : null;
 
     if (!thread?.id || !thread.workspace_id) return;
 
     const now = new Date().toISOString();
+
     await createChatMessage(thread.workspace_id, {
       threadId: thread.id,
       author: 'client',
       body: text,
       deliveryState: null,
       viaBot: true,
-      metadata: { source: 'telegram_inbox', clientTelegramChatId: params.chatId },
-    }).catch(() => null);
+      metadata: {
+        source: 'telegram_inbox',
+        clientTelegramChatId: params.chatId,
+      },
+    }).catch((error) => logWebhookError('handleClientChatMessage create message failed', error));
 
     await updateChatThread(thread.workspace_id, thread.id, {
       lastMessagePreview: text,
@@ -549,28 +764,43 @@ async function handleClientChatMessage(params: {
         clientTelegramChatId: params.chatId,
         clientTelegramId: params.from.id,
       },
-    }).catch(() => null);
+    }).catch((error) => logWebhookError('handleClientChatMessage update thread failed', error));
 
     return;
   }
 
-  const { data: bookingRow } = await admin
+  const { data: bookingRow, error: bookingError } = await admin
     .from('sloty_bookings')
     .select('*')
     .eq('id', link.booking_id)
     .maybeSingle();
 
-  const booking = bookingRow ? mapBookingRow(bookingRow as BookingRow) : link.booking_snapshot;
+  if (bookingError) {
+    logWebhookError('handleClientChatMessage booking read failed', bookingError);
+  }
+
+  const booking = bookingRow
+    ? mapBookingRow(bookingRow as BookingRow)
+    : link.booking_snapshot;
+
   if (!booking) return;
 
   const existingThread = booking.clientPhone
-    ? await fetchChatThreadByPhone(link.workspace_id, booking.clientPhone).catch(() => null)
+    ? await fetchChatThreadByPhone(link.workspace_id, booking.clientPhone).catch(
+        (error) => {
+          logWebhookError('handleClientChatMessage fetch thread failed', error);
+          return null;
+        },
+      )
     : null;
+
+  const now = new Date().toISOString();
+
   const thread = existingThread
     ? await updateChatThread(link.workspace_id, existingThread.id, {
         botConnected: true,
         lastMessagePreview: text,
-        lastMessageAt: new Date().toISOString(),
+        lastMessageAt: now,
         unreadCount: (existingThread.unreadCount ?? 0) + 1,
         metadata: {
           ...(existingThread.metadata ?? {}),
@@ -578,7 +808,10 @@ async function handleClientChatMessage(params: {
           clientTelegramChatId: params.chatId,
           clientTelegramId: params.from.id,
         },
-      }).catch(() => existingThread)
+      }).catch((error) => {
+        logWebhookError('handleClientChatMessage update existing thread failed', error);
+        return existingThread;
+      })
     : await createChatThread(link.workspace_id, {
         clientName: booking.clientName,
         clientPhone: booking.clientPhone,
@@ -588,14 +821,17 @@ async function handleClientChatMessage(params: {
         nextVisit: booking.date,
         botConnected: true,
         lastMessagePreview: text,
-        lastMessageAt: new Date().toISOString(),
+        lastMessageAt: now,
         unreadCount: 1,
         metadata: {
           bookingId: booking.id,
           clientTelegramChatId: params.chatId,
           clientTelegramId: params.from.id,
         },
-      }).catch(() => null);
+      }).catch((error) => {
+        logWebhookError('handleClientChatMessage create thread failed', error);
+        return null;
+      });
 
   if (!thread?.id) return;
 
@@ -606,19 +842,43 @@ async function handleClientChatMessage(params: {
     deliveryState: null,
     viaBot: true,
     metadata: { bookingId: booking.id, source: 'telegram_inbox' },
-  }).catch(() => null);
+  }).catch((error) => logWebhookError('handleClientChatMessage create linked message failed', error));
 }
 
 export async function POST(request: Request) {
-  const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
-  const receivedSecret = request.headers.get('x-telegram-bot-api-secret-token');
+  const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
+  const receivedSecret =
+    request.headers.get('x-telegram-bot-api-secret-token')?.trim() ?? '';
 
   if (webhookSecret && receivedSecret !== webhookSecret) {
-    return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+    console.error('[telegram-webhook] forbidden: secret mismatch');
+
+    return NextResponse.json({
+      ok: true,
+      ignored: true,
+      reason: 'secret_mismatch',
+    });
   }
 
   try {
-    const update = (await request.json()) as TelegramUpdate;
+    const update = (await request.json().catch((error) => {
+      logWebhookError('invalid json', error);
+      return null;
+    })) as TelegramUpdate | null;
+
+    if (!update) {
+      return NextResponse.json({ ok: true, ignored: true });
+    }
+
+    console.log('[telegram-webhook] update received', {
+      updateId: update.update_id,
+      hasMessage: Boolean(update.message),
+      hasCallback: Boolean(update.callback_query),
+      text: update.message?.text ?? null,
+      from: update.message?.from?.id ?? update.callback_query?.from?.id ?? null,
+      chat: update.message?.chat?.id ?? update.callback_query?.message?.chat?.id ?? null,
+    });
+
     const callbackQuery = update.callback_query;
 
     if (callbackQuery?.id) {
@@ -647,6 +907,7 @@ export async function POST(request: Request) {
         updateId: update.update_id,
         messageId: message.message_id,
       });
+
       return NextResponse.json({ ok: true });
     }
 
@@ -656,12 +917,19 @@ export async function POST(request: Request) {
         from: message.from,
         chatId: message.chat.id,
       });
+
       return NextResponse.json({ ok: true });
     }
 
     if (isPlainStart(message.text)) {
-      await rememberTelegramUser({ from: message.from, chatId: message.chat.id });
-      await sendMasterMenu(message.chat.id);
+      await safeTask('plain start rememberTelegramUser', () =>
+        rememberTelegramUser({ from: message.from as TelegramFrom, chatId: message.chat.id }),
+      );
+
+      await safeTask('plain start sendMasterMenu', () =>
+        sendMasterMenu(message.chat.id),
+      );
+
       return NextResponse.json({ ok: true });
     }
 
@@ -673,9 +941,13 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'telegram_webhook_failed';
+    logWebhookError('fatal', error);
 
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({
+      ok: true,
+      swallowed: true,
+      error: error instanceof Error ? error.message : 'telegram_webhook_failed',
+    });
   }
 }
 
