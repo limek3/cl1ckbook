@@ -115,14 +115,14 @@ function divideTone(light: boolean) {
 
 function cardTone(light: boolean) {
   return light
-    ? 'border-black/[0.08] bg-[#fbfbfa]'
-    : 'border-white/[0.08] bg-[#101010]';
+    ? 'border-black/[0.08] bg-[#f4f4f2]'
+    : 'border-white/[0.08] bg-[#0b0b0b]';
 }
 
 function insetTone(light: boolean) {
   return light
-    ? 'border-black/[0.07] bg-black/[0.025]'
-    : 'border-white/[0.07] bg-white/[0.035]';
+    ? 'border-black/[0.07] bg-black/[0.018]'
+    : 'border-white/[0.07] bg-white/[0.022]';
 }
 
 function buttonBase(light: boolean, active = false) {

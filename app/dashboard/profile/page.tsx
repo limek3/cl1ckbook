@@ -33,6 +33,10 @@ import { useAppearance } from '@/lib/appearance-context';
 import { accentPalette } from '@/lib/appearance-palette';
 import { useLocale } from '@/lib/locale-context';
 import { createClient } from '@/lib/supabase/client';
+import {
+  authorizeTelegramMiniAppSession,
+  getTelegramAppSessionHeaders,
+} from '@/lib/telegram-miniapp-auth-client';
 import { cn } from '@/lib/utils';
 
 type ThemeMode = 'light' | 'dark';
@@ -415,9 +419,29 @@ function ConnectedAccountsCard({
           error: 'Could not connect the account. Check OAuth or Telegram settings.',
         };
 
-  const refreshUser = async () => {
+  const refreshUser = async (signal?: AbortSignal) => {
     try {
-      const response = await fetch('/api/auth/accounts', { cache: 'no-store' });
+      await authorizeTelegramMiniAppSession({ waitMs: 1200 });
+
+      const supabase = createClient();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const headers: Record<string, string> = {
+        ...getTelegramAppSessionHeaders(),
+      };
+
+      if (session?.access_token) {
+        headers.Authorization = `Bearer ${session.access_token}`;
+      }
+
+      const response = await fetch('/api/auth/accounts', {
+        cache: 'no-store',
+        credentials: 'include',
+        headers,
+        signal,
+      });
 
       if (!response.ok) throw new Error('accounts_failed');
 
@@ -427,6 +451,8 @@ function ConnectedAccountsCard({
           providers?: string[];
         };
       };
+
+      if (signal?.aborted) return;
 
       setState((current) => ({
         ...current,
@@ -449,6 +475,8 @@ function ConnectedAccountsCard({
           nextProviders.add('telegram');
         }
 
+        if (signal?.aborted) return;
+
         setState((current) => ({
           ...current,
           providers: nextProviders,
@@ -456,13 +484,16 @@ function ConnectedAccountsCard({
           loading: false,
         }));
       } catch {
+        if (signal?.aborted) return;
         setState((current) => ({ ...current, loading: false }));
       }
     }
   };
 
   useEffect(() => {
-    void refreshUser();
+    const controller = new AbortController();
+    void refreshUser(controller.signal);
+    return () => controller.abort();
   }, []);
 
   const connectOAuth = async (provider: 'google' | 'vk') => {
@@ -890,8 +921,8 @@ function ProfileOverviewCard({
             <div className="flex justify-center">
               <div
                 className={cn(
-                  'flex items-center justify-center overflow-hidden rounded-[20px] border',
-                  'h-[132px] w-[132px]',
+                  'flex items-center justify-center overflow-hidden rounded-[22px] border',
+                  'h-[152px] w-[152px]',
                   light
                     ? 'border-black/[0.08] bg-[#f6f6f4]'
                     : 'border-white/[0.08] bg-white/[0.035]',
@@ -900,20 +931,13 @@ function ProfileOverviewCard({
                 <MasterAvatar
                   name={name || labels.name}
                   avatar={avatar}
-                  className="h-full w-full rounded-none border-0 object-cover object-center text-[36px]"
+                  className="h-full w-full rounded-none border-0 object-cover object-center text-[40px]"
                 />
               </div>
             </div>
 
-            <div className="mt-4 flex items-center justify-center">
-              <MicroLabel light={light} active accentColor={accentColor}>
-                <StatusDot light={light} active accentColor={accentColor} />
-                {labels.profile}
-              </MicroLabel>
-            </div>
-
             <div
-              className="mt-4 h-1.5 rounded-full"
+              className="mt-5 h-1.5 rounded-full"
               style={{
                 background: `linear-gradient(90deg, ${accentColor}, color-mix(in srgb, ${accentColor} 26%, transparent))`,
               }}
