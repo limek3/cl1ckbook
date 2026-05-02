@@ -98,9 +98,9 @@ function extractAuthToken(text?: string) {
   if (!value) return null;
 
   const patterns = [
-    /^\/start\s+auth_([a-f0-9]{64})(?:\s|$)/i,
-    /^\/start@\w+\s+auth_([a-f0-9]{64})(?:\s|$)/i,
-    /^auth_([a-f0-9]{64})(?:\s|$)/i,
+    /^\/start\s+auth_([a-f0-9]{32,64})(?:\s|$)/i,
+    /^\/start@\w+\s+auth_([a-f0-9]{32,64})(?:\s|$)/i,
+    /^auth_([a-f0-9]{32,64})(?:\s|$)/i,
   ];
 
   for (const pattern of patterns) {

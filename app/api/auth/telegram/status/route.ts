@@ -4,6 +4,7 @@ import type { User } from '@supabase/supabase-js';
 import { createSupabaseAdminClient } from '@/lib/server/supabase-admin';
 import { createTelegramAppSessionToken, setTelegramAppSessionCookie } from '@/lib/server/app-session';
 import { ensureTelegramAuthUser as ensureSharedTelegramAuthUser, upsertTelegramAccount } from '@/lib/server/telegram-user';
+import { createTelegramVirtualUser } from '@/lib/server/telegram-virtual-user';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -192,7 +193,7 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const token = url.searchParams.get('token');
 
-    if (!token || !/^[a-f0-9]{64}$/i.test(token)) {
+    if (!token || !/^[a-f0-9]{32,64}$/i.test(token)) {
       return NextResponse.json({ status: 'invalid' }, { status: 400 });
     }
 
@@ -333,25 +334,49 @@ export async function GET(request: Request) {
       });
     }
 
-    const user = await ensureSharedTelegramAuthUser({
-      admin,
-      telegramId,
-      accountUserId: existingAccount?.user_id as string | undefined,
-      username: loginRequest.username,
-      firstName: loginRequest.first_name,
-      lastName: loginRequest.last_name,
-      photoUrl: loginRequest.photo_url,
-    });
+    let user: User;
 
-    await upsertTelegramAccount(admin, {
-      userId: user.id,
-      telegramId,
-      username: loginRequest.username,
-      firstName: loginRequest.first_name,
-      lastName: loginRequest.last_name,
-      photoUrl: loginRequest.photo_url,
-      authDate: loginRequest.confirmed_at,
-    });
+    try {
+      user = await ensureSharedTelegramAuthUser({
+        admin,
+        telegramId,
+        accountUserId: existingAccount?.user_id as string | undefined,
+        username: loginRequest.username,
+        firstName: loginRequest.first_name,
+        lastName: loginRequest.last_name,
+        photoUrl: loginRequest.photo_url,
+      });
+    } catch (error) {
+      console.warn(
+        '[telegram-status] Supabase Auth user ensure failed, using virtual Telegram user',
+        error instanceof Error ? error.message : 'unknown_error',
+      );
+
+      user = createTelegramVirtualUser({
+        telegramId,
+        username: loginRequest.username,
+        firstName: loginRequest.first_name,
+        lastName: loginRequest.last_name,
+        photoUrl: loginRequest.photo_url,
+      });
+    }
+
+    try {
+      await upsertTelegramAccount(admin, {
+        userId: user.id,
+        telegramId,
+        username: loginRequest.username,
+        firstName: loginRequest.first_name,
+        lastName: loginRequest.last_name,
+        photoUrl: loginRequest.photo_url,
+        authDate: loginRequest.confirmed_at,
+      });
+    } catch (error) {
+      console.warn(
+        '[telegram-status] Telegram account upsert skipped',
+        error instanceof Error ? error.message : 'unknown_error',
+      );
+    }
 
     await admin
       .from('sloty_telegram_login_requests')

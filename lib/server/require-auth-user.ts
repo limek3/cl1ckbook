@@ -7,6 +7,7 @@ import { getSupabasePublishableKey, getSupabaseUrl } from '@/lib/supabase/env';
 import { createSupabaseAdminClient } from '@/lib/server/supabase-admin';
 import { getTelegramAppSessionUser, getTelegramAppSessionUserFromToken } from '@/lib/server/app-session';
 import { ensureTelegramAuthUser, upsertTelegramAccount } from '@/lib/server/telegram-user';
+import { createTelegramVirtualUser } from '@/lib/server/telegram-virtual-user';
 
 function parseBearerToken(value: string | null) {
   if (!value) return null;
@@ -75,26 +76,47 @@ async function repairTelegramAppSessionUser(sessionUser: User | null) {
     .eq('telegram_id', telegramId)
     .maybeSingle();
 
-  const user = await ensureTelegramAuthUser({
-    admin,
-    telegramId,
-    accountUserId: typeof account?.user_id === 'string' ? account.user_id : null,
+  const telegramProfile = {
     username: getStringMetadata(sessionUser, 'telegram_username') ?? (typeof account?.username === 'string' ? account.username : null),
     firstName: getStringMetadata(sessionUser, 'telegram_first_name') ?? (typeof account?.first_name === 'string' ? account.first_name : null),
     lastName: getStringMetadata(sessionUser, 'telegram_last_name') ?? (typeof account?.last_name === 'string' ? account.last_name : null),
     photoUrl: getStringMetadata(sessionUser, 'telegram_photo_url') ?? (typeof account?.photo_url === 'string' ? account.photo_url : null),
     chatId: typeof account?.chat_id === 'number' ? account.chat_id : null,
-  });
+  };
 
-  await upsertTelegramAccount(admin, {
-    userId: user.id,
-    telegramId,
-    username: getStringMetadata(user, 'telegram_username') ?? getStringMetadata(sessionUser, 'telegram_username') ?? null,
-    firstName: getStringMetadata(user, 'telegram_first_name') ?? getStringMetadata(sessionUser, 'telegram_first_name') ?? null,
-    lastName: getStringMetadata(user, 'telegram_last_name') ?? getStringMetadata(sessionUser, 'telegram_last_name') ?? null,
-    photoUrl: getStringMetadata(user, 'telegram_photo_url') ?? getStringMetadata(sessionUser, 'telegram_photo_url') ?? null,
-    chatId: typeof account?.chat_id === 'number' ? account.chat_id : null,
-  });
+  let user: User;
+
+  try {
+    user = await ensureTelegramAuthUser({
+      admin,
+      telegramId,
+      accountUserId: typeof account?.user_id === 'string' ? account.user_id : null,
+      ...telegramProfile,
+    });
+  } catch (error) {
+    console.warn(
+      '[require-auth-user] Telegram Auth repair failed, using virtual user',
+      error instanceof Error ? error.message : 'unknown_error',
+    );
+    user = createTelegramVirtualUser({ telegramId, ...telegramProfile });
+  }
+
+  try {
+    await upsertTelegramAccount(admin, {
+      userId: user.id,
+      telegramId,
+      username: getStringMetadata(user, 'telegram_username') ?? telegramProfile.username ?? null,
+      firstName: getStringMetadata(user, 'telegram_first_name') ?? telegramProfile.firstName ?? null,
+      lastName: getStringMetadata(user, 'telegram_last_name') ?? telegramProfile.lastName ?? null,
+      photoUrl: getStringMetadata(user, 'telegram_photo_url') ?? telegramProfile.photoUrl ?? null,
+      chatId: telegramProfile.chatId,
+    });
+  } catch (error) {
+    console.warn(
+      '[require-auth-user] Telegram account upsert skipped',
+      error instanceof Error ? error.message : 'unknown_error',
+    );
+  }
 
   return user;
 }

@@ -18,7 +18,9 @@ function getBotUsername() {
 export async function POST() {
   try {
     const admin = createSupabaseAdminClient();
-    const token = randomBytes(32).toString('hex');
+    // Telegram deep-link start payload must stay <= 64 chars.
+    // `auth_` + 32 hex chars = 37 chars, so it works both on PC and phone.
+    const token = randomBytes(16).toString('hex');
 
     const { error } = await admin.from('sloty_telegram_login_requests').insert({
       token,

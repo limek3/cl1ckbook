@@ -2,6 +2,7 @@ import 'server-only';
 
 import crypto from 'node:crypto';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
+import { createTelegramVirtualUser } from '@/lib/server/telegram-virtual-user';
 
 type TelegramUserInput = {
   telegramId: number;
@@ -16,6 +17,17 @@ type EnsureTelegramUserParams = TelegramUserInput & {
   admin: SupabaseClient;
   accountUserId?: string | null;
 };
+
+function normalizeAuthError(value: unknown) {
+  if (value instanceof Error) return value.message;
+  if (typeof value === 'string') return value;
+
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return 'unknown_auth_error';
+  }
+}
 
 export function telegramSyntheticEmail(telegramId: number) {
   return `telegram_${telegramId}@auth.clickbook.app`;
@@ -146,7 +158,13 @@ export async function ensureTelegramAuthUser(params: EnsureTelegramUserParams) {
   if (minimalError || !minimalData?.user) {
     const racedAfterFallback = await findTelegramAuthUser(params.admin, params.telegramId);
     if (racedAfterFallback) return racedAfterFallback;
-    throw minimalError ?? error ?? new Error('telegram_user_create_failed');
+
+    console.warn(
+      '[telegram-user] Supabase Auth user create failed, using virtual Telegram user',
+      normalizeAuthError(minimalError ?? error),
+    );
+
+    return createTelegramVirtualUser(params);
   }
 
   const { data: updatedData, error: updateError } = await params.admin.auth.admin.updateUserById(
