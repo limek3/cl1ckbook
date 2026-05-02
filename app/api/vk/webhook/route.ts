@@ -104,6 +104,44 @@ async function writeVkWebhookLog(params: {
   }
 }
 
+
+async function sendVkReply(params: {
+  label: string;
+  peerId: number | string;
+  textPreview?: string | null;
+  send: () => Promise<unknown>;
+}) {
+  try {
+    const result = await params.send();
+
+    await writeVkWebhookLog({
+      eventType: 'message_send',
+      peerId: params.peerId,
+      text: params.textPreview ?? params.label,
+      status: 'sent',
+      payload: {
+        label: params.label,
+        result: result && typeof result === 'object' ? result : { value: result },
+      },
+    });
+
+    return result;
+  } catch (error) {
+    logVkWebhookError(`send:${params.label}`, error);
+
+    await writeVkWebhookLog({
+      eventType: 'message_send',
+      peerId: params.peerId,
+      text: params.textPreview ?? params.label,
+      status: 'send_error',
+      error,
+      payload: { label: params.label },
+    });
+
+    return null;
+  }
+}
+
 function isStartLikeText(value: unknown) {
   if (typeof value !== 'string') return false;
   const text = value.trim().toLowerCase();
@@ -188,10 +226,15 @@ async function confirmVkLogin(params: {
   if (readError) throw readError;
 
   if (!requestRow) {
-    await sendVkMessage({
+    await sendVkReply({
+      label: 'login_request_not_found',
       peerId: params.peerId,
-      message: 'Не нашли запрос на вход. Вернитесь на сайт и нажмите «Войти через VK» ещё раз.',
-    }).catch((error) => logVkWebhookError('send not found message', error));
+      textPreview: 'Не нашли запрос на вход.',
+      send: () => sendVkMessage({
+        peerId: params.peerId,
+        message: 'Не нашли запрос на вход. Вернитесь на сайт и нажмите «Войти через VK» ещё раз.',
+      }),
+    });
     return false;
   }
 
@@ -204,10 +247,15 @@ async function confirmVkLogin(params: {
         .eq('status', 'pending');
     } catch {}
 
-    await sendVkMessage({
+    await sendVkReply({
+      label: 'login_request_expired',
       peerId: params.peerId,
-      message: 'Ссылка входа устарела или уже использована. Вернитесь на сайт и нажмите «Войти через VK» ещё раз.',
-    }).catch((error) => logVkWebhookError('send expired message', error));
+      textPreview: 'Ссылка входа устарела или уже использована.',
+      send: () => sendVkMessage({
+        peerId: params.peerId,
+        message: 'Ссылка входа устарела или уже использована. Вернитесь на сайт и нажмите «Войти через VK» ещё раз.',
+      }),
+    });
     return false;
   }
 
@@ -273,10 +321,15 @@ async function confirmVkLogin(params: {
       ? requestRow.metadata.next
       : '/dashboard';
 
-  await sendVkLoginConfirmedMessage({
+  await sendVkReply({
+    label: 'login_confirmed',
     peerId: params.peerId,
-    next,
-  }).catch((error) => logVkWebhookError('send login confirmed', error));
+    textPreview: 'Вход в ClickBook через VK подтверждён.',
+    send: () => sendVkLoginConfirmedMessage({
+      peerId: params.peerId,
+      next,
+    }),
+  });
 
   return true;
 }
@@ -327,13 +380,21 @@ async function handleMessageNew(payload: VkCallbackPayload) {
   }).catch((error) => logVkWebhookError('remember vk user', error));
 
   if (isStartLikeText(message.text)) {
-    await sendVkBotWelcomeMessage({ peerId, loginUrl: `${getAppUrl()}/login` })
-      .catch((error) => logVkWebhookError('send welcome message', error));
+    await sendVkReply({
+      label: 'welcome',
+      peerId,
+      textPreview: 'Привет! Я бот ClickBook.',
+      send: () => sendVkBotWelcomeMessage({ peerId, loginUrl: `${getAppUrl()}/login` }),
+    });
     return;
   }
 
-  await sendVkBotAuthFallbackMessage({ peerId })
-    .catch((error) => logVkWebhookError('send fallback message', error));
+  await sendVkReply({
+    label: 'auth_fallback',
+    peerId,
+    textPreview: 'Я получил сообщение, но не вижу активный код входа.',
+    send: () => sendVkBotAuthFallbackMessage({ peerId }),
+  });
 }
 
 async function handleMessageEvent(payload: VkCallbackPayload) {
@@ -397,6 +458,18 @@ async function handleMessageAllow(payload: VkCallbackPayload) {
     messagesAllowed: true,
     metadata: { source: 'message_allow' },
   }).catch((error) => logVkWebhookError('message allow upsert', error));
+
+  await sendVkReply({
+    label: 'message_allow_welcome',
+    peerId: vkUserId,
+    textPreview: 'Сообщения VK подключены к ClickBook.',
+    send: () => sendVkMessage({
+      peerId: vkUserId,
+      message: 'Сообщения VK подключены к ClickBook ✅
+
+Теперь через этот диалог можно подтверждать вход и получать уведомления о записях.',
+    }),
+  });
 }
 
 async function handleMessageDeny(payload: VkCallbackPayload) {
@@ -477,5 +550,12 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
-  return NextResponse.json({ ok: true, endpoint: '/api/vk/webhook' });
+  return NextResponse.json({
+    ok: true,
+    endpoint: '/api/vk/webhook',
+    groupId: getVkBotGroupId() || null,
+    hasAccessToken: Boolean(process.env.VK_BOT_ACCESS_TOKEN || process.env.VK_GROUP_ACCESS_TOKEN),
+    hasConfirmationCode: Boolean(getConfirmationCode()),
+    hasSecret: Boolean(getCallbackSecret()),
+  });
 }

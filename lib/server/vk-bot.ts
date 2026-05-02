@@ -156,7 +156,6 @@ export function buildVkKeyboard(
               type: 'open_link',
               label: button.label,
               link: button.link,
-              payload: button.payload ? JSON.stringify(button.payload) : undefined,
             }
           : {
               type: 'callback',
@@ -174,16 +173,31 @@ export async function sendVkMessage(params: {
   message: string;
   keyboard?: string | Record<string, unknown>;
 }) {
-  return vkApi('messages.send', {
+  const basePayload = {
     peer_id: String(params.peerId),
     random_id: crypto.randomInt(1, 2147483647),
     message: params.message,
     disable_mentions: 1,
     dont_parse_links: 1,
-    ...(params.keyboard
-      ? { keyboard: typeof params.keyboard === 'string' ? params.keyboard : JSON.stringify(params.keyboard) }
-      : {}),
-  });
+  };
+
+  try {
+    return await vkApi('messages.send', {
+      ...basePayload,
+      ...(params.keyboard
+        ? { keyboard: typeof params.keyboard === 'string' ? params.keyboard : JSON.stringify(params.keyboard) }
+        : {}),
+    });
+  } catch (error) {
+    // VK can reject a message because of keyboard/open_link restrictions in some
+    // community configurations. In that case the bot must still answer, so retry
+    // once with plain text. Auth confirmation itself does not depend on buttons.
+    if (params.keyboard) {
+      return vkApi('messages.send', basePayload);
+    }
+
+    throw error;
+  }
 }
 
 export async function answerVkMessageEvent(params: {
