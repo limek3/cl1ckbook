@@ -356,9 +356,11 @@ function providerConnected(providers: Set<string>, provider: ConnectedProvider) 
 function ConnectedAccountsCard({
   light,
   locale,
+  accentColor,
 }: {
   light: boolean;
   locale: 'ru' | 'en';
+  accentColor: string;
 }) {
   const [state, setState] = useState<ConnectedAccountState>({
     providers: new Set(),
@@ -1414,7 +1416,7 @@ export default function DashboardProfilePage() {
               avatar={ownedProfile.avatar}
             />
 
-            <ConnectedAccountsCard light={isLight} locale={locale} />
+            <ConnectedAccountsCard light={isLight} locale={locale} accentColor={accentColor} />
 
             <div className="dashboard-profile-form-clean">
               <MasterProfileForm
