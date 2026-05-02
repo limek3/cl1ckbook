@@ -8,7 +8,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function slugify(value: string) {
-  return value
+  return String(value ?? '')
     .trim()
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s-]/gu, '')
@@ -17,8 +17,8 @@ export function slugify(value: string) {
     .replace(/^-|-$/g, '');
 }
 
-export function parseServices(value: string) {
-  return value
+export function parseServices(value: unknown) {
+  return String(value ?? '')
     .split(/\n|,/)
     .map((item) => item.trim())
     .filter(Boolean);
@@ -55,8 +55,8 @@ export function formatCreatedAt(value: string, locale: Locale = 'ru') {
   }).format(new Date(value));
 }
 
-export function getInitials(value: string) {
-  return value
+export function getInitials(value: unknown) {
+  return String(value ?? '')
     .split(' ')
     .filter(Boolean)
     .slice(0, 2)

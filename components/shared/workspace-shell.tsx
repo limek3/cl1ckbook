@@ -751,7 +751,8 @@ function AccountMenuRow({
 }
 
 function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
-  const pathname = usePathname();
+  const rawPathname = usePathname();
+  const pathname = rawPathname || '/dashboard';
   const searchParams = useBrowserSearchParams();
   const { ownedProfile } = useApp();
   const { theme, setTheme } = useTheme();
@@ -1784,7 +1785,8 @@ function MobileSheet({
 }
 
 export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
-  const pathname = usePathname();
+  const rawPathname = usePathname();
+  const pathname = rawPathname || '/dashboard';
   const searchParams = useBrowserSearchParams();
 
   const { ownedProfile, getBookingsBySlug } = useApp();

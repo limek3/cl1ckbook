@@ -113,6 +113,203 @@ function buildProfile(values: SaveProfileValues, previous?: MasterProfile | null
   };
 }
 
+
+const BOOKING_STATUSES: BookingStatus[] = ['new', 'confirmed', 'completed', 'no_show', 'cancelled'];
+
+function valueToString(value: unknown, fallback = '') {
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  return fallback;
+}
+
+function optionalString(value: unknown) {
+  const text = valueToString(value);
+  return text || undefined;
+}
+
+function objectRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function normalizeServiceList(value: unknown): string[] {
+  const rawItems = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? parseServices(value)
+      : [];
+
+  return Array.from(
+    new Map(
+      rawItems
+        .map((item) => {
+          if (typeof item === 'string' || typeof item === 'number') return valueToString(item);
+          const row = objectRecord(item);
+          return valueToString(row.name ?? row.title ?? row.label ?? row.service);
+        })
+        .filter(Boolean)
+        .map((item) => [item.toLowerCase(), item] as const),
+    ).values(),
+  );
+}
+
+function normalizeLocationMode(value: unknown): MasterProfile['locationMode'] {
+  return value === 'address' ? 'address' : 'online';
+}
+
+function normalizeWorkGallery(value: unknown): MasterProfile['workGallery'] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item, index) => {
+      const row = objectRecord(item);
+      const title = valueToString(row.title ?? row.name);
+      const image = valueToString(row.image ?? row.url ?? row.src);
+      if (!title && !image) return null;
+
+      return {
+        id: valueToString(row.id, `work-${index}`),
+        title,
+        image,
+        note: optionalString(row.note ?? row.description),
+      };
+    })
+    .filter((item): item is NonNullable<MasterProfile['workGallery']>[number] => Boolean(item));
+}
+
+function normalizeReviews(value: unknown): MasterProfile['reviews'] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item, index) => {
+      const row = objectRecord(item);
+      const author = valueToString(row.author ?? row.name ?? row.clientName);
+      const text = valueToString(row.text ?? row.message ?? row.comment);
+      if (!author && !text) return null;
+
+      const rating = Number(row.rating ?? 5);
+
+      return {
+        id: valueToString(row.id, `review-${index}`),
+        author: author || 'Клиент',
+        text,
+        rating: Number.isFinite(rating) ? Math.min(5, Math.max(1, rating)) : 5,
+        dateLabel: optionalString(row.dateLabel ?? row.date),
+        service: optionalString(row.service),
+      };
+    })
+    .filter((item): item is NonNullable<MasterProfile['reviews']>[number] => Boolean(item));
+}
+
+function normalizeProfile(value: unknown): MasterProfile | null {
+  const row = objectRecord(value);
+  if (Object.keys(row).length === 0) return null;
+
+  const rawName = valueToString(row.name ?? row.masterName ?? row.title ?? row.displayName);
+  const rawSlug = valueToString(row.slug ?? row.username);
+  const name = rawName || 'Профиль мастера';
+  const slug = slugify(rawSlug || name) || 'master';
+  const services = normalizeServiceList(row.services ?? row.servicesText);
+  const rating = Number(row.rating);
+  const reviewCount = Number(row.reviewCount ?? row.review_count);
+
+  return {
+    id: valueToString(row.id, slug),
+    slug,
+    name,
+    profession: valueToString(row.profession ?? row.specialization, 'Специалист'),
+    city: valueToString(row.city, 'Город'),
+    bio: valueToString(row.bio ?? row.description, 'Описание профиля'),
+    services,
+    phone: optionalString(row.phone),
+    telegram: optionalString(row.telegram),
+    whatsapp: optionalString(row.whatsapp ?? row.vk),
+    locationMode: normalizeLocationMode(row.locationMode ?? row.location_mode),
+    address: optionalString(row.address),
+    mapUrl: optionalString(row.mapUrl ?? row.map_url),
+    hidePhone: Boolean(row.hidePhone ?? row.hide_phone),
+    hideTelegram: Boolean(row.hideTelegram ?? row.hide_telegram),
+    hideWhatsapp: Boolean(row.hideWhatsapp ?? row.hide_whatsapp),
+    avatar: optionalString(row.avatar ?? row.avatarUrl ?? row.photo),
+    rating: Number.isFinite(rating) ? rating : undefined,
+    reviewCount: Number.isFinite(reviewCount) ? reviewCount : undefined,
+    responseTime: optionalString(row.responseTime ?? row.response_time),
+    experienceLabel: optionalString(row.experienceLabel ?? row.experience_label),
+    priceHint: optionalString(row.priceHint ?? row.price_hint),
+    reviews: normalizeReviews(row.reviews),
+    workGallery: normalizeWorkGallery(row.workGallery ?? row.work_gallery),
+    createdAt: valueToString(row.createdAt ?? row.created_at, new Date().toISOString()),
+  };
+}
+
+function normalizeBookingStatus(value: unknown): BookingStatus {
+  return BOOKING_STATUSES.includes(value as BookingStatus) ? (value as BookingStatus) : 'new';
+}
+
+function normalizeBooking(value: unknown, index: number): Booking | null {
+  const row = objectRecord(value);
+  if (Object.keys(row).length === 0) return null;
+
+  const clientName = valueToString(row.clientName ?? row.client_name ?? row.name, 'Клиент');
+  const clientPhone = valueToString(row.clientPhone ?? row.client_phone ?? row.phone, '');
+  const service = valueToString(row.service ?? row.serviceName ?? row.service_name, 'Услуга');
+  const date = valueToString(row.date, new Date().toISOString().slice(0, 10));
+  const time = valueToString(row.time, '10:00').slice(0, 5);
+  const createdAt = valueToString(row.createdAt ?? row.created_at, new Date().toISOString());
+  const priceAmount = Number(row.priceAmount ?? row.price_amount);
+  const durationMinutes = Number(row.durationMinutes ?? row.duration_minutes);
+  const metadata = row.metadata && typeof row.metadata === 'object' && !Array.isArray(row.metadata)
+    ? (row.metadata as Record<string, unknown>)
+    : undefined;
+
+  return {
+    id: valueToString(row.id, `booking-${index}-${date}-${time}`),
+    masterSlug: valueToString(row.masterSlug ?? row.master_slug ?? row.slug),
+    clientName,
+    clientPhone,
+    service,
+    date,
+    time,
+    comment: optionalString(row.comment),
+    status: normalizeBookingStatus(row.status),
+    createdAt,
+    source: optionalString(row.source),
+    channel: optionalString(row.channel),
+    priceAmount: Number.isFinite(priceAmount) ? priceAmount : undefined,
+    durationMinutes: Number.isFinite(durationMinutes) ? durationMinutes : undefined,
+    confirmedAt: optionalString(row.confirmedAt ?? row.confirmed_at),
+    completedAt: optionalString(row.completedAt ?? row.completed_at),
+    noShowAt: optionalString(row.noShowAt ?? row.no_show_at),
+    cancelledAt: optionalString(row.cancelledAt ?? row.cancelled_at),
+    cancelReason: optionalString(row.cancelReason ?? row.cancel_reason),
+    statusCheckSentAt: optionalString(row.statusCheckSentAt ?? row.status_check_sent_at),
+    metadata,
+  };
+}
+
+function normalizeBookings(value: unknown, fallbackSlug?: string) {
+  if (!Array.isArray(value)) return [] as Booking[];
+
+  return value
+    .map((item, index) => normalizeBooking(item, index))
+    .filter((item): item is Booking => Boolean(item))
+    .map((booking) => ({
+      ...booking,
+      masterSlug: booking.masterSlug || fallbackSlug || '',
+    }));
+}
+
+function normalizeWorkspaceData(value: unknown, fallbackSlug?: string): WorkspaceSections {
+  const source = objectRecord(value);
+  const bookings = normalizeBookings(source.bookings, fallbackSlug);
+
+  return {
+    ...source,
+    bookings,
+  } as WorkspaceSections;
+}
+
 function buildBooking(masterSlug: string, values: BookingFormValues): Omit<Booking, 'id' | 'status' | 'createdAt'> {
   return {
     masterSlug,
@@ -201,10 +398,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    setWorkspaceId(snapshot.id);
-    setOwnedProfile(snapshot.profile);
-    setStoredBookings(Array.isArray(snapshot.data?.bookings) ? (snapshot.data.bookings as Booking[]) : []);
-    setWorkspaceData(snapshot.data ?? {});
+    const safeProfile = normalizeProfile(snapshot.profile);
+    const safeData = normalizeWorkspaceData(snapshot.data, safeProfile?.slug ?? snapshot.slug);
+    const safeBookings = Array.isArray(safeData.bookings) ? safeData.bookings : [];
+
+    setWorkspaceId(valueToString(snapshot.id));
+    setOwnedProfile(safeProfile);
+    setStoredBookings(safeBookings);
+    setWorkspaceData(safeData);
   }, []);
 
   const refreshWorkspace = useCallback(async () => {

@@ -56,7 +56,12 @@ export function useOwnedWorkspaceData() {
 
   const dataset = useMemo(() => {
     if (!resolvedProfile) return null;
-    return buildWorkspaceDatasetFromStored(resolvedProfile, resolvedBookings, locale, resolvedWorkspaceData);
+
+    try {
+      return buildWorkspaceDatasetFromStored(resolvedProfile, resolvedBookings, locale, resolvedWorkspaceData);
+    } catch {
+      return null;
+    }
   }, [locale, resolvedBookings, resolvedProfile, resolvedWorkspaceData]);
 
   return {
