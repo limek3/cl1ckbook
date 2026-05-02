@@ -1691,16 +1691,8 @@ export function MasterProfileForm({
   const nextNavItem = navItems[activeIndex + 1] ?? null;
 
   const switchSection = (section: ProfileSection) => {
+    if (section === activeSection) return;
     setActiveSection(section);
-
-    if (typeof window !== 'undefined') {
-      window.requestAnimationFrame(() => {
-        window.scrollTo({
-          top: 0,
-          behavior: 'smooth',
-        });
-      });
-    }
   };
 
   const checklistItems: Array<{

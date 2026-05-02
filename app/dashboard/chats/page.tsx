@@ -113,6 +113,61 @@ function arrayMove<T>(items: T[], from: number, to: number) {
   return next;
 }
 
+function mergeThreadMessages(
+  currentMessages: ChatMessageRecord[],
+  incomingMessages: ChatMessageRecord[],
+) {
+  const map = new Map<string, ChatMessageRecord>();
+
+  for (const message of currentMessages) {
+    map.set(message.id, message);
+  }
+
+  for (const message of incomingMessages) {
+    const current = map.get(message.id);
+    map.set(message.id, current ? { ...current, ...message } : message);
+  }
+
+  return Array.from(map.values()).sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
+}
+
+function mergeThreadSnapshots(
+  currentThreads: ChatThreadRecord[],
+  incomingThreads: ChatThreadRecord[],
+  sortMode: SortMode,
+) {
+  const currentMap = new Map(currentThreads.map((thread) => [thread.id, thread]));
+  const merged = incomingThreads.map((thread) => {
+    const current = currentMap.get(thread.id);
+    if (!current) return thread;
+
+    return {
+      ...current,
+      ...thread,
+      messages: mergeThreadMessages(current.messages ?? [], thread.messages ?? []),
+    } satisfies ChatThreadRecord;
+  });
+
+  if (sortMode !== 'manual') {
+    return sortThreads(merged, 'recent');
+  }
+
+  const ordered: ChatThreadRecord[] = [];
+  const used = new Set<string>();
+
+  for (const thread of currentThreads) {
+    const next = merged.find((item) => item.id === thread.id);
+    if (!next) continue;
+    ordered.push(next);
+    used.add(next.id);
+  }
+
+  const fresh = merged.filter((thread) => !used.has(thread.id));
+  return [...sortThreads(fresh, 'recent'), ...ordered];
+}
+
 function pageBg(light: boolean) {
   return light ? 'bg-[#f4f4f2]' : 'bg-[#090909]';
 }
@@ -1009,6 +1064,7 @@ export default function DashboardChatsPage() {
   const dragOffsetRef = useRef(0);
   const dragOverIndexRef = useRef<number | null>(null);
   const dragThresholdRef = useRef(6);
+  const threadsRefreshInFlightRef = useRef(false);
 
   useEffect(() => {
     setMounted(true);
@@ -1235,49 +1291,47 @@ export default function DashboardChatsPage() {
     } catch {}
   }, [hasHydrated, pinStateHydrated, pinnedStorageKey, pinnedThreadIds]);
 
-  useEffect(() => {
-    if (!hasHydrated) return;
+  const refreshThreads = useCallback(
+    async ({ background = false }: { background?: boolean } = {}) => {
+      if (!hasHydrated || threadsRefreshInFlightRef.current) return;
 
-    let ignore = false;
-
-    const loadThreads = async () => {
       if (demoMode) {
         const fallback = getDashboardDemoChatThreads(locale);
 
         try {
-          const raw = window.localStorage.getItem(demoStorageKey);
+          const raw = typeof window !== 'undefined' ? window.localStorage.getItem(demoStorageKey) : null;
           const next = raw ? (JSON.parse(raw) as ChatThreadRecord[]) : fallback;
 
-          if (!ignore) {
-            setThreads(sortThreads(next, 'recent'));
-            setActiveThreadId((current) => current ?? next[0]?.id ?? null);
-            setError(null);
-            setIsLoading(false);
-          }
+          setThreads((current) =>
+            background ? mergeThreadSnapshots(current, next, sortMode) : sortThreads(next, 'recent'),
+          );
+          setActiveThreadId((current) => current ?? next[0]?.id ?? null);
+          setError(null);
+          setIsLoading(false);
         } catch {
-          if (!ignore) {
-            setThreads(sortThreads(fallback, 'recent'));
-            setActiveThreadId(fallback[0]?.id ?? null);
-            setError(null);
-            setIsLoading(false);
-          }
-        }
-
-        return;
-      }
-
-      if (!ownedProfile) {
-        if (!ignore) {
-          setThreads([]);
-          setActiveThreadId(null);
+          setThreads((current) =>
+            background ? mergeThreadSnapshots(current, fallback, sortMode) : sortThreads(fallback, 'recent'),
+          );
+          setActiveThreadId((current) => current ?? fallback[0]?.id ?? null);
+          setError(null);
           setIsLoading(false);
         }
 
         return;
       }
 
-      setIsLoading(true);
-      setError(null);
+      if (!ownedProfile) {
+        setThreads([]);
+        setActiveThreadId(null);
+        setIsLoading(false);
+        return;
+      }
+
+      threadsRefreshInFlightRef.current = true;
+
+      if (!background) {
+        setIsLoading(true);
+      }
 
       try {
         const response = await fetch('/api/chats', {
@@ -1291,30 +1345,51 @@ export default function DashboardChatsPage() {
         }
 
         const payload = (await response.json()) as ChatThreadListResponse;
-        const nextThreads = sortThreads(payload.threads ?? [], 'recent');
+        const nextThreads = payload.threads ?? [];
 
-        if (!ignore) {
-          setThreads(nextThreads);
-          setActiveThreadId((current) => current ?? nextThreads[0]?.id ?? null);
-          setError(null);
-        }
+        setThreads((current) =>
+          background
+            ? mergeThreadSnapshots(current, nextThreads, sortMode)
+            : sortThreads(nextThreads, 'recent'),
+        );
+        setActiveThreadId((current) => current ?? nextThreads[0]?.id ?? null);
+        setError(null);
       } catch {
-        if (!ignore) {
+        if (!background) {
           setError(labels.loadError);
         }
       } finally {
-        if (!ignore) {
+        threadsRefreshInFlightRef.current = false;
+        if (!background) {
           setIsLoading(false);
         }
       }
+    },
+    [demoMode, demoStorageKey, hasHydrated, labels.loadError, locale, ownedProfile, sortMode],
+  );
+
+  useEffect(() => {
+    void refreshThreads();
+  }, [refreshThreads]);
+
+  useEffect(() => {
+    if (!hasHydrated || !ownedProfile || demoMode || typeof window === 'undefined') return;
+
+    const tick = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      void refreshThreads({ background: true });
     };
 
-    void loadThreads();
+    const intervalId = window.setInterval(tick, 4000);
+    window.addEventListener('focus', tick);
+    document.addEventListener('visibilitychange', tick);
 
     return () => {
-      ignore = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', tick);
+      document.removeEventListener('visibilitychange', tick);
     };
-  }, [demoMode, demoStorageKey, hasHydrated, labels.loadError, locale, ownedProfile]);
+  }, [demoMode, hasHydrated, ownedProfile, refreshThreads]);
 
   useEffect(() => {
     if (!demoMode || !hasHydrated) return;

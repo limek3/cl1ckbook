@@ -356,11 +356,9 @@ function providerConnected(providers: Set<string>, provider: ConnectedProvider) 
 function ConnectedAccountsCard({
   light,
   locale,
-  accentColor,
 }: {
   light: boolean;
   locale: 'ru' | 'en';
-  accentColor: string;
 }) {
   const [state, setState] = useState<ConnectedAccountState>({
     providers: new Set(),
@@ -889,36 +887,63 @@ function ProfileOverviewCard({
       <div className="p-4">
         <div className="grid gap-4 xl:grid-cols-[260px_minmax(0,1fr)]">
           <Panel light={light} className="p-4">
-            <div className="flex flex-col items-center text-center">
-              <div
-                className={cn(
-                  'flex size-[92px] items-center justify-center overflow-hidden rounded-[16px] border',
-                  light
-                    ? 'border-black/[0.08] bg-[#fbfbfa]'
-                    : 'border-white/[0.08] bg-white/[0.035]',
-                )}
-              >
+            <div
+              className={cn(
+                'relative overflow-hidden rounded-[18px] border',
+                light
+                  ? 'border-black/[0.08] bg-[#f6f6f4]'
+                  : 'border-white/[0.08] bg-white/[0.035]',
+              )}
+            >
+              <div className="relative aspect-[4/5] min-h-[300px] w-full overflow-hidden">
                 <MasterAvatar
                   name={name || labels.name}
                   avatar={avatar}
-                  className="h-[76px] w-[76px] rounded-[14px] border-0 object-contain object-center"
+                  className="absolute inset-0 h-full w-full rounded-none border-0 object-cover object-center text-[42px]"
                 />
-              </div>
 
-              <div className="mt-3 min-w-0">
-                <div className={cn('text-[17px] font-semibold tracking-[-0.03em]', pageText(light))}>
-                  {name || '—'}
-                </div>
+                <div
+                  className="pointer-events-none absolute inset-x-0 bottom-0 h-[55%]"
+                  style={{
+                    background: light
+                      ? 'linear-gradient(180deg, rgba(251,251,250,0) 0%, rgba(251,251,250,0.18) 22%, rgba(251,251,250,0.88) 100%)'
+                      : 'linear-gradient(180deg, rgba(16,16,16,0) 0%, rgba(16,16,16,0.24) 22%, rgba(16,16,16,0.92) 100%)',
+                  }}
+                />
 
-                <div className={cn('mt-1 text-[11px]', mutedText(light))}>
-                  {profession || '—'}
-                </div>
+                <div className="absolute inset-x-3 bottom-3">
+                  <div
+                    className={cn(
+                      'rounded-[14px] border px-3.5 py-3 backdrop-blur-[22px]',
+                      light
+                        ? 'border-black/[0.08] bg-[#fbfbfa]/78 text-black shadow-[0_14px_40px_rgba(15,15,15,0.06)]'
+                        : 'border-white/[0.10] bg-[#101010]/72 text-white shadow-[0_16px_44px_rgba(0,0,0,0.32)]',
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className={cn('truncate text-[22px] font-semibold leading-none tracking-[-0.065em]', pageText(light))}>
+                          {name || '—'}
+                        </div>
 
-                {city ? (
-                  <div className={cn('mt-1 text-[10.5px]', faintText(light))}>
-                    {city}
+                        <div className={cn('mt-2 truncate text-[11.5px] font-medium', mutedText(light))}>
+                          {profession || '—'}
+                        </div>
+
+                        {city ? (
+                          <div className={cn('mt-1 truncate text-[10.5px]', faintText(light))}>
+                            {city}
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <MicroLabel light={light} active accentColor={accentColor} className="shrink-0">
+                        <StatusDot light={light} active accentColor={accentColor} />
+                        {labels.profile}
+                      </MicroLabel>
+                    </div>
                   </div>
-                ) : null}
+                </div>
               </div>
             </div>
 
@@ -1416,7 +1441,7 @@ export default function DashboardProfilePage() {
               avatar={ownedProfile.avatar}
             />
 
-            <ConnectedAccountsCard light={isLight} locale={locale} accentColor={accentColor} />
+            <ConnectedAccountsCard light={isLight} locale={locale} />
 
             <div className="dashboard-profile-form-clean">
               <MasterProfileForm

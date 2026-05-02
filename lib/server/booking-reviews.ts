@@ -136,3 +136,63 @@ export async function submitBookingReview(params: {
 
   return { ok: true as const, review, profile: nextProfile };
 }
+
+
+export async function getBookingReviewContext(tokenInput: string) {
+  const admin = createSupabaseAdminClient();
+  const token = tokenInput.trim();
+
+  if (!token) {
+    return { ok: false as const, reason: 'required' as const };
+  }
+
+  const { data: link, error: linkError } = await admin
+    .from('sloty_booking_review_links')
+    .select('*')
+    .eq('token', token)
+    .maybeSingle();
+
+  if (linkError) throw linkError;
+  if (!link) return { ok: false as const, reason: 'not_found' as const };
+
+  const { data: workspace, error: workspaceError } = await admin
+    .from('sloty_workspaces')
+    .select('id,slug,profile')
+    .eq('id', link.workspace_id)
+    .maybeSingle();
+
+  if (workspaceError) throw workspaceError;
+  if (!workspace) return { ok: false as const, reason: 'workspace_not_found' as const };
+
+  const profile = ((workspace.profile ?? {}) as MasterProfile) || ({} as MasterProfile);
+  const expiresAt = typeof link.expires_at === 'string' ? link.expires_at : null;
+  const expired = Boolean(expiresAt && Date.now() > new Date(expiresAt).getTime());
+
+  return {
+    ok: true as const,
+    context: {
+      token,
+      status: typeof link.status === 'string' ? link.status : 'pending',
+      expired,
+      expiresAt,
+      submittedAt: typeof link.submitted_at === 'string' ? link.submitted_at : null,
+      master: {
+        slug:
+          (typeof workspace.slug === 'string' && workspace.slug) ||
+          (typeof link.master_slug === 'string' ? link.master_slug : '') ||
+          profile.slug ||
+          '',
+        name: profile.name || 'Мастер',
+        profession: profile.profession || '',
+        city: profile.city || '',
+        avatar: profile.avatar || '',
+        rating: profile.rating ?? null,
+        reviewCount: profile.reviewCount ?? 0,
+      },
+      booking: {
+        clientName: typeof link.client_name === 'string' ? link.client_name : '',
+        service: typeof link.service === 'string' ? link.service : '',
+      },
+    },
+  };
+}

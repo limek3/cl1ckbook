@@ -546,11 +546,53 @@ function getWorkspaceIdentity(profile: unknown, locale: 'ru' | 'en') {
         ? 'рабочий профиль'
         : 'working profile';
 
+  const avatar =
+    typeof data.avatar === 'string' && data.avatar.trim()
+      ? data.avatar.trim()
+      : undefined;
+
   return {
     name,
     subtitle: slug.startsWith('@') ? slug : `@${slug}`,
     initial: name.trim().slice(0, 1).toUpperCase() || 'К',
+    avatar,
   };
+}
+
+function WorkspaceIdentityAvatar({
+  identity,
+  size = 'sm',
+}: {
+  identity: {
+    name: string;
+    initial: string;
+    avatar?: string;
+  };
+  size?: 'sm' | 'md';
+}) {
+  return (
+    <span
+      className={cn(
+        'relative flex shrink-0 items-center justify-center overflow-hidden border font-bold',
+        size === 'md'
+          ? 'size-9 rounded-[11px] text-[12px]'
+          : 'size-8 rounded-[10px] text-[11px]',
+        'border-black/[0.08] bg-[#fbfbfa] text-black/72',
+        'dark:border-white/[0.09] dark:bg-[#101010] dark:text-white/78',
+      )}
+    >
+      {identity.avatar ? (
+        <img src={identity.avatar} alt={identity.name} className="h-full w-full object-cover" />
+      ) : (
+        identity.initial
+      )}
+
+      <span
+        aria-hidden="true"
+        className="absolute -right-0.5 -top-0.5 size-2 rounded-full border-2 border-[#fbfbfa] bg-emerald-500 animate-pulse dark:border-[#101010]"
+      />
+    </span>
+  );
 }
 
 function AccountThemeIcon({ value }: { value: ThemeOption }) {
@@ -1036,20 +1078,7 @@ function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
             <div className="px-2.5 pb-2 pt-2">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-start gap-2.5">
-                  <span
-                    className={cn(
-                      'relative flex size-9 shrink-0 items-center justify-center rounded-[11px] border text-[12px] font-bold',
-                      'border-black/[0.08] bg-black/[0.035] text-black/72',
-                      'dark:border-white/[0.09] dark:bg-white/[0.06] dark:text-white/78',
-                    )}
-                  >
-                    {identity.initial}
-
-                    <span
-                      aria-hidden="true"
-                      className="absolute -right-0.5 -top-0.5 size-2 rounded-full border-2 border-[#fbfbfa] bg-emerald-500 animate-pulse dark:border-[#101010]"
-                    />
-                  </span>
+                  <WorkspaceIdentityAvatar identity={identity} size="md" />
 
                   <span className="min-w-0 pt-0.5">
                     <span className="block truncate text-[13px] font-semibold leading-none tracking-[-0.04em]">
@@ -1450,20 +1479,7 @@ function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
             open && 'bg-black/[0.045] dark:bg-white/[0.07]',
           )}
         >
-          <span
-            className={cn(
-              'relative flex size-8 shrink-0 items-center justify-center rounded-[10px] border text-[11px] font-bold',
-              'border-black/[0.07] bg-[#fbfbfa] text-black/72',
-              'dark:border-white/[0.09] dark:bg-[#101010] dark:text-white/78',
-            )}
-          >
-            {identity.initial}
-
-            <span
-              aria-hidden="true"
-              className="absolute -right-0.5 -top-0.5 size-2 rounded-full border-2 border-[#fbfbfa] bg-emerald-500 animate-pulse dark:border-[#101010]"
-            />
-          </span>
+          <WorkspaceIdentityAvatar identity={identity} />
 
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[11.5px] font-semibold leading-none tracking-[-0.03em] text-black dark:text-white" title={identity.name}>
