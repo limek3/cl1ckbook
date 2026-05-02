@@ -319,7 +319,7 @@ function CopyButton({
       title={copied ? copiedLabel : copyLabel}
       className={cn(
         'inline-flex h-8 shrink-0 items-center justify-center gap-2 overflow-hidden rounded-[9px] border text-[11px] font-medium shadow-none transition-[width,background,border-color,color,opacity,transform] duration-200 active:scale-[0.985]',
-        copied ? 'w-[118px] px-3' : 'w-8 px-0',
+        copied ? 'w-[162px] px-3' : 'w-8 px-0',
         light
           ? 'border-black/[0.08] bg-white text-black/54 hover:border-black/[0.12] hover:bg-black/[0.035] hover:text-black'
           : 'border-white/[0.08] bg-white/[0.04] text-white/58 hover:border-white/[0.13] hover:bg-white/[0.07] hover:text-white',
@@ -631,7 +631,7 @@ function ConnectedAccountsCard({
     <Card light={light} className="cb-profile-linked-accounts overflow-hidden">
       <CardTitle title={labels.title} description={labels.description} light={light} />
 
-      <div className="grid gap-3 p-4 xl:grid-cols-[minmax(0,1fr)_260px]">
+      <div className="p-4">
         <div className="grid gap-2 md:grid-cols-3">
           {rows.map((row) => {
             const connected = providerConnected(state.providers, row.provider);
@@ -700,14 +700,31 @@ function ConnectedAccountsCard({
           })}
         </div>
 
-        <Panel light={light} className="p-3">
-          <div className={cn('text-[12px] font-semibold tracking-[-0.005em]', pageText(light))}>
-            {state.email ?? labels.ready}
+        {(state.email || state.message) ? (
+          <div
+            className={cn(
+              'mt-3 flex min-h-10 items-start gap-3 rounded-[10px] border px-3 py-2.5',
+              light
+                ? 'border-black/[0.07] bg-black/[0.025]'
+                : 'border-white/[0.08] bg-white/[0.035]',
+            )}
+          >
+            <span
+              className={cn(
+                'mt-1 size-1.5 shrink-0 rounded-full',
+                light ? 'bg-black/30' : 'bg-white/28',
+              )}
+            />
+            <div className="min-w-0">
+              <div className={cn('truncate text-[11.5px] font-semibold tracking-[-0.005em]', pageText(light))}>
+                {state.email ?? labels.ready}
+              </div>
+              <p className={cn('mt-1 text-[10.5px] leading-4', mutedText(light))}>
+                {state.message ?? labels.ready}
+              </p>
+            </div>
           </div>
-          <p className={cn('mt-1.5 text-[10.5px] leading-4', mutedText(light))}>
-            {state.message ?? labels.setup}
-          </p>
-        </Panel>
+        ) : null}
       </div>
     </Card>
   );
@@ -969,7 +986,7 @@ function ProfileOverviewCard({
             </div>
 
             <div className="mt-3 grid gap-2">
-              <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+              <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto]">
                 <div
                   className={cn(
                     'flex min-w-0 flex-1 items-center gap-2 rounded-[10px] border px-3 py-2.5',
@@ -987,7 +1004,7 @@ function ProfileOverviewCard({
                   </div>
                 </div>
 
-                <div className="flex shrink-0 flex-wrap gap-2">
+                <div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">
                   <ActionLink href={publicHref} light={light} active>
                     <Globe2 className="size-3.5" />
                     {labels.openPublic}
@@ -1003,7 +1020,7 @@ function ProfileOverviewCard({
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+              <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto]">
                 <div
                   className={cn(
                     'flex min-w-0 flex-1 items-center gap-2 rounded-[10px] border px-3 py-2.5',
@@ -1021,8 +1038,8 @@ function ProfileOverviewCard({
                   </div>
                 </div>
 
-                <div className="flex shrink-0 flex-wrap gap-2">
-                  <ActionLink href={reviewHref} light={light}>
+                <div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">
+                  <ActionLink href={reviewHref} light={light} active>
                     <Quote className="size-3.5" />
                     {labels.openReview}
                   </ActionLink>
@@ -1077,7 +1094,7 @@ export default function DashboardProfilePage() {
           personalPage: 'Персональная страница',
           reviewPage: 'Для отзывов',
           openPublic: 'Открыть страницу',
-          openReview: 'Открыть отзыв',
+          openReview: 'Открыть отзывы',
           copyLink: 'Скопировать ссылку',
 
           createProfileTitle: 'Профиль ещё не создан',
@@ -1112,7 +1129,7 @@ export default function DashboardProfilePage() {
           name: 'Имя',
           phone: 'Телефон',
           telegram: 'Telegram',
-          whatsapp: 'WhatsApp',
+          whatsapp: 'VK',
           copy: 'Скопировать',
           copied: 'Скопировано',
           overview: 'Сводка профиля',
@@ -1129,7 +1146,7 @@ export default function DashboardProfilePage() {
           personalPage: 'Personal page',
           reviewPage: 'For reviews',
           openPublic: 'Open page',
-          openReview: 'Open review',
+          openReview: 'Open reviews',
           copyLink: 'Copy link',
 
           createProfileTitle: 'Profile is not created yet',
@@ -1164,7 +1181,7 @@ export default function DashboardProfilePage() {
           name: 'Name',
           phone: 'Phone',
           telegram: 'Telegram',
-          whatsapp: 'WhatsApp',
+          whatsapp: 'VK',
           copy: 'Copy',
           copied: 'Copied',
           overview: 'Profile overview',

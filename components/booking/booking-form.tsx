@@ -805,10 +805,8 @@ function SuccessView({
                 target="_blank"
                 rel="noreferrer"
                 className={cn(
-                  'inline-flex h-10 w-full items-center justify-center gap-2 rounded-[10px] border px-4 text-[12px] font-semibold transition active:scale-[0.99]',
-                  light
-                    ? 'border-black/[0.08] bg-white text-black/72 hover:border-black/[0.14] hover:bg-black/[0.035] hover:text-black'
-                    : 'border-white/[0.08] bg-white/[0.04] text-white/72 hover:border-white/[0.14] hover:bg-white/[0.07] hover:text-white',
+                  'inline-flex h-10 w-full items-center justify-center gap-2 rounded-[10px] px-4 text-[12px] font-semibold transition active:scale-[0.99]',
+                  quietButtonClass(light),
                 )}
               >
                 <Send className="size-4" />
@@ -822,10 +820,8 @@ function SuccessView({
                 target="_blank"
                 rel="noreferrer"
                 className={cn(
-                  'inline-flex h-10 w-full items-center justify-center gap-2 rounded-[10px] border px-4 text-[12px] font-semibold transition active:scale-[0.99]',
-                  light
-                    ? 'border-black/[0.08] bg-white text-black/72 hover:border-black/[0.14] hover:bg-black/[0.035] hover:text-black'
-                    : 'border-white/[0.08] bg-white/[0.04] text-white/72 hover:border-white/[0.14] hover:bg-white/[0.07] hover:text-white',
+                  'inline-flex h-10 w-full items-center justify-center gap-2 rounded-[10px] px-4 text-[12px] font-semibold transition active:scale-[0.99]',
+                  quietButtonClass(light),
                 )}
               >
                 <MessageCircleMore className="size-4" />
@@ -952,9 +948,9 @@ export function BookingForm({
           submit: 'Отправить',
           successTitle: 'Заявка отправлена',
           successDescription:
-            'Мастер получил заявку. Подключите Telegram или VK, чтобы не потерять запись: бот пришлёт статус, напоминание за 2 часа, адрес и маршрут.',
+            'Мастер получил заявку. Подключите Telegram или VK, чтобы не потерять запись: бот пришлёт статус, напоминание за 24 часа с подтверждением/переносом, а за 2 часа — адрес и маршрут.',
           connectTitle: 'Получите подтверждение в удобном канале',
-          connectText: 'Лучше нажать сразу: так бот сможет прислать напоминание за 2 часа, адрес, маршрут и кнопки подтверждения/переноса ближе к визиту.',
+          connectText: 'Лучше нажать сразу: так бот сможет прислать подтверждение записи, напоминание за 24 часа с кнопками подтверждения/переноса, а за 2 часа — просто адрес и маршрут.',
           telegramConfirm: 'Получить в Telegram',
           telegramConfirmHint:
             'Telegram-бот отправит статус, напоминание и маршрут.',
@@ -995,9 +991,9 @@ export function BookingForm({
           submit: 'Send',
           successTitle: 'Request sent',
           successDescription:
-            'The master received your request. Connect Telegram or VK to get status, a 2-hour reminder, address, and route.',
+            'The master received your request. Connect Telegram or VK to get status, a 24-hour reminder with confirm/reschedule actions, and a 2-hour reminder with address and route.',
           connectTitle: 'Get confirmation in a convenient channel',
-          connectText: 'Tap now so the bot can send a 2-hour reminder, address, route, and confirm/reschedule actions closer to the visit.',
+          connectText: 'Tap now so the bot can send confirmation, a 24-hour reminder with confirm/reschedule actions, and a 2-hour reminder with address and route.',
           telegramConfirm: 'Get in Telegram',
           telegramConfirmHint:
             'Telegram bot will send status, reminder, and route.',

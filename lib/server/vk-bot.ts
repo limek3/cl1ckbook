@@ -604,7 +604,7 @@ export async function sendClientVkBookingConfirmation(params: {
       `Время: ${bookingDateLabel(params.booking)}`,
       ...placeLines,
       '',
-      'Ближе к записи я пришлю напоминание. В нём можно будет подтвердить визит, запросить перенос и открыть маршрут.',
+      'Ближе к записи я пришлю напоминание за 24 часа с подтверждением/переносом. За 2 часа придёт отдельное напоминание с адресом и маршрутом.',
     ]
       .filter(Boolean)
       .join('\n'),
@@ -632,13 +632,13 @@ export async function sendClientVkBookingReminder(params: {
       `Время: ${params.booking.time}`,
       ...placeLines,
       '',
-      params.hoursBefore <= 2
-        ? 'Хорошего визита! Подтвердите запись или выберите перенос. Если выбрать перенос, слот освободится, а мастер получит предупреждение.'
-        : 'Ближе к визиту я пришлю контрольное напоминание с кнопками подтверждения/переноса.',
+      params.hoursBefore >= 24
+        ? 'Пожалуйста, подтвердите запись или запросите перенос. Если выбрать перенос, слот освободится, а мастер получит предупреждение.'
+        : 'Скоро визит. Ниже адрес и маршрут, если приём проходит по адресу. Хорошего визита!',
     ]
       .filter(Boolean)
       .join('\n'),
-    keyboard: params.hoursBefore <= 2 ? buildVkClientBookingKeyboard(params.booking.id) : undefined,
+    keyboard: params.hoursBefore >= 24 ? buildVkClientBookingKeyboard(params.booking.id) : undefined,
   });
 }
 

@@ -13,6 +13,7 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
+import { toast } from 'sonner';
 import {
   ArrowLeft,
   BadgeCheck,
@@ -563,7 +564,7 @@ function CopyIconButton({
       title={copied ? copiedLabel : copyLabel}
       className={cn(
         'inline-flex h-8 shrink-0 items-center justify-center gap-2 overflow-hidden rounded-[9px] border text-[11.5px] font-medium shadow-none transition-[width,background,border-color,color,opacity,transform] duration-200 active:scale-[0.985]',
-        copied ? 'w-[122px] px-3' : 'w-8 px-0',
+        copied ? 'w-[162px] px-3' : 'w-8 px-0',
         light
           ? 'border-black/[0.08] bg-white text-black/58 hover:border-black/[0.14] hover:bg-black/[0.035] hover:text-black'
           : 'border-white/[0.08] bg-white/[0.04] text-white/55 hover:border-white/[0.14] hover:bg-white/[0.07] hover:text-white',
@@ -2098,7 +2099,11 @@ export function MasterProfileForm({
     const result = await saveProfile(cleanedValues);
 
     if (!result.success || !result.profile) {
-      setError(result.error || 'Unable to save profile');
+      const message = result.error || 'Unable to save profile';
+      setError(message);
+      toast.error(locale === 'ru' ? 'Не удалось сохранить' : 'Could not save', {
+        description: message,
+      });
       return;
     }
 
@@ -2106,6 +2111,9 @@ export function MasterProfileForm({
     setValues(createInitialValues(result.profile));
     setSlugTouched(Boolean(result.profile.slug));
     setSavedAt(new Date().toISOString());
+    toast.success(locale === 'ru' ? 'Сохранено' : 'Saved', {
+      description: locale === 'ru' ? 'Изменения профиля успешно применены.' : 'Profile changes were saved successfully.',
+    });
 
     if (mode === 'create') {
       router.push(demoMode ? '/dashboard/profile?demo=1' : '/dashboard/profile');
@@ -2140,11 +2148,28 @@ export function MasterProfileForm({
               />
 
               <div className="grid place-items-center">
-                <MasterAvatar
-                  name={previewProfile.name}
-                  avatar={values.avatar}
-                  className="h-24 w-24 rounded-[14px]"
-                />
+                <div
+                  className={cn(
+                    'flex h-24 w-24 items-center justify-center overflow-hidden rounded-[14px] border',
+                    isLight
+                      ? 'border-black/[0.08] bg-[#fbfbfa]'
+                      : 'border-white/[0.08] bg-white/[0.035]',
+                  )}
+                >
+                  {values.avatar ? (
+                    <img
+                      src={values.avatar}
+                      alt={previewProfile.name}
+                      className="h-full w-full object-contain object-center p-2"
+                    />
+                  ) : (
+                    <MasterAvatar
+                      name={previewProfile.name}
+                      avatar={values.avatar}
+                      className="h-full w-full rounded-[14px] border-0"
+                    />
+                  )}
+                </div>
 
                 <div className="mt-3 text-center">
                   <div className={cn('text-[12px] font-semibold', pageText(isLight))}>
@@ -2177,15 +2202,23 @@ export function MasterProfileForm({
                   </ActionButton>
 
                   {values.avatar ? (
-                    <ActionButton
-                      light={isLight}
+                    <button
+                      type="button"
                       onClick={() => {
                         setValues((current) => ({ ...current, avatar: '' }));
                         setAvatarError(null);
                       }}
+                      className={cn(
+                        'inline-flex h-8 items-center justify-center gap-2 rounded-[9px] border px-3 text-[12px] font-medium shadow-none transition-[background,border-color,color,opacity,transform] duration-150 active:scale-[0.985]',
+                        isLight
+                          ? 'border-red-500/20 bg-red-500/[0.08] text-red-600 hover:border-red-500/30 hover:bg-red-500/[0.12] hover:text-red-700'
+                          : 'border-red-500/24 bg-red-500/[0.14] text-red-200 hover:border-red-400/36 hover:bg-red-500/[0.2] hover:text-red-100',
+                      )}
+                      aria-label={labels.delete}
+                      title={labels.delete}
                     >
                       <Trash2 className="size-3.5" />
-                    </ActionButton>
+                    </button>
                   ) : null}
                 </div>
               </div>

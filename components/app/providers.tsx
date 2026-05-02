@@ -16,7 +16,7 @@ export function Providers({ children }: { children: ReactNode }) {
           <AppearanceProvider>
             <TelegramMiniAppAutoAuth />
             {children}
-            <Toaster richColors position="top-center" />
+            <Toaster richColors position="bottom-right" closeButton />
           </AppearanceProvider>
         </AppProvider>
       </LocaleProvider>

@@ -1124,6 +1124,7 @@ function ClientCrmDialog({
   const [draftReminderText, setDraftReminderText] = useState(reminderValue?.text ?? '');
   const [draftReminderAt, setDraftReminderAt] = useState(reminderValue?.remindAt ?? '');
   const [activeMiniDialog, setActiveMiniDialog] = useState<'note' | 'reminder' | null>(null);
+  const [timelinePage, setTimelinePage] = useState(0);
 
   useEffect(() => {
     if (!client) return;
@@ -1131,11 +1132,19 @@ function ClientCrmDialog({
     setDraftReminderText(reminderValue?.text ?? '');
     setDraftReminderAt(reminderValue?.remindAt ?? '');
     setActiveMiniDialog(null);
+    setTimelinePage(0);
   }, [client, noteValue, reminderValue?.remindAt, reminderValue?.text]);
 
   if (!open || !client || typeof document === 'undefined') return null;
 
   const timeline = buildClientTimeline(client, locale);
+  const timelinePageSize = 2;
+  const totalTimelinePages = Math.max(1, Math.ceil(timeline.length / timelinePageSize));
+  const safeTimelinePage = Math.min(timelinePage, totalTimelinePages - 1);
+  const visibleTimeline = timeline.slice(
+    safeTimelinePage * timelinePageSize,
+    safeTimelinePage * timelinePageSize + timelinePageSize,
+  );
   const segmentAccent = segmentColor(
     client.segment,
     client.favorite,
@@ -1171,6 +1180,9 @@ function ClientCrmDialog({
           remind: 'Напомнить',
           details: 'Данные клиента',
           makeFavorite: client.favorite ? 'Убрать из VIP' : 'Сделать VIP',
+          previousPage: 'Назад',
+          nextPage: 'Дальше',
+          page: 'Страница',
         }
       : {
           title: 'CRM record',
@@ -1197,6 +1209,9 @@ function ClientCrmDialog({
           remind: 'Remind',
           details: 'Client details',
           makeFavorite: client.favorite ? 'Remove VIP' : 'Make VIP',
+          previousPage: 'Previous',
+          nextPage: 'Next',
+          page: 'Page',
         };
 
   function ModalRow({
@@ -1391,8 +1406,8 @@ function ClientCrmDialog({
                   </div>
                 </div>
 
-                <div className={cn('divide-y', divideTone(light))}>
-                  {timeline.slice(0, 4).map((item) => {
+                <div className={cn('min-h-[142px] divide-y', divideTone(light))}>
+                  {visibleTimeline.map((item) => {
                     const color =
                       item.tone === 'accent'
                         ? segmentAccent
@@ -1432,7 +1447,39 @@ function ClientCrmDialog({
                       </div>
                     );
                   })}
+
+                  {visibleTimeline.length === 0 ? (
+                    <div className={cn('px-3 py-4 text-[11px]', mutedText(light))}>
+                      —
+                    </div>
+                  ) : null}
                 </div>
+
+                {timeline.length > timelinePageSize ? (
+                  <div className={cn('flex items-center justify-between gap-2 border-t px-3 py-2.5', borderTone(light))}>
+                    <button
+                      type="button"
+                      onClick={() => setTimelinePage((current) => Math.max(0, current - 1))}
+                      disabled={safeTimelinePage === 0}
+                      className={cn(buttonBase(light, false), disabledButtonClass(), 'h-8 rounded-[9px]')}
+                    >
+                      {copy.previousPage}
+                    </button>
+
+                    <div className={cn('text-[10.5px] font-medium', mutedText(light))}>
+                      {copy.page} {safeTimelinePage + 1} / {totalTimelinePages}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setTimelinePage((current) => Math.min(totalTimelinePages - 1, current + 1))}
+                      disabled={safeTimelinePage >= totalTimelinePages - 1}
+                      className={cn(buttonBase(light, false), disabledButtonClass(), 'h-8 rounded-[9px]')}
+                    >
+                      {copy.nextPage}
+                    </button>
+                  </div>
+                ) : null}
               </Panel>
             </div>
 

@@ -185,7 +185,7 @@ export async function sendClientBookingConfirmation(params: {
       `Время: ${bookingDateLabel(params.booking)}`,
       ...placeLines,
       '',
-      'Ближе к записи пришлём напоминание. Если визит офлайн — там же будет адрес и маршрут.',
+      'За 24 часа до визита пришлём напоминание с подтверждением/переносом, а за 2 часа — адрес и маршрут, если визит офлайн.',
     ]
       .filter(Boolean)
       .join('\n'),
