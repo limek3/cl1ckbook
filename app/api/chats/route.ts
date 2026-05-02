@@ -4,6 +4,7 @@ import type { Booking } from '@/lib/types';
 import type { ChatChannel, ChatDeliveryState, ChatSegment, ChatThreadRecord } from '@/lib/chat-types';
 import { requireAuthUser } from '@/lib/server/require-auth-user';
 import { sendClientTelegramMessage } from '@/lib/server/client-telegram';
+import { sendClientVkMessage } from '@/lib/server/client-vk';
 import { isNotificationEnabled } from '@/lib/server/notification-settings';
 import { listBookingsByWorkspace } from '@/lib/server/supabase-bookings';
 import {
@@ -311,16 +312,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'thread_not_found' }, { status: 404 });
     }
 
-    const shouldSendToClient =
-      thread.channel === 'Telegram' &&
-      isNotificationEnabled(workspace, {
-        id: 'chat-message',
-        titleIncludes: 'чат',
-        audience: 'client',
-        fallback: true,
-      });
+    const canSendToClient = isNotificationEnabled(workspace, {
+      id: 'chat-message',
+      titleIncludes: 'чат',
+      audience: 'client',
+      fallback: true,
+    });
 
-    const telegramDelivered = shouldSendToClient
+    const telegramDelivered = canSendToClient && thread.channel === 'Telegram'
       ? await sendClientTelegramMessage({
           workspaceId: workspace.id,
           bookingId: getThreadBookingId(thread, bookings),
@@ -334,7 +333,23 @@ export async function POST(request: Request) {
         }).catch(() => false)
       : false;
 
-    const deliveryState: ChatDeliveryState | null = telegramDelivered
+    const vkDelivered = canSendToClient && thread.channel === 'VK'
+      ? await sendClientVkMessage({
+          workspaceId: workspace.id,
+          bookingId: getThreadBookingId(thread, bookings),
+          clientPhone: thread.clientPhone,
+          clientName: thread.clientName,
+          directPeerId:
+            typeof thread.metadata?.clientVkPeerId === 'number' || typeof thread.metadata?.clientVkPeerId === 'string'
+              ? thread.metadata.clientVkPeerId
+              : null,
+          text,
+        }).catch(() => false)
+      : false;
+
+    const deliveredToClient = telegramDelivered || vkDelivered;
+
+    const deliveryState: ChatDeliveryState | null = deliveredToClient
       ? 'delivered'
       : requestedDeliveryState ?? (viaBot ? 'queued' : 'sent');
 
@@ -343,9 +358,10 @@ export async function POST(request: Request) {
       author,
       body: text,
       deliveryState,
-      viaBot: viaBot || telegramDelivered,
+      viaBot: viaBot || deliveredToClient,
       metadata: {
         sentToClientTelegram: telegramDelivered,
+        sentToClientVk: vkDelivered,
         sourceThreadId: threadId,
       },
     });
@@ -355,14 +371,15 @@ export async function POST(request: Request) {
       lastMessageAt: message?.createdAt ?? new Date().toISOString(),
       unreadCount: 0,
       segment: author === 'system' ? 'followup' : 'active',
-      botConnected: telegramDelivered || thread.botConnected,
+      botConnected: deliveredToClient || thread.botConnected,
       metadata: {
         ...(thread.metadata ?? {}),
         lastTelegramDelivery: telegramDelivered ? 'delivered' : 'queued',
+        lastVkDelivery: vkDelivered ? 'delivered' : 'queued',
       },
     });
 
-    return NextResponse.json({ message, threadId: thread.id, telegramDelivered });
+    return NextResponse.json({ message, threadId: thread.id, telegramDelivered, vkDelivered });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'unknown_error';
     if (message === 'unauthorized') {

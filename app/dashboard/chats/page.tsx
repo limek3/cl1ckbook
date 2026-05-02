@@ -18,6 +18,7 @@ import { useTheme } from 'next-themes';
 import { useBrowserSearchParams } from '@/hooks/use-browser-search-params';
 import { useMobile } from '@/hooks/use-mobile';
 import {
+  AlertTriangle,
   ArrowRightLeft,
   Bot,
   CalendarClock,
@@ -161,6 +162,32 @@ function buttonBase(light: boolean, active = false) {
         ? 'border-black/[0.08] bg-white text-black/58 hover:border-black/[0.14] hover:bg-black/[0.035] hover:text-black'
         : 'border-white/[0.08] bg-white/[0.04] text-white/55 hover:border-white/[0.14] hover:bg-white/[0.07] hover:text-white',
   );
+}
+
+type ThreadActiveAlert = {
+  type?: string;
+  status?: string;
+  bookingId?: string;
+  channel?: string;
+  createdAt?: string;
+  message?: string;
+};
+
+function getThreadActiveAlert(thread?: ChatThreadRecord | null): ThreadActiveAlert | null {
+  const raw = thread?.metadata?.activeAlert;
+  if (!raw || typeof raw !== 'object') return null;
+
+  const alert = raw as ThreadActiveAlert;
+  if (alert.type !== 'reschedule_request') return null;
+  if (alert.status && alert.status !== 'open') return null;
+
+  return alert;
+}
+
+function warningTone(light: boolean) {
+  return light
+    ? 'border-amber-500/24 bg-amber-500/[0.075] text-amber-950'
+    : 'border-amber-300/20 bg-amber-300/[0.08] text-amber-100';
 }
 
 /**
@@ -1065,6 +1092,9 @@ export default function DashboardChatsPage() {
           sort: 'Сортировка',
           filters: 'Фильтры',
           details: 'Детали',
+          rescheduleAlert: 'Клиент хочет перенос',
+          rescheduleAlertText: 'Слот освобождён. Подберите новое время и ответьте клиенту в этом чате.',
+          rescheduleAlertShort: 'Перенос',
         }
       : {
           title: 'Chats',
@@ -1137,6 +1167,9 @@ export default function DashboardChatsPage() {
           sort: 'Sort',
           filters: 'Filters',
           details: 'Details',
+          rescheduleAlert: 'Client wants to reschedule',
+          rescheduleAlertText: 'The slot is released. Pick a new time and reply in this chat.',
+          rescheduleAlertShort: 'Reschedule',
         };
 
   const templateOptions = useMemo(() => dataset?.templates ?? [], [dataset?.templates]);
@@ -2048,6 +2081,7 @@ export default function DashboardChatsPage() {
     const preview = Boolean(options?.preview);
     const active = thread.id === activeThreadId;
     const pinned = isThreadPinned(thread.id);
+    const activeAlert = getThreadActiveAlert(thread);
     const canDrag = !mobile && filteredThreads.length > 1 && !preview;
 
     return (
@@ -2083,6 +2117,7 @@ export default function DashboardChatsPage() {
               ? 'border-black/[0.07] bg-white/60 hover:border-black/[0.11] hover:bg-white'
               : 'border-white/[0.07] bg-black/20 hover:border-white/[0.11] hover:bg-white/[0.04]',
           pinned && (isLight ? 'bg-white' : 'bg-white/[0.052]'),
+          activeAlert && warningTone(isLight),
         )}
         aria-label={labels.openThread}
       >
@@ -2142,6 +2177,18 @@ export default function DashboardChatsPage() {
                   {thread.isPriority ? (
                     <Star className="size-3 shrink-0 fill-current" style={{ color: accentColor }} />
                   ) : null}
+
+                  {activeAlert ? (
+                    <span
+                      className={cn(
+                        'inline-flex h-5 shrink-0 items-center gap-1 rounded-[7px] border px-1.5 text-[8.5px] font-semibold uppercase tracking-[0.08em]',
+                        warningTone(isLight),
+                      )}
+                    >
+                      <AlertTriangle className="size-3" />
+                      {labels.rescheduleAlertShort}
+                    </span>
+                  ) : null}
                 </div>
 
                 <div className={cn('mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-[10px]', mutedText(isLight))}>
@@ -2192,6 +2239,13 @@ export default function DashboardChatsPage() {
                 <MicroLabel light={isLight} className="h-6 px-2 py-0 text-[9px]">
                   <CalendarClock className="size-3" />
                   {formatDateLabel(thread.nextVisit, locale)}
+                </MicroLabel>
+              ) : null}
+
+              {activeAlert ? (
+                <MicroLabel light={isLight} className={cn('h-6 px-2 py-0 text-[9px]', warningTone(isLight))}>
+                  <AlertTriangle className="size-3" />
+                  {labels.rescheduleAlert}
                 </MicroLabel>
               ) : null}
             </div>
@@ -2770,6 +2824,7 @@ export default function DashboardChatsPage() {
 
   const renderChatHeader = () => {
     const activePinned = activeThread ? isThreadPinned(activeThread.id) : false;
+    const activeAlert = getThreadActiveAlert(activeThread);
 
     return (
       <header
@@ -2848,6 +2903,22 @@ export default function DashboardChatsPage() {
                       : labels.notScheduled}
                   </span>
                 </div>
+
+                {activeAlert ? (
+                  <div className={cn('mt-3 rounded-[10px] border px-3 py-2.5', warningTone(isLight))}>
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-[12px] font-semibold tracking-[-0.02em]">
+                          {labels.rescheduleAlert}
+                        </div>
+                        <div className={cn('mt-1 text-[10.5px] leading-4', isLight ? 'text-amber-950/70' : 'text-amber-100/70')}>
+                          {activeAlert.message || labels.rescheduleAlertText}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
 

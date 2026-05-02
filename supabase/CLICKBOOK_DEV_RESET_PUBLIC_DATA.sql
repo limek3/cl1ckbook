@@ -12,6 +12,7 @@ declare
     'public.sloty_workspace_subscriptions',
     'public.sloty_marketing_campaigns',
     'public.sloty_booking_telegram_links',
+    'public.sloty_booking_vk_links',
     'public.sloty_telegram_login_requests',
     'public.sloty_telegram_accounts',
     'public.sloty_chat_messages',

@@ -495,6 +495,138 @@ export async function sendMasterVkBookingNotification(params: {
   });
 }
 
+
+export async function sendMasterVkRescheduleRequestNotification(params: {
+  peerId: number | string;
+  booking: Booking;
+  profile?: MasterProfile | null;
+  workspaceSlug: string;
+  source?: string;
+}) {
+  const appUrl = getAppUrl();
+  const masterName = params.profile?.name || params.workspaceSlug;
+
+  return sendVkMessage({
+    peerId: params.peerId,
+    message: [
+      'Клиент хочет перенос ⚠️',
+      '',
+      `Мастер: ${masterName}`,
+      `Клиент: ${params.booking.clientName}`,
+      `Телефон: ${params.booking.clientPhone}`,
+      `Услуга: ${params.booking.service}`,
+      `Старое время: ${bookingDateLabel(params.booking)}`,
+      `Канал: ${params.source || 'VK'}`,
+      '',
+      'Слот освобождён. В чатах КликБук появилась жёлтая плашка-предупреждение.',
+    ].join('\n'),
+    keyboard: buildVkKeyboard([
+      [{ label: 'Открыть чаты', action: 'open_url', url: `${appUrl}/dashboard/chats`, color: 'primary' }],
+      [{ label: 'Кабинет', action: 'open_url', url: `${appUrl}/dashboard`, color: 'secondary' }],
+    ]),
+  });
+}
+
+export async function sendMasterVkBookingConfirmedNotice(params: {
+  peerId: number | string;
+  booking: Booking;
+  profile?: MasterProfile | null;
+  workspaceSlug: string;
+  source?: string;
+}) {
+  const appUrl = getAppUrl();
+  const masterName = params.profile?.name || params.workspaceSlug;
+
+  return sendVkMessage({
+    peerId: params.peerId,
+    message: [
+      'Клиент подтвердил запись ✅',
+      '',
+      `Мастер: ${masterName}`,
+      `Клиент: ${params.booking.clientName}`,
+      `Услуга: ${params.booking.service}`,
+      `Время: ${bookingDateLabel(params.booking)}`,
+      `Канал: ${params.source || 'VK'}`,
+    ].join('\n'),
+    keyboard: buildVkKeyboard([
+      [{ label: 'Открыть записи', action: 'open_url', url: `${appUrl}/dashboard/today`, color: 'primary' }],
+    ]),
+  });
+}
+
+export function buildVkClientBookingKeyboard(bookingId: string) {
+  return buildVkKeyboard([
+    [
+      {
+        label: 'Подтвердить',
+        action: 'client_booking_confirm',
+        color: 'positive',
+        payload: { booking_id: bookingId },
+      },
+      {
+        label: 'Перенос',
+        action: 'client_booking_reschedule',
+        color: 'negative',
+        payload: { booking_id: bookingId },
+      },
+    ],
+  ]);
+}
+
+export async function sendClientVkBookingConfirmation(params: {
+  peerId: number | string;
+  booking: Booking;
+  profile?: MasterProfile | null;
+}) {
+  const masterName = params.profile?.name || 'мастеру';
+  const address = params.profile?.city ? `\nГород: ${params.profile.city}` : '';
+
+  return sendVkMessage({
+    peerId: params.peerId,
+    message: [
+      'Запись создана ✅',
+      '',
+      `Мастер: ${masterName}`,
+      `Услуга: ${params.booking.service}`,
+      `Время: ${bookingDateLabel(params.booking)}`,
+      address.trim() ? address.trim() : null,
+      '',
+      'Ближе к записи я пришлю напоминание. В нём можно будет подтвердить визит или запросить перенос.',
+    ]
+      .filter(Boolean)
+      .join('\n'),
+    keyboard: buildVkClientBookingKeyboard(params.booking.id),
+  });
+}
+
+export async function sendClientVkBookingReminder(params: {
+  peerId: number | string;
+  booking: Booking;
+  profile?: MasterProfile | null;
+  hoursBefore: number;
+}) {
+  const masterName = params.profile?.name || 'мастеру';
+  const when = params.hoursBefore >= 24 ? 'завтра' : `через ${params.hoursBefore} часа`;
+
+  return sendVkMessage({
+    peerId: params.peerId,
+    message: [
+      'Напоминание ⏰',
+      '',
+      `У вас ${when} запись к ${masterName}.`,
+      `Услуга: ${params.booking.service}`,
+      `Дата: ${params.booking.date}`,
+      `Время: ${params.booking.time}`,
+      params.profile?.city ? `Город: ${params.profile.city}` : null,
+      '',
+      'Подтвердите запись или выберите перенос. Если выбрать перенос, слот освободится, а мастер получит предупреждение.',
+    ]
+      .filter(Boolean)
+      .join('\n'),
+    keyboard: buildVkClientBookingKeyboard(params.booking.id),
+  });
+}
+
 export async function sendVkLoginConfirmedMessage(params: {
   peerId: number | string;
   token: string;

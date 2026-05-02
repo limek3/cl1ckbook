@@ -209,6 +209,88 @@ export async function sendMasterVisitCheck(params: {
   });
 }
 
+
+export async function sendMasterRescheduleRequestNotification(params: {
+  chatId: number | string;
+  booking: Booking;
+  profile?: MasterProfile | null;
+  workspaceSlug: string;
+  source?: string;
+}) {
+  const appUrl = getAppUrl();
+  const masterName = params.profile?.name || params.workspaceSlug;
+
+  return sendTelegramMessage({
+    chatId: params.chatId,
+    text: [
+      'Клиент хочет перенос ⚠️',
+      '',
+      `Мастер: ${masterName}`,
+      `Клиент: ${params.booking.clientName}`,
+      `Телефон: ${params.booking.clientPhone}`,
+      `Услуга: ${params.booking.service}`,
+      `Старое время: ${bookingDateLabel(params.booking)}`,
+      `Канал: ${params.source || 'Telegram'}`,
+      '',
+      'Слот освобождён. В чатах КликБук создано предупреждение — подберите новое время и ответьте клиенту.',
+    ].join('\n'),
+    replyMarkup: {
+      inline_keyboard: [
+        [
+          {
+            text: 'Открыть чат',
+            web_app: {
+              url: `${appUrl}/app?redirectTo=${encodeURIComponent('/dashboard/chats')}`,
+            },
+          },
+        ],
+        [
+          {
+            text: 'Веб-кабинет',
+            url: `${appUrl}/dashboard/chats`,
+          },
+        ],
+      ],
+    },
+  });
+}
+
+export async function sendMasterBookingConfirmedNotice(params: {
+  chatId: number | string;
+  booking: Booking;
+  profile?: MasterProfile | null;
+  workspaceSlug: string;
+  source?: string;
+}) {
+  const appUrl = getAppUrl();
+  const masterName = params.profile?.name || params.workspaceSlug;
+
+  return sendTelegramMessage({
+    chatId: params.chatId,
+    text: [
+      'Клиент подтвердил запись ✅',
+      '',
+      `Мастер: ${masterName}`,
+      `Клиент: ${params.booking.clientName}`,
+      `Услуга: ${params.booking.service}`,
+      `Время: ${bookingDateLabel(params.booking)}`,
+      `Канал: ${params.source || 'Telegram'}`,
+    ].join('\n'),
+    replyMarkup: {
+      inline_keyboard: [
+        [
+          {
+            text: 'Открыть записи',
+            web_app: {
+              url: `${appUrl}/app?redirectTo=${encodeURIComponent('/dashboard/today')}`,
+            },
+          },
+        ],
+      ],
+    },
+  });
+}
+
 export async function setTelegramMenuButton() {
   const appUrl = getAppUrl();
 

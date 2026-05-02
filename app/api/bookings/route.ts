@@ -5,8 +5,7 @@ import { buildWorkspaceSeed } from '@/lib/workspace-store';
 import type { Booking } from '@/lib/types';
 import { requireAuthUser } from '@/lib/server/require-auth-user';
 import { createClientTelegramBookingLink, notifyWorkspaceOwnerAboutBooking } from '@/lib/server/booking-telegram';
-import { notifyWorkspaceOwnerAboutBookingVk } from '@/lib/server/booking-vk';
-import { getVkBotDeepLink, getVkBotDialogLink } from '@/lib/server/vk-bot';
+import { createClientVkBookingLink, notifyWorkspaceOwnerAboutBookingVk } from '@/lib/server/booking-vk';
 import { sendClientTelegramMessage } from '@/lib/server/client-telegram';
 import { isNotificationEnabled } from '@/lib/server/notification-settings';
 import { createBookingRecord, listBookingsByWorkspace, updateBookingStatusRecord } from '@/lib/server/supabase-bookings';
@@ -205,6 +204,7 @@ export async function POST(request: Request) {
     });
 
     let telegramBookingLink: { token: string; url: string | null } | null = null;
+    let vkBookingLink: { token: string; url: string | null } | null = null;
 
     try {
       telegramBookingLink = await createClientTelegramBookingLink({
@@ -214,6 +214,16 @@ export async function POST(request: Request) {
       });
     } catch {
       telegramBookingLink = null;
+    }
+
+    try {
+      vkBookingLink = await createClientVkBookingLink({
+        workspaceId: workspace.id,
+        masterSlug: body.masterSlug,
+        booking: persistedBooking,
+      });
+    } catch {
+      vkBookingLink = null;
     }
 
     if (
@@ -335,8 +345,7 @@ export async function POST(request: Request) {
       // /api/chats can synthesize chat rows from bookings if normalized chat tables fail.
     }
 
-    const vkConfirmationUrl = getVkBotDeepLink() || getVkBotDialogLink() || null;
-    return NextResponse.json({ booking: persistedBooking, workspaceId: workspace.id, telegram: telegramBookingLink, vkConfirmationUrl });
+    return NextResponse.json({ booking: persistedBooking, workspaceId: workspace.id, telegram: telegramBookingLink, vk: vkBookingLink, vkConfirmationUrl: vkBookingLink?.url ?? null });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'unknown_error' }, { status: 500 });
   }

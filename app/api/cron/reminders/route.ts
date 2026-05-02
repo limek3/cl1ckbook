@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/server/supabase-admin';
 import { sendMasterVisitCheck, sendTelegramMessage } from '@/lib/server/telegram-bot';
+import { sendClientVkBookingReminder } from '@/lib/server/vk-bot';
 import type { Booking, MasterProfile } from '@/lib/types';
 
 export const runtime = 'nodejs';
@@ -15,6 +16,16 @@ type ReminderLinkRow = {
   reminder_24h_sent_at: string | null;
   reminder_2h_sent_at: string | null;
   status_check_sent_at?: string | null;
+};
+
+type VkReminderLinkRow = {
+  id: string;
+  workspace_id: string;
+  booking_id: string;
+  booking_snapshot: Booking | null;
+  peer_id: number | null;
+  reminder_24h_sent_at: string | null;
+  reminder_2h_sent_at: string | null;
 };
 
 type BookingRow = {
@@ -108,7 +119,7 @@ function shouldSendReminder(booking: Booking, hoursBefore: number) {
 
 async function resolveBooking(
   admin: ReturnType<typeof createSupabaseAdminClient>,
-  row: ReminderLinkRow,
+  row: Pick<ReminderLinkRow, 'booking_id' | 'booking_snapshot'>,
 ) {
   const { data: bookingRow } = await admin
     .from('sloty_bookings')
@@ -233,6 +244,48 @@ export async function GET(request: Request) {
       }
     } catch {
       failed.push(row.id);
+    }
+  }
+
+  const { data: vkData, error: vkError } = await admin
+    .from('sloty_booking_vk_links')
+    .select('*')
+    .eq('status', 'confirmed')
+    .not('peer_id', 'is', null)
+    .limit(100);
+
+  if (!vkError) {
+    for (const rowRaw of vkData ?? []) {
+      const row = rowRaw as VkReminderLinkRow;
+      if (!row.peer_id) continue;
+
+      try {
+        const booking = await resolveBooking(admin, row);
+        if (!booking || booking.status === 'cancelled' || booking.status === 'completed' || booking.status === 'no_show') continue;
+
+        const profile = await resolveProfile(admin, row.workspace_id);
+
+        if (!row.reminder_24h_sent_at && shouldSendReminder(booking, 24)) {
+          await sendClientVkBookingReminder({ peerId: row.peer_id, booking, profile, hoursBefore: 24 });
+          await admin
+            .from('sloty_booking_vk_links')
+            .update({ reminder_24h_sent_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+            .eq('id', row.id);
+          sent.push(`${row.id}:vk-24h`);
+          continue;
+        }
+
+        if (!row.reminder_2h_sent_at && shouldSendReminder(booking, 2)) {
+          await sendClientVkBookingReminder({ peerId: row.peer_id, booking, profile, hoursBefore: 2 });
+          await admin
+            .from('sloty_booking_vk_links')
+            .update({ reminder_2h_sent_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+            .eq('id', row.id);
+          sent.push(`${row.id}:vk-2h`);
+        }
+      } catch {
+        failed.push(`${row.id}:vk`);
+      }
     }
   }
 

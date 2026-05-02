@@ -12,10 +12,14 @@ import {
   sendVkBotFaqMessage,
   sendVkBotNotificationsMessage,
   sendVkBotSupportMessage,
+  sendClientVkBookingConfirmation,
   sendVkBotWelcomeMessage,
   sendVkLoginConfirmedMessage,
   sendVkMessage,
 } from '@/lib/server/vk-bot';
+import { handleClientBookingAction } from '@/lib/server/booking-client-actions';
+import { createChatMessage, createChatThread, fetchChatThreadByPhone, updateChatThread } from '@/lib/server/supabase-chats';
+import type { Booking, MasterProfile } from '@/lib/types';
 import {
   buildVkLoginToken,
   createVkBotVirtualUser,
@@ -31,6 +35,29 @@ type VkCallbackPayload = {
   group_id?: number;
   secret?: string;
   object?: any;
+};
+
+type VkBookingLinkRow = {
+  token: string;
+  status: 'pending' | 'confirmed' | 'expired';
+  workspace_id: string;
+  booking_id: string;
+  master_slug: string;
+  booking_snapshot: Booking | null;
+  expires_at: string;
+};
+
+type BookingRow = {
+  id: string;
+  master_slug: string;
+  client_name: string;
+  client_phone: string;
+  service: string;
+  booking_date: string;
+  booking_time: string;
+  comment: string | null;
+  status: Booking['status'];
+  created_at: string;
 };
 
 function textResponse(value: string, init?: ResponseInit) {
@@ -233,6 +260,62 @@ function extractAuthToken(message: Record<string, unknown> | null, eventPayload?
   return null;
 }
 
+
+function extractBookingTokenFromValue(value: unknown) {
+  if (typeof value !== 'string') return null;
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const match = trimmed.match(/(?:^|[\s:/?&=])booking_([a-f0-9]{64})(?:\b|$)/i);
+  return match?.[1] ?? null;
+}
+
+function extractBookingToken(message: Record<string, unknown> | null, eventPayload?: Record<string, unknown> | null) {
+  const directCandidates = [
+    message?.text,
+    message?.ref,
+    message?.ref_source,
+    message?.payload,
+    eventPayload?.token,
+    eventPayload?.booking_token,
+    eventPayload?.payload,
+  ];
+
+  for (const candidate of directCandidates) {
+    const token = extractBookingTokenFromValue(candidate);
+    if (token) return token;
+  }
+
+  const payloadObject = normalizePayload(message?.payload);
+
+  if (payloadObject) {
+    const token =
+      extractBookingTokenFromValue(payloadObject.token) ||
+      extractBookingTokenFromValue(payloadObject.booking_token) ||
+      extractBookingTokenFromValue(payloadObject.start_param);
+
+    if (token) return token;
+  }
+
+  return null;
+}
+
+function mapBookingRow(row: BookingRow): Booking {
+  return {
+    id: row.id,
+    masterSlug: row.master_slug,
+    clientName: row.client_name,
+    clientPhone: row.client_phone,
+    service: row.service,
+    date: row.booking_date,
+    time: row.booking_time,
+    comment: row.comment ?? undefined,
+    status: row.status,
+    createdAt: row.created_at,
+  };
+}
+
 function numberValue(value: unknown) {
   if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value);
   if (typeof value === 'string' && value.trim() && Number.isFinite(Number(value))) return Math.trunc(Number(value));
@@ -360,6 +443,214 @@ async function confirmVkLogin(params: {
 }
 
 
+
+async function handleVkBookingStart(params: {
+  token: string;
+  vkUserId: number | string;
+  peerId: number | string;
+  profile: Awaited<ReturnType<typeof getVkBotUserProfile>>;
+}) {
+  const admin = createSupabaseAdminClient();
+  const now = new Date().toISOString();
+
+  const { data: linkRow, error: linkError } = await admin
+    .from('sloty_booking_vk_links')
+    .select('*')
+    .eq('token', params.token)
+    .eq('status', 'pending')
+    .maybeSingle();
+
+  if (linkError) throw linkError;
+
+  const link = linkRow as VkBookingLinkRow | null;
+
+  if (!link) {
+    await sendVkReply({
+      label: 'vk_booking_link_not_found',
+      peerId: params.peerId,
+      textPreview: 'Ссылка записи уже использована или устарела.',
+      send: () => sendVkMessage({
+        peerId: params.peerId,
+        message: 'Ссылка подтверждения уже использована или устарела. Вернитесь на страницу записи и создайте новую заявку.',
+      }),
+    });
+    return;
+  }
+
+  const expired = link.expires_at && new Date(link.expires_at).getTime() < Date.now();
+
+  if (expired) {
+    await admin
+      .from('sloty_booking_vk_links')
+      .update({ status: 'expired', updated_at: now })
+      .eq('token', params.token);
+
+    await sendVkReply({
+      label: 'vk_booking_link_expired',
+      peerId: params.peerId,
+      textPreview: 'Ссылка подтверждения устарела.',
+      send: () => sendVkMessage({
+        peerId: params.peerId,
+        message: 'Ссылка подтверждения устарела. Но запись уже создана — мастер получил заявку.',
+      }),
+    });
+    return;
+  }
+
+  const { data: workspaceRow } = await admin
+    .from('sloty_workspaces')
+    .select('profile')
+    .eq('id', link.workspace_id)
+    .maybeSingle();
+
+  const profile = (workspaceRow?.profile as MasterProfile | undefined) ?? null;
+
+  await admin
+    .from('sloty_booking_vk_links')
+    .update({
+      status: 'confirmed',
+      vk_user_id: String(params.vkUserId),
+      peer_id: Number(params.peerId),
+      first_name: params.profile.firstName ?? null,
+      last_name: params.profile.lastName ?? null,
+      screen_name: params.profile.screenName || params.profile.domain || null,
+      photo_url: params.profile.photoUrl ?? null,
+      confirmed_at: now,
+      updated_at: now,
+      metadata: {
+        source: 'vk_booking_link',
+        profile: params.profile.rawProfile ?? {},
+      },
+    })
+    .eq('token', params.token)
+    .eq('status', 'pending');
+
+  const result = await handleClientBookingAction({
+    bookingId: link.booking_id,
+    action: 'confirm',
+    source: 'vk',
+    directClientRef: {
+      clientVkPeerId: params.peerId,
+      clientVkUserId: String(params.vkUserId),
+    },
+  });
+
+  const booking = result.ok ? result.booking : link.booking_snapshot;
+
+  if (!booking) {
+    await sendVkReply({
+      label: 'vk_booking_not_found',
+      peerId: params.peerId,
+      textPreview: 'Запись не найдена.',
+      send: () => sendVkMessage({
+        peerId: params.peerId,
+        message: 'Запись не найдена. Мастер всё равно получил заявку, но уведомления подключить не удалось.',
+      }),
+    });
+    return;
+  }
+
+  await sendVkReply({
+    label: 'vk_booking_connected',
+    peerId: params.peerId,
+    textPreview: 'VK подключён к записи.',
+    send: () => sendClientVkBookingConfirmation({
+      peerId: params.peerId,
+      booking,
+      profile,
+    }),
+  });
+}
+
+async function handleClientVkChatMessage(params: {
+  vkUserId: number | string;
+  peerId: number | string;
+  text?: unknown;
+}) {
+  const text = typeof params.text === 'string' ? params.text.trim() : '';
+  if (!text || text.startsWith('/')) return false;
+
+  const admin = createSupabaseAdminClient();
+
+  const { data: linkRows, error: linkRowsError } = await admin
+    .from('sloty_booking_vk_links')
+    .select('*')
+    .eq('peer_id', Number(params.peerId))
+    .eq('status', 'confirmed')
+    .order('confirmed_at', { ascending: false })
+    .limit(1);
+
+  if (linkRowsError) {
+    logVkWebhookError('client vk chat link read', linkRowsError);
+  }
+
+  const link = Array.isArray(linkRows) ? (linkRows[0] as VkBookingLinkRow | undefined) : undefined;
+  if (!link) return false;
+
+  const { data: bookingRow } = await admin
+    .from('sloty_bookings')
+    .select('*')
+    .eq('id', link.booking_id)
+    .maybeSingle();
+
+  const booking = bookingRow ? mapBookingRow(bookingRow as BookingRow) : link.booking_snapshot;
+  if (!booking) return false;
+
+  const now = new Date().toISOString();
+  const existingThread = booking.clientPhone
+    ? await fetchChatThreadByPhone(link.workspace_id, booking.clientPhone).catch(() => null)
+    : null;
+
+  const thread = existingThread
+    ? await updateChatThread(link.workspace_id, existingThread.id, {
+        channel: 'VK',
+        botConnected: true,
+        lastMessagePreview: text,
+        lastMessageAt: now,
+        unreadCount: (existingThread.unreadCount ?? 0) + 1,
+        metadata: {
+          ...(existingThread.metadata ?? {}),
+          bookingId: booking.id,
+          clientVkPeerId: params.peerId,
+          clientVkUserId: String(params.vkUserId),
+        },
+      }).catch(() => existingThread)
+    : await createChatThread(link.workspace_id, {
+        clientName: booking.clientName,
+        clientPhone: booking.clientPhone,
+        channel: 'VK',
+        segment: 'active',
+        source: 'VK-бот',
+        nextVisit: booking.date,
+        botConnected: true,
+        lastMessagePreview: text,
+        lastMessageAt: now,
+        unreadCount: 1,
+        metadata: {
+          bookingId: booking.id,
+          clientVkPeerId: params.peerId,
+          clientVkUserId: String(params.vkUserId),
+        },
+      }).catch(() => null);
+
+  if (!thread?.id) return false;
+
+  await createChatMessage(link.workspace_id, {
+    threadId: thread.id,
+    author: 'client',
+    body: text,
+    deliveryState: null,
+    viaBot: true,
+    metadata: {
+      bookingId: booking.id,
+      source: 'vk_inbox',
+      clientVkPeerId: params.peerId,
+    },
+  }).catch((error) => logVkWebhookError('client vk chat message create', error));
+
+  return true;
+}
+
 async function createDirectVkLoginToken(params: {
   vkUserId: number | string;
   peerId: number | string;
@@ -420,6 +711,7 @@ async function handleMessageNew(payload: VkCallbackPayload) {
   if (!message || !vkUserId || !peerId) return;
 
   const token = extractAuthToken(message);
+  const bookingToken = extractBookingToken(message);
 
   if (token) {
     await confirmVkLogin({ token, vkUserId, peerId });
@@ -451,6 +743,11 @@ async function handleMessageNew(payload: VkCallbackPayload) {
       refSource: typeof message.ref_source === 'string' ? message.ref_source : null,
     },
   }).catch((error) => logVkWebhookError('remember vk user', error));
+
+  if (bookingToken) {
+    await handleVkBookingStart({ token: bookingToken, vkUserId, peerId, profile });
+    return;
+  }
 
   if (isStartLikeText(message.text)) {
     const directLoginToken = await createDirectVkLoginToken({ vkUserId, peerId, profile });
@@ -507,6 +804,9 @@ async function handleMessageNew(payload: VkCallbackPayload) {
     return;
   }
 
+  const clientChatHandled = await handleClientVkChatMessage({ vkUserId, peerId, text: message.text });
+  if (clientChatHandled) return;
+
   await sendVkReply({
     label: 'auth_fallback',
     peerId,
@@ -527,6 +827,62 @@ async function handleMessageEvent(payload: VkCallbackPayload) {
   const action = typeof eventPayload?.action === 'string' ? eventPayload.action : null;
   const token = extractAuthToken(null, eventPayload);
   const appUrl = getAppUrl();
+
+  if (action === 'client_booking_confirm' || action === 'client_booking_reschedule') {
+    const bookingId = typeof eventPayload?.booking_id === 'string' ? eventPayload.booking_id : null;
+    const clientAction = action === 'client_booking_confirm' ? 'confirm' : 'reschedule';
+
+    if (!bookingId) {
+      await answerVkMessageEvent({
+        eventId,
+        userId: vkUserId,
+        peerId,
+        text: 'Запись не найдена.',
+      }).catch((error) => logVkWebhookError('answer client booking missing id', error));
+      return;
+    }
+
+    const result = await handleClientBookingAction({
+      bookingId,
+      action: clientAction,
+      source: 'vk',
+      directClientRef: {
+        clientVkPeerId: peerId,
+        clientVkUserId: String(vkUserId),
+      },
+    }).catch((error) => {
+      logVkWebhookError('client vk booking action', error);
+      return null;
+    });
+
+    await answerVkMessageEvent({
+      eventId,
+      userId: vkUserId,
+      peerId,
+      text:
+        result?.ok && clientAction === 'confirm'
+          ? 'Запись подтверждена.'
+          : result?.ok
+            ? 'Запрос на перенос отправлен мастеру.'
+            : 'Не удалось обработать действие.',
+    }).catch((error) => logVkWebhookError('answer client booking action', error));
+
+    await sendVkReply({
+      label: clientAction === 'confirm' ? 'client_booking_confirmed' : 'client_booking_reschedule_requested',
+      peerId,
+      textPreview: clientAction === 'confirm' ? 'Запись подтверждена.' : 'Запрос на перенос отправлен мастеру.',
+      send: () => sendVkMessage({
+        peerId,
+        message:
+          result?.ok && clientAction === 'confirm'
+            ? 'Спасибо, запись подтверждена ✅'
+            : result?.ok
+              ? 'Поняли, запрос на перенос отправлен мастеру. Слот освобождён, мастер подберёт новое время и ответит вам в чате.'
+              : 'Не удалось обработать действие. Напишите мастеру обычным сообщением в этот диалог.',
+      }),
+    });
+    return;
+  }
 
   if (action === 'open_dashboard') {
     let dashboardToken = token;

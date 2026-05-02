@@ -1,8 +1,9 @@
 import 'server-only';
 
+import crypto from 'node:crypto';
 import type { Booking, MasterProfile } from '@/lib/types';
 import { supabaseRestRequest } from '@/lib/server/supabase-rest';
-import { sendMasterVkBookingNotification } from '@/lib/server/vk-bot';
+import { getVkBotDeepLink, sendMasterVkBookingNotification } from '@/lib/server/vk-bot';
 
 type VkBotAccountRow = {
   vk_user_id: string;
@@ -10,6 +11,38 @@ type VkBotAccountRow = {
   peer_id: number | null;
   messages_allowed: boolean | null;
 };
+
+function buildBookingToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+export async function createClientVkBookingLink(params: {
+  workspaceId: string;
+  masterSlug: string;
+  booking: Booking;
+}) {
+  const token = buildBookingToken();
+
+  await supabaseRestRequest('/rest/v1/sloty_booking_vk_links', {
+    method: 'POST',
+    body: JSON.stringify([
+      {
+        token,
+        workspace_id: params.workspaceId,
+        booking_id: params.booking.id,
+        master_slug: params.masterSlug,
+        booking_snapshot: params.booking,
+        status: 'pending',
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      },
+    ]),
+  });
+
+  return {
+    token,
+    url: getVkBotDeepLink(`booking_${token}`),
+  };
+}
 
 export async function notifyWorkspaceOwnerAboutBookingVk(params: {
   ownerId?: string | null;

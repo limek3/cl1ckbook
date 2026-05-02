@@ -6,6 +6,7 @@ import {
   upsertTelegramAccount,
 } from '@/lib/server/telegram-user';
 import { isNotificationEnabled } from '@/lib/server/notification-settings';
+import { handleClientBookingAction } from '@/lib/server/booking-client-actions';
 import {
   createChatMessage,
   createChatThread,
@@ -294,62 +295,65 @@ async function handleVisitCallback(params: {
 async function handleClientReminderCallback(params: {
   callbackQueryId: string;
   data?: string;
+  chatId?: number | string | null;
+  from?: TelegramFrom | null;
 }) {
   const parsed = extractClientReminderCallback(params.data);
   if (!parsed) return false;
 
-  const admin = createSupabaseAdminClient();
-  const now = new Date().toISOString();
+  try {
+    const result = await handleClientBookingAction({
+      bookingId: parsed.bookingId,
+      action: parsed.action,
+      source: 'telegram',
+      directClientRef: {
+        ...(params.chatId ? { clientTelegramChatId: params.chatId } : {}),
+        ...(params.from?.id ? { clientTelegramId: params.from.id } : {}),
+      },
+    });
 
-  const { data: bookingRow, error: bookingError } = await admin
-    .from('sloty_bookings')
-    .select('id,workspace_id,status')
-    .eq('id', parsed.bookingId)
-    .maybeSingle();
+    if (!result.ok) {
+      await safeTask('answer client reminder callback booking not found', () =>
+        answerTelegramCallbackQuery({
+          callbackQueryId: params.callbackQueryId,
+          text: 'Запись не найдена',
+        }),
+      );
 
-  if (bookingError) {
-    logWebhookError('handleClientReminderCallback booking read failed', bookingError);
-  }
+      return true;
+    }
 
-  const workspaceId = bookingRow?.workspace_id as string | undefined;
-
-  if (!workspaceId) {
-    await safeTask('answer client reminder callback booking not found', () =>
+    await safeTask('answer client reminder callback', () =>
       answerTelegramCallbackQuery({
         callbackQueryId: params.callbackQueryId,
-        text: 'Запись не найдена',
+        text:
+          parsed.action === 'confirm'
+            ? 'Отлично, запись подтверждена'
+            : 'Запрос на перенос отправлен мастеру',
       }),
     );
 
-    return true;
+    if (params.chatId) {
+      await safeTask('send client reminder callback followup', () =>
+        sendTelegramMessage({
+          chatId: params.chatId as number | string,
+          text:
+            parsed.action === 'confirm'
+              ? 'Спасибо, запись подтверждена ✅'
+              : 'Поняли, запрос на перенос отправлен мастеру. Слот освобождён, мастер подберёт новое время и ответит вам в чате.',
+        }),
+      );
+    }
+  } catch (error) {
+    logWebhookError('handleClientReminderCallback failed', error);
+
+    await safeTask('answer client reminder callback failed', () =>
+      answerTelegramCallbackQuery({
+        callbackQueryId: params.callbackQueryId,
+        text: 'Не удалось обработать действие. Напишите мастеру в чат.',
+      }),
+    );
   }
-
-  const nextStatus: Booking['status'] = parsed.action === 'confirm' ? 'confirmed' : 'cancelled';
-
-  const { error: updateError } = await admin
-    .from('sloty_bookings')
-    .update({
-      status: nextStatus,
-      updated_at: now,
-      ...(nextStatus === 'confirmed' ? { confirmed_at: now } : {}),
-      ...(nextStatus === 'cancelled' ? { cancelled_at: now } : {}),
-    })
-    .eq('id', parsed.bookingId);
-
-  if (updateError) {
-    logWebhookError('handleClientReminderCallback booking update failed', updateError);
-  }
-
-  await syncWorkspaceBookingStatus(admin, workspaceId, parsed.bookingId, nextStatus);
-
-  await safeTask('answer client reminder callback', () =>
-    answerTelegramCallbackQuery({
-      callbackQueryId: params.callbackQueryId,
-      text: parsed.action === 'confirm'
-        ? 'Отлично, запись подтверждена'
-        : 'Поняли. Запись снята, слот снова свободен',
-    }),
-  );
 
   return true;
 }
@@ -961,12 +965,21 @@ export async function POST(request: Request) {
     const callbackQuery = update.callback_query;
 
     if (callbackQuery?.id) {
-      const handled = await handleVisitCallback({
+      const visitHandled = await handleVisitCallback({
         callbackQueryId: callbackQuery.id,
         data: callbackQuery.data,
       });
 
-      if (handled) return NextResponse.json({ ok: true });
+      if (visitHandled) return NextResponse.json({ ok: true });
+
+      const clientReminderHandled = await handleClientReminderCallback({
+        callbackQueryId: callbackQuery.id,
+        data: callbackQuery.data,
+        chatId: callbackQuery.message?.chat?.id ?? null,
+        from: callbackQuery.from ?? null,
+      });
+
+      if (clientReminderHandled) return NextResponse.json({ ok: true });
     }
 
     const message = update.message;

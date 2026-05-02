@@ -39,6 +39,7 @@ interface CreateBookingResult {
   error?: string;
   booking?: Booking;
   telegramConfirmationUrl?: string | null;
+  vkConfirmationUrl?: string | null;
 }
 
 type SaveProfileValues = MasterProfileFormValues &
@@ -448,7 +449,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           };
         }
 
-        const payload = await parseJson<{ booking: Booking; telegram?: { url?: string | null } | null }>(response);
+        const payload = await parseJson<{ booking: Booking; telegram?: { url?: string | null } | null; vk?: { url?: string | null } | null; vkConfirmationUrl?: string | null }>(response);
 
         if (ownedProfile?.slug === masterSlug) {
           setStoredBookings((current) => [payload.booking, ...current]);
@@ -462,6 +463,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           success: true,
           booking: payload.booking,
           telegramConfirmationUrl: payload.telegram?.url ?? null,
+          vkConfirmationUrl: payload.vk?.url ?? payload.vkConfirmationUrl ?? null,
         };
       } catch {
         return {
