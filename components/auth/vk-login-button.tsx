@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Check, Copy, ExternalLink, Loader2, MessageCircleMore, X } from 'lucide-react';
+import { Check, ExternalLink, Loader2, MessageCircleMore, X } from 'lucide-react';
 import { storeTelegramAppSessionToken } from '@/lib/telegram-miniapp-auth-client';
 import { cn } from '@/lib/utils';
 
@@ -67,10 +67,8 @@ export function VkLoginButton({
   const [token, setToken] = useState<string | null>(null);
   const [vkUrl, setVkUrl] = useState<string | null>(null);
   const [prefillUrl, setPrefillUrl] = useState<string | null>(null);
-  const [command, setCommand] = useState<string | null>(null);
   const [state, setState] = useState<'idle' | 'opening' | 'waiting' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState<string | null>(null);
-  const [copiedCommand, setCopiedCommand] = useState(false);
 
   const clearPoll = () => {
     if (pollTimerRef.current) {
@@ -145,8 +143,6 @@ export function VkLoginButton({
     setToken(null);
     setVkUrl(null);
     setPrefillUrl(null);
-    setCommand(null);
-    setCopiedCommand(false);
 
     try {
       const url = new URL('/api/auth/vk/start', window.location.origin);
@@ -168,9 +164,8 @@ export function VkLoginButton({
       setToken(payload.token);
       setVkUrl(payload.vkUrl);
       setPrefillUrl(payload.prefillUrl ?? null);
-      setCommand(payload.command ?? `auth_${payload.token}`);
       setState('waiting');
-      setMessage(mode === 'link' ? 'Открыл VK-диалог. Просто отправьте сообщение «Начать» — код подключения уже зашит в ссылку.' : 'Открыл VK-диалог. Отправьте /start или нажмите «Начать» — бот пришлёт кнопку входа в кабинет. Код вручную вводить не нужно.');
+      setMessage(mode === 'link' ? 'Открыл VK-бота. Отправьте /start или нажмите «Начать» — бот пришлёт кнопки подключения.' : 'Открыл VK-бота. Отправьте /start или нажмите «Начать» — бот пришлёт кнопки входа. Код вручную вводить не нужно.');
       startedAtRef.current = Date.now();
 
       window.open(payload.vkUrl, '_blank', 'noopener,noreferrer');
@@ -193,17 +188,6 @@ export function VkLoginButton({
     }
   };
 
-  const copyCommand = async () => {
-    if (!command) return;
-
-    try {
-      await navigator.clipboard.writeText(command);
-      setCopiedCommand(true);
-      window.setTimeout(() => setCopiedCommand(false), 1400);
-    } catch {
-      setCopiedCommand(false);
-    }
-  };
 
   const loading = state === 'opening' || state === 'waiting';
   const success = state === 'success';
@@ -270,31 +254,12 @@ export function VkLoginButton({
             className="inline-flex h-8 items-center justify-center gap-2 rounded-[9px] border border-black/[0.08] bg-white text-[11px] font-semibold text-black/56 transition hover:bg-black/[0.035] hover:text-black dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/56 dark:hover:bg-white/[0.07] dark:hover:text-white"
           >
             <ExternalLink className="size-3.5" />
-            Открыть VK-диалог
+            Открыть VK-бота
           </a>
 
-          {prefillUrl ? (
-            <a
-              href={prefillUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex h-8 items-center justify-center gap-2 rounded-[9px] border border-black/[0.08] bg-white text-[11px] font-semibold text-black/56 transition hover:bg-black/[0.035] hover:text-black dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/56 dark:hover:bg-white/[0.07] dark:hover:text-white"
-            >
-              <MessageCircleMore className="size-3.5" />
-              Запасной вариант /start
-            </a>
-          ) : null}
-
-          {command ? (
-            <button
-              type="button"
-              onClick={copyCommand}
-              className="inline-flex min-h-8 items-center justify-center gap-2 rounded-[9px] border border-black/[0.08] bg-white px-2 text-[10.5px] font-semibold text-black/50 transition hover:bg-black/[0.035] hover:text-black dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/50 dark:hover:bg-white/[0.07] dark:hover:text-white"
-            >
-              {copiedCommand ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-              {copiedCommand ? 'Команда скопирована' : 'Скопировать команду'}
-            </button>
-          ) : null}
+          <div className="text-center text-[10.5px] leading-4 text-black/38 dark:text-white/34">
+            В VK нажмите «Начать» или отправьте /start. Дальше бот покажет кнопки — без кодов и копирования.
+          </div>
         </div>
       ) : null}
 

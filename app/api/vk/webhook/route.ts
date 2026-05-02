@@ -317,18 +317,13 @@ async function confirmVkLogin(params: {
 
   if (updateError) throw updateError;
 
-  const next =
-    requestRow.metadata && typeof requestRow.metadata.next === 'string'
-      ? requestRow.metadata.next
-      : '/dashboard';
-
   await sendVkReply({
     label: 'login_confirmed',
     peerId: params.peerId,
     textPreview: 'Вход в КликБук через VK подтверждён.',
     send: () => sendVkLoginConfirmedMessage({
       peerId: params.peerId,
-      next,
+      token: params.token,
     }),
   });
 
@@ -336,7 +331,7 @@ async function confirmVkLogin(params: {
 }
 
 
-async function createDirectVkLoginLink(params: {
+async function createDirectVkLoginToken(params: {
   vkUserId: number | string;
   peerId: number | string;
   profile: Awaited<ReturnType<typeof getVkBotUserProfile>>;
@@ -380,7 +375,7 @@ async function createDirectVkLoginLink(params: {
 
   if (error) throw error;
 
-  return `${getAppUrl()}/api/auth/vk/complete?token=${encodeURIComponent(token)}`;
+  return token;
 }
 
 async function handleMessageNew(payload: VkCallbackPayload) {
@@ -429,28 +424,15 @@ async function handleMessageNew(payload: VkCallbackPayload) {
   }).catch((error) => logVkWebhookError('remember vk user', error));
 
   if (isStartLikeText(message.text)) {
-    const directLoginUrl = await createDirectVkLoginLink({ vkUserId, peerId, profile });
+    const directLoginToken = await createDirectVkLoginToken({ vkUserId, peerId, profile });
 
     await sendVkReply({
       label: 'vk_start_direct_login',
       peerId,
       textPreview: 'КликБук готов к входу через VK.',
-      send: () => sendVkMessage({
+      send: () => sendVkLoginConfirmedMessage({
         peerId,
-        message: [
-          'Готово ✅',
-          '',
-          'VK подключён к КликБук.',
-          'Нажмите кнопку ниже — кабинет откроется без ручного кода.',
-        ].join('\n'),
-        keyboard: JSON.stringify({
-          one_time: false,
-          inline: true,
-          buttons: [[{
-            action: { type: 'open_link', label: 'Открыть кабинет', link: directLoginUrl },
-            color: 'primary',
-          }]],
-        }),
+        token: directLoginToken,
       }),
     });
     return;
@@ -471,32 +453,93 @@ async function handleMessageEvent(payload: VkCallbackPayload) {
   const peerId = numberValue(object?.peer_id) ?? vkUserId;
   const eventId = typeof object?.event_id === 'string' ? object.event_id : null;
 
-  if (!object || !vkUserId || !peerId) return;
+  if (!object || !vkUserId || !peerId || !eventId) return;
 
+  const action = typeof eventPayload?.action === 'string' ? eventPayload.action : null;
   const token = extractAuthToken(null, eventPayload);
+  const appUrl = getAppUrl();
 
-  if (token) {
-    const confirmed = await confirmVkLogin({ token, vkUserId, peerId });
-
-    if (eventId) {
+  if (action === 'open_dashboard') {
+    if (!token) {
       await answerVkMessageEvent({
         eventId,
         userId: vkUserId,
         peerId,
-        text: confirmed ? 'Вход подтверждён' : 'Не удалось подтвердить вход',
-      }).catch((error) => logVkWebhookError('answer event', error));
+        text: 'Сначала нажмите «Войти через VK» на сайте или отправьте /start.',
+      }).catch((error) => logVkWebhookError('answer open dashboard without token', error));
+      return;
     }
-    return;
-  }
 
-  if (eventId) {
+    try {
+      const admin = createSupabaseAdminClient();
+      const { data: row } = await admin
+        .from('sloty_vk_login_requests')
+        .select('status, expires_at')
+        .eq('token', token)
+        .maybeSingle();
+
+      if (row && row.status === 'pending' && new Date(row.expires_at).getTime() >= Date.now()) {
+        await confirmVkLogin({ token, vkUserId, peerId });
+      }
+    } catch (error) {
+      logVkWebhookError('lazy confirm from button', error);
+    }
+
     await answerVkMessageEvent({
       eventId,
       userId: vkUserId,
       peerId,
-      text: 'Откройте вход через VK на сайте КликБук',
-    }).catch((error) => logVkWebhookError('answer empty event', error));
+      link: `${appUrl}/api/auth/vk/complete?token=${encodeURIComponent(token)}`,
+    }).catch((error) => logVkWebhookError('answer open dashboard', error));
+    return;
   }
+
+  if (action === 'open_url') {
+    const url = typeof eventPayload?.url === 'string' ? eventPayload.url : appUrl;
+    const safeUrl = url.startsWith(appUrl) ? url : appUrl;
+
+    await answerVkMessageEvent({
+      eventId,
+      userId: vkUserId,
+      peerId,
+      link: safeUrl,
+    }).catch((error) => logVkWebhookError('answer open url', error));
+    return;
+  }
+
+  if (action === 'notifications') {
+    await answerVkMessageEvent({
+      eventId,
+      userId: vkUserId,
+      peerId,
+      text: 'Уведомления VK включены. Новые записи будут приходить в этот диалог.',
+    }).catch((error) => logVkWebhookError('answer notifications', error));
+    return;
+  }
+
+  if (action === 'help') {
+    await answerVkMessageEvent({
+      eventId,
+      userId: vkUserId,
+      peerId,
+      text: 'Я отправил подсказку в диалог.',
+    }).catch((error) => logVkWebhookError('answer help', error));
+
+    await sendVkReply({
+      label: 'help_menu',
+      peerId,
+      textPreview: 'Помощь по VK-боту КликБук.',
+      send: () => sendVkBotWelcomeMessage({ peerId, token }),
+    });
+    return;
+  }
+
+  await answerVkMessageEvent({
+    eventId,
+    userId: vkUserId,
+    peerId,
+    text: 'Откройте вход через VK на сайте КликБук.',
+  }).catch((error) => logVkWebhookError('answer unknown event', error));
 }
 
 async function handleMessageAllow(payload: VkCallbackPayload) {
@@ -526,14 +569,13 @@ async function handleMessageAllow(payload: VkCallbackPayload) {
     metadata: { source: 'message_allow' },
   }).catch((error) => logVkWebhookError('message allow upsert', error));
 
+  const directLoginToken = await createDirectVkLoginToken({ vkUserId, peerId: vkUserId, profile }).catch(() => null);
+
   await sendVkReply({
     label: 'message_allow_welcome',
     peerId: vkUserId,
     textPreview: 'Сообщения VK подключены к КликБук.',
-    send: () => sendVkMessage({
-      peerId: vkUserId,
-      message: 'Сообщения VK подключены к КликБук ✅\n\nТеперь через этот диалог можно подтверждать вход и получать уведомления о записях.',
-    }),
+    send: () => sendVkBotWelcomeMessage({ peerId: vkUserId, token: directLoginToken }),
   });
 }
 

@@ -25,8 +25,7 @@ export async function POST(request: NextRequest) {
     const mode = safeMode(request.nextUrl.searchParams.get('mode'));
     const payload = `auth_${token}`;
     const dialogUrl = getVkBotDialogLink();
-    const usePayloadLink = mode === 'link' || request.nextUrl.searchParams.get('flow') === 'ref';
-    const vkUrl = usePayloadLink ? getVkBotDeepLink(payload) : dialogUrl || getVkBotDeepLink();
+    const vkUrl = getVkBotDeepLink(payload) || dialogUrl;
     const prefillUrl = getVkBotPrefillLink(`/start ${payload}`);
 
     if (!vkUrl) {
@@ -37,7 +36,7 @@ export async function POST(request: NextRequest) {
       token,
       status: 'pending',
       expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
-      metadata: { next, mode, flow: usePayloadLink ? 'ref' : 'no_code_start' },
+      metadata: { next, mode, flow: 'ref_button_bot' },
     });
 
     if (error) throw error;
@@ -72,8 +71,7 @@ export async function GET(request: NextRequest) {
     const token = buildVkLoginToken();
     const payload = `auth_${token}`;
     const dialogUrl = getVkBotDialogLink();
-    const usePayloadLink = mode === 'link' || request.nextUrl.searchParams.get('flow') === 'ref';
-    const vkUrl = usePayloadLink ? getVkBotDeepLink(payload) : dialogUrl || getVkBotDeepLink();
+    const vkUrl = getVkBotDeepLink(payload) || dialogUrl;
     const prefillUrl = getVkBotPrefillLink(`/start ${payload}`);
 
     if (!vkUrl) throw new Error('Missing VK_BOT_GROUP_ID or VK_BOT_SCREEN_NAME');

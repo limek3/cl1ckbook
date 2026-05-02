@@ -138,34 +138,55 @@ export async function vkApi(method: string, params: Record<string, unknown>) {
   return payload;
 }
 
-export function buildVkKeyboard(
-  buttons: Array<Array<{
-    label: string;
-    link?: string;
-    payload?: Record<string, unknown>;
-    color?: 'primary' | 'secondary' | 'negative' | 'positive';
-  }>>,
-) {
-  return JSON.stringify({
+export type VkBotButton = {
+  label: string;
+  action?: string;
+  token?: string | null;
+  url?: string | null;
+  payload?: Record<string, unknown>;
+  color?: 'primary' | 'secondary' | 'negative' | 'positive';
+};
+
+export function buildVkKeyboard(buttons: Array<Array<VkBotButton>>) {
+  return {
     one_time: false,
     inline: true,
     buttons: buttons.map((row) =>
       row.map((button) => ({
-        action: button.link
-          ? {
-              type: 'open_link',
-              label: button.label,
-              link: button.link,
-            }
-          : {
-              type: 'callback',
-              label: button.label,
-              payload: JSON.stringify(button.payload ?? {}),
-            },
-        color: button.color ?? (button.link ? 'primary' : 'secondary'),
+        action: {
+          type: 'callback',
+          label: button.label,
+          payload: JSON.stringify({
+            action: button.action || 'noop',
+            ...(button.token ? { token: button.token } : {}),
+            ...(button.url ? { url: button.url } : {}),
+            ...(button.payload ?? {}),
+          }),
+        },
+        color: button.color ?? 'secondary',
       })),
     ),
-  });
+  };
+}
+
+export function buildVkLoginKeyboard(token: string) {
+  return buildVkKeyboard([
+    [{ label: 'Открыть кабинет', action: 'open_dashboard', token, color: 'positive' }],
+    [
+      { label: 'Помощь', action: 'help', color: 'secondary' },
+      { label: 'Уведомления', action: 'notifications', color: 'secondary' },
+    ],
+  ]);
+}
+
+export function buildVkMainMenuKeyboard(token?: string | null) {
+  return buildVkKeyboard([
+    [{ label: 'Открыть кабинет', action: 'open_dashboard', token: token ?? null, color: 'primary' }],
+    [
+      { label: 'Как работает вход', action: 'help', color: 'secondary' },
+      { label: 'Включить уведомления', action: 'notifications', color: 'positive' },
+    ],
+  ]);
 }
 
 export async function sendVkMessage(params: {
@@ -173,44 +194,33 @@ export async function sendVkMessage(params: {
   message: string;
   keyboard?: string | Record<string, unknown>;
 }) {
-  const basePayload = {
+  return vkApi('messages.send', {
     peer_id: String(params.peerId),
     random_id: crypto.randomInt(1, 2147483647),
     message: params.message,
     disable_mentions: 1,
-    dont_parse_links: 1,
-  };
-
-  try {
-    return await vkApi('messages.send', {
-      ...basePayload,
-      ...(params.keyboard
-        ? { keyboard: typeof params.keyboard === 'string' ? params.keyboard : JSON.stringify(params.keyboard) }
-        : {}),
-    });
-  } catch (error) {
-    // VK can reject a message because of keyboard/open_link restrictions in some
-    // community configurations. In that case the bot must still answer, so retry
-    // once with plain text. Auth confirmation itself does not depend on buttons.
-    if (params.keyboard) {
-      return vkApi('messages.send', basePayload);
-    }
-
-    throw error;
-  }
+    ...(params.keyboard
+      ? { keyboard: typeof params.keyboard === 'string' ? params.keyboard : JSON.stringify(params.keyboard) }
+      : {}),
+  });
 }
 
 export async function answerVkMessageEvent(params: {
   eventId: string;
   userId: number | string;
   peerId: number | string;
-  text: string;
+  text?: string;
+  link?: string;
 }) {
   return vkApi('messages.sendMessageEventAnswer', {
     event_id: params.eventId,
     user_id: String(params.userId),
     peer_id: String(params.peerId),
-    event_data: JSON.stringify({ type: 'show_snackbar', text: params.text }),
+    event_data: JSON.stringify(
+      params.link
+        ? { type: 'open_link', link: params.link }
+        : { type: 'show_snackbar', text: params.text || 'Готово' },
+    ),
   });
 }
 
@@ -255,42 +265,34 @@ export async function getVkBotUserProfile(vkUserId: number | string): Promise<Vk
 
 export async function sendVkBotWelcomeMessage(params: {
   peerId: number | string;
-  loginUrl?: string | null;
+  token?: string | null;
 }) {
-  const appUrl = getAppUrl();
-  const loginUrl = params.loginUrl || `${appUrl}/login`;
-
   return sendVkMessage({
     peerId: params.peerId,
     message: [
       'Привет! Я бот КликБук.',
       '',
-      'Я помогаю входить в кабинет через VK и присылаю уведомления о записях.',
+      'Через меня можно входить в кабинет VK-кнопкой и получать уведомления о записях.',
       '',
-      'Для входа нажмите кнопку на сайте. Если вы уже открыли этот диалог по кнопке VK, просто отправьте любое сообщение — я попробую подтвердить вход по служебной ссылке.',
+      'Нажмите кнопку ниже — без ручных кодов и ссылок в сообщении.',
     ].join('\n'),
-    keyboard: buildVkKeyboard([
-      [{ label: 'Войти в кабинет', link: loginUrl, color: 'primary' }],
-      [{ label: 'Открыть сайт', link: appUrl, color: 'secondary' }],
-    ]),
+    keyboard: buildVkMainMenuKeyboard(params.token),
   });
 }
 
 export async function sendVkBotAuthFallbackMessage(params: {
   peerId: number | string;
-  command?: string | null;
+  token?: string | null;
 }) {
-  const appUrl = getAppUrl();
-
   return sendVkMessage({
     peerId: params.peerId,
     message: [
-      'Я получил сообщение, но не вижу активный код входа.',
+      'Я на связи ✅',
       '',
-      'Нажмите «Войти через VK» на сайте ещё раз. Откроется этот диалог со служебной ссылкой. Обычно достаточно отправить любое сообщение.',
-      params.command ? `\nЗапасной код: ${params.command}` : null,
-    ].filter(Boolean).join('\n'),
-    keyboard: buildVkKeyboard([[{ label: 'Вернуться на вход', link: `${appUrl}/login`, color: 'primary' }]]),
+      'Для входа нажмите кнопку «Открыть кабинет».',
+      'Если вход не открылся, вернитесь на сайт и нажмите «Войти через VK» ещё раз.',
+    ].join('\n'),
+    keyboard: buildVkMainMenuKeyboard(params.token),
   });
 }
 
@@ -322,27 +324,24 @@ export async function sendMasterVkBookingNotification(params: {
       .filter(Boolean)
       .join('\n'),
     keyboard: buildVkKeyboard([
-      [{ label: 'Открыть записи', link: `${appUrl}/dashboard/today` }],
-      [{ label: 'Кабинет', link: `${appUrl}/dashboard` }],
+      [{ label: 'Открыть записи', action: 'open_url', url: `${appUrl}/dashboard/today`, color: 'primary' }],
+      [{ label: 'Кабинет', action: 'open_url', url: `${appUrl}/dashboard`, color: 'secondary' }],
     ]),
   });
 }
 
 export async function sendVkLoginConfirmedMessage(params: {
   peerId: number | string;
-  next?: string | null;
+  token: string;
 }) {
-  const appUrl = getAppUrl();
-  const next = params.next && params.next.startsWith('/') && !params.next.startsWith('//') ? params.next : '/dashboard';
-
   return sendVkMessage({
     peerId: params.peerId,
     message: [
       'Готово ✅',
       '',
       'Вход в КликБук через VK подтверждён.',
-      'Вернитесь на сайт — кабинет откроется автоматически.',
+      'Нажмите кнопку ниже — кабинет откроется автоматически.',
     ].join('\n'),
-    keyboard: buildVkKeyboard([[{ label: 'Открыть кабинет', link: `${appUrl}${next}`, color: 'primary' }]]),
+    keyboard: buildVkLoginKeyboard(params.token),
   });
 }
