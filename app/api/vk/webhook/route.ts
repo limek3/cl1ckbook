@@ -18,6 +18,7 @@ import {
   sendVkMessage,
 } from '@/lib/server/vk-bot';
 import { handleClientBookingAction } from '@/lib/server/booking-client-actions';
+import { handleRescheduleProposalAction } from '@/lib/server/booking-reschedule-proposals';
 import { createChatMessage, createChatThread, fetchChatThreadByPhone, updateChatThread } from '@/lib/server/supabase-chats';
 import type { Booking, MasterProfile } from '@/lib/types';
 import {
@@ -827,6 +828,53 @@ async function handleMessageEvent(payload: VkCallbackPayload) {
   const action = typeof eventPayload?.action === 'string' ? eventPayload.action : null;
   const token = extractAuthToken(null, eventPayload);
   const appUrl = getAppUrl();
+
+  if (action === 'reschedule_proposal_accept' || action === 'reschedule_proposal_decline') {
+    const proposalId = typeof eventPayload?.proposal_id === 'string' ? eventPayload.proposal_id : null;
+    const proposalAction = action === 'reschedule_proposal_accept' ? 'accept' : 'decline';
+
+    if (!proposalId) {
+      await answerVkMessageEvent({ eventId, userId: vkUserId, peerId, text: 'Предложение переноса не найдено.' })
+        .catch((error) => logVkWebhookError('answer reschedule proposal missing id', error));
+      return;
+    }
+
+    const result = await handleRescheduleProposalAction({
+      proposalId,
+      action: proposalAction,
+      source: 'vk',
+      directClientRef: { clientVkPeerId: peerId, clientVkUserId: String(vkUserId) },
+    }).catch((error) => {
+      logVkWebhookError('vk reschedule proposal action', error);
+      return null;
+    });
+
+    await answerVkMessageEvent({
+      eventId,
+      userId: vkUserId,
+      peerId,
+      text: result?.ok
+        ? proposalAction === 'accept'
+          ? 'Перенос подтверждён.'
+          : 'Мастер подберёт другой слот.'
+        : 'Не удалось обработать перенос.',
+    }).catch((error) => logVkWebhookError('answer vk reschedule proposal action', error));
+
+    await sendVkReply({
+      label: proposalAction === 'accept' ? 'reschedule_proposal_accepted' : 'reschedule_proposal_declined',
+      peerId,
+      textPreview: proposalAction === 'accept' ? 'Перенос подтверждён.' : 'Нужно другое время.',
+      send: () => sendVkMessage({
+        peerId,
+        message: result?.ok
+          ? proposalAction === 'accept'
+            ? 'Спасибо, перенос подтверждён ✅ Запись обновлена.'
+            : 'Поняли, это время не подходит. Мастер подберёт другой слот и ответит вам в чате.'
+          : 'Не удалось обработать перенос. Напишите мастеру обычным сообщением в этот диалог.',
+      }),
+    });
+    return;
+  }
 
   if (action === 'client_booking_confirm' || action === 'client_booking_reschedule') {
     const bookingId = typeof eventPayload?.booking_id === 'string' ? eventPayload.booking_id : null;

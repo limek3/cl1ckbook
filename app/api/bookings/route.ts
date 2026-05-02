@@ -345,7 +345,14 @@ export async function POST(request: Request) {
       // /api/chats can synthesize chat rows from bookings if normalized chat tables fail.
     }
 
-    return NextResponse.json({ booking: persistedBooking, workspaceId: workspace.id, telegram: telegramBookingLink, vk: vkBookingLink, vkConfirmationUrl: vkBookingLink?.url ?? null });
+    return NextResponse.json({
+      booking: persistedBooking,
+      workspaceId: workspace.id,
+      telegram: telegramBookingLink,
+      telegramConfirmationUrl: telegramBookingLink?.url ?? null,
+      vk: vkBookingLink,
+      vkConfirmationUrl: vkBookingLink?.url ?? null,
+    });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'unknown_error' }, { status: 500 });
   }

@@ -21,6 +21,7 @@ import {
   Sparkles,
   SquarePen,
   Star,
+  TriangleAlert,
   TrendingUp,
   Users2,
   Wallet,
@@ -49,7 +50,7 @@ type ClientTimelineItem = {
   title: string;
   subtitle: string;
   date: string;
-  tone: 'default' | 'accent';
+  tone: 'default' | 'accent' | 'warning';
 };
 
 const tableGridClass =
@@ -211,6 +212,18 @@ function buildClientTimeline(client: ClientInsight, locale: 'ru' | 'en') {
 
   const lastVisit = new Date(client.lastVisit);
   const safeLastVisit = Number.isNaN(lastVisit.getTime()) ? new Date() : lastVisit;
+
+  if (client.hasReschedule) {
+    timeline.push({
+      id: `${client.id}-reschedule`,
+      title: locale === 'ru'
+        ? `Был перенос${client.rescheduleCount && client.rescheduleCount > 1 ? ` ×${client.rescheduleCount}` : ''}`
+        : `Rescheduled${client.rescheduleCount && client.rescheduleCount > 1 ? ` ×${client.rescheduleCount}` : ''}`,
+      subtitle: locale === 'ru' ? 'Клиент запрашивал перенос — проверьте чат' : 'Client requested reschedule — check chat',
+      date: formatClientDate(locale, client.nextVisit || client.lastVisit),
+      tone: 'warning',
+    });
+  }
 
   if (client.visits <= 1) {
     timeline.push({
@@ -1383,9 +1396,13 @@ function ClientCrmDialog({
                     const color =
                       item.tone === 'accent'
                         ? segmentAccent
-                        : light
-                          ? 'rgba(0,0,0,0.22)'
-                          : 'rgba(255,255,255,0.24)';
+                        : item.tone === 'warning'
+                          ? light
+                            ? 'rgba(245,158,11,0.78)'
+                            : 'rgba(251,191,36,0.72)'
+                          : light
+                            ? 'rgba(0,0,0,0.22)'
+                            : 'rgba(255,255,255,0.24)';
 
                     return (
                       <div key={item.id} className="grid min-h-[58px] grid-cols-[4px_minmax(0,1fr)]">
@@ -1393,8 +1410,14 @@ function ClientCrmDialog({
 
                         <div className="grid gap-2 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_112px] sm:items-center">
                           <div className="min-w-0">
-                            <div className={cn('truncate text-[12px] font-semibold', pageText(light))}>
-                              {item.title}
+                            <div className={cn('flex min-w-0 items-center gap-1.5 truncate text-[12px] font-semibold', pageText(light))}>
+                              {item.tone === 'warning' ? (
+                                <TriangleAlert
+                                  className="size-3.5 shrink-0"
+                                  style={{ color }}
+                                />
+                              ) : null}
+                              <span className="truncate">{item.title}</span>
                             </div>
 
                             <div className={cn('mt-1 truncate text-[11px]', mutedText(light))}>

@@ -38,6 +38,7 @@ type BookingRow = {
   completed_at?: string | null;
   no_show_at?: string | null;
   cancelled_at?: string | null;
+  cancel_reason?: string | null;
   metadata?: Record<string, unknown> | null;
 };
 
@@ -67,6 +68,8 @@ function mapBookingRow(row: BookingRow): Booking {
     completedAt: row.completed_at ?? undefined,
     noShowAt: row.no_show_at ?? undefined,
     cancelledAt: row.cancelled_at ?? undefined,
+    cancelReason: row.cancel_reason ?? undefined,
+    metadata: row.metadata ?? undefined,
   };
 }
 

@@ -24,7 +24,9 @@ interface BookingRow {
   completed_at?: string | null;
   no_show_at?: string | null;
   cancelled_at?: string | null;
+  cancel_reason?: string | null;
   status_check_sent_at?: string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 function mapRow(row: BookingRow): Booking {
@@ -47,7 +49,9 @@ function mapRow(row: BookingRow): Booking {
     completedAt: row.completed_at ?? undefined,
     noShowAt: row.no_show_at ?? undefined,
     cancelledAt: row.cancelled_at ?? undefined,
+    cancelReason: row.cancel_reason ?? undefined,
     statusCheckSentAt: row.status_check_sent_at ?? undefined,
+    metadata: row.metadata ?? undefined,
   };
 }
 
@@ -85,6 +89,8 @@ export async function createBookingRecord(workspaceId: string, booking: Booking)
         completed_at: booking.completedAt ?? null,
         no_show_at: booking.noShowAt ?? null,
         cancelled_at: booking.cancelledAt ?? null,
+        cancel_reason: booking.cancelReason ?? null,
+        metadata: booking.metadata ?? {},
       },
     ]),
   });

@@ -421,8 +421,8 @@ function buildBotDraft(
 
   if (flow === 'reschedule') {
     return locale === 'ru'
-      ? `Здравствуйте, ${thread.clientName}! Подготовила перенос на ${nextVisit ?? 'новое время'}. Если слот подходит — подтвердите ответом в чате.`
-      : `Hi ${thread.clientName}! I prepared a reschedule for ${nextVisit ?? 'a new time'}. Reply here if the slot works for you.`;
+      ? `Здравствуйте, ${thread.clientName}! Предлагаю перенос на ${nextVisit ?? 'новое время'}. Если слот подходит — нажмите «Подтвердить перенос», если нет — «Не подходит».`
+      : `Hi ${thread.clientName}! I suggest rescheduling to ${nextVisit ?? 'a new time'}. Please press “Confirm reschedule” if it works, or “Doesn’t work”.`;
   }
 
   return locale === 'ru'
@@ -1710,7 +1710,10 @@ export default function DashboardChatsPage() {
     if (!activeThread || !draft.trim()) return;
 
     const body = draft.trim();
-    const viaBot = composerFlow !== null;
+    const activeComposerFlow = composerFlow;
+    const activeTransferDate = transferDate;
+    const activeTransferTime = transferTime || '12:30';
+    const viaBot = activeComposerFlow !== null;
     const localMessage = createLocalMessage(
       activeThread.id,
       body,
@@ -1724,7 +1727,7 @@ export default function DashboardChatsPage() {
     setThreads((current) =>
       replaceThread(current, activeThread.id, (thread) => ({
         ...thread,
-        segment: viaBot ? (composerFlow === 'followup' ? 'followup' : 'active') : 'active',
+        segment: viaBot ? (activeComposerFlow === 'followup' ? 'followup' : 'active') : 'active',
         lastMessagePreview: body,
         lastMessageAt: localMessage.createdAt,
         unreadCount: 0,
@@ -1755,6 +1758,9 @@ export default function DashboardChatsPage() {
           author: viaBot ? 'system' : 'master',
           deliveryState: 'sent',
           viaBot,
+          ...(activeComposerFlow === 'reschedule' && activeTransferDate
+            ? { rescheduleProposal: { date: activeTransferDate, time: activeTransferTime } }
+            : {}),
         }),
       });
 

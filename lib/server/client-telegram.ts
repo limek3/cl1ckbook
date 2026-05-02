@@ -72,6 +72,7 @@ export async function sendClientTelegramMessage(params: {
   clientName?: string | null;
   directChatId?: number | string | null;
   text: string;
+  replyMarkup?: Record<string, unknown>;
 }) {
   const chatId = await findClientTelegramChatId({
     workspaceId: params.workspaceId,
@@ -86,6 +87,7 @@ export async function sendClientTelegramMessage(params: {
   await sendTelegramMessage({
     chatId,
     text: params.text,
+    replyMarkup: params.replyMarkup,
   });
 
   return true;

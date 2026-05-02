@@ -7,6 +7,7 @@ import {
 } from '@/lib/server/telegram-user';
 import { isNotificationEnabled } from '@/lib/server/notification-settings';
 import { handleClientBookingAction } from '@/lib/server/booking-client-actions';
+import { handleRescheduleProposalAction, parseTelegramRescheduleProposalCallback } from '@/lib/server/booking-reschedule-proposals';
 import { createBookingReviewLink } from '@/lib/server/booking-reviews';
 import { sendVkMessage } from '@/lib/server/vk-bot';
 import {
@@ -426,6 +427,63 @@ async function handleClientReminderCallback(params: {
       answerTelegramCallbackQuery({
         callbackQueryId: params.callbackQueryId,
         text: 'Не удалось обработать действие. Напишите мастеру в чат.',
+      }),
+    );
+  }
+
+  return true;
+}
+
+
+async function handleRescheduleProposalCallback(params: {
+  callbackQueryId: string;
+  data?: string;
+  chatId?: number | string | null;
+  from?: TelegramFrom | null;
+}) {
+  const parsed = parseTelegramRescheduleProposalCallback(params.data);
+  if (!parsed) return false;
+
+  try {
+    const result = await handleRescheduleProposalAction({
+      proposalId: parsed.proposalId,
+      action: parsed.action,
+      source: 'telegram',
+      directClientRef: {
+        ...(params.chatId ? { clientTelegramChatId: params.chatId } : {}),
+        ...(params.from?.id ? { clientTelegramId: params.from.id } : {}),
+      },
+    });
+
+    await safeTask('answer reschedule proposal callback', () =>
+      answerTelegramCallbackQuery({
+        callbackQueryId: params.callbackQueryId,
+        text: result.ok
+          ? parsed.action === 'accept'
+            ? 'Перенос подтверждён'
+            : 'Мастер подберёт другой слот'
+          : 'Предложение не найдено',
+      }),
+    );
+
+    if (params.chatId) {
+      await safeTask('send reschedule proposal followup', () =>
+        sendTelegramMessage({
+          chatId: params.chatId as number | string,
+          text: result.ok
+            ? parsed.action === 'accept'
+              ? 'Спасибо, перенос подтверждён ✅ Запись обновлена.'
+              : 'Поняли, это время не подходит. Мастер подберёт другой слот и ответит вам в чате.'
+            : 'Не удалось обработать перенос. Напишите мастеру обычным сообщением.',
+        }),
+      );
+    }
+  } catch (error) {
+    logWebhookError('handleRescheduleProposalCallback failed', error);
+    await safeTask('answer reschedule proposal callback failed', () =>
+      answerTelegramCallbackQuery({
+        callbackQueryId: params.callbackQueryId,
+        text: 'Не удалось обработать перенос. Напишите мастеру в чат.',
       }),
     );
   }
@@ -1046,6 +1104,15 @@ export async function POST(request: Request) {
       });
 
       if (visitHandled) return NextResponse.json({ ok: true });
+
+      const rescheduleProposalHandled = await handleRescheduleProposalCallback({
+        callbackQueryId: callbackQuery.id,
+        data: callbackQuery.data,
+        chatId: callbackQuery.message?.chat?.id ?? null,
+        from: callbackQuery.from ?? null,
+      });
+
+      if (rescheduleProposalHandled) return NextResponse.json({ ok: true });
 
       const clientReminderHandled = await handleClientReminderCallback({
         callbackQueryId: callbackQuery.id,

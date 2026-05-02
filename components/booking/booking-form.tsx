@@ -806,7 +806,9 @@ function SuccessView({
                 rel="noreferrer"
                 className={cn(
                   'inline-flex h-10 w-full items-center justify-center gap-2 rounded-[10px] border px-4 text-[12px] font-semibold transition active:scale-[0.99]',
-                  primaryButtonClass(light),
+                  light
+                    ? 'border-black/[0.08] bg-white text-black/72 hover:border-black/[0.14] hover:bg-black/[0.035] hover:text-black'
+                    : 'border-white/[0.08] bg-white/[0.04] text-white/72 hover:border-white/[0.14] hover:bg-white/[0.07] hover:text-white',
                 )}
               >
                 <Send className="size-4" />
@@ -950,14 +952,14 @@ export function BookingForm({
           submit: 'Отправить',
           successTitle: 'Заявка отправлена',
           successDescription:
-            'Мастер получил заявку. Подключите Telegram или VK, чтобы не потерять запись: бот пришлёт подтверждение, напоминание, адрес и маршрут.',
+            'Мастер получил заявку. Подключите Telegram или VK, чтобы не потерять запись: бот пришлёт статус, напоминание за 2 часа, адрес и маршрут.',
           connectTitle: 'Получите подтверждение в удобном канале',
-          connectText: 'Лучше нажать сразу: так бот сможет напомнить о записи, дать кнопки подтверждения/переноса и прислать маршрут.',
+          connectText: 'Лучше нажать сразу: так бот сможет прислать напоминание за 2 часа, адрес, маршрут и кнопки подтверждения/переноса ближе к визиту.',
           telegramConfirm: 'Получить в Telegram',
           telegramConfirmHint:
-            'Telegram-бот отправит подтверждение, напоминание и маршрут.',
+            'Telegram-бот отправит статус, напоминание и маршрут.',
           vkConfirm: 'Получить в VK',
-          vkConfirmHint: 'VK-бот продублирует подтверждение, напоминание и маршрут.',
+          vkConfirmHint: 'VK-бот продублирует статус, напоминание и маршрут.',
           newRequest: 'Новая заявка',
           nothingFound: 'Ничего не найдено.',
           step: 'Шаг',
@@ -993,14 +995,14 @@ export function BookingForm({
           submit: 'Send',
           successTitle: 'Request sent',
           successDescription:
-            'The master received your request. Connect Telegram or VK to get confirmation, reminders, address, and route.',
+            'The master received your request. Connect Telegram or VK to get status, a 2-hour reminder, address, and route.',
           connectTitle: 'Get confirmation in a convenient channel',
-          connectText: 'Tap now so the bot can remind you, offer confirm/reschedule actions, and send the route.',
+          connectText: 'Tap now so the bot can send a 2-hour reminder, address, route, and confirm/reschedule actions closer to the visit.',
           telegramConfirm: 'Get in Telegram',
           telegramConfirmHint:
-            'Telegram bot will send confirmation, reminder, and route.',
+            'Telegram bot will send status, reminder, and route.',
           vkConfirm: 'Get in VK',
-          vkConfirmHint: 'VK bot can also send confirmation, reminder, and route.',
+          vkConfirmHint: 'VK bot can also send status, reminder, and route.',
           newRequest: 'New request',
           nothingFound: 'Nothing found.',
           step: 'Step',

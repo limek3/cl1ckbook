@@ -15,10 +15,10 @@ import {
   Chrome,
   Copy,
   Globe2,
-  Link2,
   Loader2,
   MessageCircleMore,
   Plus,
+  Quote,
   Send,
   Sparkles,
   SquarePen,
@@ -823,8 +823,12 @@ function ProfileOverviewCard({
   accentColor,
   publicHref,
   publicUrl,
+  reviewHref,
+  reviewUrl,
   copied,
+  reviewCopied,
   onCopy,
+  onCopyReview,
   labels,
   name,
   profession,
@@ -840,8 +844,12 @@ function ProfileOverviewCard({
   accentColor: string;
   publicHref: string;
   publicUrl: string;
+  reviewHref: string;
+  reviewUrl: string;
   copied: boolean;
+  reviewCopied: boolean;
   onCopy: () => void;
+  onCopyReview: () => void;
   labels: Record<string, string>;
   name?: string;
   profession?: string;
@@ -960,32 +968,73 @@ function ProfileOverviewCard({
               <KeyValue label={labels.whatsapp} value={whatsapp || '—'} light={light} />
             </div>
 
-            <div className="mt-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-              <div
-                className={cn(
-                  'flex min-w-0 flex-1 items-center gap-2 rounded-[10px] border px-3 py-2.5',
-                  fieldTone(light),
-                )}
-              >
-                <Link2 className={cn('size-3.5 shrink-0', mutedText(light))} />
-                <span className={cn('truncate text-[11.5px] font-medium', mutedText(light))}>
-                  {publicUrl}
-                </span>
+            <div className="mt-3 grid gap-2">
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                <div
+                  className={cn(
+                    'flex min-w-0 flex-1 items-center gap-2 rounded-[10px] border px-3 py-2.5',
+                    fieldTone(light),
+                  )}
+                >
+                  <Globe2 className={cn('size-3.5 shrink-0', mutedText(light))} />
+                  <div className="min-w-0 flex-1">
+                    <div className={cn('text-[10px] font-semibold uppercase tracking-[0.12em]', faintText(light))}>
+                      {labels.personalPage}
+                    </div>
+                    <div className={cn('mt-1 truncate text-[11.5px] font-medium', mutedText(light))}>
+                      {publicUrl}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <ActionLink href={publicHref} light={light} active>
+                    <Globe2 className="size-3.5" />
+                    {labels.openPublic}
+                  </ActionLink>
+
+                  <CopyButton
+                    copied={copied}
+                    onClick={onCopy}
+                    copyLabel={labels.copy}
+                    copiedLabel={labels.copied}
+                    light={light}
+                  />
+                </div>
               </div>
 
-              <div className="flex shrink-0 flex-wrap gap-2">
-                <ActionLink href={publicHref} light={light} active>
-                  <Globe2 className="size-3.5" />
-                  {labels.openPublic}
-                </ActionLink>
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                <div
+                  className={cn(
+                    'flex min-w-0 flex-1 items-center gap-2 rounded-[10px] border px-3 py-2.5',
+                    fieldTone(light),
+                  )}
+                >
+                  <Quote className={cn('size-3.5 shrink-0', mutedText(light))} />
+                  <div className="min-w-0 flex-1">
+                    <div className={cn('text-[10px] font-semibold uppercase tracking-[0.12em]', faintText(light))}>
+                      {labels.reviewPage}
+                    </div>
+                    <div className={cn('mt-1 truncate text-[11.5px] font-medium', mutedText(light))}>
+                      {reviewUrl}
+                    </div>
+                  </div>
+                </div>
 
-                <CopyButton
-                  copied={copied}
-                  onClick={onCopy}
-                  copyLabel={labels.copy}
-                  copiedLabel={labels.copied}
-                  light={light}
-                />
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <ActionLink href={reviewHref} light={light}>
+                    <Quote className="size-3.5" />
+                    {labels.openReview}
+                  </ActionLink>
+
+                  <CopyButton
+                    copied={reviewCopied}
+                    onClick={onCopyReview}
+                    copyLabel={labels.copy}
+                    copiedLabel={labels.copied}
+                    light={light}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -1003,6 +1052,7 @@ export default function DashboardProfilePage() {
 
   const [mounted, setMounted] = useState(false);
   const [copiedPublicLink, setCopiedPublicLink] = useState(false);
+  const [copiedReviewLink, setCopiedReviewLink] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -1024,7 +1074,10 @@ export default function DashboardProfilePage() {
           description:
             'Один чистый экран для публичной ссылки, карточки клиента и редактирования данных мастера.',
           publicPage: 'Публичная страница',
+          personalPage: 'Персональная страница',
+          reviewPage: 'Для отзывов',
           openPublic: 'Открыть страницу',
+          openReview: 'Открыть отзыв',
           copyLink: 'Скопировать ссылку',
 
           createProfileTitle: 'Профиль ещё не создан',
@@ -1073,7 +1126,10 @@ export default function DashboardProfilePage() {
           description:
             'One clean screen for public link, client card, and master profile editing.',
           publicPage: 'Public page',
+          personalPage: 'Personal page',
+          reviewPage: 'For reviews',
           openPublic: 'Open page',
+          openReview: 'Open review',
           copyLink: 'Copy link',
 
           createProfileTitle: 'Profile is not created yet',
@@ -1129,26 +1185,48 @@ export default function DashboardProfilePage() {
       ? `${window.location.origin}${publicHref}`
       : publicHref;
 
+  const reviewHref = ownedProfile ? `/m/${ownedProfile.slug}/review` : '/create-profile';
+  const reviewUrl =
+    mounted && typeof window !== 'undefined'
+      ? `${window.location.origin}${reviewHref}`
+      : reviewHref;
+
+  const copyText = async (value: string) => {
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(value);
+      return;
+    }
+
+    if (typeof document !== 'undefined') {
+      const textarea = document.createElement('textarea');
+      textarea.value = value;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
+  };
+
   const handleCopyPublicLink = async () => {
     try {
-      if (navigator.clipboard) {
-        await navigator.clipboard.writeText(publicUrl);
-      } else if (typeof document !== 'undefined') {
-        const textarea = document.createElement('textarea');
-        textarea.value = publicUrl;
-        textarea.style.position = 'fixed';
-        textarea.style.left = '-9999px';
-        document.body.appendChild(textarea);
-        textarea.focus();
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-      }
-
+      await copyText(publicUrl);
       setCopiedPublicLink(true);
       window.setTimeout(() => setCopiedPublicLink(false), 1400);
     } catch {
       setCopiedPublicLink(false);
+    }
+  };
+
+  const handleCopyReviewLink = async () => {
+    try {
+      await copyText(reviewUrl);
+      setCopiedReviewLink(true);
+      window.setTimeout(() => setCopiedReviewLink(false), 1400);
+    } catch {
+      setCopiedReviewLink(false);
     }
   };
 
@@ -1294,8 +1372,12 @@ export default function DashboardProfilePage() {
               accentColor={accentColor}
               publicHref={publicHref}
               publicUrl={publicUrl}
+              reviewHref={reviewHref}
+              reviewUrl={reviewUrl}
               copied={copiedPublicLink}
+              reviewCopied={copiedReviewLink}
               onCopy={handleCopyPublicLink}
+              onCopyReview={handleCopyReviewLink}
               labels={labels}
               name={ownedProfile.name}
               profession={ownedProfile.profession}

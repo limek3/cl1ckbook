@@ -72,6 +72,7 @@ export async function sendClientVkMessage(params: {
   clientName?: string | null;
   directPeerId?: number | string | null;
   text: string;
+  keyboard?: string | Record<string, unknown>;
 }) {
   const peerId = await findClientVkPeerId({
     workspaceId: params.workspaceId,
@@ -86,6 +87,7 @@ export async function sendClientVkMessage(params: {
   await sendVkMessage({
     peerId,
     message: params.text,
+    keyboard: params.keyboard,
   });
 
   return true;

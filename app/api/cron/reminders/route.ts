@@ -180,18 +180,20 @@ async function sendReminder(params: {
       '',
       params.hoursBefore <= 2
         ? 'Хорошего визита! Подтвердите запись или выберите перенос. Если выбрать перенос, слот освободится.'
-        : 'Подтвердите запись или выберите перенос. Если выбрать перенос, слот освободится.',
+        : 'Ближе к визиту я пришлю контрольное напоминание с кнопками подтверждения/переноса.',
     ]
       .filter(Boolean)
       .join('\n'),
-    replyMarkup: {
-      inline_keyboard: [
-        [
-          { text: 'Подтвердить', callback_data: `client_booking:${params.booking.id}:confirm` },
-          { text: 'Перенос', callback_data: `client_booking:${params.booking.id}:reschedule` },
-        ],
-      ],
-    },
+    replyMarkup: params.hoursBefore <= 2
+      ? {
+          inline_keyboard: [
+            [
+              { text: 'Подтвердить', callback_data: `client_booking:${params.booking.id}:confirm` },
+              { text: 'Перенос', callback_data: `client_booking:${params.booking.id}:reschedule` },
+            ],
+          ],
+        }
+      : undefined,
   });
 }
 

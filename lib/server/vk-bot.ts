@@ -608,7 +608,6 @@ export async function sendClientVkBookingConfirmation(params: {
     ]
       .filter(Boolean)
       .join('\n'),
-    keyboard: buildVkClientBookingKeyboard(params.booking.id),
   });
 }
 
@@ -635,11 +634,11 @@ export async function sendClientVkBookingReminder(params: {
       '',
       params.hoursBefore <= 2
         ? 'Хорошего визита! Подтвердите запись или выберите перенос. Если выбрать перенос, слот освободится, а мастер получит предупреждение.'
-        : 'Подтвердите запись или выберите перенос. Если выбрать перенос, слот освободится, а мастер получит предупреждение.',
+        : 'Ближе к визиту я пришлю контрольное напоминание с кнопками подтверждения/переноса.',
     ]
       .filter(Boolean)
       .join('\n'),
-    keyboard: buildVkClientBookingKeyboard(params.booking.id),
+    keyboard: params.hoursBefore <= 2 ? buildVkClientBookingKeyboard(params.booking.id) : undefined,
   });
 }
 

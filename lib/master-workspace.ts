@@ -40,6 +40,8 @@ export interface ClientInsight {
   note: string;
   source: string;
   service: string;
+  hasReschedule?: boolean;
+  rescheduleCount?: number;
 }
 
 export interface DailyInsight {
@@ -364,6 +366,22 @@ function buildClients(bookings: Booking[], services: ServiceInsight[], locale: L
       const daysSince = pastItems[0]
         ? Math.round((now - getBookingDateTime(pastItems[0]).getTime()) / 86400000)
         : 0;
+      const hasReschedule = sorted.some((booking) => {
+        const metadata = booking.metadata && typeof booking.metadata === 'object' ? booking.metadata : {};
+        return booking.cancelReason === 'client_reschedule_requested' ||
+          Boolean(metadata.rescheduleRequested) ||
+          Boolean(metadata.acceptedRescheduleProposalId) ||
+          Boolean(metadata.declinedRescheduleProposalId) ||
+          Boolean(metadata.rescheduledFromDate);
+      });
+      const rescheduleCount = sorted.filter((booking) => {
+        const metadata = booking.metadata && typeof booking.metadata === 'object' ? booking.metadata : {};
+        return booking.cancelReason === 'client_reschedule_requested' ||
+          Boolean(metadata.rescheduleRequested) ||
+          Boolean(metadata.acceptedRescheduleProposalId) ||
+          Boolean(metadata.declinedRescheduleProposalId) ||
+          Boolean(metadata.rescheduledFromDate);
+      }).length;
       const hasNoShow = sorted.some((booking) => booking.status === 'no_show' || booking.status === 'cancelled');
       const latestStatus = sorted[0]?.status;
       const segment: ClientInsight['segment'] =
@@ -388,6 +406,8 @@ function buildClients(bookings: Booking[], services: ServiceInsight[], locale: L
         note: NOTES[locale][index % NOTES[locale].length],
         source,
         service: sorted[0].service,
+        hasReschedule,
+        rescheduleCount,
       };
     })
     .sort((a, b) => b.totalRevenue - a.totalRevenue);

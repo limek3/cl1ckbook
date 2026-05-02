@@ -16,6 +16,11 @@ import {
   updateChatThread,
 } from '@/lib/server/supabase-chats';
 import { fetchWorkspaceForUser } from '@/lib/server/supabase-workspaces';
+import {
+  buildTelegramRescheduleProposalReplyMarkup,
+  buildVkRescheduleProposalKeyboard,
+  createRescheduleProposal,
+} from '@/lib/server/booking-reschedule-proposals';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -288,6 +293,15 @@ export async function POST(request: Request) {
     const text = typeof body.body === 'string' ? body.body.trim() : '';
     const author: 'master' | 'system' = body.author === 'system' ? 'system' : 'master';
     const viaBot = body.viaBot === true;
+    const rescheduleProposal =
+      body.rescheduleProposal && typeof body.rescheduleProposal === 'object'
+        ? (body.rescheduleProposal as Record<string, unknown>)
+        : null;
+    const proposedDate = typeof rescheduleProposal?.date === 'string' ? rescheduleProposal.date : '';
+    const proposedTime = typeof rescheduleProposal?.time === 'string' && rescheduleProposal.time
+      ? rescheduleProposal.time
+      : '12:30';
+
     const requestedDeliveryState: ChatDeliveryState | null =
       body.deliveryState === 'queued' ||
       body.deliveryState === 'sent' ||
@@ -319,31 +333,57 @@ export async function POST(request: Request) {
       fallback: true,
     });
 
+    const bookingId = getThreadBookingId(thread, bookings);
+    let outgoingText = text;
+    let rescheduleProposalId: string | null = null;
+    let telegramReplyMarkup: Record<string, unknown> | undefined;
+    let vkKeyboard: Record<string, unknown> | undefined;
+
+    if (bookingId && proposedDate) {
+      const proposal = await createRescheduleProposal({
+        workspaceId: workspace.id,
+        threadId: thread.id,
+        bookingId,
+        proposedDate,
+        proposedTime,
+        message: text,
+      }).catch(() => null);
+
+      if (proposal) {
+        outgoingText = proposal.text;
+        rescheduleProposalId = proposal.proposal.id;
+        telegramReplyMarkup = buildTelegramRescheduleProposalReplyMarkup(proposal.proposal.id);
+        vkKeyboard = buildVkRescheduleProposalKeyboard(proposal.proposal.id);
+      }
+    }
+
     const telegramDelivered = canSendToClient && thread.channel === 'Telegram'
       ? await sendClientTelegramMessage({
           workspaceId: workspace.id,
-          bookingId: getThreadBookingId(thread, bookings),
+          bookingId,
           clientPhone: thread.clientPhone,
           clientName: thread.clientName,
           directChatId:
             typeof thread.metadata?.clientTelegramChatId === 'number' || typeof thread.metadata?.clientTelegramChatId === 'string'
               ? thread.metadata.clientTelegramChatId
               : null,
-          text,
+          text: outgoingText,
+          replyMarkup: telegramReplyMarkup,
         }).catch(() => false)
       : false;
 
     const vkDelivered = canSendToClient && thread.channel === 'VK'
       ? await sendClientVkMessage({
           workspaceId: workspace.id,
-          bookingId: getThreadBookingId(thread, bookings),
+          bookingId,
           clientPhone: thread.clientPhone,
           clientName: thread.clientName,
           directPeerId:
             typeof thread.metadata?.clientVkPeerId === 'number' || typeof thread.metadata?.clientVkPeerId === 'string'
               ? thread.metadata.clientVkPeerId
               : null,
-          text,
+          text: outgoingText,
+          keyboard: vkKeyboard,
         }).catch(() => false)
       : false;
 
@@ -363,6 +403,7 @@ export async function POST(request: Request) {
         sentToClientTelegram: telegramDelivered,
         sentToClientVk: vkDelivered,
         sourceThreadId: threadId,
+        ...(rescheduleProposalId ? { kind: 'reschedule_proposal', rescheduleProposalId, proposedDate, proposedTime } : {}),
       },
     });
 
@@ -376,10 +417,24 @@ export async function POST(request: Request) {
         ...(thread.metadata ?? {}),
         lastTelegramDelivery: telegramDelivered ? 'delivered' : 'queued',
         lastVkDelivery: vkDelivered ? 'delivered' : 'queued',
+        ...(rescheduleProposalId ? {
+          rescheduleProposalId,
+          rescheduleProposalStatus: 'pending',
+          rescheduleProposalDate: proposedDate,
+          rescheduleProposalTime: proposedTime,
+          activeAlert: {
+            type: 'reschedule_request',
+            status: 'proposal_sent',
+            bookingId,
+            proposalId: rescheduleProposalId,
+            createdAt: new Date().toISOString(),
+            message: `Клиенту предложен перенос на ${proposedDate} ${proposedTime}. Ждём подтверждение.`,
+          },
+        } : {}),
       },
     });
 
-    return NextResponse.json({ message, threadId: thread.id, telegramDelivered, vkDelivered });
+    return NextResponse.json({ message, threadId: thread.id, telegramDelivered, vkDelivered, rescheduleProposalId });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'unknown_error';
     if (message === 'unauthorized') {

@@ -1108,6 +1108,7 @@ export function MasterProfileForm({
   );
   const [slugTouched, setSlugTouched] = useState(Boolean(initialProfile?.slug));
   const [error, setError] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [reviewCopied, setReviewCopied] = useState(false);
   const [customService, setCustomService] = useState('');
@@ -1137,6 +1138,7 @@ export function MasterProfileForm({
     });
     setAvatarError(null);
     setError(null);
+    setSavedAt(null);
     setActiveSection('base');
   }, [initialProfile]);
 
@@ -1291,11 +1293,14 @@ export function MasterProfileForm({
           privacy: 'Приватность',
           privacyText: 'Можно скрыть контакт до подтверждения записи.',
           readiness: 'Готовность',
-          publicLink: 'Публичная ссылка',
+          publicLink: 'Персональная страница',
           preview: 'Открыть',
           copy: 'Копировать',
           copied: 'Скопировано',
           save: mode === 'create' ? 'Создать профиль' : 'Сохранить',
+          saved: 'Сохранено',
+          savedSuccess: 'Изменения сохранены',
+          savedSuccessText: 'Профиль обновлён. Публичная страница и бот уже используют новые данные.',
           back: 'К кабинету',
           servicesCount: 'Услуги',
           contactsCount: 'Контакты',
@@ -1303,7 +1308,7 @@ export function MasterProfileForm({
           reviewsCount: 'Отзывы',
           chars: 'симв.',
           publicPreview: 'Превью страницы',
-          reviewLink: 'Ссылка для отзыва',
+          reviewLink: 'Для отзывов',
           rating: 'Рейтинг',
           filled: 'заполнено',
           linkReady: 'Ссылка готова',
@@ -1437,11 +1442,14 @@ export function MasterProfileForm({
           privacy: 'Privacy',
           privacyText: 'Contact can be hidden until booking confirmation.',
           readiness: 'Readiness',
-          publicLink: 'Public link',
+          publicLink: 'Personal page',
           preview: 'Open',
           copy: 'Copy',
           copied: 'Copied',
           save: mode === 'create' ? 'Create profile' : 'Save',
+          saved: 'Saved',
+          savedSuccess: 'Changes saved',
+          savedSuccessText: 'The profile is updated. Public page and bot now use the new data.',
           back: 'Dashboard',
           servicesCount: 'Services',
           contactsCount: 'Contacts',
@@ -1449,7 +1457,7 @@ export function MasterProfileForm({
           reviewsCount: 'Reviews',
           chars: 'chars',
           publicPreview: 'Page preview',
-          reviewLink: 'Review link',
+          reviewLink: 'For reviews',
           rating: 'Rating',
           filled: 'filled',
           linkReady: 'Link ready',
@@ -2086,6 +2094,7 @@ export function MasterProfileForm({
       reviewCount: cleanedReviews.length,
     };
 
+    setSavedAt(null);
     const result = await saveProfile(cleanedValues);
 
     if (!result.success || !result.profile) {
@@ -2094,7 +2103,19 @@ export function MasterProfileForm({
     }
 
     setError(null);
-    router.push(demoMode ? '/dashboard/profile?demo=1' : '/dashboard/profile');
+    setValues(createInitialValues(result.profile));
+    setSlugTouched(Boolean(result.profile.slug));
+    setSavedAt(new Date().toISOString());
+
+    if (mode === 'create') {
+      router.push(demoMode ? '/dashboard/profile?demo=1' : '/dashboard/profile');
+      return;
+    }
+
+    router.refresh();
+    if (typeof window !== 'undefined') {
+      window.setTimeout(() => setSavedAt(null), 2600);
+    }
   };
 
   if (!mounted) return null;
@@ -2264,8 +2285,8 @@ export function MasterProfileForm({
                           'h-8 rounded-[8px] px-3 text-[11px] font-semibold transition active:scale-[0.985]',
                           values.locationMode === option.value
                             ? isLight
-                              ? 'bg-black text-white'
-                              : 'bg-white text-black'
+                              ? 'cb-neutral-primary cb-neutral-primary-light'
+                              : 'cb-neutral-primary cb-neutral-primary-dark'
                             : isLight
                               ? 'text-black/46 hover:bg-black/[0.04] hover:text-black'
                               : 'text-white/42 hover:bg-white/[0.06] hover:text-white',
@@ -2674,7 +2695,7 @@ export function MasterProfileForm({
 
                   <ActionButton light={isLight} type="submit" className="w-full">
                     <Save className="size-3.5" />
-                    {labels.save}
+                    {savedAt ? labels.saved : labels.save}
                   </ActionButton>
                 </div>
               </Panel>
@@ -3446,6 +3467,38 @@ export function MasterProfileForm({
               </div>
             ) : null}
 
+            {savedAt ? (
+              <div
+                className={cn(
+                  'border-t px-4 py-3',
+                  isLight
+                    ? 'border-emerald-500/18 bg-emerald-500/[0.075] text-emerald-700'
+                    : 'border-emerald-400/18 bg-emerald-400/[0.09] text-emerald-200',
+                )}
+              >
+                <div className="flex items-start gap-2.5">
+                  <span
+                    className={cn(
+                      'mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full border',
+                      isLight
+                        ? 'border-emerald-500/25 bg-emerald-500/10'
+                        : 'border-emerald-300/25 bg-emerald-300/10',
+                    )}
+                  >
+                    <Check className="size-3.5" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-[12px] font-semibold tracking-[-0.015em]">
+                      {labels.savedSuccess}
+                    </div>
+                    <div className="mt-0.5 text-[11px] leading-4 opacity-75">
+                      {labels.savedSuccessText}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             <div className={cn('border-t p-4', borderTone(isLight))}>
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="flex min-w-0 flex-wrap gap-2">
@@ -3475,7 +3528,7 @@ export function MasterProfileForm({
 
                   <ActionButton light={isLight} active type="submit">
                     <Save className="size-3.5" />
-                    {labels.save}
+                    {savedAt ? labels.saved : labels.save}
                   </ActionButton>
                 </div>
               </div>
