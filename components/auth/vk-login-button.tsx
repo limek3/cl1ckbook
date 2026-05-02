@@ -165,10 +165,10 @@ export function VkLoginButton({
       setVkUrl(payload.vkUrl);
       setPrefillUrl(payload.prefillUrl ?? null);
       setState('waiting');
-      setMessage(mode === 'link' ? 'Открыл VK-бота. Отправьте /start или нажмите «Начать» — бот пришлёт кнопки подключения.' : 'Открыл VK-бота. Отправьте /start или нажмите «Начать» — бот пришлёт кнопки входа. Код вручную вводить не нужно.');
+      setMessage(mode === 'link' ? 'Открываем VK в этой же вкладке. Нажмите «Открыть кабинет» в боте.' : 'Открываем VK в этой же вкладке. Нажмите «Открыть кабинет» в боте — без ручных кодов.');
       startedAtRef.current = Date.now();
 
-      window.open(payload.vkUrl, '_blank', 'noopener,noreferrer');
+      window.location.assign(payload.vkUrl);
 
       pollTimerRef.current = window.setInterval(() => {
         void pollStatus(payload.token as string).catch((error) => {
@@ -249,16 +249,14 @@ export function VkLoginButton({
         <div className="grid gap-2 rounded-[11px] border border-black/[0.08] bg-white/50 p-2 dark:border-white/[0.08] dark:bg-white/[0.04]">
           <a
             href={vkUrl}
-            target="_blank"
-            rel="noreferrer"
             className="inline-flex h-8 items-center justify-center gap-2 rounded-[9px] border border-black/[0.08] bg-white text-[11px] font-semibold text-black/56 transition hover:bg-black/[0.035] hover:text-black dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/56 dark:hover:bg-white/[0.07] dark:hover:text-white"
           >
             <ExternalLink className="size-3.5" />
-            Открыть VK-бота
+            Открыть VK-бота в этой вкладке
           </a>
 
           <div className="text-center text-[10.5px] leading-4 text-black/38 dark:text-white/34">
-            В VK нажмите «Начать» или отправьте /start. Дальше бот покажет кнопки — без кодов и копирования.
+            VK откроется в этой же вкладке. В боте нажмите «Открыть кабинет».
           </div>
         </div>
       ) : null}

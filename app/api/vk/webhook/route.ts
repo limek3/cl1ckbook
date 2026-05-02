@@ -7,6 +7,11 @@ import {
   getVkBotGroupId,
   getVkBotUserProfile,
   sendVkBotAuthFallbackMessage,
+  sendVkBotBookingsMessage,
+  sendVkBotFaqAnswerMessage,
+  sendVkBotFaqMessage,
+  sendVkBotNotificationsMessage,
+  sendVkBotSupportMessage,
   sendVkBotWelcomeMessage,
   sendVkLoginConfirmedMessage,
   sendVkMessage,
@@ -146,7 +151,31 @@ async function sendVkReply(params: {
 function isStartLikeText(value: unknown) {
   if (typeof value !== 'string') return false;
   const text = value.trim().toLowerCase();
-  return text === '/start' || text === 'start' || text === 'начать' || text === 'старт';
+  return text === '/start' || text === 'start' || text === 'начать' || text === 'старт' || text === 'меню';
+}
+
+function normalizedText(value: unknown) {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+function isFaqLikeText(value: unknown) {
+  const text = normalizedText(value);
+  return text === 'faq' || text === '/faq' || text === 'вопросы' || text === 'частые вопросы';
+}
+
+function isSupportLikeText(value: unknown) {
+  const text = normalizedText(value);
+  return text === 'поддержка' || text === '/support' || text === 'связь' || text === 'помощь';
+}
+
+function isNotificationLikeText(value: unknown) {
+  const text = normalizedText(value);
+  return text === 'уведомления' || text === '/notifications';
+}
+
+function isBookingsLikeText(value: unknown) {
+  const text = normalizedText(value);
+  return text === 'записи' || text === '/bookings' || text === 'мои записи';
 }
 
 function normalizePayload(value: unknown): Record<string, unknown> | null {
@@ -438,10 +467,50 @@ async function handleMessageNew(payload: VkCallbackPayload) {
     return;
   }
 
+  if (isFaqLikeText(message.text)) {
+    await sendVkReply({
+      label: 'faq_from_text',
+      peerId,
+      textPreview: 'FAQ КликБук.',
+      send: () => sendVkBotFaqMessage({ peerId }),
+    });
+    return;
+  }
+
+  if (isSupportLikeText(message.text)) {
+    await sendVkReply({
+      label: 'support_from_text',
+      peerId,
+      textPreview: 'Поддержка КликБук.',
+      send: () => sendVkBotSupportMessage({ peerId }),
+    });
+    return;
+  }
+
+  if (isNotificationLikeText(message.text)) {
+    await sendVkReply({
+      label: 'notifications_from_text',
+      peerId,
+      textPreview: 'Уведомления VK.',
+      send: () => sendVkBotNotificationsMessage({ peerId }),
+    });
+    return;
+  }
+
+  if (isBookingsLikeText(message.text)) {
+    await sendVkReply({
+      label: 'bookings_from_text',
+      peerId,
+      textPreview: 'Мои записи.',
+      send: () => sendVkBotBookingsMessage({ peerId }),
+    });
+    return;
+  }
+
   await sendVkReply({
     label: 'auth_fallback',
     peerId,
-    textPreview: 'Я получил сообщение, но не вижу активный код входа.',
+    textPreview: 'Главное меню КликБук.',
     send: () => sendVkBotAuthFallbackMessage({ peerId }),
   });
 }
@@ -460,12 +529,32 @@ async function handleMessageEvent(payload: VkCallbackPayload) {
   const appUrl = getAppUrl();
 
   if (action === 'open_dashboard') {
-    if (!token) {
+    let dashboardToken = token;
+
+    if (!dashboardToken) {
+      try {
+        const profile = await getVkBotUserProfile(vkUserId).catch(() => ({
+          vkId: String(vkUserId),
+          firstName: null,
+          lastName: null,
+          fullName: null,
+          screenName: null,
+          domain: null,
+          photoUrl: null,
+          rawProfile: { source: 'open_dashboard_callback_fallback' },
+        }));
+        dashboardToken = await createDirectVkLoginToken({ vkUserId, peerId, profile });
+      } catch (error) {
+        logVkWebhookError('create direct token from button', error);
+      }
+    }
+
+    if (!dashboardToken) {
       await answerVkMessageEvent({
         eventId,
         userId: vkUserId,
         peerId,
-        text: 'Сначала нажмите «Войти через VK» на сайте или отправьте /start.',
+        text: 'Не удалось создать вход. Отправьте /start и нажмите кнопку ещё раз.',
       }).catch((error) => logVkWebhookError('answer open dashboard without token', error));
       return;
     }
@@ -475,11 +564,11 @@ async function handleMessageEvent(payload: VkCallbackPayload) {
       const { data: row } = await admin
         .from('sloty_vk_login_requests')
         .select('status, expires_at')
-        .eq('token', token)
+        .eq('token', dashboardToken)
         .maybeSingle();
 
       if (row && row.status === 'pending' && new Date(row.expires_at).getTime() >= Date.now()) {
-        await confirmVkLogin({ token, vkUserId, peerId });
+        await confirmVkLogin({ token: dashboardToken, vkUserId, peerId });
       }
     } catch (error) {
       logVkWebhookError('lazy confirm from button', error);
@@ -489,7 +578,7 @@ async function handleMessageEvent(payload: VkCallbackPayload) {
       eventId,
       userId: vkUserId,
       peerId,
-      link: `${appUrl}/api/auth/vk/complete?token=${encodeURIComponent(token)}`,
+      link: `${appUrl}/api/auth/vk/complete?token=${encodeURIComponent(dashboardToken)}`,
     }).catch((error) => logVkWebhookError('answer open dashboard', error));
     return;
   }
@@ -507,28 +596,105 @@ async function handleMessageEvent(payload: VkCallbackPayload) {
     return;
   }
 
-  if (action === 'notifications') {
+  if (action === 'notifications' || action === 'notifications_enabled') {
     await answerVkMessageEvent({
       eventId,
       userId: vkUserId,
       peerId,
-      text: 'Уведомления VK включены. Новые записи будут приходить в этот диалог.',
+      text: 'Уведомления VK включены.',
     }).catch((error) => logVkWebhookError('answer notifications', error));
+
+    await sendVkReply({
+      label: 'notifications_menu',
+      peerId,
+      textPreview: 'Уведомления VK включены.',
+      send: () => sendVkBotNotificationsMessage({ peerId, token }),
+    });
     return;
   }
 
-  if (action === 'help') {
+  if (action === 'bookings') {
     await answerVkMessageEvent({
       eventId,
       userId: vkUserId,
       peerId,
-      text: 'Я отправил подсказку в диалог.',
-    }).catch((error) => logVkWebhookError('answer help', error));
+      text: 'Открыл раздел записей в боте.',
+    }).catch((error) => logVkWebhookError('answer bookings', error));
 
     await sendVkReply({
-      label: 'help_menu',
+      label: 'bookings_menu',
       peerId,
-      textPreview: 'Помощь по VK-боту КликБук.',
+      textPreview: 'Мои записи.',
+      send: () => sendVkBotBookingsMessage({ peerId, token }),
+    });
+    return;
+  }
+
+  if (action === 'faq' || action === 'help') {
+    await answerVkMessageEvent({
+      eventId,
+      userId: vkUserId,
+      peerId,
+      text: 'FAQ отправлен в диалог.',
+    }).catch((error) => logVkWebhookError('answer faq', error));
+
+    await sendVkReply({
+      label: 'faq_menu',
+      peerId,
+      textPreview: 'FAQ КликБук.',
+      send: () => sendVkBotFaqMessage({ peerId, token }),
+    });
+    return;
+  }
+
+  if (action === 'faq_login' || action === 'faq_bookings' || action === 'faq_notifications' || action === 'faq_tariffs') {
+    const topic = action.replace('faq_', '') as 'login' | 'bookings' | 'notifications' | 'tariffs';
+
+    await answerVkMessageEvent({
+      eventId,
+      userId: vkUserId,
+      peerId,
+      text: 'Ответ отправлен в диалог.',
+    }).catch((error) => logVkWebhookError(`answer ${action}`, error));
+
+    await sendVkReply({
+      label: action,
+      peerId,
+      textPreview: `FAQ: ${topic}`,
+      send: () => sendVkBotFaqAnswerMessage({ peerId, token, topic }),
+    });
+    return;
+  }
+
+  if (action === 'support' || action === 'support_human') {
+    await answerVkMessageEvent({
+      eventId,
+      userId: vkUserId,
+      peerId,
+      text: 'Поддержка отправлена в диалог.',
+    }).catch((error) => logVkWebhookError('answer support', error));
+
+    await sendVkReply({
+      label: 'support_menu',
+      peerId,
+      textPreview: 'Поддержка КликБук.',
+      send: () => sendVkBotSupportMessage({ peerId, token }),
+    });
+    return;
+  }
+
+  if (action === 'back_main' || action === 'noop') {
+    await answerVkMessageEvent({
+      eventId,
+      userId: vkUserId,
+      peerId,
+      text: 'Главное меню отправлено.',
+    }).catch((error) => logVkWebhookError('answer main menu', error));
+
+    await sendVkReply({
+      label: 'main_menu',
+      peerId,
+      textPreview: 'Главное меню КликБук.',
       send: () => sendVkBotWelcomeMessage({ peerId, token }),
     });
     return;
@@ -538,8 +704,15 @@ async function handleMessageEvent(payload: VkCallbackPayload) {
     eventId,
     userId: vkUserId,
     peerId,
-    text: 'Откройте вход через VK на сайте КликБук.',
+    text: 'Я отправил главное меню в диалог.',
   }).catch((error) => logVkWebhookError('answer unknown event', error));
+
+  await sendVkReply({
+    label: 'unknown_action_menu',
+    peerId,
+    textPreview: 'Главное меню КликБук.',
+    send: () => sendVkBotWelcomeMessage({ peerId, token }),
+  });
 }
 
 async function handleMessageAllow(payload: VkCallbackPayload) {

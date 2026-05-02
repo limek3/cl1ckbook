@@ -173,19 +173,61 @@ export function buildVkLoginKeyboard(token: string) {
   return buildVkKeyboard([
     [{ label: 'Открыть кабинет', action: 'open_dashboard', token, color: 'positive' }],
     [
-      { label: 'Помощь', action: 'help', color: 'secondary' },
-      { label: 'Уведомления', action: 'notifications', color: 'secondary' },
+      { label: 'Мои записи', action: 'bookings', token, color: 'primary' },
+      { label: 'Уведомления', action: 'notifications', token, color: 'secondary' },
+    ],
+    [
+      { label: 'FAQ', action: 'faq', token, color: 'secondary' },
+      { label: 'Поддержка', action: 'support', token, color: 'secondary' },
     ],
   ]);
 }
 
 export function buildVkMainMenuKeyboard(token?: string | null) {
   return buildVkKeyboard([
-    [{ label: 'Открыть кабинет', action: 'open_dashboard', token: token ?? null, color: 'primary' }],
+    [{ label: 'Открыть кабинет', action: 'open_dashboard', token: token ?? null, color: 'positive' }],
     [
-      { label: 'Как работает вход', action: 'help', color: 'secondary' },
-      { label: 'Включить уведомления', action: 'notifications', color: 'positive' },
+      { label: 'Мои записи', action: 'bookings', token: token ?? null, color: 'primary' },
+      { label: 'Уведомления', action: 'notifications', token: token ?? null, color: 'secondary' },
     ],
+    [
+      { label: 'FAQ', action: 'faq', token: token ?? null, color: 'secondary' },
+      { label: 'Поддержка', action: 'support', token: token ?? null, color: 'secondary' },
+    ],
+  ]);
+}
+
+export function buildVkFaqKeyboard(token?: string | null) {
+  return buildVkKeyboard([
+    [
+      { label: 'Вход', action: 'faq_login', token: token ?? null, color: 'primary' },
+      { label: 'Записи', action: 'faq_bookings', token: token ?? null, color: 'primary' },
+    ],
+    [
+      { label: 'Уведомления', action: 'faq_notifications', token: token ?? null, color: 'secondary' },
+      { label: 'Тарифы', action: 'faq_tariffs', token: token ?? null, color: 'secondary' },
+    ],
+    [{ label: 'Главное меню', action: 'back_main', token: token ?? null, color: 'secondary' }],
+  ]);
+}
+
+export function buildVkNotificationsKeyboard(token?: string | null) {
+  return buildVkKeyboard([
+    [{ label: 'Уведомления включены', action: 'notifications_enabled', token: token ?? null, color: 'positive' }],
+    [
+      { label: 'Что будет приходить', action: 'faq_notifications', token: token ?? null, color: 'secondary' },
+      { label: 'Главное меню', action: 'back_main', token: token ?? null, color: 'secondary' },
+    ],
+  ]);
+}
+
+export function buildVkSupportKeyboard(token?: string | null) {
+  return buildVkKeyboard([
+    [
+      { label: 'FAQ', action: 'faq', token: token ?? null, color: 'primary' },
+      { label: 'Главное меню', action: 'back_main', token: token ?? null, color: 'secondary' },
+    ],
+    [{ label: 'Связь с поддержкой', action: 'support_human', token: token ?? null, color: 'secondary' }],
   ]);
 }
 
@@ -270,11 +312,11 @@ export async function sendVkBotWelcomeMessage(params: {
   return sendVkMessage({
     peerId: params.peerId,
     message: [
-      'Привет! Я бот КликБук.',
+      'КликБук на связи ✅',
       '',
-      'Через меня можно входить в кабинет VK-кнопкой и получать уведомления о записях.',
+      'Это ваш VK-бот для входа, уведомлений и быстрых действий по кабинету.',
       '',
-      'Нажмите кнопку ниже — без ручных кодов и ссылок в сообщении.',
+      'Выберите действие ниже. Всё работает через кнопки — без ручных кодов и лишних ссылок в сообщениях.',
     ].join('\n'),
     keyboard: buildVkMainMenuKeyboard(params.token),
   });
@@ -289,8 +331,131 @@ export async function sendVkBotAuthFallbackMessage(params: {
     message: [
       'Я на связи ✅',
       '',
-      'Для входа нажмите кнопку «Открыть кабинет».',
-      'Если вход не открылся, вернитесь на сайт и нажмите «Войти через VK» ещё раз.',
+      'Через этот диалог можно войти в кабинет, получить подсказку, проверить уведомления и открыть разделы КликБук.',
+      '',
+      'Выберите действие ниже.',
+    ].join('\n'),
+    keyboard: buildVkMainMenuKeyboard(params.token),
+  });
+}
+
+export async function sendVkBotFaqMessage(params: {
+  peerId: number | string;
+  token?: string | null;
+}) {
+  return sendVkMessage({
+    peerId: params.peerId,
+    message: [
+      'FAQ КликБук',
+      '',
+      'Выберите тему — я отвечу прямо здесь, в диалоге VK.',
+      '',
+      '• Вход — как работает авторизация через VK и Telegram',
+      '• Записи — где смотреть заявки и статусы клиентов',
+      '• Уведомления — что будет приходить в VK',
+      '• Тарифы — чем отличаются Start, Pro, Studio и Premium',
+    ].join('\n'),
+    keyboard: buildVkFaqKeyboard(params.token),
+  });
+}
+
+export async function sendVkBotFaqAnswerMessage(params: {
+  peerId: number | string;
+  token?: string | null;
+  topic: 'login' | 'bookings' | 'notifications' | 'tariffs';
+}) {
+  const answers = {
+    login: [
+      'Как работает вход',
+      '',
+      '1. На сайте нажмите «Войти через VK».',
+      '2. Откроется этот диалог с ботом.',
+      '3. Нажмите «Открыть кабинет» или отправьте /start.',
+      '4. КликБук создаст безопасную сессию и откроет кабинет.',
+      '',
+      'Коды руками вводить не нужно.',
+    ],
+    bookings: [
+      'Записи и заявки',
+      '',
+      'Все записи доступны в кабинете: «Сегодня», «Календарь», «Клиенты» и «Статистика».',
+      '',
+      'В VK будут приходить важные события: новая запись, перенос, отмена, no-show и напоминания.',
+    ],
+    notifications: [
+      'Уведомления VK',
+      '',
+      'После первого сообщения боту сообщество может отправлять вам сервисные уведомления.',
+      '',
+      'Сюда будут приходить: новые записи, переносы, отмены, напоминания и важные события кабинета.',
+    ],
+    tariffs: [
+      'Тарифы',
+      '',
+      'Start — базовый тариф для запуска.',
+      'Pro — больше услуг, аналитика и рабочие инструменты.',
+      'Studio — для команды и студии.',
+      'Premium — расширенные лимиты и приоритетные возможности.',
+    ],
+  } as const;
+
+  return sendVkMessage({
+    peerId: params.peerId,
+    message: answers[params.topic].join('\n'),
+    keyboard: buildVkFaqKeyboard(params.token),
+  });
+}
+
+export async function sendVkBotNotificationsMessage(params: {
+  peerId: number | string;
+  token?: string | null;
+}) {
+  return sendVkMessage({
+    peerId: params.peerId,
+    message: [
+      'Уведомления VK включены ✅',
+      '',
+      'Теперь этот диалог можно использовать как рабочий канал КликБук.',
+      '',
+      'Что будет приходить:',
+      '• новая запись клиента',
+      '• перенос или отмена записи',
+      '• напоминания',
+      '• важные события по кабинету и тарифу',
+    ].join('\n'),
+    keyboard: buildVkNotificationsKeyboard(params.token),
+  });
+}
+
+export async function sendVkBotSupportMessage(params: {
+  peerId: number | string;
+  token?: string | null;
+}) {
+  return sendVkMessage({
+    peerId: params.peerId,
+    message: [
+      'Поддержка КликБук',
+      '',
+      'Опишите вопрос обычным сообщением в этом диалоге. Я сохраню обращение в канал поддержки, а быстрые ответы можно открыть через FAQ.',
+      '',
+      'Для срочных рабочих вопросов укажите: что случилось, где именно в кабинете и что вы уже пробовали сделать.',
+    ].join('\n'),
+    keyboard: buildVkSupportKeyboard(params.token),
+  });
+}
+
+export async function sendVkBotBookingsMessage(params: {
+  peerId: number | string;
+  token?: string | null;
+}) {
+  return sendVkMessage({
+    peerId: params.peerId,
+    message: [
+      'Мои записи',
+      '',
+      'Записи открываются в кабинете КликБук. В этом VK-диалоге бот будет присылать уведомления о новых заявках, переносах, отменах и напоминаниях.',
+      '',
+      'Нажмите «Открыть кабинет», чтобы перейти к рабочему экрану.',
     ].join('\n'),
     keyboard: buildVkMainMenuKeyboard(params.token),
   });
@@ -339,8 +504,10 @@ export async function sendVkLoginConfirmedMessage(params: {
     message: [
       'Готово ✅',
       '',
-      'Вход в КликБук через VK подтверждён.',
-      'Нажмите кнопку ниже — кабинет откроется автоматически.',
+      'VK подключён к КликБук.',
+      'Нажмите «Открыть кабинет» — вход завершится в этой же вкладке.',
+      '',
+      'Также здесь доступны FAQ, поддержка и уведомления по записям.',
     ].join('\n'),
     keyboard: buildVkLoginKeyboard(params.token),
   });
