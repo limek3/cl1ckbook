@@ -6,6 +6,8 @@ import {
   getAppUrl,
   getVkBotGroupId,
   getVkBotUserProfile,
+  sendVkBotAuthFallbackMessage,
+  sendVkBotWelcomeMessage,
   sendVkLoginConfirmedMessage,
   sendVkMessage,
 } from '@/lib/server/vk-bot';
@@ -64,6 +66,48 @@ function verifyVkCallback(payload: VkCallbackPayload) {
 
 function logVkWebhookError(label: string, error: unknown) {
   console.error('[vk-webhook]', label, error instanceof Error ? error.message : error);
+}
+
+
+function safeString(value: unknown, max = 1000) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.length > max ? `${trimmed.slice(0, max)}...` : trimmed;
+}
+
+async function writeVkWebhookLog(params: {
+  eventType?: string;
+  groupId?: number | null;
+  vkUserId?: number | string | null;
+  peerId?: number | string | null;
+  text?: unknown;
+  ref?: unknown;
+  status?: string;
+  error?: unknown;
+  payload?: unknown;
+}) {
+  try {
+    await createSupabaseAdminClient().from('sloty_vk_webhook_events').insert({
+      event_type: params.eventType ?? null,
+      group_id: params.groupId ?? null,
+      vk_user_id: params.vkUserId != null ? String(params.vkUserId) : null,
+      peer_id: params.peerId != null ? Number(params.peerId) : null,
+      text: safeString(params.text),
+      ref: safeString(params.ref),
+      status: params.status ?? 'received',
+      error: params.error instanceof Error ? params.error.message : safeString(params.error),
+      payload: params.payload && typeof params.payload === 'object' ? params.payload : {},
+    });
+  } catch {
+    // Debug logging must never break VK callback delivery.
+  }
+}
+
+function isStartLikeText(value: unknown) {
+  if (typeof value !== 'string') return false;
+  const text = value.trim().toLowerCase();
+  return text === '/start' || text === 'start' || text === 'начать' || text === 'старт';
 }
 
 function normalizePayload(value: unknown): Record<string, unknown> | null {
@@ -274,19 +318,22 @@ async function handleMessageNew(payload: VkCallbackPayload) {
     peerId,
     profile,
     messagesAllowed: true,
-    metadata: { source: 'message_new' },
+    metadata: {
+      source: 'message_new',
+      lastText: typeof message.text === 'string' ? message.text : null,
+      ref: typeof message.ref === 'string' ? message.ref : null,
+      refSource: typeof message.ref_source === 'string' ? message.ref_source : null,
+    },
   }).catch((error) => logVkWebhookError('remember vk user', error));
 
-  await sendVkMessage({
-    peerId,
-    message: [
-      'Привет! Это бот ClickBook.',
-      '',
-      'Чтобы войти в кабинет, нажмите «Войти через VK» на сайте. Я получу код из ссылки и подтвержу вход автоматически.',
-      '',
-      `Кабинет: ${getAppUrl()}/login`,
-    ].join('\n'),
-  }).catch((error) => logVkWebhookError('send help message', error));
+  if (isStartLikeText(message.text)) {
+    await sendVkBotWelcomeMessage({ peerId, loginUrl: `${getAppUrl()}/login` })
+      .catch((error) => logVkWebhookError('send welcome message', error));
+    return;
+  }
+
+  await sendVkBotAuthFallbackMessage({ peerId })
+    .catch((error) => logVkWebhookError('send fallback message', error));
 }
 
 async function handleMessageEvent(payload: VkCallbackPayload) {
@@ -311,6 +358,16 @@ async function handleMessageEvent(payload: VkCallbackPayload) {
         text: confirmed ? 'Вход подтверждён' : 'Не удалось подтвердить вход',
       }).catch((error) => logVkWebhookError('answer event', error));
     }
+    return;
+  }
+
+  if (eventId) {
+    await answerVkMessageEvent({
+      eventId,
+      userId: vkUserId,
+      peerId,
+      text: 'Откройте вход через VK на сайте ClickBook',
+    }).catch((error) => logVkWebhookError('answer empty event', error));
   }
 }
 
@@ -377,6 +434,25 @@ export async function POST(request: Request) {
   }
 
   try {
+    const messageForLog = payload.object?.message && typeof payload.object.message === 'object'
+      ? payload.object.message
+      : payload.object && typeof payload.object === 'object'
+        ? payload.object
+        : null;
+    const vkUserIdForLog = numberValue(messageForLog?.from_id ?? messageForLog?.user_id);
+    const peerIdForLog = numberValue(messageForLog?.peer_id) ?? vkUserIdForLog;
+
+    await writeVkWebhookLog({
+      eventType: payload.type,
+      groupId: payload.group_id ?? null,
+      vkUserId: vkUserIdForLog,
+      peerId: peerIdForLog,
+      text: messageForLog?.text,
+      ref: messageForLog?.ref ?? messageForLog?.ref_source,
+      status: 'received',
+      payload,
+    });
+
     if (payload.type === 'message_new') {
       await handleMessageNew(payload);
     } else if (payload.type === 'message_event') {
@@ -388,6 +464,13 @@ export async function POST(request: Request) {
     }
   } catch (error) {
     logVkWebhookError(payload.type || 'unknown', error);
+    await writeVkWebhookLog({
+      eventType: payload.type,
+      groupId: payload.group_id ?? null,
+      status: 'error',
+      error,
+      payload,
+    });
   }
 
   return textResponse('ok');

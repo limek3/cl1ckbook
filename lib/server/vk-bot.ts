@@ -66,14 +66,30 @@ export function getVkBotDeepLink(payload?: string) {
   const groupId = getVkBotGroupId();
   if (!groupId) return null;
 
-  return `https://vk.com/write-${groupId}${ref}`;
+  // For communities without a custom screen name, vk.me/club<ID> is the
+  // most reliable link for passing ref into the first incoming message.
+  return `https://vk.me/club${groupId}${ref}`;
+}
+
+export function getVkBotDialogLink() {
+  const screenName = getVkBotScreenName();
+
+  if (screenName) return `https://vk.me/${screenName}`;
+
+  const groupId = getVkBotGroupId();
+  if (!groupId) return null;
+
+  return `https://vk.com/write-${groupId}`;
 }
 
 export function getVkBotPrefillLink(text: string) {
   const groupId = getVkBotGroupId();
   if (!groupId) return getVkBotDeepLink();
 
-  return `https://vk.com/im?sel=-${groupId}&message=${encodeURIComponent(text)}`;
+  // VK Web does not guarantee prefilled text in all clients. `msg` works
+  // in more desktop builds than `message`, but we still keep ref-based auth
+  // as the main path and use this only as a fallback.
+  return `https://vk.com/im?sel=-${groupId}&msg=${encodeURIComponent(text)}`;
 }
 
 async function readJsonSafe(response: Response) {
@@ -122,7 +138,14 @@ export async function vkApi(method: string, params: Record<string, unknown>) {
   return payload;
 }
 
-export function buildVkKeyboard(buttons: Array<Array<{ label: string; link?: string; payload?: Record<string, unknown> }>>) {
+export function buildVkKeyboard(
+  buttons: Array<Array<{
+    label: string;
+    link?: string;
+    payload?: Record<string, unknown>;
+    color?: 'primary' | 'secondary' | 'negative' | 'positive';
+  }>>,
+) {
   return JSON.stringify({
     one_time: false,
     inline: true,
@@ -140,6 +163,7 @@ export function buildVkKeyboard(buttons: Array<Array<{ label: string; link?: str
               label: button.label,
               payload: JSON.stringify(button.payload ?? {}),
             },
+        color: button.color ?? (button.link ? 'primary' : 'secondary'),
       })),
     ),
   });
@@ -154,6 +178,8 @@ export async function sendVkMessage(params: {
     peer_id: String(params.peerId),
     random_id: crypto.randomInt(1, 2147483647),
     message: params.message,
+    disable_mentions: 1,
+    dont_parse_links: 1,
     ...(params.keyboard
       ? { keyboard: typeof params.keyboard === 'string' ? params.keyboard : JSON.stringify(params.keyboard) }
       : {}),
@@ -212,6 +238,48 @@ export async function getVkBotUserProfile(vkUserId: number | string): Promise<Vk
   };
 }
 
+
+export async function sendVkBotWelcomeMessage(params: {
+  peerId: number | string;
+  loginUrl?: string | null;
+}) {
+  const appUrl = getAppUrl();
+  const loginUrl = params.loginUrl || `${appUrl}/login`;
+
+  return sendVkMessage({
+    peerId: params.peerId,
+    message: [
+      'Привет! Я бот ClickBook.',
+      '',
+      'Я помогаю входить в кабинет через VK и присылаю уведомления о записях.',
+      '',
+      'Для входа нажмите кнопку на сайте. Если вы уже открыли этот диалог по кнопке VK, просто отправьте любое сообщение — я попробую подтвердить вход по служебной ссылке.',
+    ].join('\n'),
+    keyboard: buildVkKeyboard([
+      [{ label: 'Войти в кабинет', link: loginUrl, color: 'primary' }],
+      [{ label: 'Открыть сайт', link: appUrl, color: 'secondary' }],
+    ]),
+  });
+}
+
+export async function sendVkBotAuthFallbackMessage(params: {
+  peerId: number | string;
+  command?: string | null;
+}) {
+  const appUrl = getAppUrl();
+
+  return sendVkMessage({
+    peerId: params.peerId,
+    message: [
+      'Я получил сообщение, но не вижу активный код входа.',
+      '',
+      'Нажмите «Войти через VK» на сайте ещё раз. Откроется этот диалог со служебной ссылкой. Обычно достаточно отправить любое сообщение.',
+      params.command ? `\nЗапасной код: ${params.command}` : null,
+    ].filter(Boolean).join('\n'),
+    keyboard: buildVkKeyboard([[{ label: 'Вернуться на вход', link: `${appUrl}/login`, color: 'primary' }]]),
+  });
+}
+
 function bookingDateLabel(booking: Pick<Booking, 'date' | 'time'>) {
   return `${booking.date} · ${booking.time}`;
 }
@@ -255,7 +323,12 @@ export async function sendVkLoginConfirmedMessage(params: {
 
   return sendVkMessage({
     peerId: params.peerId,
-    message: 'Готово. Вход в ClickBook подтверждён. Вернитесь на сайт — кабинет откроется автоматически.',
-    keyboard: buildVkKeyboard([[{ label: 'Открыть кабинет', link: `${appUrl}${next}` }]]),
+    message: [
+      'Готово ✅',
+      '',
+      'Вход в ClickBook через VK подтверждён.',
+      'Вернитесь на сайт — кабинет откроется автоматически.',
+    ].join('\n'),
+    keyboard: buildVkKeyboard([[{ label: 'Открыть кабинет', link: `${appUrl}${next}`, color: 'primary' }]]),
   });
 }

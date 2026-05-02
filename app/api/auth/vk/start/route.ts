@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/server/supabase-admin';
 import { requireAuthUser } from '@/lib/server/require-auth-user';
 import { buildVkLoginToken } from '@/lib/server/vk-bot-auth';
-import { getVkBotDeepLink, getVkBotPrefillLink } from '@/lib/server/vk-bot';
+import { getVkBotDeepLink, getVkBotDialogLink, getVkBotPrefillLink } from '@/lib/server/vk-bot';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
     const mode = safeMode(request.nextUrl.searchParams.get('mode'));
     const payload = `auth_${token}`;
     const vkUrl = getVkBotDeepLink(payload);
+    const dialogUrl = getVkBotDialogLink();
     const prefillUrl = getVkBotPrefillLink(payload);
 
     if (!vkUrl) {
@@ -43,6 +44,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       token,
       vkUrl,
+      dialogUrl,
       prefillUrl,
       command: payload,
       expiresIn: 600,
@@ -69,6 +71,7 @@ export async function GET(request: NextRequest) {
     const token = buildVkLoginToken();
     const payload = `auth_${token}`;
     const vkUrl = getVkBotDeepLink(payload);
+    const dialogUrl = getVkBotDialogLink();
     const prefillUrl = getVkBotPrefillLink(payload);
 
     if (!vkUrl) throw new Error('Missing VK_BOT_GROUP_ID or VK_BOT_SCREEN_NAME');
@@ -82,7 +85,7 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    return NextResponse.redirect(prefillUrl || vkUrl);
+    return NextResponse.redirect(vkUrl || prefillUrl || dialogUrl || '/dashboard/profile');
   } catch (error) {
     const url = new URL('/dashboard/profile', request.url);
     url.searchParams.set('message', error instanceof Error ? error.message : 'vk_link_start_failed');

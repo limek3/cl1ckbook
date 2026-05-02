@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 type VkStartResponse = {
   token?: string;
   vkUrl?: string;
+  dialogUrl?: string;
   prefillUrl?: string;
   command?: string;
   expiresIn?: number;
@@ -169,10 +170,10 @@ export function VkLoginButton({
       setPrefillUrl(payload.prefillUrl ?? null);
       setCommand(payload.command ?? `auth_${payload.token}`);
       setState('waiting');
-      setMessage('Открыл VK. Если текст уже вставился в поле сообщения — просто нажмите отправить. Если текст не появился, нажмите «Открыть с готовым текстом» ниже.');
+      setMessage('Открыл VK-диалог. Код входа уже зашит в ссылку. Просто отправьте любое сообщение, например «Начать». Если VK не передаст код, ниже есть запасная кнопка с готовым текстом.');
       startedAtRef.current = Date.now();
 
-      window.open(payload.prefillUrl || payload.vkUrl, '_blank', 'noopener,noreferrer');
+      window.open(payload.vkUrl, '_blank', 'noopener,noreferrer');
 
       pollTimerRef.current = window.setInterval(() => {
         void pollStatus(payload.token as string).catch((error) => {
@@ -269,7 +270,7 @@ export function VkLoginButton({
             className="inline-flex h-8 items-center justify-center gap-2 rounded-[9px] border border-black/[0.08] bg-white text-[11px] font-semibold text-black/56 transition hover:bg-black/[0.035] hover:text-black dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/56 dark:hover:bg-white/[0.07] dark:hover:text-white"
           >
             <ExternalLink className="size-3.5" />
-            Открыть VK ещё раз
+            Открыть VK-диалог
           </a>
 
           {prefillUrl ? (
@@ -280,7 +281,7 @@ export function VkLoginButton({
               className="inline-flex h-8 items-center justify-center gap-2 rounded-[9px] border border-black/[0.08] bg-white text-[11px] font-semibold text-black/56 transition hover:bg-black/[0.035] hover:text-black dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/56 dark:hover:bg-white/[0.07] dark:hover:text-white"
             >
               <MessageCircleMore className="size-3.5" />
-              Открыть с готовым текстом
+              Запасной вариант с текстом
             </a>
           ) : null}
 
@@ -291,7 +292,7 @@ export function VkLoginButton({
               className="inline-flex min-h-8 items-center justify-center gap-2 rounded-[9px] border border-black/[0.08] bg-white px-2 text-[10.5px] font-semibold text-black/50 transition hover:bg-black/[0.035] hover:text-black dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/50 dark:hover:bg-white/[0.07] dark:hover:text-white"
             >
               {copiedCommand ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-              {copiedCommand ? 'Код скопирован' : 'Запасной код для VK'}
+              {copiedCommand ? 'Код скопирован' : 'Скопировать код вручную'}
             </button>
           ) : null}
         </div>
@@ -299,7 +300,7 @@ export function VkLoginButton({
 
       {token && state === 'waiting' ? (
         <div className="text-center text-[10.5px] text-black/34 dark:text-white/30">
-          Вход активен 10 минут.
+          Вход активен 10 минут. Уведомления и подтверждения будут приходить от сообщества ClickBook.
         </div>
       ) : null}
     </div>
