@@ -58,17 +58,22 @@ export function getAppUrl() {
 function normalizeClassicVkScope(value?: string | null) {
   const raw = value?.trim();
 
-  if (!raw) return 'email';
+  // Classic oauth.vk.com is picky about permissions and returns
+  // { error: "invalid_request", error_description: "invalid scope" }
+  // for VK ID scopes such as vkid.personal_info and for some app types even
+  // for optional scopes like email. For ClickBook login we only need the VK
+  // user_id from the token response and the public profile from users.get, so
+  // the safest default is to omit scope completely.
+  if (!raw || raw === '-' || raw.toLowerCase() === 'none') return '';
 
   const scopes = raw
     .split(/[\s,]+/)
     .map((scope) => scope.trim())
     .filter(Boolean)
-    // VK ID scopes like vkid.personal_info belong to id.vk.ru OAuth 2.1.
-    // Classic oauth.vk.com does not understand them, so strip them here.
-    .filter((scope) => !scope.startsWith('vkid.'));
+    .filter((scope) => !scope.startsWith('vkid.'))
+    .filter((scope) => !['openid', 'profile'].includes(scope.toLowerCase()));
 
-  return scopes.length ? scopes.join(',') : 'email';
+  return scopes.join(',');
 }
 
 export function getVkIdConfig(): VkOAuthConfig {
@@ -85,7 +90,7 @@ export function getVkIdConfig(): VkOAuthConfig {
       process.env.VK_ID_REDIRECT_URI?.trim() ||
       process.env.VK_REDIRECT_URI?.trim() ||
       `${getAppUrl()}/api/auth/vk/callback`,
-    scope: normalizeClassicVkScope(process.env.VK_ID_SCOPE || process.env.VK_SCOPE || 'email'),
+    scope: normalizeClassicVkScope(process.env.VK_ID_SCOPE || process.env.VK_SCOPE || ''),
   };
 }
 
@@ -110,7 +115,7 @@ export function buildVkAuthorizeUrl(params: { state: string; codeChallenge?: str
   url.searchParams.set('client_id', config.clientId);
   url.searchParams.set('redirect_uri', config.redirectUri);
   url.searchParams.set('display', 'page');
-  url.searchParams.set('scope', config.scope);
+  if (config.scope) url.searchParams.set('scope', config.scope);
   url.searchParams.set('response_type', 'code');
   url.searchParams.set('state', params.state);
   url.searchParams.set('v', VK_API_VERSION);
