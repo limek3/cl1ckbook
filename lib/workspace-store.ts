@@ -2,12 +2,16 @@
 import type { AppearanceSettings } from '@/lib/appearance';
 import type { Locale } from '@/lib/i18n';
 import {
+  buildSubscriptionPayments,
   buildWorkspaceDataset,
+  buildLimits,
   type AvailabilityDayInsight,
   type ClientInsight,
   type MessageTemplateInsight,
   type NotificationInsight,
   type ServiceInsight,
+  normalizeSubscriptionEvents,
+  normalizeSubscriptionInsight,
   type WorkspaceDataset,
 } from '@/lib/master-workspace';
 import type { Booking, MasterProfile } from '@/lib/types';
@@ -24,6 +28,8 @@ export interface WorkspaceSections {
   appearance?: AppearanceSettings;
   quietHours?: boolean;
   fallbackEmail?: boolean;
+  subscription?: unknown;
+  subscriptionEvents?: unknown[];
   clientNotes?: Record<string, string>;
   clientReminders?: Record<string, { text?: string; remindAt?: string; updatedAt?: string }>;
   clientFavorites?: Record<string, boolean>;
@@ -220,6 +226,10 @@ export function buildWorkspaceDatasetFromStored(
   const activeBookings = bookings.filter((booking) => booking.status !== 'cancelled' && booking.status !== 'no_show');
   const revenue = activeBookings.filter((booking) => countsAsRevenue(booking.status)).reduce((sum, booking) => sum + (booking.priceAmount ?? serviceMap.get(booking.service)?.price ?? parsePriceFromName(booking.service, 0)), 0);
 
+  const subscription = normalizeSubscriptionInsight(source.subscription, locale);
+  const subscriptionEvents = normalizeSubscriptionEvents(source.subscriptionEvents);
+  const clients = overlayClientExtras(base.clients, source);
+
   return {
     ...base,
     services: effectiveServices,
@@ -228,7 +238,10 @@ export function buildWorkspaceDatasetFromStored(
     availability: Array.isArray(source.availability) && source.availability.length > 0 ? (source.availability as AvailabilityDayInsight[]) : base.availability,
     templates: Array.isArray(source.templates) && source.templates.length > 0 ? (source.templates as MessageTemplateInsight[]) : base.templates,
     notifications: normalizeNotificationItems(source.notifications as unknown[] | undefined, base.notifications),
-    clients: overlayClientExtras(base.clients, source),
+    clients,
+    subscription,
+    payments: buildSubscriptionPayments(locale, subscriptionEvents),
+    limits: buildLimits(effectiveServices, clients, locale, subscription.planId),
     totals: {
       ...base.totals,
       confirmed,

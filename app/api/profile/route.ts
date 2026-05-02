@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import type { Locale } from '@/lib/i18n';
+import { getPlanLimits, normalizeSubscriptionPlanId } from '@/lib/billing-plans';
 import type { Booking, MasterProfile } from '@/lib/types';
 import { requireAuthUser } from '@/lib/server/require-auth-user';
+import { getWorkspaceBillingSnapshot } from '@/lib/server/supabase-subscriptions';
 import { buildWorkspaceSeed } from '@/lib/workspace-store';
 import {
   createWorkspace,
@@ -92,6 +94,25 @@ export async function POST(request: Request) {
 
     await ensureUniqueSlug(body.profile.slug, currentWorkspace?.id ?? null);
 
+    const profileServicesCount = Array.isArray(body.profile.services) ? body.profile.services.length : 0;
+    const currentBilling = currentWorkspace
+      ? await getWorkspaceBillingSnapshot(currentWorkspace.id).catch(() => null)
+      : null;
+    const profilePlanId = normalizeSubscriptionPlanId(currentBilling?.subscription?.planId ?? currentBilling?.subscription?.plan ?? 'start');
+    const profileLimits = getPlanLimits(profilePlanId);
+
+    if (profileServicesCount > profileLimits.services) {
+      return NextResponse.json(
+        {
+          error: 'limit_services_exceeded',
+          plan: profilePlanId,
+          limit: profileLimits.services,
+          used: profileServicesCount,
+        },
+        { status: 402 },
+      );
+    }
+
     if (currentWorkspace) {
       const updated = await updateWorkspace(currentWorkspace.id, {
         slug: body.profile.slug,
@@ -101,6 +122,20 @@ export async function POST(request: Request) {
           ...(ownerTelegramId ? { ownerTelegramId } : {}),
         },
       });
+
+      if (updated) {
+        const billing = await getWorkspaceBillingSnapshot(updated.id).catch(() => null);
+        if (billing) {
+          return NextResponse.json({
+            ...updated,
+            data: {
+              ...(updated.data ?? {}),
+              subscription: billing.subscription,
+              subscriptionEvents: billing.subscriptionEvents,
+            },
+          });
+        }
+      }
 
       return NextResponse.json(updated);
     }
@@ -115,6 +150,19 @@ export async function POST(request: Request) {
       },
       appearance: null,
     });
+
+    const billing = await getWorkspaceBillingSnapshot(created.id).catch(() => null);
+
+    if (billing) {
+      return NextResponse.json({
+        ...created,
+        data: {
+          ...(created.data ?? {}),
+          subscription: billing.subscription,
+          subscriptionEvents: billing.subscriptionEvents,
+        },
+      });
+    }
 
     return NextResponse.json(created);
   } catch (error) {

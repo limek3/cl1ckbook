@@ -16,7 +16,7 @@ import { useLocale } from '@/lib/locale-context';
 import { buildWorkspaceDatasetFromStored } from '@/lib/workspace-store';
 
 export function useOwnedWorkspaceData() {
-  const { ownedProfile, bookings, workspaceData, hasHydrated } = useApp();
+  const { ownedProfile, bookings, workspaceData, hasHydrated, refreshWorkspace } = useApp();
   const { locale } = useLocale();
   const searchParams = useBrowserSearchParams();
   const demoMode = isDashboardDemoEnabled(searchParams);
@@ -67,5 +67,6 @@ export function useOwnedWorkspaceData() {
     locale,
     workspaceData: resolvedWorkspaceData,
     demoMode,
+    refreshWorkspace,
   };
 }

@@ -35,6 +35,7 @@ import { Button } from '@/components/ui/button';
 import { useOwnedWorkspaceData } from '@/hooks/use-owned-workspace-data';
 import { useAppearance } from '@/lib/appearance-context';
 import { accentPalette } from '@/lib/appearance-palette';
+import { getTelegramAppSessionHeaders } from '@/lib/telegram-miniapp-auth-client';
 import { formatCurrency } from '@/lib/master-workspace';
 import { cn } from '@/lib/utils';
 
@@ -1073,6 +1074,9 @@ function PaymentManageDialog({
   nextChargeValue,
   cardLabel,
   isSelectedCurrent,
+  onConfirm,
+  isBusy,
+  errorMessage,
 }: {
   open: boolean;
   onClose: () => void;
@@ -1085,6 +1089,9 @@ function PaymentManageDialog({
   nextChargeValue: string;
   cardLabel: string;
   isSelectedCurrent: boolean;
+  onConfirm: () => void;
+  isBusy: boolean;
+  errorMessage?: string | null;
 }) {
   if (!open) return null;
 
@@ -1310,12 +1317,26 @@ function PaymentManageDialog({
             <ModalActionButton icon={ReceiptText} label={copy.invoices} />
             <ModalActionButton icon={Banknote} label={copy.downloadInvoice} />
 
+            {errorMessage ? (
+              <div
+                className={cn(
+                  'rounded-[10px] border px-3 py-2 text-[11px] leading-4',
+                  light
+                    ? 'border-red-500/20 bg-red-500/[0.06] text-red-700'
+                    : 'border-red-400/20 bg-red-400/[0.08] text-red-200',
+                )}
+              >
+                {errorMessage}
+              </div>
+            ) : null}
+
             <button
               type="button"
-              onClick={onClose}
-              className={cn('mt-3 w-full', buttonBase(light, true))}
+              onClick={onConfirm}
+              disabled={isBusy}
+              className={cn('mt-3 w-full disabled:cursor-not-allowed disabled:opacity-60', buttonBase(light, true))}
             >
-              {copy.portal}
+              {isBusy ? (locale === 'ru' ? 'Применяем...' : 'Applying...') : copy.portal}
               <ArrowRight className="size-4" />
             </button>
           </div>
@@ -1326,7 +1347,7 @@ function PaymentManageDialog({
 }
 
 export default function SubscriptionPage() {
-  const { hasHydrated, ownedProfile, dataset, locale } = useOwnedWorkspaceData();
+  const { hasHydrated, ownedProfile, dataset, locale, refreshWorkspace } = useOwnedWorkspaceData();
   const { resolvedTheme } = useTheme();
   const { settings } = useAppearance();
 
@@ -1334,12 +1355,20 @@ export default function SubscriptionPage() {
 
   const [mounted, setMounted] = useState(false);
   const [billing, setBilling] = useState<BillingCycle>('monthly');
-  const [selectedPlanId, setSelectedPlanId] = useState('pro');
+  const [selectedPlanId, setSelectedPlanId] = useState('start');
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [applyingPlan, setApplyingPlan] = useState(false);
+  const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!dataset?.subscription) return;
+    setSelectedPlanId(dataset.subscription.planId);
+    setBilling(dataset.subscription.billingCycle);
+  }, [dataset?.subscription?.billingCycle, dataset?.subscription?.planId]);
 
   const currentTheme: ThemeMode = mounted
     ? resolvedTheme === 'light'
@@ -1381,9 +1410,9 @@ export default function SubscriptionPage() {
           discount: 'Экономия',
           zeroSaving: 'Нет экономии',
           nextCharge: 'Следующее списание',
-          nextChargeValue: '1 мая 2026',
+          nextChargeValue: 'Бесплатный тариф',
           paymentMethod: 'Способ оплаты',
-          card: 'Visa •••• 3142',
+          card: 'Не привязана',
           managePayment: 'Управлять оплатой',
           choosePlan: 'Выбрать тариф',
 
@@ -1445,9 +1474,9 @@ export default function SubscriptionPage() {
           discount: 'Savings',
           zeroSaving: 'No savings',
           nextCharge: 'Next charge',
-          nextChargeValue: 'May 1, 2026',
+          nextChargeValue: 'Free plan',
           paymentMethod: 'Payment method',
-          card: 'Visa •••• 3142',
+          card: 'Not connected',
           managePayment: 'Manage payment',
           choosePlan: 'Choose plan',
 
@@ -1486,7 +1515,7 @@ export default function SubscriptionPage() {
   const currentPlan = useMemo(() => {
     if (!dataset) return undefined;
 
-    return ((dataset.plans.find((plan) => plan.id === 'pro') ?? dataset.plans[0]) as
+    return ((dataset.plans.find((plan) => plan.id === dataset.subscription.planId) ?? dataset.plans[0]) as
       | PlanLike
       | undefined);
   }, [dataset]);
@@ -1500,6 +1529,44 @@ export default function SubscriptionPage() {
       (dataset.plans[0] as PlanLike | undefined)
     );
   }, [currentPlan, dataset, selectedPlanId]);
+
+  async function handleApplyPlan() {
+    if (!selectedPlan) return;
+
+    setApplyingPlan(true);
+    setSubscriptionError(null);
+
+    try {
+      const response = await fetch('/api/subscription', {
+        method: 'PATCH',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getTelegramAppSessionHeaders(),
+        },
+        body: JSON.stringify({
+          planId: selectedPlan.id,
+          billingCycle: billing,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('subscription_update_failed');
+      }
+
+      await refreshWorkspace();
+      setPaymentOpen(false);
+    } catch {
+      setSubscriptionError(
+        appLocale === 'ru'
+          ? 'Не удалось применить тариф. Проверьте деплой и SQL-патч подписок.'
+          : 'Could not apply the plan. Check deployment and the subscription SQL patch.',
+      );
+    } finally {
+      setApplyingPlan(false);
+    }
+  }
 
   if (!hasHydrated || !mounted) return null;
 
@@ -1623,7 +1690,10 @@ export default function SubscriptionPage() {
   const selectedAccent = selectedVisual.accent || fallbackAccent;
   const selectedPrice = billing === 'monthly' ? selectedPlan.monthly : selectedPlan.yearly;
   const yearlySavings = Math.max(0, selectedPlan.monthly * 12 - selectedPlan.yearly);
-  const isSelectedCurrent = selectedPlan.id === currentPlan.id;
+  const isSelectedCurrent = selectedPlan.id === currentPlan.id && billing === dataset.subscription.billingCycle;
+  const currentSubscription = dataset.subscription;
+  const nextChargeValue = currentSubscription.nextChargeLabel || copy.nextChargeValue;
+  const paymentMethodValue = currentSubscription.paymentMethodLabel || copy.card;
 
   const priceLabel =
     selectedPrice === 0 ? copy.free : formatCurrency(selectedPrice, appLocale);
@@ -1777,7 +1847,7 @@ export default function SubscriptionPage() {
 
                 <SmallInfoTile
                   label={copy.nextCharge}
-                  value={copy.nextChargeValue}
+                  value={nextChargeValue}
                   icon={CalendarClock}
                   light={isLight}
                 />
@@ -1897,7 +1967,7 @@ export default function SubscriptionPage() {
                         pageText(isLight),
                       )}
                     >
-                      {copy.nextChargeValue}
+                      {nextChargeValue}
                     </div>
                   </Panel>
 
@@ -1915,13 +1985,13 @@ export default function SubscriptionPage() {
                         pageText(isLight),
                       )}
                     >
-                      {copy.card}
+                      {paymentMethodValue}
                     </div>
                   </Panel>
 
                   <Button
                     type="button"
-                    onClick={() => setPaymentOpen(true)}
+                    onClick={() => { setSubscriptionError(null); setPaymentOpen(true); }}
                     className={cn('mt-5 w-full', buttonBase(isLight, true))}
                   >
                     {isSelectedCurrent ? copy.managePayment : copy.choosePlan}
@@ -2022,9 +2092,12 @@ export default function SubscriptionPage() {
         planName={selectedPlan.name}
         priceLabel={priceLabel}
         billingPeriodLabel={billingPeriodLabel}
-        nextChargeValue={copy.nextChargeValue}
-        cardLabel={copy.card}
+        nextChargeValue={nextChargeValue}
+        cardLabel={paymentMethodValue}
         isSelectedCurrent={isSelectedCurrent}
+        onConfirm={handleApplyPlan}
+        isBusy={applyingPlan}
+        errorMessage={subscriptionError}
       />
     </WorkspaceShell>
   );

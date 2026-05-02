@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { requireAuthUser } from '@/lib/server/require-auth-user';
 import { listBookingsByWorkspace } from '@/lib/server/supabase-bookings';
+import { getWorkspaceBillingSnapshot } from '@/lib/server/supabase-subscriptions';
 import { fetchWorkspaceForUser } from '@/lib/server/supabase-workspaces';
 import type { Booking } from '@/lib/types';
 
@@ -37,12 +38,18 @@ export async function GET() {
       : [];
     const tableBookings = await listBookingsByWorkspace(workspace.id).catch(() => [] as Booking[]);
     const bookings = mergeBookings(tableBookings, jsonBookings);
+    const billing = await getWorkspaceBillingSnapshot(workspace.id).catch(() => ({
+      subscription: workspace.data?.subscription ?? null,
+      subscriptionEvents: Array.isArray(workspace.data?.subscriptionEvents) ? workspace.data.subscriptionEvents : [],
+    }));
 
     return NextResponse.json({
       ...workspace,
       data: {
         ...(workspace.data ?? {}),
         bookings,
+        subscription: billing.subscription,
+        subscriptionEvents: billing.subscriptionEvents,
       },
     });
   } catch (error) {

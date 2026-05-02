@@ -1,4 +1,16 @@
 import type { Locale } from '@/lib/i18n';
+import {
+  getBillingPlan,
+  getLocalizedPlans,
+  getPlanLimits,
+  isFinitePlanLimit,
+  normalizeBillingCycle,
+  normalizeSubscriptionPlanId,
+  normalizeSubscriptionStatus,
+  type BillingCycle,
+  type SubscriptionPlanId,
+  type SubscriptionStatus,
+} from '@/lib/billing-plans';
 import type { Booking, BookingStatus, MasterProfile } from '@/lib/types';
 
 export interface ServiceInsight {
@@ -105,6 +117,33 @@ export interface PaymentInsight {
   plan: string;
 }
 
+export interface WorkspaceSubscriptionInsight {
+  id: string | null;
+  planId: SubscriptionPlanId;
+  planName: string;
+  status: SubscriptionStatus;
+  billingCycle: BillingCycle;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+  nextChargeLabel: string;
+  paymentMethodLabel: string;
+  cancelAtPeriodEnd: boolean;
+  provider: string;
+}
+
+export interface SubscriptionEventInsight {
+  id: string;
+  eventType: string;
+  amount: number;
+  currency: string;
+  planId?: string;
+  planName?: string;
+  status?: string;
+  method?: string;
+  createdAt: string;
+  metadata?: Record<string, unknown>;
+}
+
 export interface SubscriptionPlan {
   id: 'start' | 'pro' | 'studio' | 'premium';
   name: string;
@@ -136,6 +175,7 @@ export interface WorkspaceDataset {
   notifications: NotificationInsight[];
   payments: PaymentInsight[];
   plans: SubscriptionPlan[];
+  subscription: WorkspaceSubscriptionInsight;
   limits: LimitInsight[];
   totals: {
     bookings: number;
@@ -612,112 +652,166 @@ function buildNotifications(locale: Locale): NotificationInsight[] {
       ];
 }
 
-function buildPayments(locale: Locale): PaymentInsight[] {
-  void locale;
-  return [];
+function formatBillingDate(value: string | null | undefined, locale: Locale) {
+  if (!value) return locale === 'ru' ? 'не запланировано' : 'not scheduled';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return locale === 'ru' ? 'не запланировано' : 'not scheduled';
+
+  return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(date);
+}
+
+function getStringFromRecord(record: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function getBooleanFromRecord(record: Record<string, unknown>, key: string, fallback = false) {
+  const value = record[key];
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+export function normalizeSubscriptionInsight(value: unknown, locale: Locale): WorkspaceSubscriptionInsight {
+  const row = value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+
+  const metadata = row.metadata && typeof row.metadata === 'object' && !Array.isArray(row.metadata)
+    ? (row.metadata as Record<string, unknown>)
+    : {};
+
+  const planId = normalizeSubscriptionPlanId(
+    row.planId ?? row.plan_id ?? row.plan ?? metadata.planId ?? metadata.plan_id ?? metadata.plan,
+  );
+  const plan = getBillingPlan(planId);
+  const status = normalizeSubscriptionStatus(row.status ?? metadata.status);
+  const billingCycle = normalizeBillingCycle(row.billingCycle ?? row.billing_cycle ?? metadata.billingCycle ?? metadata.billing_cycle);
+  const currentPeriodStart = getStringFromRecord(row, ['currentPeriodStart', 'current_period_start']);
+  const currentPeriodEnd = getStringFromRecord(row, ['currentPeriodEnd', 'current_period_end']);
+  const paymentMethodLabel =
+    getStringFromRecord(row, ['paymentMethodLabel', 'payment_method_label']) ??
+    getStringFromRecord(metadata, ['paymentMethodLabel', 'payment_method_label', 'method']) ??
+    (locale === 'ru' ? 'Не привязана' : 'Not connected');
+
+  return {
+    id: getStringFromRecord(row, ['id']),
+    planId,
+    planName: plan.name,
+    status,
+    billingCycle,
+    currentPeriodStart,
+    currentPeriodEnd,
+    nextChargeLabel: plan.monthly === 0 ? (locale === 'ru' ? 'Бесплатный тариф' : 'Free plan') : formatBillingDate(currentPeriodEnd, locale),
+    paymentMethodLabel,
+    cancelAtPeriodEnd: getBooleanFromRecord(row, 'cancelAtPeriodEnd') || getBooleanFromRecord(row, 'cancel_at_period_end'),
+    provider: getStringFromRecord(row, ['provider']) ?? getStringFromRecord(metadata, ['provider']) ?? 'manual',
+  };
+}
+
+export function normalizeSubscriptionEvents(value: unknown): SubscriptionEventInsight[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .filter((item) => item && typeof item === 'object')
+    .map((item, index) => {
+      const row = item as Record<string, unknown>;
+      const metadata = row.metadata && typeof row.metadata === 'object' && !Array.isArray(row.metadata)
+        ? (row.metadata as Record<string, unknown>)
+        : {};
+      const amount = typeof row.amount === 'number'
+        ? row.amount
+        : Number(row.amount ?? metadata.amount ?? 0);
+
+      return {
+        id: String(row.id ?? `subscription-event-${index}`),
+        eventType: String(row.eventType ?? row.event_type ?? metadata.eventType ?? 'subscription_event'),
+        amount: Number.isFinite(amount) ? amount : 0,
+        currency: String(row.currency ?? metadata.currency ?? 'RUB'),
+        planId: getStringFromRecord(row, ['planId', 'plan_id', 'plan']) ?? getStringFromRecord(metadata, ['planId', 'plan_id', 'plan']) ?? undefined,
+        planName: getStringFromRecord(row, ['planName', 'plan_name']) ?? getStringFromRecord(metadata, ['planName', 'plan_name']) ?? undefined,
+        status: getStringFromRecord(row, ['status']) ?? getStringFromRecord(metadata, ['status']) ?? undefined,
+        method: getStringFromRecord(row, ['method']) ?? getStringFromRecord(metadata, ['method']) ?? undefined,
+        createdAt: String(row.createdAt ?? row.created_at ?? new Date().toISOString()),
+        metadata,
+      } satisfies SubscriptionEventInsight;
+    })
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+export function buildSubscriptionPayments(locale: Locale, events: SubscriptionEventInsight[] = []): PaymentInsight[] {
+  return events
+    .filter((event) => event.amount > 0 || event.eventType.includes('payment'))
+    .map((event) => {
+      const plan = getBillingPlan(event.planId);
+      const status: PaymentInsight['status'] = event.eventType.includes('refund')
+        ? 'refunded'
+        : event.eventType.includes('pending') || event.status === 'pending'
+          ? 'pending'
+          : 'paid';
+
+      return {
+        id: event.id,
+        date: formatBillingDate(event.createdAt, locale),
+        amount: event.amount,
+        status,
+        method: event.method || (locale === 'ru' ? 'Ручная активация' : 'Manual activation'),
+        plan: event.planName || plan.name,
+      };
+    });
 }
 
 function buildPlans(locale: Locale): SubscriptionPlan[] {
-  return locale === 'ru'
-    ? [
-        {
-          id: 'start',
-          name: 'Start',
-          description: 'Для мастера, который только запускает страницу записи.',
-          monthly: 0,
-          yearly: 0,
-          features: ['До 5 услуг', 'Базовая ссылка', 'Заявки и календарь', '1 канал уведомлений'],
-        },
-        {
-          id: 'pro',
-          name: 'Pro',
-          description: 'Основной рабочий тариф с аналитикой и кастомизацией.',
-          monthly: 990,
-          yearly: 9990,
-          popular: true,
-          features: ['До 20 услуг', 'Статистика и доход', 'Шаблоны сообщений', 'Кастомизация страницы', 'Напоминания клиентам'],
-        },
-        {
-          id: 'studio',
-          name: 'Studio',
-          description: 'Для мастеров с несколькими направлениями и плотным потоком.',
-          monthly: 2490,
-          yearly: 24990,
-          features: ['Неограниченные услуги', 'Источники и конверсия', 'Экспорт данных', 'Интеграции', 'Брендирование'],
-        },
-        {
-          id: 'premium',
-          name: 'Premium',
-          description: 'Для студии и команды с приоритетной поддержкой.',
-          monthly: 5990,
-          yearly: 59990,
-          features: ['Команда и сотрудники', 'Премиум-аналитика', 'Брендированные блоки', 'Приоритетная поддержка', 'Расширенные лимиты'],
-        },
-      ]
-    : [
-        {
-          id: 'start',
-          name: 'Start',
-          description: 'For a master just launching a booking page.',
-          monthly: 0,
-          yearly: 0,
-          features: ['Up to 5 services', 'Basic public link', 'Requests and calendar', '1 notification channel'],
-        },
-        {
-          id: 'pro',
-          name: 'Pro',
-          description: 'The main working plan with analytics and customization.',
-          monthly: 990,
-          yearly: 9990,
-          popular: true,
-          features: ['Up to 20 services', 'Stats and revenue', 'Message templates', 'Public page styling', 'Client reminders'],
-        },
-        {
-          id: 'studio',
-          name: 'Studio',
-          description: 'For busier masters with multiple service lines.',
-          monthly: 2490,
-          yearly: 24990,
-          features: ['Unlimited services', 'Sources and conversion', 'Data export', 'Integrations', 'Branding'],
-        },
-        {
-          id: 'premium',
-          name: 'Premium',
-          description: 'For studios and teams with priority support.',
-          monthly: 5990,
-          yearly: 59990,
-          features: ['Team members', 'Premium analytics', 'White-label blocks', 'Priority support', 'Expanded limits'],
-        },
-      ];
+  return getLocalizedPlans(locale) as SubscriptionPlan[];
 }
 
-function buildLimits(services: ServiceInsight[], clients: ClientInsight[], locale: Locale): LimitInsight[] {
+export function buildLimits(
+  services: ServiceInsight[],
+  clients: ClientInsight[],
+  locale: Locale,
+  planId: SubscriptionPlanId = 'start',
+): LimitInsight[] {
+  const limits = getPlanLimits(planId);
+  const totalLabel = (value: number) => (isFinitePlanLimit(value) ? value : 9999);
+
   return [
     {
       id: 'services',
       label: locale === 'ru' ? 'Активные услуги' : 'Active services',
       used: services.filter((service) => service.status !== 'draft').length,
-      total: 20,
+      total: totalLabel(limits.services),
     },
     {
       id: 'clients',
       label: locale === 'ru' ? 'Клиенты в месяц' : 'Clients per month',
       used: clients.length,
-      total: 150,
+      total: totalLabel(limits.clients),
     },
     {
       id: 'reminders',
       label: locale === 'ru' ? 'Напоминания' : 'Reminders',
       used: 0,
-      total: 120,
+      total: totalLabel(limits.reminders),
       accent: 'warning',
     },
     {
       id: 'exports',
       label: locale === 'ru' ? 'Экспорты данных' : 'Data exports',
       used: 0,
-      total: 10,
+      total: totalLabel(limits.exports),
       accent: 'success',
+    },
+    {
+      id: 'templates',
+      label: locale === 'ru' ? 'Шаблоны сообщений' : 'Message templates',
+      used: 0,
+      total: totalLabel(limits.templates),
     },
   ];
 }
@@ -763,9 +857,10 @@ export function buildWorkspaceDataset(
     availability: buildAvailability(locale),
     integrations: buildIntegrations(locale),
     notifications: buildNotifications(locale),
-    payments: buildPayments(locale),
+    payments: buildSubscriptionPayments(locale),
     plans: buildPlans(locale),
-    limits: buildLimits(services, clients, locale),
+    subscription: normalizeSubscriptionInsight(null, locale),
+    limits: buildLimits(services, clients, locale, 'start'),
     totals,
   };
 }

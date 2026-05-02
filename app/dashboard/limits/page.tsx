@@ -53,8 +53,8 @@ export default function LimitsPage() {
         <div className="dashboard-kpi-grid grid grid-cols-2 gap-3">
           <MetricCard label={locale === 'ru' ? 'Лимитов отслеживается' : 'Tracked limits'} value={String(dataset.limits.length)} icon={Gauge} />
           <MetricCard label={locale === 'ru' ? 'Почти заполнены' : 'Near limit'} value={String(dataset.limits.filter((item) => item.used / item.total > 0.65).length)} icon={Activity} />
-          <MetricCard label={locale === 'ru' ? 'Текущий план' : 'Current plan'} value="Pro" icon={ShieldCheck} />
-          <MetricCard label={locale === 'ru' ? 'Рекомендуется апгрейд' : 'Upgrade suggested'} value={locale === 'ru' ? 'Пока нет' : 'Not yet'} />
+          <MetricCard label={locale === 'ru' ? 'Текущий план' : 'Current plan'} value={dataset.subscription.planName} icon={ShieldCheck} />
+          <MetricCard label={locale === 'ru' ? 'Рекомендуется апгрейд' : 'Upgrade suggested'} value={dataset.limits.some((item) => item.used / Math.max(1, item.total) > 0.85) ? (locale === 'ru' ? 'Да' : 'Yes') : (locale === 'ru' ? 'Пока нет' : 'Not yet')} />
         </div>
 
         <SectionCard

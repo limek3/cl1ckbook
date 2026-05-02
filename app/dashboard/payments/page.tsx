@@ -51,8 +51,8 @@ export default function PaymentsPage() {
         <div className="dashboard-kpi-grid grid grid-cols-2 gap-4">
           <MetricCard label={locale === 'ru' ? 'Последний платёж' : 'Last payment'} value={formatCurrency(dataset.payments[0]?.amount ?? 0, locale)} icon={CreditCard} />
           <MetricCard label={locale === 'ru' ? 'История оплат' : 'Payment records'} value={String(dataset.payments.length)} icon={ReceiptText} />
-          <MetricCard label={locale === 'ru' ? 'Активный метод' : 'Active method'} value="Visa •••• 3142" />
-          <MetricCard label={locale === 'ru' ? 'Статус' : 'Status'} value={locale === 'ru' ? 'Активно' : 'Active'} />
+          <MetricCard label={locale === 'ru' ? 'Активный метод' : 'Active method'} value={dataset.subscription.paymentMethodLabel || (locale === 'ru' ? 'Не привязана' : 'Not connected')} />
+          <MetricCard label={locale === 'ru' ? 'Статус' : 'Status'} value={dataset.subscription.status === 'active' ? (locale === 'ru' ? 'Активно' : 'Active') : dataset.subscription.status} />
         </div>
 
         <SectionCard

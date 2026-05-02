@@ -369,6 +369,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
           return { success: false, error: copy.validation.slugTaken };
         }
 
+        if (response.status === 402) {
+          const payload = await parseJson<{ limit?: number }>(response).catch(() => ({}));
+          return {
+            success: false,
+            error: locale === 'ru'
+              ? `На текущем тарифе можно сохранить до ${payload.limit ?? 5} активных услуг. Уменьшите список или смените тариф.`
+              : `Your current plan allows up to ${payload.limit ?? 5} active services. Reduce the list or change the plan.`,
+          };
+        }
+
         if (!response.ok) {
           return {
             success: false,
@@ -490,7 +500,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         });
 
         if (!response.ok) {
-          throw new Error('section_update_failed');
+          await refreshWorkspace();
+          return false;
         }
 
         // Do not apply the full returned snapshot here. Multiple quick saves

@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 
 import type { Booking } from '@/lib/types';
+import { getPlanLimits, normalizeSubscriptionPlanId } from '@/lib/billing-plans';
 import { requireAuthUser } from '@/lib/server/require-auth-user';
+import { getWorkspaceBillingSnapshot } from '@/lib/server/supabase-subscriptions';
 import { syncAvailabilityDays, syncMessageTemplates, syncServices } from '@/lib/server/supabase-workspace-sections';
 import { fetchWorkspaceForUser, updateWorkspace } from '@/lib/server/supabase-workspaces';
 import { buildWorkspaceSeed } from '@/lib/workspace-store';
@@ -41,6 +43,28 @@ export async function PATCH(request: Request) {
       // Do not accidentally wipe the service catalog when a stale client snapshot
       // sends an empty array. The user can still hide services individually.
       sectionValue = existingServices.length > 0 ? existingServices : seed.services;
+    }
+
+    if (body.section === 'services' && Array.isArray(sectionValue)) {
+      const billing = await getWorkspaceBillingSnapshot(workspace.id).catch(() => null);
+      const planId = normalizeSubscriptionPlanId(billing?.subscription?.planId ?? billing?.subscription?.plan);
+      const limits = getPlanLimits(planId);
+      const activeServicesCount = sectionValue.filter((service) => {
+        if (!service || typeof service !== 'object') return false;
+        return (service as Record<string, unknown>).status !== 'draft';
+      }).length;
+
+      if (activeServicesCount > limits.services) {
+        return NextResponse.json(
+          {
+            error: 'limit_services_exceeded',
+            plan: planId,
+            limit: limits.services,
+            used: activeServicesCount,
+          },
+          { status: 402 },
+        );
+      }
     }
 
     const nextData = {
