@@ -373,7 +373,7 @@ function ConnectedAccountsCard({
       ? {
           title: 'Связанные аккаунты',
           description:
-            'Подключите Google, Telegram и VK ID, чтобы входить в один кабинет разными способами.',
+            'Подключите Google, Telegram и VK, чтобы входить в один кабинет разными способами.',
           connected: 'Подключено',
           connect: 'Подключить',
           reconnect: 'Обновить связь',
@@ -381,11 +381,11 @@ function ConnectedAccountsCard({
           googleHint: 'Вход через Google OAuth',
           telegram: 'Telegram',
           telegramHint: 'Вход через бота и Mini App',
-          vk: 'VK ID',
+          vk: 'VK',
           vkHint: 'Вход через аккаунт ВК',
           ready: 'Аккаунты синхронизированы.',
           setup:
-            'Если провайдер не открывается, включите его в Supabase Auth → Providers и добавьте redirect URL /auth/callback.',
+            'Если Google не открывается, включите его в Supabase Auth. Для VK укажите адрес сайта/домен в настройках приложения и добавьте переменные VK_ID_* в Vercel.',
           telegramStarted:
             'Открыл Telegram. Нажмите Start в боте, затем вернитесь сюда — связь обновится автоматически.',
           telegramWaiting: 'Ждём подтверждение в Telegram...',
@@ -395,7 +395,7 @@ function ConnectedAccountsCard({
       : {
           title: 'Connected accounts',
           description:
-            'Connect Google, Telegram, and VK ID to use one workspace with different login methods.',
+            'Connect Google, Telegram, and VK to use one workspace with different login methods.',
           connected: 'Connected',
           connect: 'Connect',
           reconnect: 'Refresh link',
@@ -403,11 +403,11 @@ function ConnectedAccountsCard({
           googleHint: 'Google OAuth login',
           telegram: 'Telegram',
           telegramHint: 'Bot and Mini App login',
-          vk: 'VK ID',
+          vk: 'VK',
           vkHint: 'VK account login',
           ready: 'Accounts are synced.',
           setup:
-            'If a provider does not open, enable it in Supabase Auth → Providers and add /auth/callback as redirect URL.',
+            'If Google does not open, enable it in Supabase Auth. For VK, set the site/domain in the VK app settings and add VK_ID_* variables in Vercel.',
           telegramStarted:
             'Telegram opened. Press Start in the bot, then return here — the link will refresh automatically.',
           telegramWaiting: 'Waiting for Telegram confirmation...',
@@ -466,6 +466,15 @@ function ConnectedAccountsCard({
   }, []);
 
   const connectOAuth = async (provider: 'google' | 'vk') => {
+    if (provider === 'vk') {
+      setState((current) => ({ ...current, action: 'vk', message: null }));
+      const url = new URL('/api/auth/vk/start', window.location.origin);
+      url.searchParams.set('mode', 'link');
+      url.searchParams.set('next', '/dashboard/profile');
+      window.location.assign(url.toString());
+      return;
+    }
+
     try {
       setState((current) => ({ ...current, action: provider, message: null }));
 
@@ -477,13 +486,10 @@ function ConnectedAccountsCard({
         provider,
         options: {
           redirectTo: callbackUrl.toString(),
-          queryParams:
-            provider === 'google'
-              ? {
-                  access_type: 'offline',
-                  prompt: 'consent',
-                }
-              : undefined,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         },
       });
 

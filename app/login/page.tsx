@@ -110,12 +110,29 @@ export default function LoginPage() {
     [searchParams],
   );
 
+
+  const incomingError = useMemo(() => {
+    const message = searchParams.get('message');
+    const error = searchParams.get('error');
+
+    if (message) return message;
+    if (error === 'vk_not_configured') return 'VK OAuth не настроен. Добавьте VK_ID_CLIENT_ID и VK_ID_CLIENT_SECRET в Vercel.';
+    if (error === 'vk_auth_failed') return 'Не удалось войти через VK. Попробуйте ещё раз.';
+    if (error === 'auth_callback_failed') return 'Не удалось завершить вход. Попробуйте ещё раз.';
+    return null;
+  }, [searchParams]);
+
   const botUrl = useMemo(() => {
     const username = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME?.replace(/^@/, '').trim();
     return username ? `https://t.me/${username}?startapp=dashboard` : null;
   }, []);
 
   const startOAuth = async (provider: OAuthProvider) => {
+    if (provider === 'vk') {
+      startVkAuth();
+      return;
+    }
+
     try {
       setOauthError(null);
       setLoadingProvider(provider);
@@ -128,13 +145,10 @@ export default function LoginPage() {
         provider,
         options: {
           redirectTo: callbackUrl.toString(),
-          queryParams:
-            provider === 'google'
-              ? {
-                  access_type: 'offline',
-                  prompt: 'consent',
-                }
-              : undefined,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         },
       });
 
@@ -147,6 +161,15 @@ export default function LoginPage() {
           : 'Не удалось открыть авторизацию. Проверьте OAuth provider в Supabase.',
       );
     }
+  };
+
+  const startVkAuth = () => {
+    setOauthError(null);
+    setLoadingProvider('vk');
+
+    const url = new URL('/api/auth/vk/start', window.location.origin);
+    url.searchParams.set('next', redirectTo);
+    window.location.assign(url.toString());
   };
 
   if (!authConfigured) {
@@ -212,7 +235,7 @@ export default function LoginPage() {
                   Кабинет мастера
                 </div>
                 <div className="mt-0.5 text-[11px] text-black/42 dark:text-white/38">
-                  Telegram, Google и VK ID
+                  Telegram, Google и VK
                 </div>
               </div>
             </div>
@@ -280,16 +303,16 @@ export default function LoginPage() {
             />
             <ProviderButton
               icon={<MessageCircleMore className="size-3.5" />}
-              label="VK ID"
+              label="VK"
               hint="войти через ВК"
               loading={loadingProvider === 'vk'}
               onClick={() => startOAuth('vk')}
             />
           </div>
 
-          {oauthError ? (
+          {(oauthError || incomingError) ? (
             <div className="mt-3 rounded-[11px] border border-red-500/15 bg-red-500/[0.06] px-3 py-2 text-[11px] leading-4 text-red-600 dark:text-red-300">
-              {oauthError}
+              {oauthError || incomingError}
             </div>
           ) : null}
 

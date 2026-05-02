@@ -5,7 +5,7 @@ import { createClient as createSupabaseClient, type User } from '@supabase/supab
 import { createClient as createServerSupabaseClient } from '@/lib/supabase/server';
 import { getSupabasePublishableKey, getSupabaseUrl } from '@/lib/supabase/env';
 import { createSupabaseAdminClient } from '@/lib/server/supabase-admin';
-import { getTelegramAppSessionUser, getTelegramAppSessionUserFromToken } from '@/lib/server/app-session';
+import { getAppSessionUser, getAppSessionUserFromToken } from '@/lib/server/app-session';
 import { ensureTelegramAuthUser, upsertTelegramAccount } from '@/lib/server/telegram-user';
 import { createTelegramVirtualUser } from '@/lib/server/telegram-virtual-user';
 
@@ -158,18 +158,18 @@ export async function requireAuthUser(): Promise<User> {
     }
   }
 
-  const headerTelegramUser = await repairTelegramAppSessionUser(
-    getTelegramAppSessionUserFromToken(appSessionToken),
-  );
+  const headerAppSessionUser = getAppSessionUserFromToken(appSessionToken);
 
-  if (headerTelegramUser) {
-    return headerTelegramUser;
+  if (headerAppSessionUser) {
+    const repaired = await repairTelegramAppSessionUser(headerAppSessionUser);
+    return repaired ?? headerAppSessionUser;
   }
 
-  const telegramUser = await repairTelegramAppSessionUser(await getTelegramAppSessionUser());
+  const appSessionUser = await getAppSessionUser();
 
-  if (telegramUser) {
-    return telegramUser;
+  if (appSessionUser) {
+    const repaired = await repairTelegramAppSessionUser(appSessionUser);
+    return repaired ?? appSessionUser;
   }
 
   throw new Error('unauthorized');
