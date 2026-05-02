@@ -465,9 +465,7 @@ async function handleMessageAllow(payload: VkCallbackPayload) {
     textPreview: 'Сообщения VK подключены к ClickBook.',
     send: () => sendVkMessage({
       peerId: vkUserId,
-      message: 'Сообщения VK подключены к ClickBook ✅
-
-Теперь через этот диалог можно подтверждать вход и получать уведомления о записях.',
+      message: 'Сообщения VK подключены к ClickBook ✅\n\nТеперь через этот диалог можно подтверждать вход и получать уведомления о записях.',
     }),
   });
 }
