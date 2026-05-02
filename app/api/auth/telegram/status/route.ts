@@ -121,10 +121,6 @@ async function ensureTelegramAuthUser(params: {
   if (existing) {
     const updatePayload: Parameters<typeof params.admin.auth.admin.updateUserById>[1] = {
       user_metadata: userMetadata,
-      app_metadata: {
-        provider: 'telegram',
-        providers: ['telegram'],
-      },
     };
 
     // Do not force email change for old users. It can fail if Supabase still has
@@ -148,10 +144,6 @@ async function ensureTelegramAuthUser(params: {
       password,
       email_confirm: true,
       user_metadata: userMetadata,
-      app_metadata: {
-        provider: 'telegram',
-        providers: ['telegram'],
-      },
     });
 
   if (createUserError || !createdUser.user) {

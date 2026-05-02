@@ -18,6 +18,7 @@ import {
   Link2,
   Loader2,
   MessageCircleMore,
+  Plus,
   Send,
   Sparkles,
   SquarePen,

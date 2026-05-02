@@ -100,11 +100,6 @@ export async function ensureTelegramAuthUser(params: EnsureTelegramUserParams) {
         ...(existing.user_metadata ?? {}),
         ...userMetadata,
       },
-      app_metadata: {
-        ...(existing.app_metadata ?? {}),
-        provider: 'telegram',
-        providers: ['telegram'],
-      },
     });
 
     return data.user ?? existing;
@@ -115,10 +110,6 @@ export async function ensureTelegramAuthUser(params: EnsureTelegramUserParams) {
     password: crypto.randomBytes(48).toString('hex'),
     email_confirm: true,
     user_metadata: userMetadata,
-    app_metadata: {
-      provider: 'telegram',
-      providers: ['telegram'],
-    },
   });
 
   if (error || !data.user) {
