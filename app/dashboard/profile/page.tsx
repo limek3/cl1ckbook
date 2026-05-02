@@ -360,10 +360,14 @@ function providerConnected(providers: Set<string>, provider: ConnectedProvider) 
 function ConnectedAccountsCard({
   light,
   locale,
+  accentColor,
 }: {
   light: boolean;
   locale: 'ru' | 'en';
+  accentColor?: string;
 }) {
+  const accountAccentColor = typeof accentColor === 'string' && accentColor.trim() ? accentColor : '#8b8b8b';
+
   const [state, setState] = useState<ConnectedAccountState>({
     providers: new Set(),
     email: null,
@@ -742,7 +746,7 @@ function ConnectedAccountsCard({
           >
             <span
               className="mt-[5px] size-2 shrink-0 rounded-full animate-pulse"
-              style={{ background: accentColor }}
+              style={{ background: accountAccentColor }}
             />
             <div className="min-w-0">
               <div className={cn('truncate text-[11.5px] font-semibold tracking-[-0.005em]', pageText(light))}>
@@ -1430,7 +1434,7 @@ export default function DashboardProfilePage() {
               avatar={ownedProfile.avatar}
             />
 
-            <ConnectedAccountsCard light={isLight} locale={locale} />
+            <ConnectedAccountsCard light={isLight} locale={locale} accentColor={accentColor} />
 
             <div className="dashboard-profile-form-clean">
               <MasterProfileForm
