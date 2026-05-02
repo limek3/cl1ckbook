@@ -325,9 +325,10 @@ async function handleAuthStart(params: {
 }) {
   const admin = createSupabaseAdminClient();
 
-  await safeTask('rememberTelegramUser auth start', () =>
-    rememberTelegramUser({ from: params.from, chatId: params.chatId }),
-  );
+  // Do not create/update Supabase Auth user inside Telegram webhook.
+  // The webhook only confirms the short-lived request; /api/auth/telegram/status
+  // creates the app user once the browser finishes the login. This keeps the
+  // webhook stable even if Supabase Auth returns a generic GoTrue 500.
 
   const { data: loginRequest, error: findError } = await admin
     .from('sloty_telegram_login_requests')

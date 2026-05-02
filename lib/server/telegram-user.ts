@@ -95,31 +95,70 @@ export async function ensureTelegramAuthUser(params: EnsureTelegramUserParams) {
   );
 
   if (existing) {
-    const { data } = await params.admin.auth.admin.updateUserById(existing.id, {
+    const { data, error } = await params.admin.auth.admin.updateUserById(existing.id, {
       user_metadata: {
         ...(existing.user_metadata ?? {}),
         ...userMetadata,
+        providers: Array.from(
+          new Set([
+            ...(Array.isArray(existing.user_metadata?.providers)
+              ? existing.user_metadata.providers.map(String)
+              : []),
+            'telegram',
+          ]),
+        ),
       },
     });
+
+    if (error) {
+      // Supabase Auth metadata updates are not allowed to break Telegram login.
+      console.warn('[telegram-user] metadata update skipped', error.message);
+      return existing;
+    }
 
     return data.user ?? existing;
   }
 
+  const email = telegramSyntheticEmail(params.telegramId);
+  const password = crypto.randomBytes(48).toString('hex');
+
   const { data, error } = await params.admin.auth.admin.createUser({
-    email: telegramSyntheticEmail(params.telegramId),
-    password: crypto.randomBytes(48).toString('hex'),
+    email,
+    password,
     email_confirm: true,
     user_metadata: userMetadata,
   });
 
-  if (error || !data.user) {
-    const raced = await findTelegramAuthUser(params.admin, params.telegramId);
-    if (raced) return raced;
+  if (!error && data?.user) return data.user;
 
-    throw error ?? new Error('telegram_user_create_failed');
+  // Fallback for projects where GoTrue rejects metadata payloads with a generic
+  // "Internal Server Error". Create the user with the smallest possible payload,
+  // then attach Telegram metadata best-effort.
+  const raced = await findTelegramAuthUser(params.admin, params.telegramId);
+  if (raced) return raced;
+
+  const { data: minimalData, error: minimalError } = await params.admin.auth.admin.createUser({
+    email,
+    password: crypto.randomBytes(48).toString('hex'),
+    email_confirm: true,
+  });
+
+  if (minimalError || !minimalData?.user) {
+    const racedAfterFallback = await findTelegramAuthUser(params.admin, params.telegramId);
+    if (racedAfterFallback) return racedAfterFallback;
+    throw minimalError ?? error ?? new Error('telegram_user_create_failed');
   }
 
-  return data.user;
+  const { data: updatedData, error: updateError } = await params.admin.auth.admin.updateUserById(
+    minimalData.user.id,
+    { user_metadata: userMetadata },
+  );
+
+  if (updateError) {
+    console.warn('[telegram-user] metadata update after create skipped', updateError.message);
+  }
+
+  return updatedData.user ?? minimalData.user;
 }
 
 export async function upsertTelegramAccount(

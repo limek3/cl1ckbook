@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import type { User } from '@supabase/supabase-js';
 import { createSupabaseAdminClient } from '@/lib/server/supabase-admin';
 import { createTelegramAppSessionToken, setTelegramAppSessionCookie } from '@/lib/server/app-session';
+import { ensureTelegramAuthUser as ensureSharedTelegramAuthUser, upsertTelegramAccount } from '@/lib/server/telegram-user';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -119,20 +120,25 @@ async function ensureTelegramAuthUser(params: {
   );
 
   if (existing) {
-    const updatePayload: Parameters<typeof params.admin.auth.admin.updateUserById>[1] = {
-      user_metadata: userMetadata,
-    };
-
-    // Do not force email change for old users. It can fail if Supabase still has
-    // a legacy synthetic address. The app session only needs the stable user id.
-    const { data, error } = await params.admin.auth.admin.updateUserById(
-      existing.id,
-      updatePayload,
-    );
+    const { data, error } = await params.admin.auth.admin.updateUserById(existing.id, {
+      user_metadata: {
+        ...(existing.user_metadata ?? {}),
+        ...userMetadata,
+        providers: Array.from(
+          new Set([
+            ...(Array.isArray(existing.user_metadata?.providers)
+              ? existing.user_metadata.providers.map(String)
+              : []),
+            'telegram',
+          ]),
+        ),
+      },
+    });
 
     if (error) {
       // Metadata update is not critical for login. Keep the stable user id.
       console.warn('[telegram-status] user metadata update skipped', error.message);
+      return existing as User;
     }
 
     return (data?.user ?? existing) as User;
@@ -146,15 +152,39 @@ async function ensureTelegramAuthUser(params: {
       user_metadata: userMetadata,
     });
 
-  if (createUserError || !createdUser.user) {
-    // Rare race: user may have been created between listUsers and createUser.
-    const racedUser = await findTelegramAuthUser(params.admin, params.telegramId);
-    if (racedUser) return racedUser;
+  if (!createUserError && createdUser?.user) return createdUser.user;
 
-    throw createUserError ?? new Error('telegram_user_create_failed');
+  // Rare race: user may have been created between listUsers and createUser.
+  const racedUser = await findTelegramAuthUser(params.admin, params.telegramId);
+  if (racedUser) return racedUser;
+
+  // Fallback for projects where GoTrue rejects metadata payloads with a generic
+  // "Internal Server Error". Create the Auth user with minimum fields and then
+  // attach metadata best-effort.
+  const { data: minimalUser, error: minimalCreateError } =
+    await params.admin.auth.admin.createUser({
+      email,
+      password: randomBytes(48).toString('hex'),
+      email_confirm: true,
+    });
+
+  if (minimalCreateError || !minimalUser?.user) {
+    const racedAfterFallback = await findTelegramAuthUser(params.admin, params.telegramId);
+    if (racedAfterFallback) return racedAfterFallback;
+
+    throw minimalCreateError ?? createUserError ?? new Error('telegram_user_create_failed');
   }
 
-  return createdUser.user;
+  const { data: updatedUser, error: metadataUpdateError } =
+    await params.admin.auth.admin.updateUserById(minimalUser.user.id, {
+      user_metadata: userMetadata,
+    });
+
+  if (metadataUpdateError) {
+    console.warn('[telegram-status] metadata update after create skipped', metadataUpdateError.message);
+  }
+
+  return updatedUser.user ?? minimalUser.user;
 }
 
 export async function GET(request: Request) {
@@ -303,7 +333,7 @@ export async function GET(request: Request) {
       });
     }
 
-    const user = await ensureTelegramAuthUser({
+    const user = await ensureSharedTelegramAuthUser({
       admin,
       telegramId,
       accountUserId: existingAccount?.user_id as string | undefined,
@@ -313,22 +343,15 @@ export async function GET(request: Request) {
       photoUrl: loginRequest.photo_url,
     });
 
-    const { error: upsertError } = await admin.from('sloty_telegram_accounts').upsert(
-      {
-        telegram_id: telegramId,
-        user_id: user.id,
-        username: loginRequest.username,
-        first_name: loginRequest.first_name,
-        last_name: loginRequest.last_name,
-        photo_url: loginRequest.photo_url,
-        auth_date: loginRequest.confirmed_at,
-        metadata: userMetadata,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'telegram_id' },
-    );
-
-    if (upsertError) throw upsertError;
+    await upsertTelegramAccount(admin, {
+      userId: user.id,
+      telegramId,
+      username: loginRequest.username,
+      firstName: loginRequest.first_name,
+      lastName: loginRequest.last_name,
+      photoUrl: loginRequest.photo_url,
+      authDate: loginRequest.confirmed_at,
+    });
 
     await admin
       .from('sloty_telegram_login_requests')
