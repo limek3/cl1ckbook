@@ -21,6 +21,7 @@ type LoginRequestRow = {
   confirmed_at: string | null;
   consumed_at: string | null;
   expires_at: string;
+  chat_id?: number | null;
 };
 
 function telegramEmail(telegramId: number) {
@@ -306,6 +307,7 @@ export async function GET(request: Request) {
           last_name: loginRequest.last_name,
           photo_url: loginRequest.photo_url,
           auth_date: loginRequest.confirmed_at,
+          chat_id: typeof loginRequest.chat_id === 'number' ? loginRequest.chat_id : null,
           metadata: userMetadata,
           updated_at: new Date().toISOString(),
         },
@@ -370,6 +372,7 @@ export async function GET(request: Request) {
         lastName: loginRequest.last_name,
         photoUrl: loginRequest.photo_url,
         authDate: loginRequest.confirmed_at,
+        chatId: typeof loginRequest.chat_id === 'number' ? loginRequest.chat_id : null,
       });
     } catch (error) {
       console.warn(

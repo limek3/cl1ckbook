@@ -4,6 +4,7 @@ import type { Booking, MasterProfile } from '@/lib/types';
 import { createSupabaseAdminClient } from '@/lib/server/supabase-admin';
 import { createChatMessage, updateChatThread } from '@/lib/server/supabase-chats';
 import { getAppUrl, sendTelegramMessage } from '@/lib/server/telegram-bot';
+import { bookingCode, bookingServicesText } from '@/lib/server/booking-context';
 import { buildVkKeyboard, sendVkMessage } from '@/lib/server/vk-bot';
 
 type ProposalStatus = 'pending' | 'accepted' | 'declined' | 'expired';
@@ -86,10 +87,8 @@ function formatProposalDate(date: string, time: string) {
 export function buildTelegramRescheduleProposalReplyMarkup(proposalId: string) {
   return {
     inline_keyboard: [
-      [
-        { text: 'Подтвердить перенос', callback_data: `rs:${proposalId}:a` },
-        { text: 'Не подходит', callback_data: `rs:${proposalId}:d` },
-      ],
+      [{ text: '✅ Подтвердить перенос', callback_data: `rs:${proposalId}:a` }],
+      [{ text: '❌ Не подходит', callback_data: `rs:${proposalId}:d` }],
     ],
   };
 }
@@ -98,13 +97,13 @@ export function buildVkRescheduleProposalKeyboard(proposalId: string) {
   return buildVkKeyboard([
     [
       {
-        label: 'Подтвердить перенос',
+        label: '✅ Подтвердить перенос',
         action: 'reschedule_proposal_accept',
         color: 'positive',
         payload: { proposal_id: proposalId },
       },
       {
-        label: 'Не подходит',
+        label: '❌ Не подходит',
         action: 'reschedule_proposal_decline',
         color: 'negative',
         payload: { proposal_id: proposalId },
@@ -124,15 +123,18 @@ export function buildRescheduleProposalText(params: {
     '',
     'Мастер предлагает перенести запись.',
     '',
-    'Услуга:',
-    params.booking.service || '—',
+    `Запись: ${bookingCode(params.booking)}`,
+    '',
+    'Услуги:',
+    bookingServicesText(params.booking),
     '',
     'Новое время:',
-    formatProposalDate(params.proposedDate, params.proposedTime),
+    params.proposedDate,
+    params.proposedTime,
     '',
     'Выберите действие ниже:',
-    '— «Подтвердить перенос», если время подходит.',
-    '— «Не подходит», если нужно другое время.',
+    '✅ «Подтвердить перенос» — если время подходит.',
+    '❌ «Не подходит» — если нужно другое время.',
   ].join('\n');
 }
 

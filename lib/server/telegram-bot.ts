@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { Booking, MasterProfile } from '@/lib/types';
 import { getMasterAddress, getMasterLocationMode, getMasterRouteUrl } from '@/lib/location-links';
+import { bookingCode, bookingMessageText, bookingServicesText, masterDisplayName } from '@/lib/server/booking-context';
 
 export function getAppUrl() {
   return (process.env.NEXT_PUBLIC_APP_URL || 'https://www.кликбук.рф').replace(/\/$/, '');
@@ -147,6 +148,10 @@ function bookingDateLabel(booking: Pick<Booking, 'date' | 'time'>) {
   return `${booking.date} · ${booking.time}`;
 }
 
+function bookingDateLines(booking: Pick<Booking, 'date' | 'time'>) {
+  return [`Дата: ${booking.date}`, `Время: ${booking.time}`];
+}
+
 function buildVisitPlaceLines(profile?: MasterProfile | null) {
   if (!profile || getMasterLocationMode(profile) !== 'address') return ['Формат: онлайн'];
 
@@ -174,11 +179,17 @@ export async function sendMasterBookingNotification(params: {
       'Новая запись ✅',
       '',
       `Мастер: ${masterName}`,
+      '',
       `Клиент: ${params.booking.clientName}`,
       `Телефон: ${params.booking.clientPhone}`,
-      `Услуга: ${params.booking.service}`,
-      `Время: ${bookingDateLabel(params.booking)}`,
-      params.booking.comment ? `Комментарий: ${params.booking.comment}` : null,
+      '',
+      'Услуга:',
+      params.booking.service || '—',
+      '',
+      ...bookingDateLines(params.booking),
+      params.booking.comment ? '' : null,
+      params.booking.comment ? 'Комментарий:' : null,
+      params.booking.comment ? params.booking.comment : null,
     ]
       .filter(Boolean)
       .join('\n'),
@@ -216,12 +227,19 @@ export async function sendClientBookingConfirmation(params: {
     text: [
       'Запись создана ✅',
       '',
+      `Здравствуйте, ${params.booking.clientName}.`,
+      '',
       `Мастер: ${masterName}`,
-      `Услуга: ${params.booking.service}`,
-      `Время: ${bookingDateLabel(params.booking)}`,
+      '',
+      'Услуга:',
+      params.booking.service || '—',
+      '',
+      ...bookingDateLines(params.booking),
+      '',
       ...placeLines,
       '',
-      'За 24 часа до визита пришлём напоминание с подтверждением/переносом, а за 2 часа — адрес и маршрут, если визит офлайн.',
+      'Мы пришлём напоминание до визита.',
+      'Если потребуется перенос — можно будет ответить кнопкой в этом чате.',
     ]
       .filter(Boolean)
       .join('\n'),

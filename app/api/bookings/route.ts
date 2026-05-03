@@ -13,7 +13,7 @@ import { createBookingRecord, listBookingsByWorkspace, updateBookingStatusRecord
 import {
   createChatMessage,
   createChatThread,
-  fetchChatThreadByPhone,
+  fetchChatThreadByBookingId,
   updateChatThread,
 } from '@/lib/server/supabase-chats';
 import { upsertClientFromBooking, type ClientSourceChannel } from '@/lib/server/supabase-clients';
@@ -23,6 +23,7 @@ import {
   fetchWorkspaceBySlug,
   updateWorkspace,
 } from '@/lib/server/supabase-workspaces';
+import { bookingMessageText, bookingShortContext, bookingThreadMetadata } from '@/lib/server/booking-context';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -349,8 +350,8 @@ export async function POST(request: Request) {
     }
 
     try {
-      const existingThread = await fetchChatThreadByPhone(workspace.id, persistedBooking.clientPhone);
-      const bookingSummary = `Новая запись: ${persistedBooking.service} · ${persistedBooking.date} ${persistedBooking.time}`;
+      const existingThread = await fetchChatThreadByBookingId(workspace.id, persistedBooking.id);
+      const bookingSummary = `Новая запись: ${bookingShortContext(persistedBooking)}`;
 
       const thread =
         existingThread ??
@@ -366,14 +367,22 @@ export async function POST(request: Request) {
           isPriority: false,
           lastMessagePreview: bookingSummary,
           lastMessageAt: persistedBooking.createdAt,
-          metadata: { bookingId: persistedBooking.id, bookingIds: [persistedBooking.id], communicationScenario: sourceInfo.communicationScenario },
+          metadata: bookingThreadMetadata(persistedBooking, workspace.profile, {
+            communicationScenario: sourceInfo.communicationScenario,
+          }),
         }));
 
       if (thread) {
         await createChatMessage(workspace.id, {
           threadId: thread.id,
           author: 'client',
-          body: bookingSummary,
+          body: bookingMessageText({
+            title: 'Новая запись',
+            booking: persistedBooking,
+            profile: workspace.profile,
+            includeClient: false,
+            source: sourceInfo.source,
+          }),
           deliveryState: null,
           viaBot: false,
           metadata: {
@@ -409,7 +418,13 @@ export async function POST(request: Request) {
               bookingId: persistedBooking.id,
               clientPhone: persistedBooking.clientPhone,
               clientName: persistedBooking.clientName,
-              text: `Ваша заявка принята. ${persistedBooking.service} · ${persistedBooking.date} ${persistedBooking.time}`,
+              text: [
+                'Запись создана ✅',
+                '',
+                `Услуга: ${persistedBooking.service || '—'}`,
+                `Дата: ${persistedBooking.date}`,
+                `Время: ${persistedBooking.time}`,
+              ].join('\n'),
             }).catch(() => false)
           : false;
 
@@ -425,12 +440,8 @@ export async function POST(request: Request) {
           metadata: {
             ...(thread.metadata ?? {}),
             bookingId: persistedBooking.id,
-            bookingIds: [
-              ...new Set([
-                ...((Array.isArray(thread.metadata?.bookingIds) ? thread.metadata?.bookingIds : []) as string[]),
-                persistedBooking.id,
-              ]),
-            ],
+            ...bookingThreadMetadata(persistedBooking, workspace.profile),
+            bookingIds: [persistedBooking.id],
             lastClientTelegramDelivery: sentToClientTelegram ? 'delivered' : sourceInfo.channel === 'telegram' ? 'pending_link' : 'phone_fallback',
             communicationScenario: sourceInfo.communicationScenario,
           },

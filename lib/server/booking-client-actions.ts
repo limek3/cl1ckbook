@@ -5,7 +5,7 @@ import { createSupabaseAdminClient } from '@/lib/server/supabase-admin';
 import {
   createChatMessage,
   createChatThread,
-  fetchChatThreadByPhone,
+  fetchChatThreadByBookingId,
   updateChatThread,
 } from '@/lib/server/supabase-chats';
 import {
@@ -16,6 +16,7 @@ import {
   sendMasterVkBookingConfirmedNotice,
   sendMasterVkRescheduleRequestNotification,
 } from '@/lib/server/vk-bot';
+import { bookingMessageText, bookingShortContext, bookingThreadMetadata } from '@/lib/server/booking-context';
 
 type ClientBookingAction = 'confirm' | 'reschedule';
 type ClientActionSource = 'telegram' | 'vk';
@@ -142,7 +143,6 @@ async function syncWorkspaceBooking(params: {
     return {
       ...item,
       status: params.status,
-      source: sourceLabel(params.source),
       channel: params.source,
       ...(params.action === 'confirm' ? { confirmedAt: params.now } : {}),
       ...(params.action === 'reschedule'
@@ -185,9 +185,7 @@ async function upsertChatAlert(params: {
 }) {
   const preview = actionPreview(params.action, params.booking, params.source);
   const messageBody = actionMessage(params.action, params.booking, params.source);
-  const existingThread = params.booking.clientPhone
-    ? await fetchChatThreadByPhone(params.workspaceId, params.booking.clientPhone).catch(() => null)
-    : null;
+  const existingThread = await fetchChatThreadByBookingId(params.workspaceId, params.booking.id).catch(() => null);
 
   const baseMetadata = existingThread?.metadata ?? {};
   const previousBookingIds = Array.isArray(baseMetadata.bookingIds)
@@ -234,7 +232,7 @@ async function upsertChatAlert(params: {
   const thread = existingThread
     ? await updateChatThread(params.workspaceId, existingThread.id, {
         channel: params.source === 'vk' ? 'VK' : existingThread.channel,
-        source: sourceLabel(params.source),
+        source: existingThread.source ?? params.booking.source ?? sourceLabel(params.source),
         segment: params.action === 'reschedule' ? 'followup' : 'active',
         nextVisit: params.action === 'reschedule' ? null : params.booking.date,
         isPriority: params.action === 'reschedule' ? true : existingThread.isPriority,
@@ -242,21 +240,27 @@ async function upsertChatAlert(params: {
         lastMessagePreview: preview,
         lastMessageAt: params.now,
         unreadCount: (existingThread.unreadCount ?? 0) + 1,
-        metadata,
+        metadata: {
+          ...bookingThreadMetadata(params.booking, null, metadata),
+          ...metadata,
+        },
       }).catch(() => existingThread)
     : await createChatThread(params.workspaceId, {
         clientName: params.booking.clientName,
         clientPhone: params.booking.clientPhone,
         channel: params.source === 'vk' ? 'VK' : 'Telegram',
         segment: params.action === 'reschedule' ? 'followup' : 'active',
-        source: sourceLabel(params.source),
+        source: params.booking.source ?? sourceLabel(params.source),
         nextVisit: params.action === 'reschedule' ? null : params.booking.date,
         isPriority: params.action === 'reschedule',
         botConnected: true,
         lastMessagePreview: preview,
         lastMessageAt: params.now,
         unreadCount: 1,
-        metadata,
+        metadata: {
+          ...bookingThreadMetadata(params.booking, null, metadata),
+          ...metadata,
+        },
       }).catch(() => null);
 
   if (!thread?.id) return null;
@@ -394,7 +398,6 @@ export async function handleClientBookingAction(params: {
     .from('sloty_bookings')
     .update({
       status: nextStatus,
-      source: sourceLabel(params.source),
       channel: params.source,
       updated_at: now,
       metadata: {

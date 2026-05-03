@@ -3,6 +3,7 @@ import 'server-only';
 import crypto from 'node:crypto';
 import type { Booking, MasterProfile } from '@/lib/types';
 import { getMasterAddress, getMasterLocationMode, getMasterRouteUrl } from '@/lib/location-links';
+import { bookingCode, bookingMessageText, bookingServicesText, masterDisplayName } from '@/lib/server/booking-context';
 
 const VK_API_VERSION = '5.199';
 
@@ -497,6 +498,10 @@ function bookingDateLabel(booking: Pick<Booking, 'date' | 'time'>) {
   return `${booking.date} · ${booking.time}`;
 }
 
+function bookingDateLines(booking: Pick<Booking, 'date' | 'time'>) {
+  return [`Дата: ${booking.date}`, `Время: ${booking.time}`];
+}
+
 function buildVisitPlaceLines(profile?: MasterProfile | null) {
   if (!profile || getMasterLocationMode(profile) !== 'address') return ['Формат: онлайн'];
 
@@ -524,11 +529,17 @@ export async function sendMasterVkBookingNotification(params: {
       'Новая запись ✅',
       '',
       `Мастер: ${masterName}`,
+      '',
       `Клиент: ${params.booking.clientName}`,
       `Телефон: ${params.booking.clientPhone}`,
-      `Услуга: ${params.booking.service}`,
-      `Время: ${bookingDateLabel(params.booking)}`,
-      params.booking.comment ? `Комментарий: ${params.booking.comment}` : null,
+      '',
+      'Услуга:',
+      params.booking.service || '—',
+      '',
+      ...bookingDateLines(params.booking),
+      params.booking.comment ? '' : null,
+      params.booking.comment ? 'Комментарий:' : null,
+      params.booking.comment ? params.booking.comment : null,
     ]
       .filter(Boolean)
       .join('\n'),
@@ -602,13 +613,15 @@ export function buildVkClientBookingKeyboard(bookingId: string) {
   return buildVkKeyboard([
     [
       {
-        label: 'Подтвердить',
+        label: '✅ Подтвердить',
         action: 'client_booking_confirm',
         color: 'positive',
         payload: { booking_id: bookingId },
       },
+    ],
+    [
       {
-        label: 'Перенос',
+        label: '❌ Нужен перенос',
         action: 'client_booking_reschedule',
         color: 'negative',
         payload: { booking_id: bookingId },
@@ -630,12 +643,19 @@ export async function sendClientVkBookingConfirmation(params: {
     message: [
       'Запись создана ✅',
       '',
+      `Здравствуйте, ${params.booking.clientName}.`,
+      '',
       `Мастер: ${masterName}`,
-      `Услуга: ${params.booking.service}`,
-      `Время: ${bookingDateLabel(params.booking)}`,
+      '',
+      'Услуга:',
+      params.booking.service || '—',
+      '',
+      ...bookingDateLines(params.booking),
+      '',
       ...placeLines,
       '',
-      'Ближе к записи я пришлю напоминание за 24 часа с подтверждением/переносом. За 2 часа придёт отдельное напоминание с адресом и маршрутом.',
+      'Мы пришлём напоминание до визита.',
+      'Если потребуется перенос — можно будет ответить кнопкой в этом чате.',
     ]
       .filter(Boolean)
       .join('\n'),
@@ -658,7 +678,10 @@ export async function sendClientVkBookingReminder(params: {
       'Напоминание ⏰',
       '',
       `У вас ${when} запись к ${masterName}.`,
-      `Услуга: ${params.booking.service}`,
+      '',
+      'Услуга:',
+      params.booking.service || '—',
+      '',
       `Дата: ${params.booking.date}`,
       `Время: ${params.booking.time}`,
       ...placeLines,

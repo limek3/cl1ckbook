@@ -20,7 +20,8 @@ import {
 } from '@/lib/server/vk-bot';
 import { handleClientBookingAction } from '@/lib/server/booking-client-actions';
 import { handleRescheduleProposalAction } from '@/lib/server/booking-reschedule-proposals';
-import { createChatMessage, createChatThread, fetchChatThreadByPhone, updateChatThread } from '@/lib/server/supabase-chats';
+import { createChatMessage, createChatThread, fetchChatThreadByBookingId, updateChatThread } from '@/lib/server/supabase-chats';
+import { bookingThreadMetadata } from '@/lib/server/booking-context';
 import type { Booking, MasterProfile } from '@/lib/types';
 import {
   buildVkLoginToken,
@@ -603,9 +604,7 @@ async function handleClientVkChatMessage(params: {
   if (!booking) return false;
 
   const now = new Date().toISOString();
-  const existingThread = booking.clientPhone
-    ? await fetchChatThreadByPhone(link.workspace_id, booking.clientPhone).catch(() => null)
-    : null;
+  const existingThread = await fetchChatThreadByBookingId(link.workspace_id, booking.id).catch(() => null);
 
   const thread = existingThread
     ? await updateChatThread(link.workspace_id, existingThread.id, {
@@ -615,8 +614,7 @@ async function handleClientVkChatMessage(params: {
         lastMessageAt: now,
         unreadCount: (existingThread.unreadCount ?? 0) + 1,
         metadata: {
-          ...(existingThread.metadata ?? {}),
-          bookingId: booking.id,
+          ...bookingThreadMetadata(booking, null, existingThread.metadata ?? {}),
           clientVkPeerId: params.peerId,
           clientVkUserId: String(params.vkUserId),
         },
@@ -633,7 +631,7 @@ async function handleClientVkChatMessage(params: {
         lastMessageAt: now,
         unreadCount: 1,
         metadata: {
-          bookingId: booking.id,
+          ...bookingThreadMetadata(booking),
           clientVkPeerId: params.peerId,
           clientVkUserId: String(params.vkUserId),
         },
@@ -868,8 +866,8 @@ async function handleMessageEvent(payload: VkCallbackPayload) {
 
     const clientText = result?.ok
       ? proposalAction === 'accept'
-        ? 'Спасибо, перенос подтверждён ✅\n\nЗапись обновлена. Кнопки больше не активны.'
-        : 'Поняли, это время не подходит.\n\nМастер подберёт другой слот и ответит вам в этом чате. Кнопки больше не активны.'
+        ? 'Спасибо, перенос подтверждён ✅\n\nЗапись обновлена.\nКнопки больше не активны.'
+        : 'Поняли, это время не подходит.\n\nМастер подберёт другой слот и ответит вам в этом чате.\nКнопки больше не активны.'
       : 'Не удалось обработать перенос.\n\nНапишите мастеру обычным сообщением в этот диалог.';
 
     if (conversationMessageId) {
@@ -930,7 +928,7 @@ async function handleMessageEvent(payload: VkCallbackPayload) {
     }).catch((error) => logVkWebhookError('answer client booking action', error));
 
     const clientText = result?.ok && clientAction === 'confirm'
-      ? 'Спасибо, запись подтверждена ✅\n\nКнопки больше не активны. Мастер увидит подтверждение в кабинете.'
+      ? 'Спасибо, запись подтверждена ✅\n\nЗапись обновлена.\nКнопки больше не активны.'
       : result?.ok
         ? 'Поняли, запрос на перенос отправлен мастеру.\n\nСлот освобождён. Мастер подберёт новое время и ответит вам в этом чате.'
         : 'Не удалось обработать действие.\n\nНапишите мастеру обычным сообщением в этот диалог.';

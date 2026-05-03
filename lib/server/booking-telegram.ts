@@ -11,6 +11,10 @@ type TelegramAccountRow = {
   chat_id: number | null;
 };
 
+type TelegramLoginRequestRow = {
+  chat_id: number | null;
+};
+
 function buildBookingToken() {
   // Telegram deep-link payload is limited to 64 chars.
   // We send payload as `b_<token>`, so keep token short enough.
@@ -59,7 +63,18 @@ export async function notifyWorkspaceOwnerAboutBooking(params: {
     );
 
     const rows = (await response.json()) as TelegramAccountRow[];
-    const chatId = rows[0]?.chat_id;
+    const account = rows[0];
+    let chatId = account?.chat_id;
+
+    // Older Telegram logins could store chat_id only in login requests.
+    // Fallback keeps master notifications working without forcing a relogin.
+    if (!chatId && account?.telegram_id) {
+      const loginResponse = await supabaseRestRequest(
+        `/rest/v1/sloty_telegram_login_requests?telegram_id=eq.${encodeURIComponent(String(account.telegram_id))}&chat_id=not.is.null&select=chat_id&order=confirmed_at.desc&limit=1`,
+      );
+      const loginRows = (await loginResponse.json()) as TelegramLoginRequestRow[];
+      chatId = loginRows[0]?.chat_id ?? null;
+    }
 
     if (!chatId) return false;
 

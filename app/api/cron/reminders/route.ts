@@ -173,7 +173,12 @@ async function sendReminder(params: {
       'Напоминание ⏰',
       '',
       `У вас ${when} запись к ${masterName}.`,
-      `Услуга: ${params.booking.service}`,
+      '',
+      `Запись: ${bookingCode(params.booking)}`,
+      '',
+      'Услуги:',
+      bookingServicesText(params.booking),
+      '',
       `Дата: ${params.booking.date}`,
       `Время: ${params.booking.time}`,
       ...placeLines,
@@ -187,10 +192,8 @@ async function sendReminder(params: {
     replyMarkup: params.hoursBefore >= 24
       ? {
           inline_keyboard: [
-            [
-              { text: 'Подтвердить', callback_data: `client_booking:${params.booking.id}:confirm` },
-              { text: 'Перенос', callback_data: `client_booking:${params.booking.id}:reschedule` },
-            ],
+            [{ text: '✅ Подтвердить', callback_data: `client_booking:${params.booking.id}:confirm` }],
+            [{ text: '❌ Нужен перенос', callback_data: `client_booking:${params.booking.id}:reschedule` }],
           ],
         }
       : undefined,

@@ -113,17 +113,39 @@ function arrayMove<T>(items: T[], from: number, to: number) {
   return next;
 }
 
+function isOptimisticMessage(message: ChatMessageRecord) {
+  return message.id.startsWith('local-') || message.metadata?.optimistic === true;
+}
+
+function isSameMessageContent(left: ChatMessageRecord, right: ChatMessageRecord) {
+  if (left.threadId !== right.threadId) return false;
+  if (left.author !== right.author) return false;
+  if ((left.body ?? '').trim() !== (right.body ?? '').trim()) return false;
+  if (Boolean(left.viaBot) !== Boolean(right.viaBot)) return false;
+
+  const leftTime = new Date(left.createdAt).getTime();
+  const rightTime = new Date(right.createdAt).getTime();
+
+  if (!Number.isFinite(leftTime) || !Number.isFinite(rightTime)) return true;
+  return Math.abs(leftTime - rightTime) < 2 * 60 * 1000;
+}
+
 function mergeThreadMessages(
   currentMessages: ChatMessageRecord[],
   incomingMessages: ChatMessageRecord[],
 ) {
+  const incoming = [...incomingMessages];
   const map = new Map<string, ChatMessageRecord>();
 
   for (const message of currentMessages) {
+    if (isOptimisticMessage(message) && incoming.some((incomingMessage) => isSameMessageContent(message, incomingMessage))) {
+      continue;
+    }
+
     map.set(message.id, message);
   }
 
-  for (const message of incomingMessages) {
+  for (const message of incoming) {
     const current = map.get(message.id);
     map.set(message.id, current ? { ...current, ...message } : message);
   }
@@ -527,6 +549,46 @@ function fillTemplateContent(
     .replaceAll('{{ссылка}}', publicHref);
 }
 
+function getThreadServices(thread: ChatThreadRecord | null) {
+  if (!thread?.metadata) return [] as string[];
+
+  const services = thread.metadata.services;
+  if (Array.isArray(services)) {
+    return services.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+  }
+
+  if (typeof thread.metadata.service === 'string' && thread.metadata.service.trim()) {
+    return [thread.metadata.service.trim()];
+  }
+
+  return [] as string[];
+}
+
+function getThreadContextLine(thread: ChatThreadRecord | null, locale: 'ru' | 'en') {
+  if (!thread) return null;
+
+  const services = getThreadServices(thread);
+  const service = services.length > 1
+    ? `${services[0]} +${services.length - 1}`
+    : services[0] ?? null;
+  const date = typeof thread.metadata?.bookingDate === 'string'
+    ? thread.metadata.bookingDate
+    : thread.nextVisit ?? null;
+  const time = typeof thread.metadata?.bookingTime === 'string'
+    ? thread.metadata.bookingTime
+    : null;
+  const master = typeof thread.metadata?.masterName === 'string'
+    ? thread.metadata.masterName
+    : null;
+  const code = typeof thread.metadata?.bookingCode === 'string'
+    ? thread.metadata.bookingCode
+    : null;
+
+  const dateLabel = date ? formatDateLabel(date, locale) : null;
+
+  return [code, service, dateLabel && time ? `${dateLabel} · ${time}` : dateLabel, master].filter(Boolean).join(' · ') || null;
+}
+
 function sortThreads(
   items: ChatThreadRecord[],
   sortMode: SortMode,
@@ -573,14 +635,17 @@ function createLocalMessage(
   author: 'master' | 'system',
   viaBot: boolean,
 ): ChatMessageRecord {
+  const now = new Date().toISOString();
+
   return {
-    id: crypto.randomUUID(),
+    id: `local-${crypto.randomUUID()}`,
     threadId,
     author,
     body,
     viaBot,
     deliveryState: author === 'master' || author === 'system' ? 'sent' : null,
-    createdAt: new Date().toISOString(),
+    createdAt: now,
+    metadata: { optimistic: true },
   };
 }
 
@@ -1929,6 +1994,15 @@ export default function DashboardChatsPage() {
     }
   };
 
+  const handleComposerKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== 'Enter' || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return;
+
+    event.preventDefault();
+
+    if (!activeThread || !draft.trim() || isSending) return;
+    void handleSendMessage();
+  };
+
   const handleApplyBotFlow = (flow: BotFlow) => {
     if (!activeThread) return;
 
@@ -2343,6 +2417,12 @@ export default function DashboardChatsPage() {
                     <Star className="size-3 shrink-0 fill-current" style={{ color: accentColor }} />
                   ) : null}
                 </div>
+
+                {getThreadContextLine(thread, locale) ? (
+                  <div className={cn('mt-1 truncate text-[10.5px] font-medium', pageText(isLight))}>
+                    {getThreadContextLine(thread, locale)}
+                  </div>
+                ) : null}
 
                 <div className={cn('mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-[10px]', mutedText(isLight))}>
                   <span>{channelLabel(thread.channel)}</span>
@@ -2933,6 +3013,7 @@ export default function DashboardChatsPage() {
             <Textarea
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={handleComposerKeyDown}
               placeholder={labels.messagePlaceholder}
               className={cn(
                 'resize-none rounded-[9px] px-3 py-2.5 shadow-none',
@@ -3029,6 +3110,12 @@ export default function DashboardChatsPage() {
                     </MicroLabel>
                   ) : null}
                 </div>
+
+                {getThreadContextLine(activeThread, locale) ? (
+                  <div className={cn('mt-1 truncate text-[12px] font-semibold', pageText(isLight))}>
+                    {getThreadContextLine(activeThread, locale)}
+                  </div>
+                ) : null}
 
                 <div
                   className={cn(

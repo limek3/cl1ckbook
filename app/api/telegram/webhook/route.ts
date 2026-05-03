@@ -12,9 +12,10 @@ import { sendVkMessage } from '@/lib/server/vk-bot';
 import {
   createChatMessage,
   createChatThread,
-  fetchChatThreadByPhone,
+  fetchChatThreadByBookingId,
   updateChatThread,
 } from '@/lib/server/supabase-chats';
+import { bookingShortContext, bookingThreadMetadata } from '@/lib/server/booking-context';
 import {
   getAppUrl,
   answerTelegramCallbackQuery,
@@ -68,6 +69,7 @@ type BookingLinkRow = {
   master_slug: string;
   booking_snapshot: Booking | null;
   expires_at: string;
+  confirmed_at?: string | null;
 };
 
 type BookingRow = {
@@ -440,7 +442,7 @@ async function handleClientReminderCallback(params: {
     );
 
     const clientText = parsed.action === 'confirm'
-      ? 'Спасибо, запись подтверждена ✅\n\nКнопки больше не активны. Мастер увидит подтверждение в кабинете.'
+      ? 'Спасибо, запись подтверждена ✅\n\nЗапись обновлена.\nКнопки больше не активны.'
       : 'Поняли, запрос на перенос отправлен мастеру.\n\nСлот освобождён. Мастер подберёт новое время и ответит вам в этом чате.';
 
     let editedClientMessage = false;
@@ -515,8 +517,8 @@ async function handleRescheduleProposalCallback(params: {
 
     const clientText = result.ok
       ? parsed.action === 'accept'
-        ? 'Спасибо, перенос подтверждён ✅\n\nЗапись обновлена. Кнопки больше не активны.'
-        : 'Поняли, это время не подходит.\n\nМастер подберёт другой слот и ответит вам в этом чате. Кнопки больше не активны.'
+        ? 'Спасибо, перенос подтверждён ✅\n\nЗапись обновлена.\nКнопки больше не активны.'
+        : 'Поняли, это время не подходит.\n\nМастер подберёт другой слот и ответит вам в этом чате.\nКнопки больше не активны.'
       : 'Не удалось обработать перенос.\n\nНапишите мастеру обычным сообщением в этот чат.';
 
     let editedClientMessage = false;
@@ -878,14 +880,12 @@ async function handleBookingStart(params: {
     }
   }
 
-  const existingThread = booking.clientPhone
-    ? await fetchChatThreadByPhone(link.workspace_id, booking.clientPhone).catch(
-        (error) => {
-          logWebhookError('handleBookingStart fetch thread failed', error);
-          return null;
-        },
-      )
-    : null;
+  const existingThread = await fetchChatThreadByBookingId(link.workspace_id, booking.id).catch(
+    (error) => {
+      logWebhookError('handleBookingStart fetch thread failed', error);
+      return null;
+    },
+  );
 
   const thread = existingThread
     ? await updateChatThread(link.workspace_id, existingThread.id, {
@@ -893,8 +893,7 @@ async function handleBookingStart(params: {
         source: existingThread.source ?? booking.source ?? 'Web',
         botConnected: true,
         metadata: {
-          ...(existingThread.metadata ?? {}),
-          bookingId: booking.id,
+          ...bookingThreadMetadata(booking, profile, existingThread.metadata ?? {}),
           clientTelegramChatId: params.chatId,
           clientTelegramId: params.from.id,
         },
@@ -915,7 +914,7 @@ async function handleBookingStart(params: {
         lastMessageAt: confirmedAt,
         unreadCount: 0,
         metadata: {
-          bookingId: booking.id,
+          ...bookingThreadMetadata(booking, profile),
           clientTelegramChatId: params.chatId,
           clientTelegramId: params.from.id,
         },
@@ -944,6 +943,75 @@ async function handleBookingStart(params: {
   );
 }
 
+async function sendTelegramBookingChoice(params: {
+  chatId: number | string;
+  links: BookingLinkRow[];
+}) {
+  const admin = createSupabaseAdminClient();
+  const rows: Array<Array<{ text: string; callback_data: string }>> = [];
+
+  for (const link of params.links.slice(0, 8)) {
+    const { data: bookingRow } = await admin
+      .from('sloty_bookings')
+      .select('*')
+      .eq('id', link.booking_id)
+      .maybeSingle();
+
+    const booking = bookingRow ? mapBookingRow(bookingRow as BookingRow) : link.booking_snapshot;
+    if (!booking) continue;
+
+    rows.push([
+      {
+        text: `${booking.service || 'Запись'} · ${booking.date} ${booking.time}`.slice(0, 60),
+        callback_data: `chatctx:${link.token}`,
+      },
+    ]);
+  }
+
+  await sendTelegramMessage({
+    chatId: params.chatId,
+    text: [
+      'У вас несколько активных записей.',
+      '',
+      'Выберите, по какой записи написать мастеру:',
+    ].join('\n'),
+    replyMarkup: { inline_keyboard: rows },
+  });
+}
+
+async function handleTelegramChatContextCallback(params: {
+  callbackQueryId: string;
+  data?: string;
+  chatId?: number | string | null;
+}) {
+  const match = params.data?.match(/^chatctx:(.+)$/);
+  if (!match) return false;
+
+  const now = new Date().toISOString();
+  const admin = createSupabaseAdminClient();
+
+  await admin
+    .from('sloty_booking_telegram_links')
+    .update({ confirmed_at: now, updated_at: now })
+    .eq('token', match[1])
+    .eq('status', 'confirmed')
+    .catch((error) => logWebhookError('chat context update failed', error));
+
+  await answerTelegramCallbackQuery({
+    callbackQueryId: params.callbackQueryId,
+    text: 'Запись выбрана. Напишите сообщение следующим сообщением.',
+  });
+
+  if (params.chatId) {
+    await sendTelegramMessage({
+      chatId: params.chatId,
+      text: 'Запись выбрана. Теперь напишите сообщение мастеру в этот чат.',
+    });
+  }
+
+  return true;
+}
+
 async function handleClientChatMessage(params: {
   from: TelegramFrom;
   chatId: number;
@@ -960,15 +1028,24 @@ async function handleClientChatMessage(params: {
     .eq('chat_id', params.chatId)
     .eq('status', 'confirmed')
     .order('confirmed_at', { ascending: false })
-    .limit(1);
+    .limit(8);
 
   if (linkRowsError) {
     logWebhookError('handleClientChatMessage link read failed', linkRowsError);
   }
 
-  const link = Array.isArray(linkRows)
-    ? (linkRows[0] as BookingLinkRow | undefined)
-    : null;
+  const confirmedLinks = Array.isArray(linkRows) ? (linkRows as BookingLinkRow[]) : [];
+  const link = confirmedLinks[0] ?? null;
+
+  if (confirmedLinks.length > 1) {
+    const latestSelectedAt = link?.confirmed_at ? new Date(link.confirmed_at).getTime() : 0;
+    const isFreshSelection = latestSelectedAt > 0 && Date.now() - latestSelectedAt < 10 * 60 * 1000;
+
+    if (!isFreshSelection) {
+      await sendTelegramBookingChoice({ chatId: params.chatId, links: confirmedLinks });
+      return;
+    }
+  }
 
   if (!link) {
     const { data: threadRowsByNumber, error: numberError } = await admin
@@ -1059,14 +1136,12 @@ async function handleClientChatMessage(params: {
 
   if (!booking) return;
 
-  const existingThread = booking.clientPhone
-    ? await fetchChatThreadByPhone(link.workspace_id, booking.clientPhone).catch(
-        (error) => {
-          logWebhookError('handleClientChatMessage fetch thread failed', error);
-          return null;
-        },
-      )
-    : null;
+  const existingThread = await fetchChatThreadByBookingId(link.workspace_id, booking.id).catch(
+    (error) => {
+      logWebhookError('handleClientChatMessage fetch thread failed', error);
+      return null;
+    },
+  );
 
   const now = new Date().toISOString();
 
@@ -1079,8 +1154,7 @@ async function handleClientChatMessage(params: {
         lastMessageAt: now,
         unreadCount: (existingThread.unreadCount ?? 0) + 1,
         metadata: {
-          ...(existingThread.metadata ?? {}),
-          bookingId: booking.id,
+          ...bookingThreadMetadata(booking, null, existingThread.metadata ?? {}),
           clientTelegramChatId: params.chatId,
           clientTelegramId: params.from.id,
         },
@@ -1100,7 +1174,7 @@ async function handleClientChatMessage(params: {
         lastMessageAt: now,
         unreadCount: 1,
         metadata: {
-          bookingId: booking.id,
+          ...bookingThreadMetadata(booking),
           clientTelegramChatId: params.chatId,
           clientTelegramId: params.from.id,
         },
@@ -1184,6 +1258,14 @@ export async function POST(request: Request) {
       });
 
       if (clientReminderHandled) return NextResponse.json({ ok: true });
+
+      const chatContextHandled = await handleTelegramChatContextCallback({
+        callbackQueryId: callbackQuery.id,
+        data: callbackQuery.data,
+        chatId: callbackQuery.message?.chat?.id ?? null,
+      });
+
+      if (chatContextHandled) return NextResponse.json({ ok: true });
     }
 
     const message = update.message;

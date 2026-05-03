@@ -6,8 +6,7 @@ alter table if exists public.sloty_bookings add column if not exists source text
 alter table if exists public.sloty_bookings add column if not exists channel text;
 
 update public.sloty_bookings b
-set source = 'ТГ',
-    channel = 'telegram',
+set channel = 'telegram',
     updated_at = now()
 where exists (
   select 1
@@ -18,8 +17,7 @@ where exists (
 );
 
 update public.sloty_bookings b
-set source = 'ВК',
-    channel = 'vk',
+set channel = 'vk',
     updated_at = now()
 where exists (
   select 1
@@ -30,15 +28,13 @@ where exists (
 );
 
 update public.sloty_chat_threads t
-set source = 'ВК',
-    channel = 'VK',
+set channel = 'VK',
     updated_at = now()
 where metadata ? 'clientVkPeerId'
    or metadata ? 'clientVkUserId';
 
 update public.sloty_chat_threads t
-set source = 'ТГ',
-    channel = 'Telegram',
+set channel = 'Telegram',
     updated_at = now()
 where (metadata ? 'clientTelegramChatId' or metadata ? 'clientTelegramId')
   and not (metadata ? 'clientVkPeerId' or metadata ? 'clientVkUserId');

@@ -11,16 +11,17 @@ import {
   createChatMessage,
   createChatThread,
   deleteChatThread,
-  fetchChatThreadByPhone,
+  fetchChatThreadByBookingId,
   listChatsForWorkspace,
   updateChatThread,
 } from '@/lib/server/supabase-chats';
-import { fetchWorkspaceForUser } from '@/lib/server/supabase-workspaces';
+import { fetchWorkspaceForUser, updateWorkspace } from '@/lib/server/supabase-workspaces';
 import {
   buildTelegramRescheduleProposalReplyMarkup,
   buildVkRescheduleProposalKeyboard,
   createRescheduleProposal,
 } from '@/lib/server/booking-reschedule-proposals';
+import { bookingShortContext, bookingThreadMetadata } from '@/lib/server/booking-context';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -54,96 +55,127 @@ function botConnectedFromChannel(channel: ChatChannel) {
 }
 
 function synthesizeThreadsFromBookings(workspaceId: string, bookings: Booking[]): ChatThreadRecord[] {
-  const grouped = new Map<string, Booking[]>();
-
-  for (const booking of bookings) {
-    const key = booking.clientPhone || booking.clientName || booking.id;
-    const bucket = grouped.get(key) ?? [];
-    bucket.push(booking);
-    grouped.set(key, bucket);
-  }
-
-  return Array.from(grouped.entries()).map(([key, items]) => {
-    const sorted = [...items].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
-    const latest = sorted[0];
-    const body = `Новая запись: ${latest.service} · ${latest.date} ${latest.time}`;
-    const channel = chatChannelFromBooking(latest);
+  return bookings.map((booking) => {
+    const body = `Новая запись: ${bookingShortContext(booking)}`;
+    const channel = chatChannelFromBooking(booking);
 
     return {
-      id: `booking-thread-${key}`,
+      id: `booking-thread-${booking.id}`,
       workspaceId,
-      clientName: latest.clientName,
-      clientPhone: latest.clientPhone,
+      clientName: booking.clientName,
+      clientPhone: booking.clientPhone,
       channel,
       segment: 'new',
-      source: latest.source ?? (channel === 'Web' ? 'Web' : 'Публичная страница'),
-      nextVisit: latest.date,
+      source: booking.source ?? (channel === 'Web' ? 'Web' : 'Публичная страница'),
+      nextVisit: booking.date,
       isPriority: false,
       botConnected: botConnectedFromChannel(channel),
-      lastMessagePreview: latest.comment || body,
-      lastMessageAt: latest.createdAt,
+      lastMessagePreview: booking.comment || body,
+      lastMessageAt: booking.createdAt,
       unreadCount: 1,
-      createdAt: latest.createdAt,
-      updatedAt: latest.createdAt,
+      createdAt: booking.createdAt,
+      updatedAt: booking.createdAt,
       metadata: {
         fallback: true,
-        bookingId: latest.id,
-        bookingIds: sorted.map((booking) => booking.id),
+        ...bookingThreadMetadata(booking),
       },
-      messages: sorted.flatMap((booking) => {
-        const messageBody = `Новая запись: ${booking.service} · ${booking.date} ${booking.time}`;
-        return [
-          {
-            id: `booking-message-${booking.id}`,
-            threadId: `booking-thread-${key}`,
-            author: 'client' as const,
-            body: messageBody,
-            deliveryState: null,
-            viaBot: false,
-            createdAt: booking.createdAt,
-            metadata: {
-              bookingId: booking.id,
-              service: booking.service,
-              date: booking.date,
-              time: booking.time,
-            },
+      messages: [
+        {
+          id: `booking-message-${booking.id}`,
+          threadId: `booking-thread-${booking.id}`,
+          author: 'client' as const,
+          body,
+          deliveryState: null,
+          viaBot: false,
+          createdAt: booking.createdAt,
+          metadata: {
+            bookingId: booking.id,
+            service: booking.service,
+            date: booking.date,
+            time: booking.time,
           },
-          ...(booking.comment
-            ? [
-                {
-                  id: `booking-comment-${booking.id}`,
-                  threadId: `booking-thread-${key}`,
-                  author: 'client' as const,
-                  body: booking.comment,
-                  deliveryState: null,
-                  viaBot: false,
-                  createdAt: booking.createdAt,
-                  metadata: {
-                    bookingId: booking.id,
-                    kind: 'comment',
-                  },
+        },
+        ...(booking.comment
+          ? [
+              {
+                id: `booking-comment-${booking.id}`,
+                threadId: `booking-thread-${booking.id}`,
+                author: 'client' as const,
+                body: booking.comment,
+                deliveryState: null,
+                viaBot: false,
+                createdAt: booking.createdAt,
+                metadata: {
+                  bookingId: booking.id,
+                  kind: 'comment',
                 },
-              ]
-            : []),
-        ];
-      }),
+              },
+            ]
+          : []),
+      ],
     } satisfies ChatThreadRecord;
   });
 }
 
+function chatThreadIdentities(thread: ChatThreadRecord) {
+  const ids = new Set<string>([`id:${thread.id}`]);
 
-function chatThreadIdentity(thread: ChatThreadRecord) {
-  return thread.clientPhone || thread.clientName || thread.id;
+  if (typeof thread.metadata?.bookingId === 'string') {
+    ids.add(`booking:${thread.metadata.bookingId}`);
+  }
+
+  if (Array.isArray(thread.metadata?.bookingIds)) {
+    thread.metadata.bookingIds.forEach((item) => {
+      if (typeof item === 'string' && item.trim()) ids.add(`booking:${item}`);
+    });
+  }
+
+  return ids;
 }
 
-function mergePersistedAndFallbackThreads(threads: ChatThreadRecord[], fallbackThreads: ChatThreadRecord[]) {
-  const seen = new Set(threads.map(chatThreadIdentity).filter(Boolean));
+function chatThreadIdentity(thread: ChatThreadRecord) {
+  return Array.from(chatThreadIdentities(thread))[0] || thread.id;
+}
+
+function getDeletedChatKeys(workspace: { data?: Record<string, unknown> | null }) {
+  const raw = workspace.data?.deletedChatKeys;
+  return new Set(
+    Array.isArray(raw)
+      ? raw.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+      : [],
+  );
+}
+
+function chatDeleteKeys(thread: Pick<ChatThreadRecord, 'id' | 'clientPhone' | 'clientName' | 'metadata'>) {
+  const bookingId = typeof thread.metadata?.bookingId === 'string' ? thread.metadata.bookingId : null;
+  return [
+    `id:${thread.id}`,
+    bookingId ? `booking:${bookingId}` : null,
+  ].filter(Boolean) as string[];
+}
+
+function isThreadDeleted(thread: ChatThreadRecord, deletedKeys: Set<string>) {
+  return chatDeleteKeys(thread).some((key) => deletedKeys.has(key));
+}
+
+function mergePersistedAndFallbackThreads(
+  threads: ChatThreadRecord[],
+  fallbackThreads: ChatThreadRecord[],
+  deletedKeys = new Set<string>(),
+) {
+  const visibleThreads = threads.filter((thread) => !isThreadDeleted(thread, deletedKeys));
+  const seen = new Set<string>();
+
+  visibleThreads.forEach((thread) => {
+    chatThreadIdentities(thread).forEach((identity) => seen.add(identity));
+  });
 
   return [
-    ...threads,
-    ...fallbackThreads.filter((thread) => !seen.has(chatThreadIdentity(thread))),
+    ...visibleThreads,
+    ...fallbackThreads.filter((thread) => {
+      const identities = Array.from(chatThreadIdentities(thread));
+      return !identities.some((identity) => seen.has(identity)) && !isThreadDeleted(thread, deletedKeys);
+    }),
   ].sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime());
 }
 
@@ -163,12 +195,7 @@ function findBookingForThread(threadId: string, bookings: Booking[]) {
   const key = getBookingThreadKey(threadId);
   if (!key) return null;
 
-  return (
-    bookings.find((booking) => booking.clientPhone === key) ??
-    bookings.find((booking) => booking.clientName === key) ??
-    bookings.find((booking) => booking.id === key) ??
-    null
-  );
+  return bookings.find((booking) => booking.id === key) ?? null;
 }
 
 async function resolveThreadForMessage(params: {
@@ -183,15 +210,9 @@ async function resolveThreadForMessage(params: {
   const booking = findBookingForThread(params.threadId, params.bookings);
   if (!booking) return null;
 
-  const relatedBookings = params.bookings.filter((item) => {
-    if (booking.clientPhone) return item.clientPhone === booking.clientPhone;
-    return item.clientName === booking.clientName;
-  });
-  const bookingIds = relatedBookings.map((item) => item.id);
+  const bookingIds = [booking.id];
 
-  const existing = booking.clientPhone
-    ? await fetchChatThreadByPhone(params.workspaceId, booking.clientPhone).catch(() => null)
-    : null;
+  const existing = await fetchChatThreadByBookingId(params.workspaceId, booking.id).catch(() => null);
 
   if (existing) {
     await updateChatThread(params.workspaceId, existing.id, {
@@ -201,7 +222,7 @@ async function resolveThreadForMessage(params: {
       botConnected: existing.botConnected,
       metadata: {
         ...(existing.metadata ?? {}),
-        bookingId: booking.id,
+        ...bookingThreadMetadata(booking),
         bookingIds,
       },
     }).catch(() => null);
@@ -212,7 +233,7 @@ async function resolveThreadForMessage(params: {
       nextVisit: booking.date,
       metadata: {
         ...(existing.metadata ?? {}),
-        bookingId: booking.id,
+        ...bookingThreadMetadata(booking),
         bookingIds,
       },
       messages: [],
@@ -233,7 +254,7 @@ async function resolveThreadForMessage(params: {
     lastMessageAt: booking.createdAt,
     unreadCount: 0,
     metadata: {
-      bookingId: booking.id,
+      ...bookingThreadMetadata(booking),
       bookingIds,
       createdFromFallbackThread: true,
     },
@@ -246,13 +267,7 @@ function getThreadBookingId(thread: ChatThreadRecord | null, bookings: Booking[]
   const metadataBookingId = typeof thread?.metadata?.bookingId === 'string' ? thread.metadata.bookingId : null;
   if (metadataBookingId) return metadataBookingId;
 
-  const latest = bookings.find((booking) => {
-    if (!thread) return false;
-    if (thread.clientPhone) return booking.clientPhone === thread.clientPhone;
-    return booking.clientName === thread.clientName;
-  });
-
-  return latest?.id ?? null;
+  return null;
 }
 
 export async function GET() {
@@ -271,12 +286,12 @@ export async function GET() {
       const threads = await listChatsForWorkspace(workspace.id);
       return NextResponse.json({
         workspaceId: workspace.id,
-        threads: mergePersistedAndFallbackThreads(threads, fallbackThreads),
+        threads: mergePersistedAndFallbackThreads(threads, fallbackThreads, getDeletedChatKeys(workspace)),
       });
     } catch {
       return NextResponse.json({
         workspaceId: workspace.id,
-        threads: fallbackThreads,
+        threads: fallbackThreads.filter((thread) => !isThreadDeleted(thread, getDeletedChatKeys(workspace))),
       });
     }
   } catch (error) {
@@ -534,7 +549,28 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'thread_id_required' }, { status: 400 });
     }
 
-    await deleteChatThread(workspace.id, body.threadId);
+    const bookings = await getMergedBookings(workspace);
+    const fallbackThreads = synthesizeThreadsFromBookings(workspace.id, bookings);
+    const persistedThreads = await listChatsForWorkspace(workspace.id).catch(() => [] as ChatThreadRecord[]);
+    const targetThread =
+      persistedThreads.find((thread) => thread.id === body.threadId) ??
+      fallbackThreads.find((thread) => thread.id === body.threadId);
+
+    const nextDeletedKeys = Array.from(
+      new Set([
+        ...getDeletedChatKeys(workspace),
+        ...(targetThread ? chatDeleteKeys(targetThread) : [`id:${body.threadId}`]),
+      ]),
+    );
+
+    await updateWorkspace(workspace.id, {
+      data: {
+        ...(workspace.data ?? {}),
+        deletedChatKeys: nextDeletedKeys,
+      },
+    }).catch(() => undefined);
+
+    await deleteChatThread(workspace.id, body.threadId).catch(() => undefined);
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'unknown_error';

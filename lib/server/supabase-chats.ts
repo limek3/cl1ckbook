@@ -113,6 +113,14 @@ export async function listChatsForWorkspace(workspaceId: string) {
   }));
 }
 
+export async function fetchChatThreadByBookingId(workspaceId: string, bookingId: string) {
+  const response = await supabaseRestRequest(
+    `/rest/v1/sloty_chat_threads?workspace_id=eq.${encodeURIComponent(workspaceId)}&metadata->>bookingId=eq.${encodeURIComponent(bookingId)}&select=*&order=updated_at.desc&limit=1`,
+  );
+  const rows = (await response.json()) as ChatThreadRow[];
+  return rows[0] ? mapThread(rows[0]) : null;
+}
+
 export async function fetchChatThreadByPhone(workspaceId: string, clientPhone: string) {
   const response = await supabaseRestRequest(
     `/rest/v1/sloty_chat_threads?workspace_id=eq.${encodeURIComponent(workspaceId)}&client_phone=eq.${encodeURIComponent(clientPhone)}&select=*&limit=1`,
