@@ -193,8 +193,30 @@ export function buildVkReplyKeyboard(buttons: Array<Array<VkBotButton>>) {
   };
 }
 
+export function buildVkCallbackReplyKeyboard(buttons: Array<Array<VkBotButton>>) {
+  return {
+    one_time: false,
+    inline: false,
+    buttons: buttons.map((row) =>
+      row.map((button) => ({
+        action: {
+          type: 'callback',
+          label: button.label,
+          payload: JSON.stringify({
+            action: button.action || 'noop',
+            ...(button.token ? { token: button.token } : {}),
+            ...(button.url ? { url: button.url } : {}),
+            ...(button.payload ?? {}),
+          }),
+        },
+        color: button.color ?? 'secondary',
+      })),
+    ),
+  };
+}
+
 export function buildVkClientMenuKeyboard(token?: string | null) {
-  return buildVkReplyKeyboard([
+  return buildVkCallbackReplyKeyboard([
     [
       { label: '📋 Мои записи', action: 'client_bookings', token: token ?? null, color: 'primary' },
       { label: '💬 Мастеру', action: 'client_write', token: token ?? null, color: 'secondary' },
