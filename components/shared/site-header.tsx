@@ -55,9 +55,9 @@ export function SiteHeader({ compact = false }: SiteHeaderProps) {
       <div className="centered-workspace flex items-center justify-between gap-3 px-3 py-[var(--topbar-padding-y)] sm:px-4 md:px-6 xl:px-8">
         <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
           <Link href={brandHref} className="flex min-w-0 items-center gap-2.5 sm:gap-3">
-            <BrandLogo className="w-[52px] sm:w-[64px]" priority />
+            <BrandLogo className="w-[68px] sm:w-[86px]" priority />
             <div className="min-w-0">
-              <div className="truncate text-[11px] text-muted-foreground sm:text-[12px]">{labels.subtitle}</div>
+              <div className="truncate text-[10.5px] text-muted-foreground sm:text-[11.5px]">{labels.subtitle}</div>
             </div>
           </Link>
 

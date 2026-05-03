@@ -1633,7 +1633,7 @@ function SidebarContent({
           title={product}
           className="flex flex-col items-center justify-center rounded-[12px] py-1.5 transition hover:opacity-85 active:scale-[0.99]"
         >
-          <BrandLogo className="w-[138px]" />
+          <BrandLogo className="w-[164px]" />
 
           <span className="mt-1 text-[9.5px] text-slate-500 dark:text-white/32">
             {productHint}
@@ -2377,7 +2377,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
                 className="flex min-w-0 items-center gap-2"
               >
                 <span className="flex h-8 w-[82px] shrink-0 items-center justify-center rounded-[10px] border border-black/[0.08] bg-[#fbfbfa] px-2 dark:border-white/[0.08] dark:bg-[#101010]">
-                  <BrandLogo className="w-[66px]" />
+                  <BrandLogo className="w-[82px]" />
                 </span>
 
                 <span className="min-w-0">

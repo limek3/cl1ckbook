@@ -226,7 +226,7 @@ export default function LoginPage() {
         <ShellCard className="w-full max-w-[480px]">
           <div className="border-b border-black/[0.08] p-5 dark:border-white/[0.08]">
             <div className="flex items-center gap-3">
-              <BrandLogo className="w-[74px] shrink-0" />
+              <BrandLogo className="w-[92px] shrink-0" />
               <div className="min-w-0">
                 <div className="truncate text-[14px] font-semibold tracking-[-0.005em]">
                   Кабинет мастера
@@ -279,14 +279,14 @@ export default function LoginPage() {
           <div className="border-b border-black/[0.08] p-5 dark:border-white/[0.08] sm:p-6">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <BrandLogo className="w-[78px] shrink-0" />
+                <BrandLogo className="w-[108px] shrink-0 sm:w-[118px]" />
                 <div className="min-w-0">
-                  <MicroLabel>КликБук / ClickBook</MicroLabel>
-                  <div className="mt-2 text-[30px] font-semibold leading-[0.95] tracking-[-0.07em] sm:text-[38px]">
+                  <MicroLabel>КликБук • кабинет мастера</MicroLabel>
+                  <div className="mt-1.5 text-[25px] font-semibold leading-[0.98] tracking-[-0.065em] sm:text-[32px]">
                     Вход в кабинет
                   </div>
-                  <div className="mt-2 max-w-[460px] text-[12.5px] leading-5 text-black/50 dark:text-white/44">
-                    Выберите удобный канал входа. Telegram и VK работают как полноценные боты: вход, уведомления, быстрые действия и возврат в кабинет.
+                  <div className="mt-2 max-w-[470px] text-[12px] leading-5 text-black/50 dark:text-white/44 sm:text-[12.5px]">
+                    Выберите удобный канал входа. Telegram и VK работают как полноценные каналы: вход, уведомления, быстрые действия и возврат в кабинет без лишних шагов.
                   </div>
                 </div>
               </div>
