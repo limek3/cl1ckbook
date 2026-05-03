@@ -12,7 +12,7 @@
    - `TELEGRAM_BOT_TOKEN`
    - `TELEGRAM_WEBHOOK_SECRET`
    - `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME`
-   - `NEXT_PUBLIC_APP_URL=https://cl1ckbuk.vercel.app`
+   - `NEXT_PUBLIC_APP_URL=https://www.кликбук.рф`
 2. После изменения env сделать `Redeploy without cache`.
 3. Webhook должен быть установлен на:
-   `https://cl1ckbuk.vercel.app/api/telegram/webhook`
+   `https://www.кликбук.рф/api/telegram/webhook`

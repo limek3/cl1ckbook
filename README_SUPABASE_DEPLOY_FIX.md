@@ -34,8 +34,8 @@ NEXT_PUBLIC_SUPPORT_TELEGRAM_URL=https://t.me/...
 3. В Supabase Authentication → URL Configuration добавь:
 
 ```txt
-https://cl1ckbuk.vercel.app/**
-https://www.xn--90anfbbc3d.xn--p1ai/**
+https://www.кликбук.рф/**
+https://www.кликбук.рф/**
 http://localhost:3000/**
 ```
 

@@ -19,6 +19,7 @@ import {
 import {
   getAppUrl,
   answerTelegramCallbackQuery,
+  editTelegramMessageText,
   sendClientBookingConfirmation,
   sendMasterMenu,
   sendTelegramMessage,
@@ -81,6 +82,8 @@ type BookingRow = {
   comment: string | null;
   status: Booking['status'];
   created_at: string;
+  source?: string | null;
+  channel?: string | null;
 };
 
 function logWebhookError(label: string, error: unknown) {
@@ -149,6 +152,8 @@ function mapBookingRow(row: BookingRow): Booking {
     comment: row.comment ?? undefined,
     status: row.status,
     createdAt: row.created_at,
+    source: row.source ?? undefined,
+    channel: row.channel ?? undefined,
   };
 }
 
@@ -372,6 +377,7 @@ async function handleClientReminderCallback(params: {
   callbackQueryId: string;
   data?: string;
   chatId?: number | string | null;
+  messageId?: number | null;
   from?: TelegramFrom | null;
 }) {
   const parsed = extractClientReminderCallback(params.data);
@@ -409,14 +415,30 @@ async function handleClientReminderCallback(params: {
       }),
     );
 
-    if (params.chatId) {
+    const clientText = parsed.action === 'confirm'
+      ? 'Спасибо, запись подтверждена ✅\n\nКнопки больше не активны. Мастер увидит подтверждение в кабинете.'
+      : 'Поняли, запрос на перенос отправлен мастеру.\n\nСлот освобождён. Мастер подберёт новое время и ответит вам в этом чате.';
+
+    let editedClientMessage = false;
+
+    if (params.chatId && params.messageId) {
+      try {
+        await editTelegramMessageText({
+          chatId: params.chatId as number | string,
+          messageId: params.messageId as number,
+          text: clientText,
+        });
+        editedClientMessage = true;
+      } catch (error) {
+        logWebhookError('edit client reminder callback message', error);
+      }
+    }
+
+    if (params.chatId && !editedClientMessage) {
       await safeTask('send client reminder callback followup', () =>
         sendTelegramMessage({
           chatId: params.chatId as number | string,
-          text:
-            parsed.action === 'confirm'
-              ? 'Спасибо, запись подтверждена ✅'
-              : 'Поняли, запрос на перенос отправлен мастеру. Слот освобождён, мастер подберёт новое время и ответит вам в чате.',
+          text: clientText,
         }),
       );
     }
@@ -439,6 +461,7 @@ async function handleRescheduleProposalCallback(params: {
   callbackQueryId: string;
   data?: string;
   chatId?: number | string | null;
+  messageId?: number | null;
   from?: TelegramFrom | null;
 }) {
   const parsed = parseTelegramRescheduleProposalCallback(params.data);
@@ -466,15 +489,32 @@ async function handleRescheduleProposalCallback(params: {
       }),
     );
 
-    if (params.chatId) {
+    const clientText = result.ok
+      ? parsed.action === 'accept'
+        ? 'Спасибо, перенос подтверждён ✅\n\nЗапись обновлена. Кнопки больше не активны.'
+        : 'Поняли, это время не подходит.\n\nМастер подберёт другой слот и ответит вам в этом чате. Кнопки больше не активны.'
+      : 'Не удалось обработать перенос.\n\nНапишите мастеру обычным сообщением в этот чат.';
+
+    let editedClientMessage = false;
+
+    if (params.chatId && params.messageId) {
+      try {
+        await editTelegramMessageText({
+          chatId: params.chatId as number | string,
+          messageId: params.messageId as number,
+          text: clientText,
+        });
+        editedClientMessage = true;
+      } catch (error) {
+        logWebhookError('edit reschedule proposal callback message', error);
+      }
+    }
+
+    if (params.chatId && !editedClientMessage) {
       await safeTask('send reschedule proposal followup', () =>
         sendTelegramMessage({
           chatId: params.chatId as number | string,
-          text: result.ok
-            ? parsed.action === 'accept'
-              ? 'Спасибо, перенос подтверждён ✅ Запись обновлена.'
-              : 'Поняли, это время не подходит. Мастер подберёт другой слот и ответит вам в чате.'
-            : 'Не удалось обработать перенос. Напишите мастеру обычным сообщением.',
+          text: clientText,
         }),
       );
     }
@@ -775,7 +815,7 @@ async function handleBookingStart(params: {
 
   const { error: confirmBookingError } = await admin
     .from('sloty_bookings')
-    .update({ status: 'confirmed', updated_at: confirmedAt })
+    .update({ status: 'confirmed', source: 'ТГ', channel: 'telegram', updated_at: confirmedAt })
     .eq('id', booking.id)
     .eq('workspace_id', link.workspace_id);
 
@@ -797,6 +837,8 @@ async function handleBookingStart(params: {
       ? {
           ...item,
           status: 'confirmed' as Booking['status'],
+          source: 'ТГ',
+          channel: 'telegram',
           clientTelegramConnected: true,
         }
       : item,
@@ -824,6 +866,8 @@ async function handleBookingStart(params: {
 
   const thread = existingThread
     ? await updateChatThread(link.workspace_id, existingThread.id, {
+        channel: 'Telegram',
+        source: 'ТГ',
         botConnected: true,
         metadata: {
           ...(existingThread.metadata ?? {}),
@@ -840,7 +884,7 @@ async function handleBookingStart(params: {
         clientPhone: booking.clientPhone,
         channel: 'Telegram',
         segment: 'active',
-        source: 'Публичная страница',
+        source: 'ТГ',
         nextVisit: booking.date,
         botConnected: true,
         lastMessagePreview:
@@ -1014,6 +1058,8 @@ async function handleClientChatMessage(params: {
 
   const thread = existingThread
     ? await updateChatThread(link.workspace_id, existingThread.id, {
+        channel: 'Telegram',
+        source: 'ТГ',
         botConnected: true,
         lastMessagePreview: text,
         lastMessageAt: now,
@@ -1109,6 +1155,7 @@ export async function POST(request: Request) {
         callbackQueryId: callbackQuery.id,
         data: callbackQuery.data,
         chatId: callbackQuery.message?.chat?.id ?? null,
+        messageId: callbackQuery.message?.message_id ?? null,
         from: callbackQuery.from ?? null,
       });
 
@@ -1118,6 +1165,7 @@ export async function POST(request: Request) {
         callbackQueryId: callbackQuery.id,
         data: callbackQuery.data,
         chatId: callbackQuery.message?.chat?.id ?? null,
+        messageId: callbackQuery.message?.message_id ?? null,
         from: callbackQuery.from ?? null,
       });
 

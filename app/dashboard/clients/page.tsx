@@ -14,6 +14,8 @@ import { useTheme } from 'next-themes';
 import {
   ArrowRight,
   CalendarClock,
+  CalendarDays,
+  Clock3,
   MessageCircleMore,
   NotebookPen,
   Phone,
@@ -28,6 +30,8 @@ import {
   X,
 } from 'lucide-react';
 
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { WorkspaceShell } from '@/components/shared/workspace-shell';
 import { useOwnedWorkspaceData } from '@/hooks/use-owned-workspace-data';
 import { useWorkspaceSection } from '@/hooks/use-workspace-section';
@@ -159,6 +163,49 @@ function formatClientDate(locale: 'ru' | 'en', value?: string) {
     month: 'short',
     year: 'numeric',
   }).format(parsed);
+}
+
+
+function toLocalIsoDate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function todayIsoDate() {
+  return toLocalIsoDate(new Date());
+}
+
+function splitReminderDateTime(value: string) {
+  const date = /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10) : '';
+  const time = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value) ? value.slice(11, 16) : '';
+  return { date, time };
+}
+
+function buildReminderDateTime(date: string, time: string) {
+  const safeDate = /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : todayIsoDate();
+  const safeTime = /^\d{2}:\d{2}$/.test(time) ? time : '12:30';
+  return `${safeDate}T${safeTime}`;
+}
+
+function formatPickerDateLabel(value: string, locale: 'ru' | 'en') {
+  if (!value) return locale === 'ru' ? 'Дата' : 'Date';
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
+    day: 'numeric',
+    month: 'short',
+  }).format(parsed);
+}
+
+function calendarPopoverClass(light: boolean) {
+  return cn(
+    'z-[80] w-auto overflow-hidden rounded-[12px] border p-1 shadow-none backdrop-blur-[24px]',
+    light
+      ? 'border-black/[0.09] bg-[#fbfbfa]/92 text-black shadow-[0_24px_80px_rgba(15,15,15,0.12)]'
+      : 'border-white/[0.10] bg-[#101010]/92 text-white shadow-[0_28px_90px_rgba(0,0,0,0.58)]',
+  );
 }
 
 function getClientSegmentLabel(locale: 'ru' | 'en', segment: ClientInsight['segment']) {
@@ -944,11 +991,11 @@ function MobileClientCard({
           >
             <div className="min-w-0">
               <div className={cn('text-[11px]', mutedText(light))}>
-                {client.service} · {client.source}
+                {[client.service, client.source].filter(Boolean).join(' · ')}
               </div>
 
               <div className={cn('mt-1 line-clamp-1 text-[11.5px]', pageText(light))}>
-                {client.note}
+                {client.note || (locale === 'ru' ? 'Заметка не добавлена' : 'No note yet')}
               </div>
             </div>
 
@@ -1059,7 +1106,7 @@ function ClientTableRow({
 
           <div className="min-w-0">
             <div className={cn('truncate text-[11px] leading-4', mutedText(light))}>
-              {client.source} · {client.note}
+              {[client.source, client.note].filter(Boolean).join(' · ') || '—'}
             </div>
           </div>
 
@@ -1592,19 +1639,67 @@ function ClientCrmDialog({
               </button>
             </div>
 
-            {activeMiniDialog === 'reminder' ? (
-              <input
-                type="datetime-local"
-                value={draftReminderAt}
-                onChange={(event) => setDraftReminderAt(event.target.value)}
-                className={cn(
-                  'mt-4 h-10 w-full rounded-[10px] border px-3 text-[12px] outline-none',
-                  light
-                    ? 'border-black/[0.08] bg-white text-black'
-                    : 'border-white/[0.08] bg-[#101010] text-white',
-                )}
-              />
-            ) : null}
+            {activeMiniDialog === 'reminder' ? (() => {
+              const reminderParts = splitReminderDateTime(draftReminderAt);
+
+              return (
+                <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_132px]">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className={cn(
+                          'flex h-10 w-full items-center justify-between gap-3 rounded-[10px] border px-3 text-left text-[12px] font-medium outline-none transition active:scale-[0.985]',
+                          light
+                            ? 'border-black/[0.08] bg-white text-black hover:border-black/[0.14]'
+                            : 'border-white/[0.08] bg-[#101010] text-white hover:border-white/[0.14]',
+                        )}
+                      >
+                        <span className="inline-flex min-w-0 items-center gap-2">
+                          <CalendarDays className={cn('size-4 shrink-0', mutedText(light))} />
+                          <span className="truncate">
+                            {formatPickerDateLabel(reminderParts.date, locale)}
+                          </span>
+                        </span>
+                      </button>
+                    </PopoverTrigger>
+
+                    <PopoverContent
+                      align="start"
+                      className={calendarPopoverClass(light)}
+                    >
+                      <Calendar
+                        mode="single"
+                        selected={reminderParts.date ? new Date(`${reminderParts.date}T00:00:00`) : undefined}
+                        onSelect={(date) => {
+                          if (!date) return;
+                          setDraftReminderAt(buildReminderDateTime(toLocalIsoDate(date), reminderParts.time));
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+
+                  <label
+                    className={cn(
+                      'flex h-10 items-center gap-2 rounded-[10px] border px-3',
+                      light
+                        ? 'border-black/[0.08] bg-white text-black'
+                        : 'border-white/[0.08] bg-[#101010] text-white',
+                    )}
+                  >
+                    <Clock3 className={cn('size-4 shrink-0', mutedText(light))} />
+                    <input
+                      type="time"
+                      step="1800"
+                      value={reminderParts.time || '12:30'}
+                      onChange={(event) => setDraftReminderAt(buildReminderDateTime(reminderParts.date, event.target.value))}
+                      className="min-w-0 flex-1 bg-transparent text-[12px] font-medium outline-none"
+                    />
+                  </label>
+                </div>
+              );
+            })() : null}
 
             <textarea
               value={activeMiniDialog === 'note' ? draftNote : draftReminderText}

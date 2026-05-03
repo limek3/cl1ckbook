@@ -4,7 +4,7 @@ import type { Booking, MasterProfile } from '@/lib/types';
 import { getMasterAddress, getMasterLocationMode, getMasterRouteUrl } from '@/lib/location-links';
 
 export function getAppUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL || 'https://cl1ckbuk.vercel.app').replace(/\/$/, '');
+  return (process.env.NEXT_PUBLIC_APP_URL || 'https://www.кликбук.рф').replace(/\/$/, '');
 }
 
 export function getTelegramBotUsername() {
@@ -52,6 +52,35 @@ export async function sendTelegramMessage(params: {
     parse_mode: params.parseMode,
     disable_web_page_preview: true,
     ...(params.replyMarkup ? { reply_markup: params.replyMarkup } : {}),
+  });
+}
+
+
+export async function editTelegramMessageText(params: {
+  chatId: number | string;
+  messageId: number;
+  text: string;
+  replyMarkup?: Record<string, unknown> | null;
+  parseMode?: 'HTML' | 'MarkdownV2';
+}) {
+  return telegramApi('editMessageText', {
+    chat_id: params.chatId,
+    message_id: params.messageId,
+    text: params.text,
+    parse_mode: params.parseMode,
+    disable_web_page_preview: true,
+    reply_markup: params.replyMarkup ?? { inline_keyboard: [] },
+  });
+}
+
+export async function clearTelegramMessageReplyMarkup(params: {
+  chatId: number | string;
+  messageId: number;
+}) {
+  return telegramApi('editMessageReplyMarkup', {
+    chat_id: params.chatId,
+    message_id: params.messageId,
+    reply_markup: { inline_keyboard: [] },
   });
 }
 

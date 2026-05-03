@@ -25,7 +25,7 @@ export function getAppUrl() {
       ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
       : '') ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '') ||
-    'http://localhost:3000'
+    'https://www.кликбук.рф'
   ).replace(/\/$/, '');
 }
 
@@ -245,6 +245,37 @@ export async function sendVkMessage(params: {
     ...(params.keyboard
       ? { keyboard: typeof params.keyboard === 'string' ? params.keyboard : JSON.stringify(params.keyboard) }
       : {}),
+  });
+}
+
+
+export function buildVkEmptyInlineKeyboard() {
+  return {
+    one_time: false,
+    inline: true,
+    buttons: [],
+  };
+}
+
+export async function editVkMessage(params: {
+  peerId: number | string;
+  conversationMessageId: number | string;
+  message: string;
+  keyboard?: string | Record<string, unknown> | null;
+}) {
+  return vkApi('messages.edit', {
+    peer_id: String(params.peerId),
+    conversation_message_id: String(params.conversationMessageId),
+    message: params.message,
+    disable_mentions: 1,
+    keyboard:
+      params.keyboard === null
+        ? JSON.stringify(buildVkEmptyInlineKeyboard())
+        : params.keyboard
+          ? typeof params.keyboard === 'string'
+            ? params.keyboard
+            : JSON.stringify(params.keyboard)
+          : JSON.stringify(buildVkEmptyInlineKeyboard()),
   });
 }
 
@@ -633,8 +664,8 @@ export async function sendClientVkBookingReminder(params: {
       ...placeLines,
       '',
       params.hoursBefore >= 24
-        ? 'Пожалуйста, подтвердите запись или запросите перенос. Если выбрать перенос, слот освободится, а мастер получит предупреждение.'
-        : 'Скоро визит. Ниже адрес и маршрут, если приём проходит по адресу. Хорошего визита!',
+        ? 'Подтвердите запись или запросите перенос кнопкой ниже.\nЕсли выбрать перенос, слот освободится, а мастер подберёт новое время.'
+        : 'Скоро визит.\nНиже адрес и маршрут, если приём проходит по адресу. Хорошего визита!',
     ]
       .filter(Boolean)
       .join('\n'),

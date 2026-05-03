@@ -19,7 +19,7 @@ If Telegram sends only `/start`, the bot now replies with instructions. The UI a
 NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=your_bot_username_without_at
 TELEGRAM_BOT_TOKEN=your_bot_token
 TELEGRAM_WEBHOOK_SECRET=random_secret
-NEXT_PUBLIC_APP_URL=https://cl1ckbuk.vercel.app
+NEXT_PUBLIC_APP_URL=https://www.кликбук.рф
 SUPABASE_SERVICE_ROLE_KEY=...
 NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
@@ -49,7 +49,7 @@ Invoke-RestMethod `
   -Uri "https://api.telegram.org/bot$TOKEN/setWebhook" `
   -Method Post `
   -Body @{
-    url = "https://cl1ckbuk.vercel.app/api/telegram/webhook"
+    url = "https://www.кликбук.рф/api/telegram/webhook"
     secret_token = $SECRET
   }
 ```
@@ -63,7 +63,7 @@ Invoke-RestMethod -Uri "https://api.telegram.org/bot$TOKEN/getWebhookInfo" -Meth
 Expected important fields:
 
 ```txt
-url: https://cl1ckbuk.vercel.app/api/telegram/webhook
+url: https://www.кликбук.рф/api/telegram/webhook
 pending_update_count: 0 or more
 last_error_message: empty/null
 ```

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/server/supabase-admin';
 import {
   answerVkMessageEvent,
+  editVkMessage,
   getAppUrl,
   getVkBotGroupId,
   getVkBotUserProfile,
@@ -59,6 +60,8 @@ type BookingRow = {
   comment: string | null;
   status: Booking['status'];
   created_at: string;
+  source?: string | null;
+  channel?: string | null;
 };
 
 function textResponse(value: string, init?: ResponseInit) {
@@ -314,6 +317,8 @@ function mapBookingRow(row: BookingRow): Booking {
     comment: row.comment ?? undefined,
     status: row.status,
     createdAt: row.created_at,
+    source: row.source ?? undefined,
+    channel: row.channel ?? undefined,
   };
 }
 
@@ -822,6 +827,7 @@ async function handleMessageEvent(payload: VkCallbackPayload) {
   const vkUserId = numberValue(object?.user_id);
   const peerId = numberValue(object?.peer_id) ?? vkUserId;
   const eventId = typeof object?.event_id === 'string' ? object.event_id : null;
+  const conversationMessageId = numberValue(object?.conversation_message_id) ?? numberValue(object?.message_id);
 
   if (!object || !vkUserId || !peerId || !eventId) return;
 
@@ -860,19 +866,27 @@ async function handleMessageEvent(payload: VkCallbackPayload) {
         : 'Не удалось обработать перенос.',
     }).catch((error) => logVkWebhookError('answer vk reschedule proposal action', error));
 
-    await sendVkReply({
-      label: proposalAction === 'accept' ? 'reschedule_proposal_accepted' : 'reschedule_proposal_declined',
-      peerId,
-      textPreview: proposalAction === 'accept' ? 'Перенос подтверждён.' : 'Нужно другое время.',
-      send: () => sendVkMessage({
+    const clientText = result?.ok
+      ? proposalAction === 'accept'
+        ? 'Спасибо, перенос подтверждён ✅\n\nЗапись обновлена. Кнопки больше не активны.'
+        : 'Поняли, это время не подходит.\n\nМастер подберёт другой слот и ответит вам в этом чате. Кнопки больше не активны.'
+      : 'Не удалось обработать перенос.\n\nНапишите мастеру обычным сообщением в этот диалог.';
+
+    if (conversationMessageId) {
+      await editVkMessage({
         peerId,
-        message: result?.ok
-          ? proposalAction === 'accept'
-            ? 'Спасибо, перенос подтверждён ✅ Запись обновлена.'
-            : 'Поняли, это время не подходит. Мастер подберёт другой слот и ответит вам в чате.'
-          : 'Не удалось обработать перенос. Напишите мастеру обычным сообщением в этот диалог.',
-      }),
-    });
+        conversationMessageId,
+        message: clientText,
+        keyboard: null,
+      }).catch((error) => logVkWebhookError('edit vk reschedule proposal message', error));
+    } else {
+      await sendVkReply({
+        label: proposalAction === 'accept' ? 'reschedule_proposal_accepted' : 'reschedule_proposal_declined',
+        peerId,
+        textPreview: proposalAction === 'accept' ? 'Перенос подтверждён.' : 'Нужно другое время.',
+        send: () => sendVkMessage({ peerId, message: clientText }),
+      });
+    }
     return;
   }
 
@@ -915,20 +929,27 @@ async function handleMessageEvent(payload: VkCallbackPayload) {
             : 'Не удалось обработать действие.',
     }).catch((error) => logVkWebhookError('answer client booking action', error));
 
-    await sendVkReply({
-      label: clientAction === 'confirm' ? 'client_booking_confirmed' : 'client_booking_reschedule_requested',
-      peerId,
-      textPreview: clientAction === 'confirm' ? 'Запись подтверждена.' : 'Запрос на перенос отправлен мастеру.',
-      send: () => sendVkMessage({
+    const clientText = result?.ok && clientAction === 'confirm'
+      ? 'Спасибо, запись подтверждена ✅\n\nКнопки больше не активны. Мастер увидит подтверждение в кабинете.'
+      : result?.ok
+        ? 'Поняли, запрос на перенос отправлен мастеру.\n\nСлот освобождён. Мастер подберёт новое время и ответит вам в этом чате.'
+        : 'Не удалось обработать действие.\n\nНапишите мастеру обычным сообщением в этот диалог.';
+
+    if (conversationMessageId) {
+      await editVkMessage({
         peerId,
-        message:
-          result?.ok && clientAction === 'confirm'
-            ? 'Спасибо, запись подтверждена ✅'
-            : result?.ok
-              ? 'Поняли, запрос на перенос отправлен мастеру. Слот освобождён, мастер подберёт новое время и ответит вам в чате.'
-              : 'Не удалось обработать действие. Напишите мастеру обычным сообщением в этот диалог.',
-      }),
-    });
+        conversationMessageId,
+        message: clientText,
+        keyboard: null,
+      }).catch((error) => logVkWebhookError('edit vk client booking action message', error));
+    } else {
+      await sendVkReply({
+        label: clientAction === 'confirm' ? 'client_booking_confirmed' : 'client_booking_reschedule_requested',
+        peerId,
+        textPreview: clientAction === 'confirm' ? 'Запись подтверждена.' : 'Запрос на перенос отправлен мастеру.',
+        send: () => sendVkMessage({ peerId, message: clientText }),
+      });
+    }
     return;
   }
 

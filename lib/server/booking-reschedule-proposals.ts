@@ -24,6 +24,8 @@ type BookingRow = {
   created_at: string;
   duration_minutes?: number | null;
   price_amount?: number | null;
+  source?: string | null;
+  channel?: string | null;
   confirmed_at?: string | null;
   completed_at?: string | null;
   no_show_at?: string | null;
@@ -66,6 +68,8 @@ function mapBookingRow(row: BookingRow): Booking {
     createdAt: row.created_at,
     durationMinutes: row.duration_minutes ?? undefined,
     priceAmount: row.price_amount ?? undefined,
+    source: row.source ?? undefined,
+    channel: row.channel ?? undefined,
     confirmedAt: row.confirmed_at ?? undefined,
     completedAt: row.completed_at ?? undefined,
     noShowAt: row.no_show_at ?? undefined,
@@ -116,15 +120,20 @@ export function buildRescheduleProposalText(params: {
   message?: string | null;
 }) {
   return [
-    params.message?.trim() || `Здравствуйте, ${params.booking.clientName}! Мастер предлагает новое время для записи.`,
+    `Здравствуйте, ${params.booking.clientName}!`,
     '',
-    `Услуга: ${params.booking.service}`,
-    `Новое время: ${formatProposalDate(params.proposedDate, params.proposedTime)}`,
+    'Мастер предлагает перенести запись.',
     '',
-    'Нажмите кнопку ниже: подтвердить перенос или сообщить, что время не подходит.',
-  ]
-    .filter(Boolean)
-    .join('\n');
+    'Услуга:',
+    params.booking.service || '—',
+    '',
+    'Новое время:',
+    formatProposalDate(params.proposedDate, params.proposedTime),
+    '',
+    'Выберите действие ниже:',
+    '— «Подтвердить перенос», если время подходит.',
+    '— «Не подходит», если нужно другое время.',
+  ].join('\n');
 }
 
 async function getThreadMetadata(
@@ -371,6 +380,8 @@ export async function handleRescheduleProposalAction(params: {
       .from('sloty_bookings')
       .update({
         status: 'confirmed',
+        source: params.source === 'vk' ? 'ВК' : 'ТГ',
+        channel: params.source,
         booking_date: proposal.proposed_date,
         booking_time: proposal.proposed_time,
         confirmed_at: now,
@@ -397,6 +408,8 @@ export async function handleRescheduleProposalAction(params: {
       bookingId: booking.id,
       patch: {
         status: 'confirmed',
+        source: params.source === 'vk' ? 'ВК' : 'ТГ',
+        channel: params.source,
         date: proposal.proposed_date,
         time: proposal.proposed_time,
         confirmedAt: now,
@@ -417,6 +430,8 @@ export async function handleRescheduleProposalAction(params: {
     await admin
       .from('sloty_bookings')
       .update({
+        source: params.source === 'vk' ? 'ВК' : 'ТГ',
+        channel: params.source,
         updated_at: now,
         metadata: {
           ...bookingMetadata,
@@ -435,6 +450,8 @@ export async function handleRescheduleProposalAction(params: {
       workspace,
       bookingId: booking.id,
       patch: {
+        source: params.source === 'vk' ? 'ВК' : 'ТГ',
+        channel: params.source,
         metadata: {
           declinedRescheduleProposalId: proposal.id,
           declinedRescheduleAt: now,
@@ -453,6 +470,8 @@ export async function handleRescheduleProposalAction(params: {
 
   await updateChatThread(proposal.workspace_id, proposal.thread_id, {
     segment: accepted ? 'active' : 'followup',
+    source: params.source === 'vk' ? 'ВК' : 'ТГ',
+    channel: params.source === 'vk' ? 'VK' : 'Telegram',
     nextVisit: accepted ? `${proposal.proposed_date}T${proposal.proposed_time}:00` : null,
     isPriority: !accepted,
     lastMessagePreview: preview,

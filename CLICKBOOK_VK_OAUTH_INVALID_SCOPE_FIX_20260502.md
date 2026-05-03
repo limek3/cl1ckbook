@@ -11,6 +11,6 @@
 ```env
 VK_ID_CLIENT_ID=54575151
 VK_ID_CLIENT_SECRET=новый_защищённый_ключ
-VK_ID_REDIRECT_URI=https://www.xn--90anfbbc3d.xn--p1ai/api/auth/vk/callback
+VK_ID_REDIRECT_URI=https://www.кликбук.рф/api/auth/vk/callback
 VK_ID_SCOPE=
 ```

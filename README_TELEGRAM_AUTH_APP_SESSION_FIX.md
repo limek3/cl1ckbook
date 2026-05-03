@@ -23,7 +23,7 @@ Required env:
 TELEGRAM_BOT_TOKEN=...
 TELEGRAM_WEBHOOK_SECRET=letters_numbers_only
 NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=bot_username_without_@
-NEXT_PUBLIC_APP_URL=https://cl1ckbuk.vercel.app
+NEXT_PUBLIC_APP_URL=https://www.кликбук.рф
 KEY_VAULTS_SECRET=long_random_secret
 SUPABASE_SERVICE_ROLE_KEY=...
 NEXT_PUBLIC_SUPABASE_URL=...
@@ -40,7 +40,7 @@ Invoke-RestMethod `
   -Uri "https://api.telegram.org/bot$TOKEN/setWebhook" `
   -Method Post `
   -Body @{
-    url = "https://cl1ckbuk.vercel.app/api/telegram/webhook"
+    url = "https://www.кликбук.рф/api/telegram/webhook"
     secret_token = $SECRET
     drop_pending_updates = "true"
   }

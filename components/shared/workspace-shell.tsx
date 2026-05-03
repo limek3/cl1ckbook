@@ -2037,19 +2037,9 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
 
     const billing: NavigationItem[] = [
       {
-        href: withDashboardDemoParam('/dashboard/payments', demoMode),
-        label: labels.items.payments,
-        icon: CheckCircle2,
-      },
-      {
         href: withDashboardDemoParam('/dashboard/subscription', demoMode),
         label: labels.items.subscription,
         icon: Package2,
-      },
-      {
-        href: withDashboardDemoParam('/dashboard/limits', demoMode),
-        label: labels.items.limits,
-        icon: Settings2,
       },
     ];
 
@@ -2087,10 +2077,8 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
     labels.items.chats,
     labels.items.clients,
     labels.items.home,
-    labels.items.limits,
     labels.items.marketing,
     labels.items.notifications,
-    labels.items.payments,
     labels.items.profile,
     labels.items.services,
     labels.items.stats,
@@ -2114,9 +2102,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
       '/dashboard/templates',
       '/dashboard/notifications',
       '/dashboard/marketing',
-      '/dashboard/payments',
       '/dashboard/subscription',
-      '/dashboard/limits',
     ],
     [],
   );
@@ -2175,19 +2161,9 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
 
     const profileBilling: NavigationItem[] = [
       {
-        href: withDashboardDemoParam('/dashboard/payments', demoMode),
-        label: labels.items.payments,
-        icon: CheckCircle2,
-      },
-      {
         href: withDashboardDemoParam('/dashboard/subscription', demoMode),
         label: labels.items.subscription,
         icon: Package2,
-      },
-      {
-        href: withDashboardDemoParam('/dashboard/limits', demoMode),
-        label: labels.items.limits,
-        icon: Settings2,
       },
     ];
 
@@ -2209,7 +2185,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
       },
       {
         id: 'profile-billing',
-        title: locale === 'ru' ? 'Оплата и доступ' : 'Billing and access',
+        title: locale === 'ru' ? 'Подписка' : 'Subscription',
         items: profileBilling,
       },
     ];
@@ -2217,10 +2193,8 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
     demoMode,
     labels.items.appearance,
     labels.items.availability,
-    labels.items.limits,
     labels.items.marketing,
     labels.items.notifications,
-    labels.items.payments,
     labels.items.profile,
     labels.items.services,
     labels.items.subscription,

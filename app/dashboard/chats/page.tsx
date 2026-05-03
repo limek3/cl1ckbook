@@ -476,8 +476,8 @@ function buildBotDraft(
 
   if (flow === 'reschedule') {
     return locale === 'ru'
-      ? `Здравствуйте, ${thread.clientName}! Предлагаю перенос на ${nextVisit ?? 'новое время'}. Если слот подходит — нажмите «Подтвердить перенос», если нет — «Не подходит».`
-      : `Hi ${thread.clientName}! I suggest rescheduling to ${nextVisit ?? 'a new time'}. Please press “Confirm reschedule” if it works, or “Doesn’t work”.`;
+      ? `Здравствуйте, ${thread.clientName}!\n\nПредлагаю перенести запись на ${nextVisit ?? 'новое время'}.\n\nЕсли время подходит — нажмите «Подтвердить перенос». Если нет — нажмите «Не подходит».`
+      : `Hi ${thread.clientName}!\n\nI suggest rescheduling to ${nextVisit ?? 'a new time'}.\n\nPress “Confirm reschedule” if it works, or “Doesn’t work” if it does not.`;
   }
 
   return locale === 'ru'

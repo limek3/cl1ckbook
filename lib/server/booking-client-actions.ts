@@ -34,6 +34,8 @@ type BookingRow = {
   created_at: string;
   duration_minutes?: number | null;
   price_amount?: number | null;
+  source?: string | null;
+  channel?: string | null;
   confirmed_at?: string | null;
   completed_at?: string | null;
   no_show_at?: string | null;
@@ -64,6 +66,8 @@ function mapBookingRow(row: BookingRow): Booking {
     createdAt: row.created_at,
     durationMinutes: row.duration_minutes ?? undefined,
     priceAmount: row.price_amount ?? undefined,
+    source: row.source ?? undefined,
+    channel: row.channel ?? undefined,
     confirmedAt: row.confirmed_at ?? undefined,
     completedAt: row.completed_at ?? undefined,
     noShowAt: row.no_show_at ?? undefined,
@@ -138,6 +142,8 @@ async function syncWorkspaceBooking(params: {
     return {
       ...item,
       status: params.status,
+      source: sourceLabel(params.source),
+      channel: params.source,
       ...(params.action === 'confirm' ? { confirmedAt: params.now } : {}),
       ...(params.action === 'reschedule'
         ? {
@@ -228,6 +234,7 @@ async function upsertChatAlert(params: {
   const thread = existingThread
     ? await updateChatThread(params.workspaceId, existingThread.id, {
         channel: params.source === 'vk' ? 'VK' : existingThread.channel,
+        source: sourceLabel(params.source),
         segment: params.action === 'reschedule' ? 'followup' : 'active',
         nextVisit: params.action === 'reschedule' ? null : params.booking.date,
         isPriority: params.action === 'reschedule' ? true : existingThread.isPriority,
@@ -242,7 +249,7 @@ async function upsertChatAlert(params: {
         clientPhone: params.booking.clientPhone,
         channel: params.source === 'vk' ? 'VK' : 'Telegram',
         segment: params.action === 'reschedule' ? 'followup' : 'active',
-        source: 'Публичная страница',
+        source: sourceLabel(params.source),
         nextVisit: params.action === 'reschedule' ? null : params.booking.date,
         isPriority: params.action === 'reschedule',
         botConnected: true,
@@ -387,6 +394,8 @@ export async function handleClientBookingAction(params: {
     .from('sloty_bookings')
     .update({
       status: nextStatus,
+      source: sourceLabel(params.source),
+      channel: params.source,
       updated_at: now,
       metadata: {
         ...currentMetadata,

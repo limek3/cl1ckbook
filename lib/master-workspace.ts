@@ -404,7 +404,7 @@ function buildClients(bookings: Booking[], services: ServiceInsight[], locale: L
         totalRevenue,
         segment,
         favorite: sorted.length >= 3 || totalRevenue >= 10000,
-        note: NOTES[locale][index % NOTES[locale].length],
+        note: String(sorted[0].comment ?? '').trim(),
         source,
         service: sorted[0].service,
         hasReschedule,

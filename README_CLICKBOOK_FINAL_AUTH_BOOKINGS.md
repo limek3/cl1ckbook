@@ -35,7 +35,7 @@
 ## Required env variables
 
 ```env
-NEXT_PUBLIC_APP_URL=https://cl1ckbuk.vercel.app
+NEXT_PUBLIC_APP_URL=https://www.кликбук.рф
 NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=your_bot_username_without_at
 TELEGRAM_BOT_TOKEN=your_bot_token
 TELEGRAM_WEBHOOK_SECRET=letters_numbers_only_secret
@@ -64,7 +64,7 @@ supabase/migrations/20260430_0007_miniapp_booking_reminders.sql
 You can set webhook + bot menu with one browser call after deployment:
 
 ```txt
-https://cl1ckbuk.vercel.app/api/telegram/setup?secret=TELEGRAM_WEBHOOK_SECRET
+https://www.кликбук.рф/api/telegram/setup?secret=TELEGRAM_WEBHOOK_SECRET
 ```
 
 Expected response:
@@ -83,7 +83,7 @@ Invoke-RestMethod `
   -Uri "https://api.telegram.org/bot$TOKEN/setWebhook" `
   -Method Post `
   -Body @{
-    url = "https://cl1ckbuk.vercel.app/api/telegram/webhook"
+    url = "https://www.кликбук.рф/api/telegram/webhook"
     secret_token = $SECRET
     drop_pending_updates = "true"
   }
