@@ -1,5 +1,5 @@
-import PreviewLandingPage from '@/components/marketing/preview-landing';
+import AboutProductPage from '@/components/marketing/about-product-page';
 
 export default function AboutPage() {
-  return <PreviewLandingPage />;
+  return <AboutProductPage />;
 }
