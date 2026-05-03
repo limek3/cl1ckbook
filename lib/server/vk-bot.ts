@@ -3,7 +3,7 @@ import 'server-only';
 import crypto from 'node:crypto';
 import type { Booking, MasterProfile } from '@/lib/types';
 import { getMasterAddress, getMasterLocationMode, getMasterRouteUrl } from '@/lib/location-links';
-import { bookingCode, bookingMessageText, bookingServicesText, masterDisplayName } from '@/lib/server/booking-context';
+import { bookingClientCardText, bookingCode, bookingMessageText, bookingServicesText, masterDisplayName } from '@/lib/server/booking-context';
 
 const VK_API_VERSION = '5.199';
 
@@ -193,14 +193,20 @@ export function buildVkReplyKeyboard(buttons: Array<Array<VkBotButton>>) {
   };
 }
 
-export function buildVkClientPersistentKeyboard(token?: string | null) {
-  return buildVkReplyKeyboard([
+export function buildVkClientMenuKeyboard(token?: string | null) {
+  return buildVkKeyboard([
     [{ label: '📋 Мои записи', action: 'client_bookings', token: token ?? null, color: 'primary' }],
     [
       { label: '💬 Выбрать запись', action: 'client_bookings', token: token ?? null, color: 'secondary' },
       { label: '🆘 Помощь', action: 'support', token: token ?? null, color: 'secondary' },
     ],
   ]);
+}
+
+// Kept for compatibility with older imports. VK users see inline buttons under the current bot card,
+// not a noisy reply keyboard under the input field.
+export function buildVkClientPersistentKeyboard(token?: string | null) {
+  return buildVkClientMenuKeyboard(token);
 }
 
 export function buildVkLoginKeyboard(token: string) {
@@ -650,22 +656,15 @@ export async function sendClientVkBookingConfirmation(params: {
   booking: Booking;
   profile?: MasterProfile | null;
 }) {
-  const placeLines = buildVisitPlaceLines(params.profile);
-  const footer = [
-    ...placeLines,
-    '',
-    'Мы пришлём напоминание до визита.',
-    'Если потребуется перенос — можно будет ответить кнопкой в этом чате.',
-  ].filter(Boolean).join('\n');
-
   return sendVkMessage({
     peerId: params.peerId,
-    message: bookingMessageText({
+    message: bookingClientCardText({
       title: 'Запись создана ✅',
       booking: params.booking,
       profile: params.profile,
-      footer,
+      footer: 'Мы пришлём напоминание до визита.',
     }),
+    keyboard: buildVkClientMenuKeyboard(),
   });
 }
 
@@ -709,14 +708,7 @@ export async function sendVkLoginConfirmedMessage(params: {
 }) {
   return sendVkMessage({
     peerId: params.peerId,
-    message: [
-      'Готово ✅',
-      '',
-      'VK подключён к КликБук.',
-      'Нажмите «Открыть кабинет» — вход завершится в этой же вкладке.',
-      '',
-      'Также здесь доступны FAQ, поддержка и уведомления по записям.',
-    ].join('\n'),
+    message: ['VK подключён к КликБук ✅', '', 'Откройте кабинет или выберите действие ниже.'].join('\n'),
     keyboard: buildVkLoginKeyboard(params.token),
   });
 }

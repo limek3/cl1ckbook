@@ -18,12 +18,11 @@ import {
   sendVkLoginConfirmedMessage,
   sendVkMessage,
   buildVkKeyboard,
-  buildVkClientPersistentKeyboard,
 } from '@/lib/server/vk-bot';
 import { handleClientBookingAction } from '@/lib/server/booking-client-actions';
 import { handleRescheduleProposalAction } from '@/lib/server/booking-reschedule-proposals';
 import { createChatMessage, createChatThread, fetchChatThreadByBookingId, listChatsForWorkspace, updateChatThread } from '@/lib/server/supabase-chats';
-import { bookingMessageText, bookingSelectionLabel, bookingThreadMetadata } from '@/lib/server/booking-context';
+import { bookingChoiceText, bookingClientCardText, bookingMessageText, bookingSelectionLabel, bookingThreadMetadata } from '@/lib/server/booking-context';
 import type { Booking, MasterProfile } from '@/lib/types';
 import {
   buildVkLoginToken,
@@ -647,12 +646,78 @@ function mergeVkBookingMetadata(base: Record<string, unknown> | null | undefined
   };
 }
 
-async function sendVkClientPersistentMenu(peerId: number | string, token?: string | null) {
-  await sendVkMessage({
-    peerId,
-    message: 'Меню клиента включено. Кнопки доступны под полем ввода.',
-    keyboard: buildVkClientPersistentKeyboard(token),
-  }).catch((error) => logVkWebhookError('send vk persistent client menu', error));
+function extractVkConversationMessageId(response: unknown) {
+  if (!response || typeof response !== 'object') return null;
+  const value = (response as { response?: unknown }).response;
+  if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value);
+  if (typeof value === 'string' && /^\d+$/.test(value)) return Number(value);
+  if (value && typeof value === 'object') {
+    const nested = (value as { conversation_message_id?: unknown }).conversation_message_id;
+    if (typeof nested === 'number' && Number.isFinite(nested)) return Math.trunc(nested);
+    if (typeof nested === 'string' && /^\d+$/.test(nested)) return Number(nested);
+  }
+  return null;
+}
+
+function getStoredVkClientMenuMessageId(links: VkBookingLinkRow[]) {
+  for (const link of links) {
+    const messageId = vkLinkMetadata(link).clientVkMenuMessageId;
+    if (typeof messageId === 'number') return messageId;
+    if (typeof messageId === 'string' && /^\d+$/.test(messageId)) return Number(messageId);
+  }
+  return null;
+}
+
+async function rememberVkClientMenuMessage(links: VkBookingLinkRow[], messageId: number | null) {
+  if (!messageId || links.length === 0) return;
+
+  const admin = createSupabaseAdminClient();
+
+  for (const link of links) {
+    const metadata = vkLinkMetadata(link);
+    const { error } = await admin
+      .from('sloty_booking_vk_links')
+      .update({ metadata: { ...metadata, clientVkMenuMessageId: messageId }, updated_at: new Date().toISOString() })
+      .eq('token', link.token);
+
+    if (error) logVkWebhookError('remember vk client menu metadata failed', error);
+  }
+}
+
+async function sendOrEditVkClientCard(params: {
+  peerId: number | string;
+  links: VkBookingLinkRow[];
+  message: string;
+  keyboard: Record<string, unknown>;
+}) {
+  const previousMessageId = getStoredVkClientMenuMessageId(params.links);
+
+  if (previousMessageId) {
+    try {
+      await editVkMessage({
+        peerId: params.peerId,
+        conversationMessageId: previousMessageId,
+        message: params.message,
+        keyboard: params.keyboard,
+      });
+      await rememberVkClientMenuMessage(params.links, previousMessageId);
+      return;
+    } catch (error) {
+      logVkWebhookError('edit vk client menu card', error);
+    }
+  }
+
+  const result = await sendVkMessage({
+    peerId: params.peerId,
+    message: params.message,
+    keyboard: params.keyboard,
+  });
+  await rememberVkClientMenuMessage(params.links, extractVkConversationMessageId(result));
+}
+
+async function sendVkClientPersistentMenu(_peerId: number | string, _token?: string | null) {
+  // VK does not need a separate service message like “menu enabled”.
+  // Client buttons are rendered under the current bot card via inline keyboard, like in VK UI.
 }
 
 async function getConfirmedVkBookingLinks(peerId: number | string, limit = 8) {
@@ -721,20 +786,21 @@ async function sendVkClientBookingDetails(params: {
     return;
   }
 
-  await sendVkMessage({
+  const links = await getConfirmedVkBookingLinks(params.peerId, 8);
+  await sendOrEditVkClientCard({
     peerId: params.peerId,
-    message: bookingMessageText({
-      title: params.title || 'Детали записи',
+    links: links.length > 0 ? links : [params.link],
+    message: bookingClientCardText({
+      title: params.title || 'Ваша запись',
       booking,
       profile,
-      footer: 'Нажмите «Написать по этой записи» и отправьте сообщение. Мастер увидит нужную услугу.',
+      footer: 'Нажмите «Написать по этой записи» и отправьте сообщение.',
     }),
     keyboard: buildVkKeyboard([
       [{ label: '💬 Написать по этой записи', action: 'client_chat_context', token: params.link.token, color: 'primary' }],
       [{ label: '📋 Мои записи', action: 'client_bookings', color: 'secondary' }],
     ]),
   });
-  await sendVkClientPersistentMenu(params.peerId);
 }
 
 async function sendVkClientBookingChoice(peerId: number | string) {
@@ -767,8 +833,9 @@ async function sendVkClientBookingChoice(peerId: number | string) {
 
   rows.push([{ label: '📋 Обновить список', action: 'client_bookings', color: 'secondary' }]);
 
-  await sendVkMessage({
+  await sendOrEditVkClientCard({
     peerId,
+    links,
     message: [
       'У вас несколько активных записей.',
       '',
@@ -1049,6 +1116,30 @@ async function handleMessageNew(payload: VkCallbackPayload) {
   });
 }
 
+
+async function editOrSendVkCard(params: {
+  peerId: number | string;
+  conversationMessageId?: number | null;
+  message: string;
+  keyboard: Record<string, unknown>;
+}) {
+  if (params.conversationMessageId) {
+    try {
+      await editVkMessage({
+        peerId: params.peerId,
+        conversationMessageId: params.conversationMessageId,
+        message: params.message,
+        keyboard: params.keyboard,
+      });
+      return;
+    } catch (error) {
+      logVkWebhookError('edit vk card fallback', error);
+    }
+  }
+
+  await sendVkMessage({ peerId: params.peerId, message: params.message, keyboard: params.keyboard });
+}
+
 async function handleMessageEvent(payload: VkCallbackPayload) {
   const object = payload.object && typeof payload.object === 'object' ? (payload.object as Record<string, unknown>) : null;
   const eventPayload = normalizePayload(object?.payload);
@@ -1313,18 +1404,18 @@ async function handleMessageEvent(payload: VkCallbackPayload) {
   }
 
   if (action === 'faq' || action === 'help') {
-    await answerVkMessageEvent({
-      eventId,
-      userId: vkUserId,
-      peerId,
-      text: 'FAQ отправлен в диалог.',
-    }).catch((error) => logVkWebhookError('answer faq', error));
+    await answerVkMessageEvent({ eventId, userId: vkUserId, peerId, text: 'FAQ открыт.' })
+      .catch((error) => logVkWebhookError('answer faq', error));
 
-    await sendVkReply({
-      label: 'faq_menu',
+    await editOrSendVkCard({
       peerId,
-      textPreview: 'FAQ КликБук.',
-      send: () => sendVkBotFaqMessage({ peerId, token }),
+      conversationMessageId,
+      message: [
+        'FAQ КликБук',
+        '',
+        'Выберите тему ниже — ответ появится в этой же карточке.',
+      ].join('\n'),
+      keyboard: buildVkFaqKeyboard(token),
     });
     return;
   }
@@ -1349,35 +1440,27 @@ async function handleMessageEvent(payload: VkCallbackPayload) {
   }
 
   if (action === 'support' || action === 'support_human') {
-    await answerVkMessageEvent({
-      eventId,
-      userId: vkUserId,
-      peerId,
-      text: 'Поддержка отправлена в диалог.',
-    }).catch((error) => logVkWebhookError('answer support', error));
+    await answerVkMessageEvent({ eventId, userId: vkUserId, peerId, text: 'Поддержка открыта.' })
+      .catch((error) => logVkWebhookError('answer support', error));
 
-    await sendVkReply({
-      label: 'support_menu',
+    await editOrSendVkCard({
       peerId,
-      textPreview: 'Поддержка КликБук.',
-      send: () => sendVkBotSupportMessage({ peerId, token }),
+      conversationMessageId,
+      message: ['Поддержка КликБук', '', 'Напишите вопрос обычным сообщением. Если нужно — откройте FAQ.'].join('\n'),
+      keyboard: buildVkSupportKeyboard(token),
     });
     return;
   }
 
   if (action === 'back_main' || action === 'noop') {
-    await answerVkMessageEvent({
-      eventId,
-      userId: vkUserId,
-      peerId,
-      text: 'Главное меню отправлено.',
-    }).catch((error) => logVkWebhookError('answer main menu', error));
+    await answerVkMessageEvent({ eventId, userId: vkUserId, peerId, text: 'Главное меню.' })
+      .catch((error) => logVkWebhookError('answer main menu', error));
 
-    await sendVkReply({
-      label: 'main_menu',
+    await editOrSendVkCard({
       peerId,
-      textPreview: 'Главное меню КликБук.',
-      send: () => sendVkBotWelcomeMessage({ peerId, token }),
+      conversationMessageId,
+      message: ['КликБук на связи ✅', '', 'Выберите действие ниже.'].join('\n'),
+      keyboard: buildVkMainMenuKeyboard(token),
     });
     return;
   }

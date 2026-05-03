@@ -22,7 +22,7 @@ import {
   buildVkRescheduleProposalKeyboard,
   createRescheduleProposal,
 } from '@/lib/server/booking-reschedule-proposals';
-import { bookingMessageText, bookingShortContext, bookingThreadMetadata } from '@/lib/server/booking-context';
+import { bookingMasterToClientText, bookingMessageText, bookingShortContext, bookingThreadMetadata } from '@/lib/server/booking-context';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;

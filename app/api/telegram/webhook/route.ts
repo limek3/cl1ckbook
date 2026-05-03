@@ -16,7 +16,7 @@ import {
   listChatsForWorkspace,
   updateChatThread,
 } from '@/lib/server/supabase-chats';
-import { bookingMessageText, bookingSelectionLabel, bookingShortContext, bookingThreadMetadata } from '@/lib/server/booking-context';
+import { bookingChoiceText, bookingClientCardText, bookingMessageText, bookingSelectionLabel, bookingShortContext, bookingThreadMetadata } from '@/lib/server/booking-context';
 import {
   getAppUrl,
   answerTelegramCallbackQuery,
@@ -271,13 +271,21 @@ async function ensureTelegramClientPersistentMenu(chatId: number | string, links
     );
   }
 
+  // Telegram требует отправить сообщение, чтобы обновить reply-keyboard под полем ввода.
+  // Отправляем технический символ и сразу удаляем сообщение: клиент не видит фразу
+  // «меню включено», а кнопки остаются доступными.
   const response = await sendTelegramMessage({
     chatId,
-    text: 'Меню клиента включено. Кнопки доступны под полем ввода.',
+    text: '·',
     replyMarkup: telegramClientMenuReplyMarkup(),
   });
 
-  await rememberClientKeyboardMessage(knownLinks, extractTelegramMessageId(response));
+  const messageId = extractTelegramMessageId(response);
+  if (messageId) {
+    await safeTask('delete silent reply keyboard carrier', () =>
+      deleteTelegramMessage({ chatId, messageId }),
+    );
+  }
 }
 
 
@@ -316,20 +324,40 @@ async function editStoredClientMenuMessage(params: {
 }
 
 async function sendClientLinkingHelp(chatId: number | string) {
-  await sendTelegramMessage({
+  const links = await getConfirmedTelegramBookingLinks(chatId, 8).catch(() => [] as BookingLinkRow[]);
+
+  const text = [
+    'Помощь КликБук',
+    '',
+    links.length > 0
+      ? 'Выберите запись кнопкой ниже или напишите сообщение после выбора записи.'
+      : 'Я пока не вижу связанную запись. Вернитесь на страницу заявки и нажмите «Подключить Telegram».',
+    '',
+    'Если Telegram просто открыл этот чат — скопируйте короткий код со страницы заявки и отправьте его сюда.',
+  ].join('\n').replace(/\n{3,}/g, '\n\n');
+
+  const replyMarkup = links.length > 0
+    ? {
+        inline_keyboard: [
+          [{ text: '📋 Мои записи', callback_data: 'bookings:list' }],
+          [{ text: '💬 Выбрать запись', callback_data: 'bookings:list' }],
+        ],
+      }
+    : undefined;
+
+  if (links.length > 0 && replyMarkup && await editStoredClientMenuMessage({ chatId, links, text, replyMarkup })) {
+    await ensureTelegramClientPersistentMenu(chatId, links);
+    return;
+  }
+
+  await forgetClientMenuMessage(chatId, links);
+  const response = await sendTelegramMessage({
     chatId,
-    text: [
-      'Я пока не вижу связанную запись.',
-      '',
-      'Как подключить Telegram к заявке:',
-      '1. Вернитесь на страницу записи.',
-      '2. Нажмите «Подключить Telegram».',
-      '3. Если бот просто открылся без привязки — скопируйте код со страницы заявки и отправьте его сюда одним сообщением.',
-      '',
-      'Важно: обычный /start без кода не связывает запись с клиентом.',
-    ].join('\n'),
-    replyMarkup: telegramClientMenuReplyMarkup(),
+    text,
+    replyMarkup: replyMarkup ?? telegramClientMenuReplyMarkup(),
   });
+  if (links.length > 0) await rememberClientMenuMessage(links, extractTelegramMessageId(response));
+  await ensureTelegramClientPersistentMenu(chatId, links);
 }
 
 function mapBookingRow(row: BookingRow): Booking {
@@ -1243,16 +1271,16 @@ async function sendTelegramBookingDetails(params: {
     return;
   }
 
-  const text = bookingMessageText({
-    title: params.title || 'Детали записи',
+  const text = bookingClientCardText({
+    title: params.title || 'Ваша запись',
     booking,
     profile,
-    footer: 'Нажмите «Написать по этой записи» и отправьте сообщение. Мастер увидит нужную услугу.',
+    footer: 'Нажмите «Написать по этой записи» и отправьте сообщение.',
   });
   const replyMarkup = {
     inline_keyboard: [
       [{ text: '💬 Написать по этой записи', callback_data: `chatctx:${params.link.token}` }],
-      [{ text: '📋 Мои записи', callback_data: 'bookings:list' }, { text: '🆘 Помощь', callback_data: 'bookings:help' }],
+      [{ text: '📋 Мои записи', callback_data: 'bookings:list' }],
     ],
   };
 

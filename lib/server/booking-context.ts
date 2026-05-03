@@ -123,3 +123,63 @@ export function bookingMessageText(params: {
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
+
+
+export function compactDateTime(booking: Pick<Booking, 'date' | 'time'>) {
+  return `${booking.date} · ${booking.time}`.trim();
+}
+
+export function bookingClientCardText(params: {
+  title?: string;
+  booking: Booking;
+  profile?: MasterProfile | null;
+  footer?: string | null;
+  includeComment?: boolean;
+}) {
+  const booking = params.booking;
+  const masterName = masterDisplayName(params.profile, booking.masterSlug || 'мастер');
+  const services = normalizeBookingServices(booking);
+  const serviceLine = services.length > 1 ? services.join(' + ') : services[0] || 'Услуга не указана';
+  const comment = String(booking.comment || '').trim();
+
+  const lines: Array<string | null | undefined> = [
+    params.title || 'Ваша запись',
+    '',
+    `${bookingCode(booking)} · ${masterName}`,
+    serviceLine,
+    compactDateTime(booking),
+    params.includeComment !== false && comment ? '' : null,
+    params.includeComment !== false && comment ? `Комментарий: ${comment}` : null,
+    params.footer ? '' : null,
+    params.footer || null,
+  ];
+
+  return lines
+    .filter((line) => line !== null && line !== undefined)
+    .map((line) => String(line))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+export function bookingChoiceText(count: number) {
+  return [
+    count > 1 ? `У вас ${count} активных записей.` : 'Ваша активная запись.',
+    'Выберите запись ниже. Следующее сообщение уйдёт мастеру именно по выбранной услуге.',
+  ].join('\n\n');
+}
+
+export function bookingMasterToClientText(params: {
+  booking: Booking;
+  profile?: MasterProfile | null;
+  message: string;
+}) {
+  const context = bookingClientCardText({
+    title: 'Сообщение от мастера',
+    booking: params.booking,
+    profile: params.profile,
+    includeComment: false,
+  });
+
+  return `${context}\n\n${params.message.trim()}`.trim();
+}

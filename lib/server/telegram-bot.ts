@@ -2,7 +2,7 @@ import 'server-only';
 
 import type { Booking, MasterProfile } from '@/lib/types';
 import { getMasterAddress, getMasterLocationMode, getMasterRouteUrl } from '@/lib/location-links';
-import { bookingCode, bookingMessageText, bookingServicesText, masterDisplayName } from '@/lib/server/booking-context';
+import { bookingClientCardText, bookingCode, bookingMessageText, bookingServicesText, masterDisplayName } from '@/lib/server/booking-context';
 
 export function getAppUrl() {
   return (process.env.NEXT_PUBLIC_APP_URL || 'https://www.кликбук.рф').replace(/\/$/, '');
@@ -224,22 +224,13 @@ export async function sendClientBookingConfirmation(params: {
   bookingToken?: string | null;
   hasMultipleBookings?: boolean;
 }) {
-  const placeLines = buildVisitPlaceLines(params.profile);
-  const footer = [
-    ...placeLines,
-    '',
-    'Мы пришлём напоминание до визита.',
-    'Если потребуется перенос — можно будет ответить кнопкой в этом чате.',
-    params.hasMultipleBookings
-      ? 'У вас несколько активных записей. Нажмите «Мои записи и услуги», чтобы выбрать нужную запись для переписки.'
-      : null,
-  ]
-    .filter(Boolean)
-    .join('\n');
+  const footer = params.hasMultipleBookings
+    ? 'У вас несколько записей. Откройте «Мои записи», чтобы выбрать нужную для переписки.'
+    : 'Мы пришлём напоминание до визита.';
 
   return sendTelegramMessage({
     chatId: params.chatId,
-    text: bookingMessageText({
+    text: bookingClientCardText({
       title: 'Запись создана ✅',
       booking: params.booking,
       profile: params.profile,
@@ -250,7 +241,7 @@ export async function sendClientBookingConfirmation(params: {
         ...(params.bookingToken
           ? [[{ text: '💬 Написать по этой записи', callback_data: `chatctx:${params.bookingToken}` }]]
           : []),
-        [{ text: '📋 Мои записи и услуги', callback_data: 'bookings:list' }],
+        [{ text: '📋 Мои записи', callback_data: 'bookings:list' }],
       ],
     },
   });
