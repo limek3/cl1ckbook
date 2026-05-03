@@ -178,13 +178,13 @@ function telegramBackMenuReplyMarkup() {
 function telegramBookingActionReplyMarkup() {
   return {
     keyboard: [
-      [{ text: '🔁 Хочу перенести' }, { text: '❌ Хочу отменить' }],
+      [{ text: '🔁 Перенести' }, { text: '❌ Отменить' }],
       [{ text: '💬 Написать мастеру' }, { text: '⬅️ Назад' }],
     ],
     resize_keyboard: true,
     one_time_keyboard: false,
     is_persistent: true,
-    input_field_placeholder: 'Выберите действие по записи…',
+    input_field_placeholder: 'Действие по записи…',
   };
 }
 
@@ -207,8 +207,8 @@ function telegramMenuActionFromText(value?: string): TelegramClientMenuAction | 
   if (text === '⬅️ назад' || text === 'назад') return 'back';
   if (text.includes('мои записи') || text === 'записи' || text === '/bookings') return 'bookings';
   if (text.includes('написать мастеру') || text.includes('выбрать запись') || text === '/choose') return 'write';
-  if (text.includes('хочу перенести')) return 'reschedule';
-  if (text.includes('хочу отменить')) return 'cancel';
+  if (text.includes('хочу перенести') || text.includes('перенести')) return 'reschedule';
+  if (text.includes('хочу отменить') || text.includes('отменить')) return 'cancel';
   if (text.includes('перенос') || text.includes('отмена') || text === '/reschedule') return 'reschedule_cancel';
   if (text.includes('помощ') || text === '/help') return 'help';
   return null;
@@ -395,11 +395,10 @@ async function sendOrReplaceTelegramClientCard(params: {
 
 async function buildTelegramBookingSelectionReplyMarkup(links: BookingLinkRow[]) {
   const rows: Array<Array<{ text: string }>> = [];
+  const buttons = links.slice(0, 8).map((_, index) => ({ text: String(index + 1) }));
 
-  for (const [index, link] of links.slice(0, 8).entries()) {
-    const { booking, profile } = await getBookingFromLink(link);
-    if (!booking) continue;
-    rows.push([{ text: `${index + 1}. ${bookingSelectionLabel(booking, profile)}`.slice(0, 96) }]);
+  for (let i = 0; i < buttons.length; i += 4) {
+    rows.push(buttons.slice(i, i + 4));
   }
 
   rows.push([{ text: '⬅️ Назад' }]);
@@ -409,7 +408,7 @@ async function buildTelegramBookingSelectionReplyMarkup(links: BookingLinkRow[])
     resize_keyboard: true,
     one_time_keyboard: false,
     is_persistent: true,
-    input_field_placeholder: 'Выберите запись…',
+    input_field_placeholder: 'Выберите номер…',
   };
 }
 
@@ -422,7 +421,7 @@ async function buildTelegramBookingsListText(links: BookingLinkRow[], title = '�
     lines.push(`${index + 1}. ${bookingSelectionLabel(booking, profile)}`);
   }
 
-  lines.push('', 'Выберите действие в нижнем меню.');
+  lines.push('', 'Выберите номер в нижнем меню.');
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
@@ -439,8 +438,8 @@ async function sendClientLinkingHelp(chatId: number | string) {
     'Помощь КликБук',
     '',
     links.length > 0
-      ? 'Используйте нижнее меню: «Мои записи», «Написать мастеру» или «Перенос / отмена». Все действия идут по выбранной записи.'
-      : 'Я пока не вижу связанную запись. Вернитесь на страницу заявки и нажмите «Подключить Telegram».',
+      ? 'Нижнее меню: записи, сообщение мастеру, перенос/отмена. Действия идут по выбранной записи.'
+      : 'Запись пока не связана. Вернитесь на страницу заявки и нажмите «Подключить Telegram».',
     links.length > 0 ? '' : '',
     links.length > 0 ? null : 'Если Telegram просто открыл чат — скопируйте короткий код со страницы заявки и отправьте его сюда.',
   ].filter(Boolean).join('\n').replace(/\n{3,}/g, '\n\n');
@@ -1385,7 +1384,7 @@ async function sendTelegramBookingDetails(params: {
     title: params.title || 'Ваша запись',
     booking,
     profile,
-    footer: 'Теперь напишите сообщение — мастер увидит эту запись.',
+    footer: 'Напишите сообщение — мастер увидит выбранную запись.',
   });
 
   await sendOrReplaceTelegramClientCard({
@@ -1436,17 +1435,10 @@ async function sendTelegramBookingChoice(params: {
   const mode = params.mode ?? 'choosing_chat_booking';
   await setTelegramClientState(params.links, { clientMode: mode });
 
-  const text = mode === 'choosing_action_booking'
-    ? [
-        `У вас ${params.links.length} активных записей.`,
-        '',
-        'Выберите запись для переноса или отмены через нижнее меню.',
-      ].join('\n')
-    : [
-        `У вас ${params.links.length} активных записей.`,
-        '',
-        'Выберите запись через нижнее меню — следующее сообщение уйдёт мастеру именно по выбранной услуге.',
-      ].join('\n');
+  const text = await buildTelegramBookingsListText(
+    params.links,
+    mode === 'choosing_action_booking' ? 'Выберите запись для действия' : 'Выберите запись для переписки',
+  );
 
   await sendOrReplaceTelegramClientCard({
     chatId: params.chatId,
@@ -1599,7 +1591,9 @@ async function handleClientChatMessage(params: {
 
   const confirmedLinks = Array.isArray(linkRows) ? (linkRows as BookingLinkRow[]) : [];
   const menuAction = telegramMenuActionFromText(text);
-  const mode = linkClientMode(confirmedLinks);
+  const activeContextForMode = getActiveChatContextLink(confirmedLinks);
+  const activeContextMode = activeContextForMode ? linkMetadata(activeContextForMode).clientMode : null;
+  const mode = typeof activeContextMode === 'string' && activeContextMode ? activeContextMode : linkClientMode(confirmedLinks);
   const numberedLink = await getLinkForTelegramButton(text, confirmedLinks);
 
   if (menuAction || numberedLink) {
@@ -1612,7 +1606,7 @@ async function handleClientChatMessage(params: {
       await sendOrReplaceTelegramClientCard({
         chatId: params.chatId,
         links: confirmedLinks,
-        text: 'Главное меню КликБук. Выберите действие ниже.',
+        text: 'Главное меню. Выберите действие.',
         replyMarkup: telegramClientMenuReplyMarkup(),
       });
     }
@@ -1635,13 +1629,16 @@ async function handleClientChatMessage(params: {
       return;
     }
 
-    if (confirmedLinks.length === 1) {
+    const activeLink = getActiveChatContextLink(confirmedLinks);
+    if (confirmedLinks.length === 1 || activeLink) {
+      const link = activeLink ?? confirmedLinks[0];
       const now = new Date().toISOString();
-      await setTelegramClientState(confirmedLinks, { clientMode: 'writing_to_master', activeChatContextAt: now });
+      await setTelegramClientState(confirmedLinks, { clientMode: 'writing_to_master', activeChatContextAt: null });
+      await setTelegramClientState([link], { activeChatContextAt: now });
       await sendTelegramBookingDetails({
         chatId: params.chatId,
-        link: confirmedLinks[0],
-        title: 'Выбрана запись для переписки',
+        link,
+        title: 'Запись выбрана',
         knownLinks: confirmedLinks,
       });
       return;
@@ -1657,10 +1654,13 @@ async function handleClientChatMessage(params: {
       return;
     }
 
-    if (confirmedLinks.length === 1) {
-      const { booking, profile } = await getBookingFromLink(confirmedLinks[0]);
+    const activeLink = getActiveChatContextLink(confirmedLinks);
+    if (confirmedLinks.length === 1 || activeLink) {
+      const link = activeLink ?? confirmedLinks[0];
+      const { booking, profile } = await getBookingFromLink(link);
       if (booking) {
-        await setTelegramClientState(confirmedLinks, { clientMode: 'booking_action', activeChatContextAt: new Date().toISOString() });
+        await setTelegramClientState(confirmedLinks, { clientMode: 'booking_action', activeChatContextAt: null });
+        await setTelegramClientState([link], { activeChatContextAt: new Date().toISOString() });
         await sendOrReplaceTelegramClientCard({
           chatId: params.chatId,
           links: confirmedLinks,
@@ -1668,7 +1668,7 @@ async function handleClientChatMessage(params: {
             title: 'Действия по записи',
             booking,
             profile,
-            footer: 'Выберите действие в нижнем меню.',
+            footer: 'Выберите действие ниже.',
           }),
           replyMarkup: telegramBookingActionReplyMarkup(),
         });
@@ -1705,7 +1705,7 @@ async function handleClientChatMessage(params: {
           title: 'Действия по записи',
           booking,
           profile,
-          footer: 'Выберите действие в нижнем меню.',
+          footer: 'Выберите действие ниже.',
         }),
         replyMarkup: telegramBookingActionReplyMarkup(),
       });
@@ -1736,16 +1736,17 @@ async function handleClientChatMessage(params: {
 
     await setTelegramClientState(confirmedLinks, {
       clientMode: 'writing_to_master',
-      activeChatContextAt: new Date().toISOString(),
+      activeChatContextAt: null,
     });
+    await setTelegramClientState([link], { activeChatContextAt: new Date().toISOString() });
 
     await sendOrReplaceTelegramClientCard({
       chatId: params.chatId,
       links: confirmedLinks,
       text: result?.ok
         ? clientAction === 'reschedule'
-          ? 'Запрос на перенос отправлен мастеру. Он ответит в этом чате.'
-          : 'Запрос на отмену отправлен мастеру. Он ответит в этом чате.'
+          ? 'Запрос на перенос отправлен мастеру.'
+          : 'Запрос на отмену отправлен мастеру.'
         : 'Не удалось отправить запрос мастеру. Напишите сообщение обычным текстом.',
       replyMarkup: telegramClientMenuReplyMarkup(),
     });

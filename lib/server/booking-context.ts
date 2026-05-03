@@ -53,12 +53,19 @@ export function bookingShortContext(booking: Booking) {
   return `${serviceLabel} · ${booking.date} ${booking.time}`.trim();
 }
 
+
+function compactHumanDate(value?: string | null) {
+  const raw = String(value || '').trim();
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${match[3]}.${match[2]}` : raw;
+}
+
 export function bookingSelectionLabel(booking: Booking, profile?: MasterProfile | null) {
   const services = normalizeBookingServices(booking);
   const firstService = services[0] || 'запись';
   const serviceLabel = services.length > 1 ? `${firstService} +${services.length - 1}` : firstService;
   const master = masterDisplayName(profile, booking.masterSlug || 'мастер');
-  return `${master} · ${serviceLabel} · ${booking.date} ${booking.time}`.slice(0, 64);
+  return `${master} · ${serviceLabel} · ${compactHumanDate(booking.date)} ${booking.time}`.slice(0, 64);
 }
 
 export function bookingChatTitle(booking: Booking, profile?: MasterProfile | null) {
@@ -94,31 +101,24 @@ export function bookingMessageText(params: {
 }) {
   const booking = params.booking;
   const masterName = masterDisplayName(params.profile, booking.masterSlug || 'мастер');
+  const serviceLine = normalizeBookingServices(booking).join(' + ');
+  const meta = [bookingCode(booking), masterName].filter(Boolean).join(' · ');
   const lines: Array<string | null | undefined> = [
     params.title,
-    '',
-    `Запись: ${bookingCode(booking)}`,
-    `Мастер: ${masterName}`,
+    meta,
     params.includeClient ? `Клиент: ${booking.clientName}` : null,
     params.includePhone ? `Телефон: ${booking.clientPhone}` : null,
-    '',
-    'Услуги:',
-    bookingServicesText(booking),
-    '',
-    `Дата: ${booking.date}`,
-    `Время: ${booking.time}`,
+    serviceLine,
+    `${booking.date} · ${booking.time}`,
+    booking.comment ? `Комментарий: ${booking.comment}` : null,
     params.source ? `Источник: ${params.source}` : null,
-    params.channel ? `Канал связи: ${params.channel}` : null,
-    booking.comment ? '' : null,
-    booking.comment ? 'Комментарий:' : null,
-    booking.comment || null,
-    params.footer ? '' : null,
+    params.channel ? `Канал: ${params.channel}` : null,
     params.footer || null,
   ];
 
   return lines
-    .filter((line) => line !== null && line !== undefined)
-    .map((line) => String(line))
+    .filter((line) => line !== null && line !== undefined && String(line).trim())
+    .map((line) => String(line).trim())
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
@@ -126,7 +126,7 @@ export function bookingMessageText(params: {
 
 
 export function compactDateTime(booking: Pick<Booking, 'date' | 'time'>) {
-  return `${booking.date} · ${booking.time}`.trim();
+  return `${compactHumanDate(booking.date)} · ${booking.time}`.trim();
 }
 
 export function bookingClientCardText(params: {
@@ -148,13 +148,12 @@ export function bookingClientCardText(params: {
     serviceLine,
     compactDateTime(booking),
     params.includeComment !== false && comment ? `Комментарий: ${comment}` : null,
-    params.footer ? '' : null,
     params.footer || null,
   ];
 
   return lines
-    .filter((line) => line !== null && line !== undefined)
-    .map((line) => String(line))
+    .filter((line) => line !== null && line !== undefined && String(line).trim())
+    .map((line) => String(line).trim())
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
@@ -163,8 +162,8 @@ export function bookingClientCardText(params: {
 export function bookingChoiceText(count: number) {
   return [
     count > 1 ? `У вас ${count} активных записей.` : 'Ваша активная запись.',
-    'Выберите запись ниже. Следующее сообщение уйдёт мастеру именно по выбранной услуге.',
-  ].join('\n\n');
+    'Выберите номер в нижнем меню.',
+  ].join('\n');
 }
 
 export function bookingMasterToClientText(params: {

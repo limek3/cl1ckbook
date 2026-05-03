@@ -227,10 +227,10 @@ type VkClientMenuAction =
 function vkClientMenuActionFromText(value: unknown): VkClientMenuAction | null {
   const text = normalizedText(value).replace(/ё/g, 'е');
   if (!text) return null;
-  if (text.includes('хочу перенести')) return 'reschedule';
-  if (text.includes('хочу отменить')) return 'cancel';
+  if (text.includes('хочу перенести') || text.includes('перенести')) return 'reschedule';
+  if (text.includes('хочу отменить') || text.includes('отменить')) return 'cancel';
   if (text.includes('мои записи')) return 'bookings';
-  if (text.includes('написать мастеру') || text.includes('выбрать запись')) return 'write';
+  if (text.includes('написать мастеру') || text.includes('мастеру') || text.includes('выбрать запись')) return 'write';
   if (text.includes('перенос') || text.includes('отмена')) return 'reschedule_cancel';
   if (text.includes('помощ') || text === 'sos') return 'help';
   if (text.includes('назад')) return 'back';
@@ -681,9 +681,20 @@ function extractVkConversationMessageId(response: unknown) {
   if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value);
   if (typeof value === 'string' && /^\d+$/.test(value)) return Number(value);
   if (value && typeof value === 'object') {
-    const nested = (value as { conversation_message_id?: unknown }).conversation_message_id;
-    if (typeof nested === 'number' && Number.isFinite(nested)) return Math.trunc(nested);
-    if (typeof nested === 'string' && /^\d+$/.test(nested)) return Number(nested);
+    const payload = value as Record<string, unknown>;
+    const candidates = [
+      payload.conversation_message_id,
+      payload.conversationMessageId,
+      payload.cmid,
+      payload.message_id,
+      payload.messageId,
+      payload.id,
+    ];
+
+    for (const candidate of candidates) {
+      if (typeof candidate === 'number' && Number.isFinite(candidate)) return Math.trunc(candidate);
+      if (typeof candidate === 'string' && /^\d+$/.test(candidate)) return Number(candidate);
+    }
   }
   return null;
 }
@@ -812,11 +823,11 @@ function buildVkClientBackKeyboard() {
 function buildVkClientActionKeyboard() {
   return buildVkReplyKeyboard([
     [
-      { label: '🔁 Хочу перенести', action: 'client_action_reschedule', color: 'primary' },
-      { label: '❌ Хочу отменить', action: 'client_action_cancel', color: 'negative' },
+      { label: '🔁 Перенести', action: 'client_action_reschedule', color: 'primary' },
+      { label: '❌ Отменить', action: 'client_action_cancel', color: 'negative' },
     ],
     [
-      { label: '💬 Написать мастеру', action: 'client_write', color: 'secondary' },
+      { label: '💬 Мастеру', action: 'client_write', color: 'secondary' },
       { label: '⬅️ Назад', action: 'client_back', color: 'secondary' },
     ],
   ]);
@@ -871,8 +882,8 @@ async function sendVkClientBookingDetails(params: {
       booking,
       profile,
       footer: params.actionMode
-        ? 'Выберите действие в нижнем меню.'
-        : 'Теперь напишите сообщение — мастер увидит эту запись.',
+        ? 'Выберите действие ниже.'
+        : 'Напишите сообщение — мастер увидит выбранную запись.',
     }),
     keyboard: params.actionMode ? buildVkClientActionKeyboard() : buildVkClientMenuKeyboard(),
   });
@@ -903,28 +914,34 @@ async function sendVkClientBookingChoice(peerId: number | string, mode: 'choosin
   await setVkClientState(links, { clientMode: mode });
 
   const rows: Array<Array<{ label: string; action: string; token?: string | null; color?: 'primary' | 'secondary' }>> = [];
+  const buttons: Array<{ label: string; action: string; token?: string | null; color?: 'primary' | 'secondary' }> = [];
 
   for (const [index, link] of links.entries()) {
-    const { booking, profile } = await getVkBookingFromLink(link);
-    if (!booking) continue;
-    rows.push([
-      {
-        label: `${index + 1}. ${bookingSelectionLabel(booking, profile)}`.slice(0, 40),
-        action: 'client_chat_context',
-        token: link.token,
-        color: 'primary',
-      },
-    ]);
+    buttons.push({
+      label: String(index + 1),
+      action: 'client_chat_context',
+      token: link.token,
+      color: 'primary',
+    });
+  }
+
+  for (let i = 0; i < buttons.length; i += 4) {
+    rows.push(buttons.slice(i, i + 4));
   }
 
   rows.push([{ label: '⬅️ Назад', action: 'client_back', color: 'secondary' }]);
 
+  const listLines = ['Выберите номер записи:', ''];
+  for (const [index, link] of links.entries()) {
+    const { booking, profile } = await getVkBookingFromLink(link);
+    if (!booking) continue;
+    listLines.push(`${index + 1}. ${bookingSelectionLabel(booking, profile)}`);
+  }
+
   await sendOrEditVkClientCard({
     peerId,
     links,
-    message: mode === 'choosing_action_booking'
-      ? 'Выберите запись для переноса или отмены.'
-      : 'Выберите запись — я закреплю её за перепиской.',
+    message: listLines.join('\n').trim(),
     keyboard: buildVkReplyKeyboard(rows),
   });
 }
@@ -995,15 +1012,16 @@ async function handleVkClientMenuBookingAction(params: {
     return null;
   });
 
-  await setVkClientState(links, { clientMode: 'writing_to_master', activeChatContextAt: new Date().toISOString() });
+  await setVkClientState(links, { clientMode: 'writing_to_master', activeChatContextAt: null });
+  await setVkClientState([link], { activeChatContextAt: new Date().toISOString() });
 
   await sendOrEditVkClientCard({
     peerId: params.peerId,
     links,
     message: result?.ok
       ? params.action === 'reschedule'
-        ? 'Запрос на перенос отправлен мастеру. Он ответит в этом чате.'
-        : 'Запрос на отмену отправлен мастеру. Он ответит в этом чате.'
+        ? 'Запрос на перенос отправлен мастеру.'
+        : 'Запрос на отмену отправлен мастеру.'
       : 'Не удалось отправить запрос мастеру. Напишите сообщение обычным текстом.',
     keyboard: buildVkClientMenuKeyboard(),
   });
@@ -1212,7 +1230,7 @@ async function handleMessageNew(payload: VkCallbackPayload) {
     await sendOrEditVkClientCard({
       peerId,
       links: clientLinksForText,
-      message: 'Главное меню КликБук. Выберите действие ниже.',
+      message: 'Главное меню. Выберите действие.',
       keyboard: buildVkClientMenuKeyboard(),
     });
     return;
@@ -1222,7 +1240,7 @@ async function handleMessageNew(payload: VkCallbackPayload) {
     await sendOrEditVkClientCard({
       peerId,
       links: clientLinksForText,
-      message: 'Помощь КликБук\n\nИспользуйте нижнее меню: «Мои записи», «Написать мастеру» или «Перенос / отмена».',
+      message: 'Помощь КликБук\n\nНижнее меню: записи, сообщение мастеру, перенос/отмена.',
       keyboard: buildVkClientMenuKeyboard(),
     });
     return;
@@ -1234,11 +1252,27 @@ async function handleMessageNew(payload: VkCallbackPayload) {
   }
 
   if (clientMenuAction === 'write') {
+    const activeLink = getActiveVkChatContextLink(clientLinksForText);
+    if (clientLinksForText.length === 1 || activeLink) {
+      const link = activeLink ?? clientLinksForText[0];
+      await setVkClientState(clientLinksForText, { clientMode: 'writing_to_master', activeChatContextAt: null });
+      await setVkClientState([link], { activeChatContextAt: new Date().toISOString() });
+      await sendVkClientBookingDetails({ peerId, link, title: 'Запись выбрана' });
+      return;
+    }
     await sendVkClientBookingChoice(peerId, 'choosing_chat_booking');
     return;
   }
 
   if (clientMenuAction === 'reschedule_cancel') {
+    const activeLink = getActiveVkChatContextLink(clientLinksForText);
+    if (clientLinksForText.length === 1 || activeLink) {
+      const link = activeLink ?? clientLinksForText[0];
+      await setVkClientState(clientLinksForText, { clientMode: 'booking_action', activeChatContextAt: null });
+      await setVkClientState([link], { activeChatContextAt: new Date().toISOString() });
+      await sendVkClientBookingDetails({ peerId, link, title: 'Действия по записи', actionMode: true });
+      return;
+    }
     await sendVkClientBookingChoice(peerId, 'choosing_action_booking');
     return;
   }
@@ -1580,7 +1614,7 @@ async function handleMessageEvent(payload: VkCallbackPayload) {
     await sendOrEditVkClientCard({
       peerId,
       links,
-      message: 'Главное меню КликБук. Выберите действие ниже.',
+      message: 'Главное меню. Выберите действие.',
       keyboard: buildVkClientMenuKeyboard(token),
     });
     return;
@@ -1646,7 +1680,7 @@ async function handleMessageEvent(payload: VkCallbackPayload) {
       await sendOrEditVkClientCard({
         peerId,
         links,
-        message: 'Помощь КликБук\n\nИспользуйте нижнее меню: «Мои записи», «Написать мастеру» или «Перенос / отмена».',
+        message: 'Помощь КликБук\n\nНижнее меню: записи, сообщение мастеру, перенос/отмена.',
         keyboard: buildVkClientMenuKeyboard(token),
       });
       return;

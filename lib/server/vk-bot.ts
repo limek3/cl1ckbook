@@ -178,7 +178,7 @@ export function buildVkReplyKeyboard(buttons: Array<Array<VkBotButton>>) {
     buttons: buttons.map((row) =>
       row.map((button) => ({
         action: {
-          type: 'callback',
+          type: 'text',
           label: button.label,
           payload: JSON.stringify({
             action: button.action || 'noop',
@@ -197,10 +197,10 @@ export function buildVkClientMenuKeyboard(token?: string | null) {
   return buildVkReplyKeyboard([
     [
       { label: '📋 Мои записи', action: 'client_bookings', token: token ?? null, color: 'primary' },
-      { label: '💬 Написать мастеру', action: 'client_write', token: token ?? null, color: 'secondary' },
+      { label: '💬 Мастеру', action: 'client_write', token: token ?? null, color: 'secondary' },
     ],
     [
-      { label: '🔁 Перенос / отмена', action: 'client_reschedule_cancel', token: token ?? null, color: 'secondary' },
+      { label: '🔁 Перенос/отмена', action: 'client_reschedule_cancel', token: token ?? null, color: 'secondary' },
       { label: '🆘 Помощь', action: 'support', token: token ?? null, color: 'secondary' },
     ],
   ]);
