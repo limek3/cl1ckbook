@@ -26,6 +26,19 @@ export interface ServiceInsight {
   category: string;
 }
 
+
+export interface ClientBookingSummary {
+  id: string;
+  code: string;
+  service: string;
+  services: string[];
+  date: string;
+  time: string;
+  status: BookingStatus;
+  source?: string;
+  channel?: string;
+}
+
 export interface ClientInsight {
   id: string;
   name: string;
@@ -42,7 +55,11 @@ export interface ClientInsight {
   service: string;
   hasReschedule?: boolean;
   rescheduleCount?: number;
+  bookings?: ClientBookingSummary[];
+  activeBookingCount?: number;
+  serviceList?: string[];
 }
+
 
 export interface DailyInsight {
   date: string;
@@ -338,6 +355,46 @@ function buildServices(profile: MasterProfile, bookings: Booking[], locale: Loca
   });
 }
 
+
+function normalizeBookingServiceList(value: string) {
+  const raw = String(value || '').trim();
+  if (!raw) return ['Услуга не указана'];
+
+  const cleaned = raw
+    .replace(/[-–—_]{3,}\s*входит\s*:?\s*-?/gi, '')
+    .replace(/\s+входит\s*:?\s*-?\s*$/gi, '')
+    .replace(/^[-–—_\s]+$/g, '')
+    .trim();
+
+  if (!cleaned || /^[-–—_:\s]+$/i.test(cleaned)) return ['Услуга не указана'];
+
+  const parts = cleaned
+    .split(/\n|;|\s\+\s|,\s(?=[А-ЯA-ZЁ])|\s·\s/g)
+    .map((item) => item.replace(/^[-–—_\s]+/, '').replace(/[-–—_\s]+$/, '').trim())
+    .filter(Boolean);
+
+  return parts.length > 0 ? parts : ['Услуга не указана'];
+}
+
+function bookingCodeFromId(id: string) {
+  const compact = String(id || '').replace(/[^a-z0-9]/gi, '').slice(0, 6).toUpperCase();
+  return compact ? `#CB-${compact}` : '#CB';
+}
+
+function bookingSummaryFromBooking(booking: Booking): ClientBookingSummary {
+  return {
+    id: booking.id,
+    code: bookingCodeFromId(booking.id),
+    service: booking.service,
+    services: normalizeBookingServiceList(booking.service),
+    date: booking.date,
+    time: booking.time,
+    status: booking.status,
+    source: booking.source,
+    channel: booking.channel,
+  };
+}
+
 function buildClients(bookings: Booking[], services: ServiceInsight[], locale: Locale): ClientInsight[] {
   const serviceMap = new Map(services.map((service) => [service.name, service]));
   const grouped = new Map<string, Booking[]>();
@@ -393,6 +450,12 @@ function buildClients(bookings: Booking[], services: ServiceInsight[], locale: L
             : 'new';
       const source = normalizeSourceLabel(sorted[0].source ?? sorted[0].channel, locale);
 
+      const bookingSummaries = sorted.map(bookingSummaryFromBooking);
+      const activeBookingSummaries = bookingSummaries.filter((booking) =>
+        booking.status !== 'cancelled' && booking.status !== 'no_show' && booking.status !== 'completed'
+      );
+      const serviceList = Array.from(new Set(bookingSummaries.flatMap((booking) => booking.services)));
+
       return {
         id: key,
         name: sorted[0].clientName,
@@ -406,9 +469,12 @@ function buildClients(bookings: Booking[], services: ServiceInsight[], locale: L
         favorite: sorted.length >= 3 || totalRevenue >= 10000,
         note: String(sorted[0].comment ?? '').trim(),
         source,
-        service: sorted[0].service,
+        service: serviceList[0] ?? sorted[0].service,
         hasReschedule,
         rescheduleCount,
+        bookings: bookingSummaries,
+        activeBookingCount: activeBookingSummaries.length,
+        serviceList,
       };
     })
     .sort((a, b) => b.totalRevenue - a.totalRevenue);

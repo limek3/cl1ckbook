@@ -4,19 +4,29 @@ import type { Booking, MasterProfile } from '@/lib/types';
 
 export function normalizeBookingServices(booking: Pick<Booking, 'service'>) {
   const raw = String(booking.service || '').trim();
-  if (!raw) return ['—'];
+  if (!raw) return ['Услуга не указана'];
 
   const cleaned = raw
     .replace(/[-–—_]{3,}\s*входит\s*:?\s*-?/gi, '')
     .replace(/\s+входит\s*:?\s*-?\s*$/gi, '')
+    .replace(/^[-–—_\s]+$/g, '')
     .trim();
 
-  const parts = cleaned
-    .split(/\n|;|\s\+\s|,\s(?=[А-ЯA-ZЁ])/g)
-    .map((item) => item.trim())
-    .filter(Boolean);
+  const normalized = cleaned || raw;
+  const looksEmpty =
+    !cleaned ||
+    /^[-–—_:\s]+$/i.test(normalized) ||
+    /^[-–—_:\s]*(входит|includes)\s*:?\s*[-–—_:\s]*$/i.test(normalized);
 
-  return parts.length > 0 ? parts : [raw || '—'];
+  if (looksEmpty) return ['Услуга не указана'];
+
+  const parts = normalized
+    .split(/\n|;|\s\+\s|,\s(?=[А-ЯA-ZЁ])|\s·\s/g)
+    .map((item) => item.replace(/^[-–—_\s]+/, '').replace(/[-–—_\s]+$/, '').trim())
+    .filter(Boolean)
+    .filter((item) => !/^входит\s*:?\s*[-–—_\s]*$/i.test(item));
+
+  return parts.length > 0 ? parts : ['Услуга не указана'];
 }
 
 export function bookingCode(booking: Pick<Booking, 'id'>) {
@@ -37,8 +47,18 @@ export function bookingServicesText(booking: Pick<Booking, 'service'>) {
 }
 
 export function bookingShortContext(booking: Booking) {
-  const firstService = normalizeBookingServices(booking)[0] || 'запись';
-  return `${firstService} · ${booking.date} ${booking.time}`.trim();
+  const services = normalizeBookingServices(booking);
+  const firstService = services[0] || 'запись';
+  const serviceLabel = services.length > 1 ? `${firstService} +${services.length - 1}` : firstService;
+  return `${serviceLabel} · ${booking.date} ${booking.time}`.trim();
+}
+
+export function bookingSelectionLabel(booking: Booking, profile?: MasterProfile | null) {
+  const services = normalizeBookingServices(booking);
+  const firstService = services[0] || 'запись';
+  const serviceLabel = services.length > 1 ? `${firstService} +${services.length - 1}` : firstService;
+  const master = masterDisplayName(profile, booking.masterSlug || 'мастер');
+  return `${master} · ${serviceLabel} · ${booking.date} ${booking.time}`.slice(0, 64);
 }
 
 export function bookingChatTitle(booking: Booking, profile?: MasterProfile | null) {

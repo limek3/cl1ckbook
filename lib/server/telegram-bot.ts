@@ -171,28 +171,18 @@ export async function sendMasterBookingNotification(params: {
   workspaceSlug: string;
 }) {
   const appUrl = getAppUrl();
-  const masterName = params.profile?.name || params.workspaceSlug;
 
   return sendTelegramMessage({
     chatId: params.chatId,
-    text: [
-      'Новая запись ✅',
-      '',
-      `Мастер: ${masterName}`,
-      '',
-      `Клиент: ${params.booking.clientName}`,
-      `Телефон: ${params.booking.clientPhone}`,
-      '',
-      'Услуга:',
-      params.booking.service || '—',
-      '',
-      ...bookingDateLines(params.booking),
-      params.booking.comment ? '' : null,
-      params.booking.comment ? 'Комментарий:' : null,
-      params.booking.comment ? params.booking.comment : null,
-    ]
-      .filter(Boolean)
-      .join('\n'),
+    text: bookingMessageText({
+      title: 'Новая запись ✅',
+      booking: params.booking,
+      profile: params.profile,
+      includeClient: true,
+      includePhone: true,
+      source: params.booking.source ?? null,
+      channel: params.booking.channel ?? null,
+    }),
     replyMarkup: {
       inline_keyboard: [
         [
@@ -205,8 +195,10 @@ export async function sendMasterBookingNotification(params: {
         ],
         [
           {
-            text: 'Веб-кабинет',
-            url: `${appUrl}/dashboard/today`,
+            text: 'Открыть чаты',
+            web_app: {
+              url: `${appUrl}/app?redirectTo=${encodeURIComponent('/dashboard/chats')}`,
+            },
           },
         ],
       ],
@@ -218,31 +210,38 @@ export async function sendClientBookingConfirmation(params: {
   chatId: number | string;
   booking: Booking;
   profile?: MasterProfile | null;
+  bookingToken?: string | null;
+  hasMultipleBookings?: boolean;
 }) {
-  const masterName = params.profile?.name || 'мастеру';
   const placeLines = buildVisitPlaceLines(params.profile);
+  const footer = [
+    ...placeLines,
+    '',
+    'Мы пришлём напоминание до визита.',
+    'Если потребуется перенос — можно будет ответить кнопкой в этом чате.',
+    params.hasMultipleBookings
+      ? 'У вас несколько активных записей. Нажмите «Мои записи и услуги», чтобы выбрать нужную запись для переписки.'
+      : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
 
   return sendTelegramMessage({
     chatId: params.chatId,
-    text: [
-      'Запись создана ✅',
-      '',
-      `Здравствуйте, ${params.booking.clientName}.`,
-      '',
-      `Мастер: ${masterName}`,
-      '',
-      'Услуга:',
-      params.booking.service || '—',
-      '',
-      ...bookingDateLines(params.booking),
-      '',
-      ...placeLines,
-      '',
-      'Мы пришлём напоминание до визита.',
-      'Если потребуется перенос — можно будет ответить кнопкой в этом чате.',
-    ]
-      .filter(Boolean)
-      .join('\n'),
+    text: bookingMessageText({
+      title: 'Запись создана ✅',
+      booking: params.booking,
+      profile: params.profile,
+      footer,
+    }),
+    replyMarkup: {
+      inline_keyboard: [
+        ...(params.bookingToken
+          ? [[{ text: '💬 Написать по этой записи', callback_data: `chatctx:${params.bookingToken}` }]]
+          : []),
+        [{ text: '📋 Мои записи и услуги', callback_data: 'bookings:list' }],
+      ],
+    },
   });
 }
 
@@ -285,22 +284,18 @@ export async function sendMasterRescheduleRequestNotification(params: {
   source?: string;
 }) {
   const appUrl = getAppUrl();
-  const masterName = params.profile?.name || params.workspaceSlug;
 
   return sendTelegramMessage({
     chatId: params.chatId,
-    text: [
-      'Клиент хочет перенос ⚠️',
-      '',
-      `Мастер: ${masterName}`,
-      `Клиент: ${params.booking.clientName}`,
-      `Телефон: ${params.booking.clientPhone}`,
-      `Услуга: ${params.booking.service}`,
-      `Старое время: ${bookingDateLabel(params.booking)}`,
-      `Канал: ${params.source || 'Telegram'}`,
-      '',
-      'Слот освобождён. В чатах КликБук создано предупреждение — подберите новое время и ответьте клиенту.',
-    ].join('\n'),
+    text: bookingMessageText({
+      title: 'Клиент хочет перенос ⚠️',
+      booking: params.booking,
+      profile: params.profile,
+      includeClient: true,
+      includePhone: true,
+      source: params.source || 'Telegram',
+      footer: 'Слот освобождён. В чатах КликБук создано предупреждение — подберите новое время и ответьте клиенту.',
+    }),
     replyMarkup: {
       inline_keyboard: [
         [
@@ -330,19 +325,16 @@ export async function sendMasterBookingConfirmedNotice(params: {
   source?: string;
 }) {
   const appUrl = getAppUrl();
-  const masterName = params.profile?.name || params.workspaceSlug;
 
   return sendTelegramMessage({
     chatId: params.chatId,
-    text: [
-      'Клиент подтвердил запись ✅',
-      '',
-      `Мастер: ${masterName}`,
-      `Клиент: ${params.booking.clientName}`,
-      `Услуга: ${params.booking.service}`,
-      `Время: ${bookingDateLabel(params.booking)}`,
-      `Канал: ${params.source || 'Telegram'}`,
-    ].join('\n'),
+    text: bookingMessageText({
+      title: 'Клиент подтвердил запись ✅',
+      booking: params.booking,
+      profile: params.profile,
+      includeClient: true,
+      source: params.source || 'Telegram',
+    }),
     replyMarkup: {
       inline_keyboard: [
         [

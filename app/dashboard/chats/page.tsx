@@ -589,6 +589,23 @@ function getThreadContextLine(thread: ChatThreadRecord | null, locale: 'ru' | 'e
   return [code, service, dateLabel && time ? `${dateLabel} · ${time}` : dateLabel, master].filter(Boolean).join(' · ') || null;
 }
 
+function getThreadClientKey(thread: ChatThreadRecord | null) {
+  if (!thread) return '';
+  const phone = thread.clientPhone.replace(/\D+/g, '');
+  return phone || thread.clientName.trim().toLowerCase();
+}
+
+function getThreadBookingCode(thread: ChatThreadRecord | null) {
+  return typeof thread?.metadata?.bookingCode === 'string' ? thread.metadata.bookingCode : null;
+}
+
+function getThreadServiceLabel(thread: ChatThreadRecord | null) {
+  const services = getThreadServices(thread);
+  if (services.length === 0) return null;
+  return services.length > 1 ? `${services[0]} +${services.length - 1}` : services[0];
+}
+
+
 function sortThreads(
   items: ChatThreadRecord[],
   sortMode: SortMode,
@@ -1086,6 +1103,7 @@ export default function DashboardChatsPage() {
 
   const [mounted, setMounted] = useState(false);
   const demoMode = demoModeFromHook || isDashboardDemoEnabled(searchParams);
+  const targetBookingId = searchParams.get('bookingId');
   const demoStorageKey = getDashboardDemoStorageKey('chats');
   const pinnedStorageKey = `${demoStorageKey}:pinned`;
 
@@ -1302,6 +1320,19 @@ export default function DashboardChatsPage() {
   const activeThread = useMemo(() => {
     return threads.find((item) => item.id === activeThreadId) ?? null;
   }, [activeThreadId, threads]);
+
+  useEffect(() => {
+    if (!targetBookingId || threads.length === 0) return;
+
+    const targetThread = threads.find((thread) => {
+      const bookingId = typeof thread.metadata?.bookingId === 'string' ? thread.metadata.bookingId : null;
+      return bookingId === targetBookingId || thread.id === `booking-thread-${targetBookingId}`;
+    });
+
+    if (targetThread && targetThread.id !== activeThreadId) {
+      setActiveThreadId(targetThread.id);
+    }
+  }, [activeThreadId, targetBookingId, threads]);
 
   const activeMessageSignature = useMemo(() => {
     if (!activeThread) return 'empty';
@@ -1639,6 +1670,29 @@ export default function DashboardChatsPage() {
 
     return sortThreads(next, sortMode, pinnedThreadIds);
   }, [channelFilter, pinnedThreadIds, query, segmentFilter, sortMode, threads]);
+
+  const relatedThreadsByClientKey = useMemo(() => {
+    const map = new Map<string, ChatThreadRecord[]>();
+
+    threads.forEach((thread) => {
+      const key = getThreadClientKey(thread);
+      if (!key) return;
+      const list = map.get(key) ?? [];
+      list.push(thread);
+      map.set(key, list);
+    });
+
+    map.forEach((items, key) => {
+      map.set(key, sortThreads(items, 'recent'));
+    });
+
+    return map;
+  }, [threads]);
+
+  const activeRelatedThreads = useMemo(() => {
+    if (!activeThread) return [] as ChatThreadRecord[];
+    return relatedThreadsByClientKey.get(getThreadClientKey(activeThread)) ?? [];
+  }, [activeThread, relatedThreadsByClientKey]);
 
 
   const setThreadItemRef = useMemo(
@@ -2321,6 +2375,7 @@ export default function DashboardChatsPage() {
     const active = thread.id === activeThreadId;
     const pinned = isThreadPinned(thread.id);
     const activeAlert = getThreadActiveAlert(thread);
+    const relatedThreadCount = relatedThreadsByClientKey.get(getThreadClientKey(thread))?.length ?? 0;
     const canDrag = !mobile && filteredThreads.length > 1 && !preview;
 
     return (
@@ -2438,6 +2493,13 @@ export default function DashboardChatsPage() {
                   {segmentBadgeLabel(thread.segment, locale)}
                 </MicroLabel>
 
+                {relatedThreadCount > 1 ? (
+                  <MicroLabel light={isLight} active className="h-7 px-2 py-0 text-[9px]">
+                    <CalendarClock className="size-3" />
+                    {relatedThreadCount}
+                  </MicroLabel>
+                ) : null}
+
                 <button
                   type="button"
                   className={cn('flex size-8 items-center justify-center rounded-[9px] border transition', isLight ? 'border-black/[0.07] bg-white/70 text-black/34 hover:border-black/[0.12] hover:text-black/64' : 'border-white/[0.07] bg-white/[0.035] text-white/30 hover:border-white/[0.12] hover:text-white/62')}
@@ -2472,6 +2534,12 @@ export default function DashboardChatsPage() {
                 <MicroLabel light={isLight} className="h-6 px-2 py-0 text-[9px]">
                   <CalendarClock className="size-3" />
                   {formatDateLabel(thread.nextVisit, locale)}
+                </MicroLabel>
+              ) : null}
+
+              {relatedThreadCount > 1 ? (
+                <MicroLabel light={isLight} active className="h-6 px-2 py-0 text-[9px]">
+                  {locale === 'ru' ? `${relatedThreadCount} записи` : `${relatedThreadCount} bookings`}
                 </MicroLabel>
               ) : null}
 
@@ -3114,6 +3182,34 @@ export default function DashboardChatsPage() {
                 {getThreadContextLine(activeThread, locale) ? (
                   <div className={cn('mt-1 truncate text-[12px] font-semibold', pageText(isLight))}>
                     {getThreadContextLine(activeThread, locale)}
+                  </div>
+                ) : null}
+
+                {activeRelatedThreads.length > 1 ? (
+                  <div className="mt-2 flex max-w-full gap-1.5 overflow-x-auto pb-1">
+                    {activeRelatedThreads.map((thread) => {
+                      const selected = thread.id === activeThread.id;
+                      return (
+                        <button
+                          key={thread.id}
+                          type="button"
+                          onClick={() => handleSelectThread(thread)}
+                          className={cn(
+                            'inline-flex max-w-[240px] shrink-0 items-center gap-1.5 rounded-[9px] border px-2.5 py-1.5 text-[10.5px] font-semibold transition active:scale-[0.985]',
+                            selected
+                              ? 'cb-accent-pill-active'
+                              : isLight
+                                ? 'border-black/[0.08] bg-white text-black/48 hover:text-black'
+                                : 'border-white/[0.08] bg-white/[0.04] text-white/42 hover:text-white',
+                          )}
+                          title={getThreadContextLine(thread, locale) ?? thread.clientName}
+                        >
+                          <span className="truncate">
+                            {getThreadBookingCode(thread) ?? 'CB'} · {getThreadServiceLabel(thread) ?? (locale === 'ru' ? 'запись' : 'booking')}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 ) : null}
 

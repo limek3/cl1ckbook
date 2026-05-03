@@ -287,6 +287,27 @@ function StepRail({
   );
 }
 
+
+function normalizeVisibleServices(value: string) {
+  const raw = String(value || '').trim();
+  if (!raw) return ['—'];
+
+  const cleaned = raw
+    .replace(/[-–—_]{3,}\s*входит\s*:?\s*-?/gi, '')
+    .replace(/\s+входит\s*:?\s*-?\s*$/gi, '')
+    .replace(/^[-–—_\s]+$/g, '')
+    .trim();
+
+  if (!cleaned || /^[-–—_:\s]+$/i.test(cleaned)) return ['—'];
+
+  const parts = cleaned
+    .split(/\n|;|\s\+\s|,\s(?=[А-ЯA-ZЁ])|\s·\s/g)
+    .map((item) => item.replace(/^[-–—_\s]+/, '').replace(/[-–—_\s]+$/, '').trim())
+    .filter(Boolean);
+
+  return parts.length > 0 ? parts : ['—'];
+}
+
 function SummaryBar({
   items,
   light,
@@ -859,21 +880,32 @@ function SuccessView({
         </p>
 
         <div className="mt-5 grid gap-2">
-          {[booking.service, formatDate(booking.date, undefined, locale), booking.time].map(
-            (item) => (
-              <div
-                key={item}
-                className={cn(
-                  'rounded-[9px] border px-3.5 py-3 text-[12px] font-semibold',
-                  light
-                    ? 'border-black/[0.08] bg-white text-black/70'
-                    : 'border-white/[0.08] bg-white/[0.04] text-white/70',
-                )}
-              >
-                {item}
-              </div>
-            ),
-          )}
+          <div
+            className={cn(
+              'rounded-[9px] border px-3.5 py-3 text-[12px] font-semibold',
+              light
+                ? 'border-black/[0.08] bg-white text-black/70'
+                : 'border-white/[0.08] bg-white/[0.04] text-white/70',
+            )}
+          >
+            {normalizeVisibleServices(booking.service).map((service) => (
+              <div key={service}>— {service}</div>
+            ))}
+          </div>
+
+          {[formatDate(booking.date, undefined, locale), booking.time].map((item) => (
+            <div
+              key={item}
+              className={cn(
+                'rounded-[9px] border px-3.5 py-3 text-[12px] font-semibold',
+                light
+                  ? 'border-black/[0.08] bg-white text-black/70'
+                  : 'border-white/[0.08] bg-white/[0.04] text-white/70',
+              )}
+            >
+              {item}
+            </div>
+          ))}
         </div>
 
         {telegramUrl || vkUrl ? (

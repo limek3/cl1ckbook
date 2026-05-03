@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from '@/lib/server/supabase-admin';
 import { sendMasterVisitCheck, sendTelegramMessage } from '@/lib/server/telegram-bot';
 import { sendClientVkBookingReminder } from '@/lib/server/vk-bot';
 import { getMasterAddress, getMasterLocationMode, getMasterRouteUrl } from '@/lib/location-links';
+import { bookingCode, bookingServicesText } from '@/lib/server/booking-context';
 import type { Booking, MasterProfile } from '@/lib/types';
 
 export const runtime = 'nodejs';

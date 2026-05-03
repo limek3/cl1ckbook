@@ -418,13 +418,12 @@ export async function POST(request: Request) {
               bookingId: persistedBooking.id,
               clientPhone: persistedBooking.clientPhone,
               clientName: persistedBooking.clientName,
-              text: [
-                'Запись создана ✅',
-                '',
-                `Услуга: ${persistedBooking.service || '—'}`,
-                `Дата: ${persistedBooking.date}`,
-                `Время: ${persistedBooking.time}`,
-              ].join('\n'),
+              text: bookingMessageText({
+                title: 'Запись создана ✅',
+                booking: persistedBooking,
+                profile: workspace.profile,
+                footer: 'Если потребуется перенос — ответьте в этот чат или дождитесь напоминания с кнопками.',
+              }),
             }).catch(() => false)
           : false;
 

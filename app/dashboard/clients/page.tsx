@@ -319,6 +319,31 @@ function buildClientTimeline(client: ClientInsight, locale: 'ru' | 'en') {
   return timeline;
 }
 
+function bookingStatusLabel(status: string, locale: 'ru' | 'en') {
+  if (locale === 'ru') {
+    return {
+      confirmed: 'Подтверждена',
+      pending: 'Ожидает',
+      completed: 'Завершена',
+      cancelled: 'Отменена',
+      no_show: 'Не пришёл',
+    }[status] ?? status;
+  }
+
+  return {
+    confirmed: 'Confirmed',
+    pending: 'Pending',
+    completed: 'Completed',
+    cancelled: 'Cancelled',
+    no_show: 'No-show',
+  }[status] ?? status;
+}
+
+function clientBookingTimeLabel(booking: NonNullable<ClientInsight['bookings']>[number], locale: 'ru' | 'en') {
+  return `${formatClientDate(locale, booking.date)} · ${booking.time}`;
+}
+
+
 function Card({
   children,
   light,
@@ -1211,6 +1236,10 @@ function ClientCrmDialog({
           statusFavorite: 'Избранный клиент',
           statusDefault: getClientSegmentLabel(locale, client.segment),
           primaryService: 'Основная услуга',
+          activeBookings: 'Активные записи',
+          allBookings: 'Все записи клиента',
+          services: 'Услуги',
+          openChat: 'Открыть чат',
           source: 'Источник',
           phone: 'Телефон',
           visits: 'Визиты',
@@ -1240,6 +1269,10 @@ function ClientCrmDialog({
           statusFavorite: 'Favorite client',
           statusDefault: getClientSegmentLabel(locale, client.segment),
           primaryService: 'Primary service',
+          activeBookings: 'Active bookings',
+          allBookings: 'All client bookings',
+          services: 'Services',
+          openChat: 'Open chat',
           source: 'Source',
           phone: 'Phone',
           visits: 'Visits',
@@ -1412,12 +1445,17 @@ function ClientCrmDialog({
 
                   <div className="mt-2 flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <div className={cn('truncate text-[15px] font-semibold', pageText(light))}>
-                        {client.service}
+                      <div className={cn('line-clamp-2 text-[15px] font-semibold leading-5', pageText(light))}>
+                        {(client.serviceList && client.serviceList.length > 1)
+                          ? client.serviceList.join(' + ')
+                          : client.service}
                       </div>
 
-                      <div className={cn('mt-0.5 truncate text-[10px]', mutedText(light))}>
+                      <div className={cn('mt-1 truncate text-[10px]', mutedText(light))}>
                         {copy.source}: {client.source}
+                        {client.activeBookingCount && client.activeBookingCount > 1
+                          ? ` · ${client.activeBookingCount} ${copy.activeBookings.toLowerCase()}`
+                          : ''}
                       </div>
                     </div>
 
@@ -1445,6 +1483,54 @@ function ClientCrmDialog({
                   />
                 </div>
               </Panel>
+
+              {client.bookings && client.bookings.length > 0 ? (
+                <Panel light={light} className="overflow-hidden">
+                  <div className={cn('flex items-center justify-between gap-3 border-b px-4 py-3', borderTone(light))}>
+                    <div className={cn('text-[12.5px] font-semibold', pageText(light))}>
+                      {client.activeBookingCount && client.activeBookingCount > 1
+                        ? `${copy.activeBookings} · ${client.activeBookingCount}`
+                        : copy.allBookings}
+                    </div>
+                    <div className={cn('text-[10px] font-medium', mutedText(light))}>
+                      {copy.services}
+                    </div>
+                  </div>
+
+                  <div className={cn('divide-y', divideTone(light))}>
+                    {client.bookings.slice(0, 4).map((booking) => (
+                      <div key={booking.id} className="grid gap-2 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+                        <div className="min-w-0">
+                          <div className={cn('flex min-w-0 flex-wrap items-center gap-2 text-[12px] font-semibold', pageText(light))}>
+                            <span className="truncate">{booking.code}</span>
+                            <span className={cn('rounded-[8px] px-2 py-0.5 text-[10px]', light ? 'bg-black/[0.035] text-black/54' : 'bg-white/[0.055] text-white/50')}>
+                              {bookingStatusLabel(booking.status, locale)}
+                            </span>
+                          </div>
+                          <div className={cn('mt-1 text-[11.5px] leading-5', pageText(light))}>
+                            {booking.services.map((service) => (
+                              <div key={`${booking.id}-${service}`} className="truncate">— {service}</div>
+                            ))}
+                          </div>
+                          <div className={cn('mt-1 text-[10.5px]', mutedText(light))}>
+                            {clientBookingTimeLabel(booking, locale)}
+                            {booking.source ? ` · ${booking.source}` : ''}
+                          </div>
+                        </div>
+
+                        <Link
+                          href={`/dashboard/chats?bookingId=${encodeURIComponent(booking.id)}`}
+                          onClick={onClose}
+                          className={cn(buttonBase(light, false), 'h-8 rounded-[9px] px-2.5 text-[10.5px]')}
+                        >
+                          {copy.openChat}
+                          <ArrowRight className="size-3.5" />
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
+                </Panel>
+              ) : null}
 
               <Panel light={light} className="overflow-hidden">
                 <div className={cn('border-b px-4 py-3', borderTone(light))}>
