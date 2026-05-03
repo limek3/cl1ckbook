@@ -12,7 +12,9 @@ type TelegramAccountRow = {
 };
 
 function buildBookingToken() {
-  return crypto.randomBytes(32).toString('hex');
+  // Telegram deep-link payload is limited to 64 chars.
+  // We send payload as `b_<token>`, so keep token short enough.
+  return crypto.randomBytes(24).toString('hex');
 }
 
 export async function createClientTelegramBookingLink(params: {
@@ -39,7 +41,7 @@ export async function createClientTelegramBookingLink(params: {
 
   return {
     token,
-    url: getTelegramBotDeepLink(`booking_${token}`),
+    url: getTelegramBotDeepLink(`b_${token}`),
   };
 }
 

@@ -5,7 +5,6 @@ import {
   ensureTelegramAuthUser,
   upsertTelegramAccount,
 } from '@/lib/server/telegram-user';
-import { isNotificationEnabled } from '@/lib/server/notification-settings';
 import { handleClientBookingAction } from '@/lib/server/booking-client-actions';
 import { handleRescheduleProposalAction, parseTelegramRescheduleProposalCallback } from '@/lib/server/booking-reschedule-proposals';
 import { createBookingReviewLink } from '@/lib/server/booking-reviews';
@@ -122,10 +121,13 @@ function extractBookingToken(text?: string) {
   const value = text?.trim();
   if (!value) return null;
 
+  // Telegram deep-link payload must be <= 64 chars. New links use `b_<token>`;
+  // old links used `booking_<64 hex>` and still work when sent manually.
   const patterns = [
-    /^\/start\s+booking_([a-f0-9]{64})(?:\s|$)/i,
-    /^\/start@\w+\s+booking_([a-f0-9]{64})(?:\s|$)/i,
-    /^booking_([a-f0-9]{64})(?:\s|$)/i,
+    /^\/start(?:@\w+)?\s+b_([a-f0-9]{16,64})(?:\s|$)/i,
+    /^\/start(?:@\w+)?\s+booking_([a-f0-9]{16,64})(?:\s|$)/i,
+    /^b_([a-f0-9]{16,64})(?:\s|$)/i,
+    /^booking_([a-f0-9]{16,64})(?:\s|$)/i,
   ];
 
   for (const pattern of patterns) {
@@ -142,7 +144,7 @@ function isPlainStart(text?: string) {
 
 function isLikelyBookingCodeAttempt(text?: string) {
   const value = text?.trim() ?? '';
-  return /booking[_\s-]?[a-f0-9]{6,}/i.test(value) || /^\/start(?:@\w+)?\s+booking/i.test(value);
+  return /(?:booking|b)[_\s-]?[a-f0-9]{6,}/i.test(value) || /^\/start(?:@\w+)?\s+(?:booking|b)[_\s-]?/i.test(value);
 }
 
 async function sendClientLinkingHelp(chatId: number | string) {
@@ -933,25 +935,13 @@ async function handleBookingStart(params: {
     }).catch((error) => logWebhookError('handleBookingStart create message failed', error));
   }
 
-  if (
-    isNotificationEnabled(
-      { data: workspaceData },
-      {
-        id: 'visit-reminder',
-        titleIncludes: 'напомин',
-        audience: 'client',
-        fallback: true,
-      },
-    )
-  ) {
-    await safeTask('sendClientBookingConfirmation', () =>
-      sendClientBookingConfirmation({
-        chatId: params.chatId,
-        booking,
-        profile,
-      }),
-    );
-  }
+  await safeTask('sendClientBookingConfirmation', () =>
+    sendClientBookingConfirmation({
+      chatId: params.chatId,
+      booking,
+      profile,
+    }),
+  );
 }
 
 async function handleClientChatMessage(params: {
