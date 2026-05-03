@@ -2,14 +2,19 @@
 
 import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useTheme } from 'next-themes';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   ArrowRight,
+  Check,
   Chrome,
+  Languages,
   Loader2,
   MessageCircleMore,
+  Moon,
   Send,
   ShieldCheck,
+  Sun,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -29,32 +34,108 @@ const authConfigured = Boolean(
 
 type OAuthProvider = 'google';
 type AuthChannel = 'telegram' | 'vk' | 'google';
+type LoginLanguage = 'ru' | 'en';
 
-const authChannels: Array<{
-  id: AuthChannel;
-  title: string;
-  helper: string;
-  icon: LucideIcon;
-}> = [
-  {
-    id: 'telegram',
-    title: 'Telegram',
-    helper: 'Mini App и бот',
-    icon: Send,
+const LANGUAGE_STORAGE_KEY = 'clickbook_login_language';
+
+const dictionary = {
+  ru: {
+    authBadge: 'auth',
+    loginLabel: 'Вход',
+    title: 'Войти в кабинет',
+    subtitle: 'Выберите удобный способ авторизации.',
+    themeLight: 'Светлая',
+    themeDark: 'Тёмная',
+    afterLogin: 'После входа',
+    setupLabel: 'Setup',
+    setupTitle: 'Авторизация не настроена',
+    setupText:
+      'Добавьте переменные окружения в Vercel и сделайте redeploy without cache.',
+    telegramTitle: 'Telegram',
+    telegramHelper: 'Mini App и бот',
+    vkTitle: 'VK',
+    vkHelper: 'Вход через бота',
+    googleTitle: 'Google',
+    googleHelper: 'Резервный вход',
+    openTelegram: 'Открыть Telegram Mini App',
+    openTelegramHint: 'вход через рабочий бот',
+    vkPanelTitle: 'Вход через VK',
+    vkPanelText: 'После подтверждения аккаунт будет связан с кабинетом.',
+    googleButton: 'Войти через Google',
+    googleHint: 'резервный способ доступа',
+    googlePanelTitle: 'Резервный вход',
+    googlePanelText:
+      'Используйте Google, если вход через мессенджеры временно недоступен.',
+    vkNotConfigured:
+      'VK-вход не настроен. Проверьте VK_BOT_GROUP_ID и VK_BOT_ACCESS_TOKEN в Vercel.',
+    vkAuthFailed: 'Не удалось войти через VK. Попробуйте ещё раз.',
+    callbackFailed: 'Не удалось завершить вход. Попробуйте ещё раз.',
+    oauthFallback:
+      'Не удалось открыть авторизацию. Проверьте OAuth provider в Supabase.',
   },
-  {
-    id: 'vk',
-    title: 'VK',
-    helper: 'Вход через бота',
-    icon: MessageCircleMore,
+  en: {
+    authBadge: 'auth',
+    loginLabel: 'Sign in',
+    title: 'Sign in to workspace',
+    subtitle: 'Choose a convenient authorization method.',
+    themeLight: 'Light',
+    themeDark: 'Dark',
+    afterLogin: 'After sign in',
+    setupLabel: 'Setup',
+    setupTitle: 'Authorization is not configured',
+    setupText:
+      'Add environment variables in Vercel and redeploy without cache.',
+    telegramTitle: 'Telegram',
+    telegramHelper: 'Mini App and bot',
+    vkTitle: 'VK',
+    vkHelper: 'Bot sign in',
+    googleTitle: 'Google',
+    googleHelper: 'Backup access',
+    openTelegram: 'Open Telegram Mini App',
+    openTelegramHint: 'sign in through work bot',
+    vkPanelTitle: 'VK sign in',
+    vkPanelText: 'After confirmation, the account will be linked to workspace.',
+    googleButton: 'Sign in with Google',
+    googleHint: 'backup access method',
+    googlePanelTitle: 'Backup access',
+    googlePanelText:
+      'Use Google if messenger sign in is temporarily unavailable.',
+    vkNotConfigured:
+      'VK sign in is not configured. Check VK_BOT_GROUP_ID and VK_BOT_ACCESS_TOKEN in Vercel.',
+    vkAuthFailed: 'Could not sign in with VK. Try again.',
+    callbackFailed: 'Could not complete sign in. Try again.',
+    oauthFallback:
+      'Could not open authorization. Check OAuth provider in Supabase.',
   },
-  {
-    id: 'google',
-    title: 'Google',
-    helper: 'Резервный вход',
-    icon: Chrome,
-  },
-];
+} satisfies Record<LoginLanguage, Record<string, string>>;
+
+function getAuthChannels(t: (key: keyof typeof dictionary.ru) => string) {
+  return [
+    {
+      id: 'telegram',
+      title: t('telegramTitle'),
+      helper: t('telegramHelper'),
+      icon: Send,
+    },
+    {
+      id: 'vk',
+      title: t('vkTitle'),
+      helper: t('vkHelper'),
+      icon: MessageCircleMore,
+    },
+    {
+      id: 'google',
+      title: t('googleTitle'),
+      helper: t('googleHelper'),
+      icon: Chrome,
+    },
+  ] satisfies Array<{
+    id: AuthChannel;
+    title: string;
+    helper: string;
+    icon: LucideIcon;
+  }>;
+}
 
 function MicroLabel({
   children,
@@ -85,7 +166,7 @@ function Surface({
   return (
     <section
       className={cn(
-        'rounded-[18px] border border-black/[0.08] bg-[#fbfbfa] text-[#0e0e0e] shadow-none dark:border-white/[0.09] dark:bg-[#101010] dark:text-white',
+        'relative rounded-[18px] border border-black/[0.08] bg-[#fbfbfa] text-[#0e0e0e] shadow-none dark:border-white/[0.09] dark:bg-[#101010] dark:text-white',
         className,
       )}
     >
@@ -113,12 +194,35 @@ function Panel({
   );
 }
 
+function AuthCardShell({ children }: { children: ReactNode }) {
+  return (
+    <Surface className="overflow-hidden">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-px overflow-hidden">
+        <motion.div
+          className="h-px w-1/2 bg-gradient-to-r from-transparent via-black/28 to-transparent dark:via-white/34"
+          animate={{ x: ['-100%', '260%'] }}
+          transition={{
+            duration: 3.8,
+            repeat: Infinity,
+            ease: 'easeInOut',
+            repeatDelay: 1.4,
+          }}
+        />
+      </div>
+
+      <div className="pointer-events-none absolute inset-0 rounded-[18px] ring-1 ring-inset ring-white/35 dark:ring-white/[0.025]" />
+
+      {children}
+    </Surface>
+  );
+}
+
 function AuthMethodTab({
   channel,
   active,
   onClick,
 }: {
-  channel: (typeof authChannels)[number];
+  channel: ReturnType<typeof getAuthChannels>[number];
   active: boolean;
   onClick: () => void;
 }) {
@@ -129,19 +233,111 @@ function AuthMethodTab({
       type="button"
       onClick={onClick}
       className={cn(
-        'group flex min-w-0 flex-1 items-center justify-center gap-2 rounded-[10px] px-2.5 py-2 text-left transition active:scale-[0.985]',
+        'group relative flex min-w-0 flex-1 items-center justify-center gap-2 rounded-[10px] px-2.5 py-2 text-left transition active:scale-[0.985]',
         active
-          ? 'bg-[#fbfbfa] text-black shadow-[0_8px_24px_rgba(15,15,15,0.055)] dark:bg-white/[0.08] dark:text-white dark:shadow-none'
-          : 'text-black/42 hover:bg-black/[0.025] hover:text-black/68 dark:text-white/34 dark:hover:bg-white/[0.045] dark:hover:text-white/68',
+          ? 'text-black dark:text-white'
+          : 'text-black/42 hover:text-black/68 dark:text-white/34 dark:hover:text-white/68',
       )}
     >
-      <Icon className="size-3.5 shrink-0" />
-      <span className="min-w-0">
+      {active ? (
+        <motion.span
+          layoutId="auth-method-active"
+          className="absolute inset-0 rounded-[10px] bg-[#fbfbfa] shadow-[0_8px_24px_rgba(15,15,15,0.055)] dark:bg-white/[0.08] dark:shadow-none"
+          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        />
+      ) : null}
+
+      <span className="relative z-10 inline-flex min-w-0 items-center gap-2">
+        <Icon className="size-3.5 shrink-0" />
         <span className="block truncate text-[11.5px] font-semibold leading-4">
           {channel.title}
         </span>
       </span>
     </button>
+  );
+}
+
+function ThemeLanguageControls({
+  language,
+  setLanguage,
+}: {
+  language: LoginLanguage;
+  setLanguage: (language: LoginLanguage) => void;
+}) {
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const isDark = mounted ? resolvedTheme === 'dark' : false;
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="inline-flex h-9 items-center rounded-[11px] border border-black/[0.08] bg-black/[0.025] p-1 dark:border-white/[0.08] dark:bg-white/[0.035]">
+        <button
+          type="button"
+          onClick={() => setLanguage('ru')}
+          className={cn(
+            'relative inline-flex h-7 items-center justify-center rounded-[8px] px-2.5 text-[10.5px] font-semibold transition active:scale-[0.985]',
+            language === 'ru'
+              ? 'text-black dark:text-white'
+              : 'text-black/38 hover:text-black/70 dark:text-white/34 dark:hover:text-white/70',
+          )}
+          aria-label="Русский язык"
+        >
+          {language === 'ru' ? (
+            <motion.span
+              layoutId="language-active"
+              className="absolute inset-0 rounded-[8px] bg-[#fbfbfa] shadow-[0_7px_20px_rgba(15,15,15,0.055)] dark:bg-white/[0.08] dark:shadow-none"
+              transition={{ duration: 0.2 }}
+            />
+          ) : null}
+          <span className="relative z-10">RU</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setLanguage('en')}
+          className={cn(
+            'relative inline-flex h-7 items-center justify-center rounded-[8px] px-2.5 text-[10.5px] font-semibold transition active:scale-[0.985]',
+            language === 'en'
+              ? 'text-black dark:text-white'
+              : 'text-black/38 hover:text-black/70 dark:text-white/34 dark:hover:text-white/70',
+          )}
+          aria-label="English language"
+        >
+          {language === 'en' ? (
+            <motion.span
+              layoutId="language-active"
+              className="absolute inset-0 rounded-[8px] bg-[#fbfbfa] shadow-[0_7px_20px_rgba(15,15,15,0.055)] dark:bg-white/[0.08] dark:shadow-none"
+              transition={{ duration: 0.2 }}
+            />
+          ) : null}
+          <span className="relative z-10">EN</span>
+        </button>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setTheme(isDark ? 'light' : 'dark')}
+        className="group grid size-9 place-items-center rounded-[11px] border border-black/[0.08] bg-black/[0.025] text-black/46 transition hover:border-black/[0.13] hover:bg-black/[0.04] hover:text-black active:scale-[0.985] dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-white/42 dark:hover:border-white/[0.14] dark:hover:bg-white/[0.06] dark:hover:text-white"
+        aria-label="Переключить тему"
+      >
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span
+            key={isDark ? 'moon' : 'sun'}
+            initial={{ opacity: 0, rotate: -18, y: 2 }}
+            animate={{ opacity: 1, rotate: 0, y: 0 }}
+            exit={{ opacity: 0, rotate: 18, y: -2 }}
+            transition={{ duration: 0.16 }}
+          >
+            {isDark ? <Moon className="size-4" /> : <Sun className="size-4" />}
+          </motion.span>
+        </AnimatePresence>
+      </button>
+    </div>
   );
 }
 
@@ -235,9 +431,11 @@ function SetupMissingScreen() {
 function TelegramAuthContent({
   redirectTo,
   botUrl,
+  t,
 }: {
   redirectTo: string;
   botUrl: string | null;
+  t: (key: keyof typeof dictionary.ru) => string;
 }) {
   return (
     <div className="grid gap-3">
@@ -253,10 +451,10 @@ function TelegramAuthContent({
 
             <span className="min-w-0">
               <span className="block truncate text-[12.5px] font-semibold tracking-[-0.01em]">
-                Открыть Telegram Mini App
+                {t('openTelegram')}
               </span>
               <span className="block truncate text-[11px] text-white/52 dark:text-black/48">
-                вход через рабочий бот
+                {t('openTelegramHint')}
               </span>
             </span>
           </span>
@@ -270,7 +468,13 @@ function TelegramAuthContent({
   );
 }
 
-function VkAuthContent({ redirectTo }: { redirectTo: string }) {
+function VkAuthContent({
+  redirectTo,
+  t,
+}: {
+  redirectTo: string;
+  t: (key: keyof typeof dictionary.ru) => string;
+}) {
   return (
     <div className="grid gap-3">
       <VkLoginButton redirectTo={redirectTo} />
@@ -280,10 +484,10 @@ function VkAuthContent({ redirectTo }: { redirectTo: string }) {
           <ShieldCheck className="mt-0.5 size-4 shrink-0 text-black/36 dark:text-white/34" />
           <div className="min-w-0">
             <div className="text-[12px] font-semibold text-black/68 dark:text-white/66">
-              Вход через VK
+              {t('vkPanelTitle')}
             </div>
             <div className="mt-1 text-[11.5px] leading-5 text-black/42 dark:text-white/36">
-              После подтверждения аккаунт будет связан с кабинетом.
+              {t('vkPanelText')}
             </div>
           </div>
         </div>
@@ -295,16 +499,18 @@ function VkAuthContent({ redirectTo }: { redirectTo: string }) {
 function GoogleAuthContent({
   loadingProvider,
   startOAuth,
+  t,
 }: {
   loadingProvider: OAuthProvider | null;
   startOAuth: (provider: OAuthProvider) => void;
+  t: (key: keyof typeof dictionary.ru) => string;
 }) {
   return (
     <div className="grid gap-3">
       <ProviderButton
         icon={<Chrome className="size-4" />}
-        label="Войти через Google"
-        hint="резервный способ доступа"
+        label={t('googleButton')}
+        hint={t('googleHint')}
         loading={loadingProvider === 'google'}
         onClick={() => startOAuth('google')}
       />
@@ -314,10 +520,10 @@ function GoogleAuthContent({
           <ShieldCheck className="mt-0.5 size-4 shrink-0 text-black/36 dark:text-white/34" />
           <div className="min-w-0">
             <div className="text-[12px] font-semibold text-black/68 dark:text-white/66">
-              Резервный вход
+              {t('googlePanelTitle')}
             </div>
             <div className="mt-1 text-[11.5px] leading-5 text-black/42 dark:text-white/36">
-              Используйте Google, если вход через мессенджеры временно недоступен.
+              {t('googlePanelText')}
             </div>
           </div>
         </div>
@@ -333,11 +539,31 @@ export default function LoginPage() {
     clearTelegramAppSessionToken();
   }, []);
 
+  const [language, setLanguageState] = useState<LoginLanguage>('ru');
   const [loadingProvider, setLoadingProvider] = useState<OAuthProvider | null>(
     null,
   );
   const [oauthError, setOauthError] = useState<string | null>(null);
   const [activeChannel, setActiveChannel] = useState<AuthChannel>('telegram');
+
+  useEffect(() => {
+    const savedLanguage = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
+
+    if (savedLanguage === 'ru' || savedLanguage === 'en') {
+      setLanguageState(savedLanguage);
+    }
+  }, []);
+
+  const setLanguage = (nextLanguage: LoginLanguage) => {
+    setLanguageState(nextLanguage);
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, nextLanguage);
+  };
+
+  const t = useMemo(() => {
+    return (key: keyof typeof dictionary.ru) => dictionary[language][key];
+  }, [language]);
+
+  const authChannels = useMemo(() => getAuthChannels(t), [t]);
 
   const redirectTo = useMemo(
     () => searchParams.get('redirectTo') || '/dashboard',
@@ -351,19 +577,19 @@ export default function LoginPage() {
     if (message) return message;
 
     if (error === 'vk_not_configured') {
-      return 'VK-вход не настроен. Проверьте VK_BOT_GROUP_ID и VK_BOT_ACCESS_TOKEN в Vercel.';
+      return t('vkNotConfigured');
     }
 
     if (error === 'vk_auth_failed') {
-      return 'Не удалось войти через VK. Попробуйте ещё раз.';
+      return t('vkAuthFailed');
     }
 
     if (error === 'auth_callback_failed') {
-      return 'Не удалось завершить вход. Попробуйте ещё раз.';
+      return t('callbackFailed');
     }
 
     return null;
-  }, [searchParams]);
+  }, [searchParams, t]);
 
   const botUrl = useMemo(() => {
     const username = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME?.replace(
@@ -398,11 +624,7 @@ export default function LoginPage() {
       if (error) throw error;
     } catch (error) {
       setLoadingProvider(null);
-      setOauthError(
-        error instanceof Error
-          ? error.message
-          : 'Не удалось открыть авторизацию. Проверьте OAuth provider в Supabase.',
-      );
+      setOauthError(error instanceof Error ? error.message : t('oauthFallback'));
     }
   };
 
@@ -414,28 +636,40 @@ export default function LoginPage() {
     authChannels.find((channel) => channel.id === activeChannel) ??
     authChannels[0];
 
+  const ActiveIcon = activeChannelData.icon;
+
   return (
     <main className="grid min-h-screen place-items-center bg-[#f4f4f2] px-4 py-8 text-[#0e0e0e] dark:bg-[#090909] dark:text-white">
       <div className="w-full max-w-[430px]">
-        <Surface className="overflow-hidden">
+        <AuthCardShell>
           <div className="border-b border-black/[0.08] p-5 dark:border-white/[0.08]">
             <div className="flex items-center justify-between gap-4">
               <Link href="/" className="inline-flex min-w-0 items-center">
                 <BrandLogo className="w-[118px] shrink-0" />
               </Link>
 
-              <div className="rounded-full border border-black/[0.07] bg-black/[0.025] px-2.5 py-1 text-[10px] font-semibold text-black/38 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/34">
-                auth
-              </div>
+              <ThemeLanguageControls
+                language={language}
+                setLanguage={setLanguage}
+              />
             </div>
 
             <div className="mt-6">
-              <MicroLabel>Вход</MicroLabel>
+              <div className="flex items-center justify-between gap-3">
+                <MicroLabel>{t('loginLabel')}</MicroLabel>
+
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-black/[0.07] bg-black/[0.025] px-2.5 py-1 text-[10px] font-semibold text-black/38 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/34">
+                  <Languages className="size-3" />
+                  {language.toUpperCase()}
+                </div>
+              </div>
+
               <h1 className="mt-2 text-[31px] font-semibold leading-[0.96] tracking-[-0.075em]">
-                Войти в кабинет
+                {t('title')}
               </h1>
+
               <p className="mt-3 text-[12.5px] leading-5 text-black/46 dark:text-white/40">
-                Выберите удобный способ авторизации.
+                {t('subtitle')}
               </p>
             </div>
           </div>
@@ -457,46 +691,63 @@ export default function LoginPage() {
             <div className="mt-4">
               <Panel className="overflow-hidden">
                 <div className="border-b border-black/[0.07] px-4 py-3 dark:border-white/[0.075]">
-                  <div className="flex items-center gap-2.5">
-                    <span className="grid size-8 shrink-0 place-items-center rounded-[10px] border border-black/[0.08] bg-[#fbfbfa] text-black/48 dark:border-white/[0.08] dark:bg-[#101010] dark:text-white/44">
-                      <activeChannelData.icon className="size-3.5" />
-                    </span>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <span className="grid size-8 shrink-0 place-items-center rounded-[10px] border border-black/[0.08] bg-[#fbfbfa] text-black/48 dark:border-white/[0.08] dark:bg-[#101010] dark:text-white/44">
+                        <ActiveIcon className="size-3.5" />
+                      </span>
 
-                    <div className="min-w-0">
-                      <div className="text-[12.5px] font-semibold tracking-[-0.01em] text-black/72 dark:text-white/72">
-                        {activeChannelData.title}
-                      </div>
-                      <div className="mt-0.5 text-[11px] text-black/38 dark:text-white/34">
-                        {activeChannelData.helper}
+                      <div className="min-w-0">
+                        <div className="text-[12.5px] font-semibold tracking-[-0.01em] text-black/72 dark:text-white/72">
+                          {activeChannelData.title}
+                        </div>
+                        <div className="mt-0.5 text-[11px] text-black/38 dark:text-white/34">
+                          {activeChannelData.helper}
+                        </div>
                       </div>
                     </div>
+
+                    <motion.div
+                      key={activeChannel}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.18 }}
+                      className="grid size-7 shrink-0 place-items-center rounded-[9px] border border-black/[0.07] bg-[#fbfbfa] text-black/38 dark:border-white/[0.08] dark:bg-[#101010] dark:text-white/34"
+                    >
+                      <Check className="size-3.5" />
+                    </motion.div>
                   </div>
                 </div>
 
                 <div className="bg-[#fbfbfa]/52 p-3 dark:bg-[#101010]/52">
                   <AnimatePresence mode="wait">
                     <motion.div
-                      key={activeChannel}
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -4 }}
-                      transition={{ duration: 0.18 }}
+                      key={`${activeChannel}-${language}`}
+                      initial={{ opacity: 0, y: 7, filter: 'blur(3px)' }}
+                      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                      exit={{ opacity: 0, y: -5, filter: 'blur(2px)' }}
+                      transition={{
+                        duration: 0.2,
+                        ease: [0.22, 1, 0.36, 1],
+                      }}
                     >
                       {activeChannel === 'telegram' ? (
                         <TelegramAuthContent
                           redirectTo={redirectTo}
                           botUrl={botUrl}
+                          t={t}
                         />
                       ) : null}
 
                       {activeChannel === 'vk' ? (
-                        <VkAuthContent redirectTo={redirectTo} />
+                        <VkAuthContent redirectTo={redirectTo} t={t} />
                       ) : null}
 
                       {activeChannel === 'google' ? (
                         <GoogleAuthContent
                           loadingProvider={loadingProvider}
                           startOAuth={startOAuth}
+                          t={t}
                         />
                       ) : null}
                     </motion.div>
@@ -505,20 +756,20 @@ export default function LoginPage() {
               </Panel>
             </div>
 
-            {(oauthError || incomingError) ? (
+            {oauthError || incomingError ? (
               <div className="mt-4">
                 <ErrorBanner>{oauthError || incomingError}</ErrorBanner>
               </div>
             ) : null}
 
             <div className="mt-4 flex items-center justify-between gap-3 text-[11px] text-black/34 dark:text-white/30">
-              <span>После входа</span>
+              <span>{t('afterLogin')}</span>
               <span className="max-w-[220px] truncate text-right">
                 {redirectTo}
               </span>
             </div>
           </div>
-        </Surface>
+        </AuthCardShell>
       </div>
     </main>
   );
