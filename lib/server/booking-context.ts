@@ -144,11 +144,9 @@ export function bookingClientCardText(params: {
 
   const lines: Array<string | null | undefined> = [
     params.title || 'Ваша запись',
-    '',
     `${bookingCode(booking)} · ${masterName}`,
     serviceLine,
     compactDateTime(booking),
-    params.includeComment !== false && comment ? '' : null,
     params.includeComment !== false && comment ? `Комментарий: ${comment}` : null,
     params.footer ? '' : null,
     params.footer || null,

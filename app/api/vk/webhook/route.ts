@@ -4,6 +4,7 @@ import { createSupabaseAdminClient } from '@/lib/server/supabase-admin';
 import {
   answerVkMessageEvent,
   editVkMessage,
+  deleteVkMessage,
   getAppUrl,
   getVkBotGroupId,
   getVkBotUserProfile,
@@ -18,6 +19,7 @@ import {
   sendVkLoginConfirmedMessage,
   sendVkMessage,
   buildVkKeyboard,
+  buildVkReplyKeyboard,
   buildVkClientMenuKeyboard,
 } from '@/lib/server/vk-bot';
 import { handleClientBookingAction } from '@/lib/server/booking-client-actions';
@@ -211,6 +213,24 @@ function isNotificationLikeText(value: unknown) {
 function isBookingsLikeText(value: unknown) {
   const text = normalizedText(value);
   return text === 'записи' || text === '/bookings' || text === 'мои записи' || text.includes('мои записи') || text.includes('выбрать запись');
+}
+
+function vkClientMenuActionFromText(value: unknown) {
+  const text = normalizedText(value).replace(/ё/g, 'е');
+  if (!text) return null;
+  if (text.includes('мои записи')) return 'bookings';
+  if (text.includes('написать мастеру') || text.includes('выбрать запись')) return 'write';
+  if (text.includes('перенос') || text.includes('отмена')) return 'reschedule_cancel';
+  if (text.includes('помощ') || text === 'sos') return 'help';
+  if (text.includes('назад')) return 'back';
+  return null;
+}
+
+function extractVkBookingButtonIndex(value: unknown) {
+  const match = String(value ?? '').trim().match(/^(\d{1,2})(?:\s|\.|·|$)/);
+  if (!match) return null;
+  const index = Number(match[1]) - 1;
+  return Number.isInteger(index) && index >= 0 ? index : null;
 }
 
 function normalizePayload(value: unknown): Record<string, unknown> | null {
@@ -560,16 +580,13 @@ async function handleVkBookingStart(params: {
     return;
   }
 
-  await sendVkReply({
-    label: 'vk_booking_connected',
+  const clientLinks = await getConfirmedVkBookingLinks(params.peerId, 8);
+  const response = await sendClientVkBookingConfirmation({
     peerId: params.peerId,
-    textPreview: 'VK подключён к записи.',
-    send: () => sendClientVkBookingConfirmation({
-      peerId: params.peerId,
-      booking,
-      profile,
-    }),
+    booking,
+    profile,
   });
+  await rememberVkClientMenuMessage(clientLinks.length ? clientLinks : [link], extractVkConversationMessageId(response));
 }
 
 
@@ -705,6 +722,9 @@ async function sendOrEditVkClientCard(params: {
       return;
     } catch (error) {
       logVkWebhookError('edit vk client menu card', error);
+      await deleteVkMessage({ peerId: params.peerId, conversationMessageId: previousMessageId }).catch((deleteError) =>
+        logVkWebhookError('delete stale vk client menu card', deleteError),
+      );
     }
   }
 
@@ -775,11 +795,11 @@ async function setVkClientState(links: VkBookingLinkRow[], state: Record<string,
 }
 
 function buildVkClientBackKeyboard() {
-  return buildVkKeyboard([[{ label: '⬅️ Назад', action: 'client_back', color: 'secondary' }]]);
+  return buildVkReplyKeyboard([[{ label: '⬅️ Назад', action: 'client_back', color: 'secondary' }]]);
 }
 
 function buildVkClientActionKeyboard() {
-  return buildVkKeyboard([
+  return buildVkReplyKeyboard([
     [
       { label: '🔁 Хочу перенести', action: 'client_action_reschedule', color: 'primary' },
       { label: '❌ Хочу отменить', action: 'client_action_cancel', color: 'secondary' },
@@ -840,8 +860,8 @@ async function sendVkClientBookingDetails(params: {
       booking,
       profile,
       footer: params.actionMode
-        ? 'Выберите действие ниже.'
-        : 'Теперь напишите сообщение — мастер увидит, по какой записи вы пишете.',
+        ? 'Выберите действие в нижнем меню.'
+        : 'Теперь напишите сообщение — мастер увидит эту запись.',
     }),
     keyboard: params.actionMode ? buildVkClientActionKeyboard() : buildVkClientMenuKeyboard(),
   });
@@ -893,8 +913,8 @@ async function sendVkClientBookingChoice(peerId: number | string, mode: 'choosin
     links,
     message: mode === 'choosing_action_booking'
       ? 'Выберите запись для переноса или отмены.'
-      : 'Выберите запись — следующее сообщение уйдёт мастеру именно по выбранной услуге.',
-    keyboard: buildVkKeyboard(rows),
+      : 'Выберите запись — я закреплю её за перепиской.',
+    keyboard: buildVkReplyKeyboard(rows),
   });
 }
 
@@ -1121,6 +1141,58 @@ async function handleMessageNew(payload: VkCallbackPayload) {
         token: directLoginToken,
       }),
     });
+    return;
+  }
+
+  const clientMenuAction = vkClientMenuActionFromText(message.text);
+  const clientLinksForText = await getConfirmedVkBookingLinks(peerId, 8);
+  const clientModeForText = vkClientMode(clientLinksForText);
+  const numberedTextLinkIndex = extractVkBookingButtonIndex(message.text);
+  const numberedTextLink = numberedTextLinkIndex !== null ? clientLinksForText[numberedTextLinkIndex] ?? null : null;
+
+  if (clientMenuAction === 'back') {
+    await setVkClientState(clientLinksForText, { clientMode: 'idle', activeChatContextAt: null });
+    await sendOrEditVkClientCard({
+      peerId,
+      links: clientLinksForText,
+      message: 'Главное меню КликБук. Выберите действие ниже.',
+      keyboard: buildVkClientMenuKeyboard(),
+    });
+    return;
+  }
+
+  if (clientMenuAction === 'help') {
+    await sendOrEditVkClientCard({
+      peerId,
+      links: clientLinksForText,
+      message: 'Помощь КликБук\n\nИспользуйте нижнее меню: «Мои записи», «Написать мастеру» или «Перенос / отмена».',
+      keyboard: buildVkClientMenuKeyboard(),
+    });
+    return;
+  }
+
+  if (clientMenuAction === 'bookings') {
+    await sendVkClientBookingChoice(peerId, 'choosing_chat_booking');
+    return;
+  }
+
+  if (clientMenuAction === 'write') {
+    await sendVkClientBookingChoice(peerId, 'choosing_chat_booking');
+    return;
+  }
+
+  if (clientMenuAction === 'reschedule_cancel') {
+    await sendVkClientBookingChoice(peerId, 'choosing_action_booking');
+    return;
+  }
+
+  if (numberedTextLink && clientModeForText === 'choosing_chat_booking') {
+    await selectVkClientChatContext({ peerId, token: numberedTextLink.token });
+    return;
+  }
+
+  if (numberedTextLink && clientModeForText === 'choosing_action_booking') {
+    await selectVkClientChatContext({ peerId, token: numberedTextLink.token });
     return;
   }
 
@@ -1514,9 +1586,20 @@ async function handleMessageEvent(payload: VkCallbackPayload) {
     return;
   }
 
-  if (action === 'faq' || action === 'help') {
-    await answerVkMessageEvent({ eventId, userId: vkUserId, peerId, text: 'FAQ открыт.' })
-      .catch((error) => logVkWebhookError('answer faq', error));
+  if (action === 'faq' || action === 'help' || action === 'support') {
+    await answerVkMessageEvent({ eventId, userId: vkUserId, peerId, text: 'Помощь открыта.' })
+      .catch((error) => logVkWebhookError('answer client help', error));
+
+    const links = await getConfirmedVkBookingLinks(peerId, 8);
+    if (links.length > 0) {
+      await sendOrEditVkClientCard({
+        peerId,
+        links,
+        message: 'Помощь КликБук\n\nИспользуйте нижнее меню: «Мои записи», «Написать мастеру» или «Перенос / отмена».',
+        keyboard: buildVkClientMenuKeyboard(token),
+      });
+      return;
+    }
 
     await editOrSendVkCard({
       peerId,

@@ -194,18 +194,19 @@ export function buildVkReplyKeyboard(buttons: Array<Array<VkBotButton>>) {
 }
 
 export function buildVkClientMenuKeyboard(token?: string | null) {
-  return buildVkKeyboard([
-    [{ label: '📋 Мои записи', action: 'client_bookings', token: token ?? null, color: 'primary' }],
+  return buildVkReplyKeyboard([
     [
+      { label: '📋 Мои записи', action: 'client_bookings', token: token ?? null, color: 'primary' },
       { label: '💬 Написать мастеру', action: 'client_write', token: token ?? null, color: 'secondary' },
-      { label: '🔁 Перенос / отмена', action: 'client_reschedule_cancel', token: token ?? null, color: 'secondary' },
     ],
-    [{ label: '🆘 Помощь', action: 'support', token: token ?? null, color: 'secondary' }],
+    [
+      { label: '🔁 Перенос / отмена', action: 'client_reschedule_cancel', token: token ?? null, color: 'secondary' },
+      { label: '🆘 Помощь', action: 'support', token: token ?? null, color: 'secondary' },
+    ],
   ]);
 }
 
-// Kept for compatibility with older imports. VK users see inline buttons under the current bot card,
-// not a noisy reply keyboard under the input field.
+// Persistent client keyboard under the input field. No inline buttons in service cards.
 export function buildVkClientPersistentKeyboard(token?: string | null) {
   return buildVkClientMenuKeyboard(token);
 }
@@ -316,6 +317,17 @@ export async function editVkMessage(params: {
             ? params.keyboard
             : JSON.stringify(params.keyboard)
           : JSON.stringify(buildVkEmptyInlineKeyboard()),
+  });
+}
+
+export async function deleteVkMessage(params: {
+  peerId: number | string;
+  conversationMessageId: number | string;
+}) {
+  return vkApi('messages.delete', {
+    peer_id: String(params.peerId),
+    cmids: String(params.conversationMessageId),
+    delete_for_all: 1,
   });
 }
 
