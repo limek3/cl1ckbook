@@ -298,37 +298,57 @@ export function buildVkEmptyInlineKeyboard() {
   };
 }
 
+function normalizeVkKeyboard(keyboard?: string | Record<string, unknown> | null) {
+  if (keyboard === null) return JSON.stringify(buildVkEmptyInlineKeyboard());
+  if (!keyboard) return JSON.stringify(buildVkEmptyInlineKeyboard());
+  return typeof keyboard === 'string' ? keyboard : JSON.stringify(keyboard);
+}
+
 export async function editVkMessage(params: {
   peerId: number | string;
   conversationMessageId: number | string;
   message: string;
   keyboard?: string | Record<string, unknown> | null;
 }) {
-  return vkApi('messages.edit', {
+  const payload = {
     peer_id: String(params.peerId),
-    conversation_message_id: String(params.conversationMessageId),
     message: params.message,
     disable_mentions: 1,
-    keyboard:
-      params.keyboard === null
-        ? JSON.stringify(buildVkEmptyInlineKeyboard())
-        : params.keyboard
-          ? typeof params.keyboard === 'string'
-            ? params.keyboard
-            : JSON.stringify(params.keyboard)
-          : JSON.stringify(buildVkEmptyInlineKeyboard()),
-  });
+    keyboard: normalizeVkKeyboard(params.keyboard),
+  };
+
+  try {
+    return await vkApi('messages.edit', {
+      ...payload,
+      conversation_message_id: String(params.conversationMessageId),
+    });
+  } catch (error) {
+    // Some VK clients/API responses give us message_id instead of conversation_message_id.
+    // Fallback to message_id keeps old stored cards editable instead of spawning duplicates.
+    return vkApi('messages.edit', {
+      ...payload,
+      message_id: String(params.conversationMessageId),
+    });
+  }
 }
 
 export async function deleteVkMessage(params: {
   peerId: number | string;
   conversationMessageId: number | string;
 }) {
-  return vkApi('messages.delete', {
-    peer_id: String(params.peerId),
-    cmids: String(params.conversationMessageId),
-    delete_for_all: 1,
-  });
+  try {
+    return await vkApi('messages.delete', {
+      peer_id: String(params.peerId),
+      cmids: String(params.conversationMessageId),
+      delete_for_all: 1,
+    });
+  } catch (error) {
+    return vkApi('messages.delete', {
+      peer_id: String(params.peerId),
+      message_ids: String(params.conversationMessageId),
+      delete_for_all: 1,
+    });
+  }
 }
 
 export async function answerVkMessageEvent(params: {

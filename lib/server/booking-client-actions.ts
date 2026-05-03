@@ -11,14 +11,18 @@ import {
 import {
   sendMasterBookingConfirmedNotice,
   sendMasterRescheduleRequestNotification,
+  sendTelegramMessage,
+  getAppUrl,
 } from '@/lib/server/telegram-bot';
 import {
   sendMasterVkBookingConfirmedNotice,
   sendMasterVkRescheduleRequestNotification,
+  sendVkMessage,
+  buildVkKeyboard,
 } from '@/lib/server/vk-bot';
 import { bookingMessageText, bookingShortContext, bookingThreadMetadata } from '@/lib/server/booking-context';
 
-type ClientBookingAction = 'confirm' | 'reschedule';
+type ClientBookingAction = 'confirm' | 'reschedule' | 'cancel';
 type ClientActionSource = 'telegram' | 'vk';
 
 type BookingRow = {
@@ -87,6 +91,10 @@ function actionPreview(action: ClientBookingAction, booking: Booking, source: Cl
     return `Клиент подтвердил запись: ${booking.service} · ${booking.date} ${booking.time}`;
   }
 
+  if (action === 'cancel') {
+    return `❌ Клиент хочет отменить запись: ${booking.service} · ${booking.date} ${booking.time} · ${sourceLabel(source)}`;
+  }
+
   return `⚠️ Клиент хочет перенос: ${booking.service} · ${booking.date} ${booking.time} · ${sourceLabel(source)}`;
 }
 
@@ -98,6 +106,18 @@ function actionMessage(action: ClientBookingAction, booking: Booking, source: Cl
       `Услуга: ${booking.service}`,
       `Время: ${booking.date} ${booking.time}`,
       `Канал: ${sourceLabel(source)}`,
+    ].join('\n');
+  }
+
+  if (action === 'cancel') {
+    return [
+      '❌ Клиент хочет отменить запись',
+      '',
+      `Услуга: ${booking.service}`,
+      `Время: ${booking.date} ${booking.time}`,
+      `Канал: ${sourceLabel(source)}`,
+      '',
+      'Ответьте клиенту в этом чате и подтвердите дальнейшие действия.',
     ].join('\n');
   }
 
@@ -153,6 +173,14 @@ async function syncWorkspaceBooking(params: {
             rescheduleRequestChannel: sourceLabel(params.source),
           }
         : {}),
+      ...(params.action === 'cancel'
+        ? {
+            cancelledAt: params.now,
+            cancelReason: 'client_cancel_requested',
+            cancelRequestedAt: params.now,
+            cancelRequestChannel: sourceLabel(params.source),
+          }
+        : {}),
       metadata: {
         ...metadata,
         lastClientAction: params.action,
@@ -163,6 +191,13 @@ async function syncWorkspaceBooking(params: {
               rescheduleRequested: true,
               rescheduleRequestedAt: params.now,
               rescheduleRequestChannel: params.source,
+            }
+          : {}),
+        ...(params.action === 'cancel'
+          ? {
+              cancelRequested: true,
+              cancelRequestedAt: params.now,
+              cancelRequestChannel: params.source,
             }
           : {}),
       },
@@ -193,9 +228,9 @@ async function upsertChatAlert(params: {
     : [];
 
   const activeAlert =
-    params.action === 'reschedule'
+    params.action === 'reschedule' || params.action === 'cancel'
       ? {
-          type: 'reschedule_request',
+          type: params.action === 'cancel' ? 'cancel_request' : 'reschedule_request',
           status: 'open',
           bookingId: params.booking.id,
           channel: params.source,
@@ -220,6 +255,14 @@ async function upsertChatAlert(params: {
           rescheduleRequestBookingId: params.booking.id,
           rescheduleRequestChannel: params.source,
         }
+      : params.action === 'cancel'
+        ? {
+            activeAlert,
+            cancelRequested: true,
+            cancelRequestedAt: params.now,
+            cancelRequestBookingId: params.booking.id,
+            cancelRequestChannel: params.source,
+          }
       : {
           activeAlert: baseMetadata.activeAlert &&
             typeof baseMetadata.activeAlert === 'object' &&
@@ -233,9 +276,9 @@ async function upsertChatAlert(params: {
     ? await updateChatThread(params.workspaceId, existingThread.id, {
         channel: params.source === 'vk' ? 'VK' : existingThread.channel,
         source: existingThread.source ?? params.booking.source ?? sourceLabel(params.source),
-        segment: params.action === 'reschedule' ? 'followup' : 'active',
-        nextVisit: params.action === 'reschedule' ? null : params.booking.date,
-        isPriority: params.action === 'reschedule' ? true : existingThread.isPriority,
+        segment: params.action === 'reschedule' || params.action === 'cancel' ? 'followup' : 'active',
+        nextVisit: params.action === 'reschedule' || params.action === 'cancel' ? null : params.booking.date,
+        isPriority: params.action === 'reschedule' || params.action === 'cancel' ? true : existingThread.isPriority,
         botConnected: true,
         lastMessagePreview: preview,
         lastMessageAt: params.now,
@@ -249,10 +292,10 @@ async function upsertChatAlert(params: {
         clientName: params.booking.clientName,
         clientPhone: params.booking.clientPhone,
         channel: params.source === 'vk' ? 'VK' : 'Telegram',
-        segment: params.action === 'reschedule' ? 'followup' : 'active',
+        segment: params.action === 'reschedule' || params.action === 'cancel' ? 'followup' : 'active',
         source: params.booking.source ?? sourceLabel(params.source),
-        nextVisit: params.action === 'reschedule' ? null : params.booking.date,
-        isPriority: params.action === 'reschedule',
+        nextVisit: params.action === 'reschedule' || params.action === 'cancel' ? null : params.booking.date,
+        isPriority: params.action === 'reschedule' || params.action === 'cancel',
         botConnected: true,
         lastMessagePreview: preview,
         lastMessageAt: params.now,
@@ -273,9 +316,9 @@ async function upsertChatAlert(params: {
     viaBot: true,
     metadata: {
       bookingId: params.booking.id,
-      kind: params.action === 'reschedule' ? 'reschedule_request' : 'client_confirmed',
+      kind: params.action === 'cancel' ? 'cancel_request' : params.action === 'reschedule' ? 'reschedule_request' : 'client_confirmed',
       source: params.source,
-      alert: params.action === 'reschedule',
+      alert: params.action === 'reschedule' || params.action === 'cancel',
     },
   }).catch(() => null);
 
@@ -312,6 +355,30 @@ async function notifyMaster(params: {
             workspaceSlug: params.workspace.slug,
             source: sourceLabel(params.source),
           })
+        : params.action === 'cancel'
+          ? sendTelegramMessage({
+              chatId: telegramChatId,
+              text: bookingMessageText({
+                title: 'Клиент хочет отменить запись ❌',
+                booking: params.booking,
+                profile: params.workspace.profile,
+                includeClient: true,
+                includePhone: true,
+                source: sourceLabel(params.source),
+                footer: 'В чатах КликБук создано предупреждение. Ответьте клиенту и подтвердите дальнейшие действия.',
+              }),
+              replyMarkup: {
+                inline_keyboard: [
+                  [
+                    {
+                      text: 'Открыть чат',
+                      web_app: { url: `${getAppUrl()}/app?redirectTo=${encodeURIComponent('/dashboard/chats')}` },
+                    },
+                  ],
+                  [{ text: 'Веб-кабинет', url: `${getAppUrl()}/dashboard/chats` }],
+                ],
+              },
+            })
         : sendMasterBookingConfirmedNotice({
             chatId: telegramChatId,
             booking: params.booking,
@@ -341,6 +408,23 @@ async function notifyMaster(params: {
             workspaceSlug: params.workspace.slug,
             source: sourceLabel(params.source),
           })
+        : params.action === 'cancel'
+          ? sendVkMessage({
+              peerId: vkPeerId,
+              message: bookingMessageText({
+                title: 'Клиент хочет отменить запись ❌',
+                booking: params.booking,
+                profile: params.workspace.profile,
+                includeClient: true,
+                includePhone: true,
+                source: sourceLabel(params.source),
+                footer: 'В чатах КликБук создано предупреждение. Ответьте клиенту и подтвердите дальнейшие действия.',
+              }),
+              keyboard: buildVkKeyboard([
+                [{ label: 'Открыть чаты', action: 'open_url', url: `${getAppUrl()}/dashboard/chats`, color: 'primary' }],
+                [{ label: 'Кабинет', action: 'open_url', url: `${getAppUrl()}/dashboard`, color: 'secondary' }],
+              ]),
+            })
         : sendMasterVkBookingConfirmedNotice({
             peerId: vkPeerId,
             booking: params.booking,
@@ -412,10 +496,20 @@ export async function handleClientBookingAction(params: {
               rescheduleRequestChannel: params.source,
             }
           : {}),
+        ...(params.action === 'cancel'
+          ? {
+              cancelRequested: true,
+              cancelRequestedAt: now,
+              cancelRequestChannel: params.source,
+            }
+          : {}),
       },
       ...(params.action === 'confirm' ? { confirmed_at: now } : {}),
       ...(params.action === 'reschedule'
         ? { cancelled_at: now, cancel_reason: 'client_reschedule_requested' }
+        : {}),
+      ...(params.action === 'cancel'
+        ? { cancelled_at: now, cancel_reason: 'client_cancel_requested' }
         : {}),
     })
     .eq('id', params.bookingId)

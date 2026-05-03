@@ -1719,18 +1719,37 @@ async function handleClientChatMessage(params: {
   let link = confirmedLinks.length > 1 ? activeContextLink : confirmedLinks[0] ?? null;
 
   if ((menuAction === 'reschedule' || menuAction === 'cancel') && link) {
-    text = menuAction === 'reschedule'
-      ? 'Клиент хочет перенести запись.'
-      : 'Клиент хочет отменить запись.';
-    await setTelegramClientState(confirmedLinks, { clientMode: 'writing_to_master' });
+    const clientAction = menuAction === 'cancel' ? 'cancel' : 'reschedule';
+
+    const result = await handleClientBookingAction({
+      bookingId: link.booking_id,
+      action: clientAction,
+      source: 'telegram',
+      directClientRef: {
+        clientTelegramChatId: params.chatId,
+        clientTelegramId: params.from.id,
+      },
+    }).catch((error) => {
+      logWebhookError('telegram client menu booking action failed', error);
+      return null;
+    });
+
+    await setTelegramClientState(confirmedLinks, {
+      clientMode: 'writing_to_master',
+      activeChatContextAt: new Date().toISOString(),
+    });
+
     await sendOrReplaceTelegramClientCard({
       chatId: params.chatId,
       links: confirmedLinks,
-      text: menuAction === 'reschedule'
-        ? 'Запрос на перенос отправлен мастеру. Он ответит в этом чате.'
-        : 'Запрос на отмену отправлен мастеру. Он ответит в этом чате.',
+      text: result?.ok
+        ? clientAction === 'reschedule'
+          ? 'Запрос на перенос отправлен мастеру. Он ответит в этом чате.'
+          : 'Запрос на отмену отправлен мастеру. Он ответит в этом чате.'
+        : 'Не удалось отправить запрос мастеру. Напишите сообщение обычным текстом.',
       replyMarkup: telegramClientMenuReplyMarkup(),
     });
+    return;
   }
 
   if (confirmedLinks.length > 1 && !link) {

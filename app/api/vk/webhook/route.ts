@@ -215,9 +215,20 @@ function isBookingsLikeText(value: unknown) {
   return text === 'записи' || text === '/bookings' || text === 'мои записи' || text.includes('мои записи') || text.includes('выбрать запись');
 }
 
-function vkClientMenuActionFromText(value: unknown) {
+type VkClientMenuAction =
+  | 'bookings'
+  | 'write'
+  | 'reschedule_cancel'
+  | 'help'
+  | 'back'
+  | 'reschedule'
+  | 'cancel';
+
+function vkClientMenuActionFromText(value: unknown): VkClientMenuAction | null {
   const text = normalizedText(value).replace(/ё/g, 'е');
   if (!text) return null;
+  if (text.includes('хочу перенести')) return 'reschedule';
+  if (text.includes('хочу отменить')) return 'cancel';
   if (text.includes('мои записи')) return 'bookings';
   if (text.includes('написать мастеру') || text.includes('выбрать запись')) return 'write';
   if (text.includes('перенос') || text.includes('отмена')) return 'reschedule_cancel';
@@ -802,7 +813,7 @@ function buildVkClientActionKeyboard() {
   return buildVkReplyKeyboard([
     [
       { label: '🔁 Хочу перенести', action: 'client_action_reschedule', color: 'primary' },
-      { label: '❌ Хочу отменить', action: 'client_action_cancel', color: 'secondary' },
+      { label: '❌ Хочу отменить', action: 'client_action_cancel', color: 'negative' },
     ],
     [
       { label: '💬 Написать мастеру', action: 'client_write', color: 'secondary' },
@@ -955,6 +966,47 @@ async function selectVkClientChatContext(params: {
   });
 
   return true;
+}
+
+
+async function handleVkClientMenuBookingAction(params: {
+  peerId: number | string;
+  vkUserId: number | string;
+  action: 'reschedule' | 'cancel';
+}) {
+  const links = await getConfirmedVkBookingLinks(params.peerId, 8);
+  const link = getActiveVkChatContextLink(links) ?? (links.length === 1 ? links[0] : null);
+
+  if (!link) {
+    await sendVkClientBookingChoice(params.peerId, 'choosing_action_booking');
+    return;
+  }
+
+  const result = await handleClientBookingAction({
+    bookingId: link.booking_id,
+    action: params.action,
+    source: 'vk',
+    directClientRef: {
+      clientVkPeerId: params.peerId,
+      clientVkUserId: String(params.vkUserId),
+    },
+  }).catch((error) => {
+    logVkWebhookError('vk client menu booking action failed', error);
+    return null;
+  });
+
+  await setVkClientState(links, { clientMode: 'writing_to_master', activeChatContextAt: new Date().toISOString() });
+
+  await sendOrEditVkClientCard({
+    peerId: params.peerId,
+    links,
+    message: result?.ok
+      ? params.action === 'reschedule'
+        ? 'Запрос на перенос отправлен мастеру. Он ответит в этом чате.'
+        : 'Запрос на отмену отправлен мастеру. Он ответит в этом чате.'
+      : 'Не удалось отправить запрос мастеру. Напишите сообщение обычным текстом.',
+    keyboard: buildVkClientMenuKeyboard(),
+  });
 }
 
 async function handleClientVkChatMessage(params: {
@@ -1149,6 +1201,11 @@ async function handleMessageNew(payload: VkCallbackPayload) {
   const clientModeForText = vkClientMode(clientLinksForText);
   const numberedTextLinkIndex = extractVkBookingButtonIndex(message.text);
   const numberedTextLink = numberedTextLinkIndex !== null ? clientLinksForText[numberedTextLinkIndex] ?? null : null;
+  const commandConversationMessageId = numberValue(message.conversation_message_id) ?? numberValue(message.id);
+
+  if ((clientMenuAction || numberedTextLink) && commandConversationMessageId) {
+    await deleteVkMessage({ peerId, conversationMessageId: commandConversationMessageId }).catch(() => null);
+  }
 
   if (clientMenuAction === 'back') {
     await setVkClientState(clientLinksForText, { clientMode: 'idle', activeChatContextAt: null });
@@ -1183,6 +1240,11 @@ async function handleMessageNew(payload: VkCallbackPayload) {
 
   if (clientMenuAction === 'reschedule_cancel') {
     await sendVkClientBookingChoice(peerId, 'choosing_action_booking');
+    return;
+  }
+
+  if (clientMenuAction === 'reschedule' || clientMenuAction === 'cancel') {
+    await handleVkClientMenuBookingAction({ peerId, vkUserId, action: clientMenuAction });
     return;
   }
 
@@ -1533,21 +1595,10 @@ async function handleMessageEvent(payload: VkCallbackPayload) {
       text: isCancel ? 'Запрос на отмену отправлен.' : 'Запрос на перенос отправлен.',
     }).catch((error) => logVkWebhookError('answer client action request', error));
 
-    await handleClientVkChatMessage({
+    await handleVkClientMenuBookingAction({
       vkUserId,
       peerId,
-      text: isCancel ? 'Клиент хочет отменить запись.' : 'Клиент хочет перенести запись.',
-    });
-
-    const links = await getConfirmedVkBookingLinks(peerId, 8);
-    await setVkClientState(links, { clientMode: 'writing_to_master' });
-    await sendOrEditVkClientCard({
-      peerId,
-      links,
-      message: isCancel
-        ? 'Запрос на отмену отправлен мастеру. Он ответит в этом чате.'
-        : 'Запрос на перенос отправлен мастеру. Он ответит в этом чате.',
-      keyboard: buildVkClientMenuKeyboard(token),
+      action: isCancel ? 'cancel' : 'reschedule',
     });
     return;
   }
