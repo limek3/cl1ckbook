@@ -18,10 +18,10 @@ export function BrandLogo({
 }: BrandLogoProps) {
   const lightLogo = (
     <Image
-      src="/brand/klikbuk-logo-light.png"
+      src="/brand/clickbook-logo-light-transparent.png"
       alt={alt}
-      width={530}
-      height={401}
+      width={1594}
+      height={492}
       priority={priority}
       className={cn('h-auto w-full select-none', imageClassName)}
     />
@@ -29,10 +29,10 @@ export function BrandLogo({
 
   const darkLogo = (
     <Image
-      src="/brand/klikbuk-logo-dark.png"
+      src="/brand/clickbook-logo-dark-transparent.png"
       alt={alt}
-      width={530}
-      height={398}
+      width={1594}
+      height={492}
       priority={priority}
       className={cn('h-auto w-full select-none', imageClassName)}
     />

@@ -38,6 +38,21 @@ function mergeBookings(tableBookings: Booking[], jsonBookings: Booking[]) {
   );
 }
 
+
+function chatChannelFromBooking(booking: Booking): ChatChannel {
+  const raw = `${booking.channel ?? ''} ${booking.source ?? ''}`.toLowerCase();
+
+  if (raw.includes('vk') || raw.includes('вк')) return 'VK';
+  if (raw.includes('telegram') || raw.includes('tg') || raw.includes('телеграм') || raw.includes('тг')) return 'Telegram';
+  if (raw.includes('web') || raw.includes('site') || raw.includes('сайт') || raw.includes('публич')) return 'Web';
+
+  return 'Web';
+}
+
+function botConnectedFromChannel(channel: ChatChannel) {
+  return channel !== 'Web';
+}
+
 function synthesizeThreadsFromBookings(workspaceId: string, bookings: Booking[]): ChatThreadRecord[] {
   const grouped = new Map<string, Booking[]>();
 
@@ -54,18 +69,19 @@ function synthesizeThreadsFromBookings(workspaceId: string, bookings: Booking[])
     );
     const latest = sorted[0];
     const body = `Новая запись: ${latest.service} · ${latest.date} ${latest.time}`;
+    const channel = chatChannelFromBooking(latest);
 
     return {
       id: `booking-thread-${key}`,
       workspaceId,
       clientName: latest.clientName,
       clientPhone: latest.clientPhone,
-      channel: 'Telegram',
+      channel,
       segment: 'new',
-      source: 'Публичная страница',
+      source: latest.source ?? (channel === 'Web' ? 'Web' : 'Публичная страница'),
       nextVisit: latest.date,
       isPriority: false,
-      botConnected: true,
+      botConnected: botConnectedFromChannel(channel),
       lastMessagePreview: latest.comment || body,
       lastMessageAt: latest.createdAt,
       unreadCount: 1,
@@ -115,6 +131,20 @@ function synthesizeThreadsFromBookings(workspaceId: string, bookings: Booking[])
       }),
     } satisfies ChatThreadRecord;
   });
+}
+
+
+function chatThreadIdentity(thread: ChatThreadRecord) {
+  return thread.clientPhone || thread.clientName || thread.id;
+}
+
+function mergePersistedAndFallbackThreads(threads: ChatThreadRecord[], fallbackThreads: ChatThreadRecord[]) {
+  const seen = new Set(threads.map(chatThreadIdentity).filter(Boolean));
+
+  return [
+    ...threads,
+    ...fallbackThreads.filter((thread) => !seen.has(chatThreadIdentity(thread))),
+  ].sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime());
 }
 
 async function getMergedBookings(workspace: NonNullable<Awaited<ReturnType<typeof fetchWorkspaceForUser>>>) {
@@ -189,14 +219,16 @@ async function resolveThreadForMessage(params: {
     } satisfies ChatThreadRecord;
   }
 
+  const channel = chatChannelFromBooking(booking);
+
   const created = await createChatThread(params.workspaceId, {
     clientName: booking.clientName,
     clientPhone: booking.clientPhone,
-    channel: 'Telegram',
+    channel,
     segment: 'active',
-    source: 'Публичная страница',
+    source: booking.source ?? (channel === 'Web' ? 'Web' : 'Публичная страница'),
     nextVisit: booking.date,
-    botConnected: true,
+    botConnected: botConnectedFromChannel(channel),
     lastMessagePreview: `Новая запись: ${booking.service} · ${booking.date} ${booking.time}`,
     lastMessageAt: booking.createdAt,
     unreadCount: 0,
@@ -239,7 +271,7 @@ export async function GET() {
       const threads = await listChatsForWorkspace(workspace.id);
       return NextResponse.json({
         workspaceId: workspace.id,
-        threads: threads.length > 0 ? threads : fallbackThreads,
+        threads: mergePersistedAndFallbackThreads(threads, fallbackThreads),
       });
     } catch {
       return NextResponse.json({
@@ -271,7 +303,7 @@ export async function POST(request: Request) {
     if (bodyType === 'thread') {
       const clientName = typeof body.clientName === 'string' ? body.clientName.trim() : '';
       const clientPhone = typeof body.clientPhone === 'string' ? body.clientPhone.trim() : '';
-      const channel: ChatChannel = body.channel === 'VK' ? 'VK' : body.channel === 'Instagram' ? 'Instagram' : 'Telegram';
+      const channel: ChatChannel = body.channel === 'VK' ? 'VK' : body.channel === 'Instagram' ? 'Instagram' : body.channel === 'Web' ? 'Web' : 'Telegram';
 
       if (!clientName || !clientPhone) {
         return NextResponse.json({ error: 'client_name_and_phone_required' }, { status: 400 });
@@ -281,7 +313,7 @@ export async function POST(request: Request) {
         clientName,
         clientPhone,
         channel,
-        botConnected: true,
+        botConnected: botConnectedFromChannel(channel),
         segment: 'new',
         unreadCount: 0,
       });
@@ -391,7 +423,9 @@ export async function POST(request: Request) {
 
     const deliveryState: ChatDeliveryState | null = deliveredToClient
       ? 'delivered'
-      : requestedDeliveryState ?? (viaBot ? 'queued' : 'sent');
+      : thread.channel === 'Web'
+        ? 'queued'
+        : requestedDeliveryState ?? (viaBot ? 'queued' : 'sent');
 
     const message = await createChatMessage(workspace.id, {
       threadId: thread.id,
@@ -415,8 +449,9 @@ export async function POST(request: Request) {
       botConnected: deliveredToClient || thread.botConnected,
       metadata: {
         ...(thread.metadata ?? {}),
-        lastTelegramDelivery: telegramDelivered ? 'delivered' : 'queued',
-        lastVkDelivery: vkDelivered ? 'delivered' : 'queued',
+        lastTelegramDelivery: telegramDelivered ? 'delivered' : thread.channel === 'Telegram' ? 'queued' : 'not_needed',
+        lastVkDelivery: vkDelivered ? 'delivered' : thread.channel === 'VK' ? 'queued' : 'not_needed',
+        webFallback: thread.channel === 'Web' ? 'phone_contact_required' : undefined,
         ...(rescheduleProposalId ? {
           rescheduleProposalId,
           rescheduleProposalStatus: 'pending',

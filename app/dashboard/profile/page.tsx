@@ -68,19 +68,19 @@ function divideTone(light: boolean) {
 function cardTone(light: boolean) {
   return light
     ? 'border-black/[0.08] bg-[#fbfbfa]'
-    : 'border-white/[0.08] bg-[#101010]';
+    : 'border-white/[0.08] bg-[#090909]';
 }
 
 function fieldTone(light: boolean) {
   return light
     ? 'border-black/[0.08] bg-white'
-    : 'border-white/[0.08] bg-white/[0.04]';
+    : 'border-white/[0.08] bg-[#101010]';
 }
 
 function insetTone(light: boolean) {
   return light
     ? 'border-black/[0.07] bg-black/[0.025]'
-    : 'border-white/[0.07] bg-white/[0.035]';
+    : 'border-white/[0.08] bg-[#101010]';
 }
 
 function buttonBase(light: boolean, active = false) {

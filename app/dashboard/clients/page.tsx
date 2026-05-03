@@ -83,19 +83,19 @@ function divideTone(light: boolean) {
 function cardTone(light: boolean) {
   return light
     ? 'border-black/[0.08] bg-[#fbfbfa]'
-    : 'border-white/[0.08] bg-[#101010]';
+    : 'border-white/[0.08] bg-[#090909]';
 }
 
 function insetTone(light: boolean) {
   return light
     ? 'border-black/[0.07] bg-black/[0.025]'
-    : 'border-white/[0.07] bg-white/[0.035]';
+    : 'border-white/[0.08] bg-[#101010]';
 }
 
 function fieldClass(light: boolean) {
   return light
     ? 'border-black/[0.08] bg-white text-black placeholder:text-black/32'
-    : 'border-white/[0.08] bg-white/[0.035] text-white placeholder:text-white/30';
+    : 'border-white/[0.08] bg-[#101010] text-white placeholder:text-white/30';
 }
 
 function buttonBase(light: boolean, active = false) {
@@ -1261,7 +1261,7 @@ function ClientCrmDialog({
           'flex h-11 w-full items-center justify-between gap-3 rounded-[10px] border px-3 text-left text-[12px] font-medium transition-colors active:scale-[0.992]',
           light
             ? 'border-black/[0.08] bg-white text-black/62 hover:bg-black/[0.025] hover:text-black'
-            : 'border-white/[0.08] bg-white/[0.035] text-white/58 hover:bg-white/[0.06] hover:text-white',
+            : 'border-white/[0.08] bg-[#101010] text-white/58 hover:bg-white/[0.06] hover:text-white',
         );
 
     const content = (
@@ -1500,7 +1500,7 @@ function ClientCrmDialog({
                     'flex h-11 w-full items-center justify-between gap-3 rounded-[10px] border px-3 text-left text-[12px] font-medium transition-colors active:scale-[0.992]',
                     light
                       ? 'border-black/[0.08] bg-white text-black/62 hover:bg-black/[0.025] hover:text-black'
-                      : 'border-white/[0.08] bg-white/[0.035] text-white/58 hover:bg-white/[0.06] hover:text-white',
+                      : 'border-white/[0.08] bg-[#101010] text-white/58 hover:bg-white/[0.06] hover:text-white',
                   )}
                 >
                   <span className="flex min-w-0 items-center gap-2">
@@ -1601,7 +1601,7 @@ function ClientCrmDialog({
                   'mt-4 h-10 w-full rounded-[10px] border px-3 text-[12px] outline-none',
                   light
                     ? 'border-black/[0.08] bg-white text-black'
-                    : 'border-white/[0.08] bg-white/[0.045] text-white',
+                    : 'border-white/[0.08] bg-[#101010] text-white',
                 )}
               />
             ) : null}
@@ -1618,7 +1618,7 @@ function ClientCrmDialog({
                 'mt-3 w-full resize-none rounded-[10px] border px-3 py-2 text-[12px] leading-5 outline-none transition-colors',
                 light
                   ? 'border-black/[0.08] bg-white text-black placeholder:text-black/28 focus:border-black/[0.16]'
-                  : 'border-white/[0.08] bg-white/[0.045] text-white placeholder:text-white/28 focus:border-white/[0.16]',
+                  : 'border-white/[0.08] bg-[#101010] text-white placeholder:text-white/28 focus:border-white/[0.16]',
               )}
               placeholder={
                 activeMiniDialog === 'note'

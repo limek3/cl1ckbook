@@ -310,13 +310,13 @@ function borderTone(light: boolean) {
 function cardTone(light: boolean) {
   return light
     ? 'border-black/[0.08] bg-[#fbfbfa]'
-    : 'border-white/[0.08] bg-[#101010]';
+    : 'border-white/[0.08] bg-[#090909]';
 }
 
 function insetTone(light: boolean) {
   return light
     ? 'border-black/[0.07] bg-black/[0.025]'
-    : 'border-white/[0.07] bg-white/[0.035]';
+    : 'border-white/[0.08] bg-[#101010]';
 }
 
 function buttonBase(light: boolean, active = false) {
@@ -337,7 +337,7 @@ function inputCss(light: boolean) {
     'h-9 rounded-[9px] border px-3 text-[12.5px] shadow-none outline-none transition focus-visible:ring-0',
     light
       ? 'border-black/[0.08] bg-white text-black placeholder:text-black/28 focus:border-black/[0.16]'
-      : 'border-white/[0.08] bg-white/[0.045] text-white placeholder:text-white/25 focus:border-white/[0.16]',
+      : 'border-white/[0.08] bg-[#101010] text-white placeholder:text-white/25 focus:border-white/[0.16]',
   );
 }
 
@@ -346,7 +346,7 @@ function textareaCss(light: boolean) {
     'rounded-[9px] border px-3 py-3 text-[12.5px] leading-5 shadow-none outline-none transition focus-visible:ring-0',
     light
       ? 'border-black/[0.08] bg-white text-black placeholder:text-black/28 focus:border-black/[0.16]'
-      : 'border-white/[0.08] bg-white/[0.045] text-white placeholder:text-white/25 focus:border-white/[0.16]',
+      : 'border-white/[0.08] bg-[#101010] text-white placeholder:text-white/25 focus:border-white/[0.16]',
   );
 }
 
@@ -776,7 +776,7 @@ function CompactStat({
         'min-w-0 rounded-[10px] border px-3 py-2.5',
         light
           ? 'border-black/[0.07] bg-white'
-          : 'border-white/[0.07] bg-white/[0.035]',
+          : 'border-white/[0.08] bg-[#101010]',
       )}
     >
       <div className={cn('truncate text-[10px] font-medium', mutedText(light))}>
@@ -1692,7 +1692,17 @@ export function MasterProfileForm({
 
   const switchSection = (section: ProfileSection) => {
     if (section === activeSection) return;
+
+    const previousScrollX = typeof window !== 'undefined' ? window.scrollX : 0;
+    const previousScrollY = typeof window !== 'undefined' ? window.scrollY : 0;
+
     setActiveSection(section);
+
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(() => {
+        window.scrollTo(previousScrollX, previousScrollY);
+      });
+    }
   };
 
   const checklistItems: Array<{
@@ -2749,7 +2759,7 @@ export function MasterProfileForm({
                           'rounded-[9px] border px-3 py-2',
                           isLight
                             ? 'border-black/[0.07] bg-white'
-                            : 'border-white/[0.07] bg-white/[0.035]',
+                            : 'border-white/[0.08] bg-[#101010]',
                         )}
                       >
                         <div className="flex items-start gap-2">
@@ -3374,8 +3384,8 @@ export function MasterProfileForm({
             : 'xl:grid-cols-[292px_minmax(0,1fr)]',
         )}
       >
-        <aside className="hidden min-w-0 xl:block">
-          <Card light={isLight} className="sticky top-4 overflow-hidden">
+        <aside className="hidden min-w-0 self-start xl:block">
+          <Card light={isLight} className="sticky top-5 max-h-[calc(100dvh-40px)] overflow-y-auto">
             <CardTitle
               title={labels.formTitle}
               description={labels.formDescription}

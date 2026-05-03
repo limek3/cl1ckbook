@@ -123,7 +123,9 @@ function sourceLabel(value: unknown, locale: Locale) {
   const ru = locale === 'ru';
   if (raw.includes('инст') || raw.includes('insta') || raw.includes('instagram')) return ru ? 'Инстаграм' : 'Instagram';
   if (raw.includes('вк') || raw.includes('vk') || raw.includes('max') || raw.includes('макс')) return ru ? 'ВК' : 'VK';
-  return ru ? 'ТГ' : 'Telegram';
+  if (raw.includes('web') || raw.includes('site') || raw.includes('сайт') || raw.includes('публич') || raw.includes('public')) return 'Web';
+  if (raw.includes('tg') || raw.includes('тг') || raw.includes('telegram') || raw.includes('телеграм')) return ru ? 'ТГ' : 'Telegram';
+  return 'Web';
 }
 
 function rebuildStoredServiceMetrics(services: ServiceInsight[], bookings: Booking[]) {
@@ -209,9 +211,11 @@ export function buildWorkspaceDatasetFromStored(
     next.revenue += countsAsRevenue(booking.status) ? (booking.priceAmount ?? serviceMap.get(booking.service)?.price ?? parsePriceFromName(booking.service, 0)) : 0;
     channelMap.set(label, next);
   }
-  const channels = ['ТГ', 'Инстаграм', 'ВК'].map((label) => {
-    const item = channelMap.get(locale === 'ru' ? label : label === 'ТГ' ? 'Telegram' : label === 'ВК' ? 'VK' : 'Instagram') ?? { visitors: 0, bookings: 0, revenue: 0 };
-    const display = locale === 'ru' ? label : label === 'ТГ' ? 'Telegram' : label === 'ВК' ? 'VK' : 'Instagram';
+  const channelLabels = locale === 'ru' ? ['Web', 'ТГ', 'ВК', 'Инстаграм'] : ['Web', 'Telegram', 'VK', 'Instagram'];
+  const channels = channelLabels.map((label) => {
+    const canonical = label === 'ТГ' ? 'Telegram' : label === 'ВК' ? 'VK' : label;
+    const item = channelMap.get(label) ?? channelMap.get(canonical) ?? { visitors: 0, bookings: 0, revenue: 0 };
+    const display = label;
     return {
       id: profile.slug + '-channel-' + display.toLowerCase(),
       label: display,

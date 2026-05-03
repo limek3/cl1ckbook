@@ -194,8 +194,8 @@ export interface WorkspaceDataset {
 }
 
 const SOURCE_LABELS: Record<Locale, string[]> = {
-  ru: ['ТГ', 'Инстаграм', 'ВК'],
-  en: ['Telegram', 'Instagram', 'VK'],
+  ru: ['Web', 'ТГ', 'ВК', 'Инстаграм'],
+  en: ['Web', 'Telegram', 'VK', 'Instagram'],
 };
 
 const CATEGORY_LABELS: Record<Locale, string[]> = {
@@ -264,8 +264,9 @@ function normalizeSourceLabel(value: unknown, locale: Locale): string {
   const ru = locale === 'ru';
   if (raw.includes('инст') || raw.includes('insta') || raw.includes('instagram')) return ru ? 'Инстаграм' : 'Instagram';
   if (raw.includes('вк') || raw.includes('vk') || raw.includes('max') || raw.includes('макс')) return ru ? 'ВК' : 'VK';
-  if (raw.includes('tg') || raw.includes('тг') || raw.includes('telegram') || raw.includes('телеграм') || raw.includes('публич')) return ru ? 'ТГ' : 'Telegram';
-  return ru ? 'ТГ' : 'Telegram';
+  if (raw.includes('web') || raw.includes('site') || raw.includes('сайт') || raw.includes('публич') || raw.includes('public')) return 'Web';
+  if (raw.includes('tg') || raw.includes('тг') || raw.includes('telegram') || raw.includes('телеграм')) return ru ? 'ТГ' : 'Telegram';
+  return 'Web';
 }
 
 function serviceDurationFromName(service: string, fallback: number) {

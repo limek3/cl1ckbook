@@ -322,6 +322,40 @@ function buildBooking(masterSlug: string, values: BookingFormValues): Omit<Booki
   };
 }
 
+
+function detectBookingClientChannel() {
+  if (typeof window === 'undefined') {
+    return { sourceChannel: 'web', source: 'Web', clientContext: {} as Record<string, unknown> };
+  }
+
+  const telegramWebApp = (window as typeof window & { Telegram?: { WebApp?: { initData?: string } } }).Telegram?.WebApp;
+  const params = new URLSearchParams(window.location.search);
+  const hasTelegramContext = Boolean(telegramWebApp?.initData) || params.has('tgWebAppData') || params.get('source') === 'telegram';
+  const hasVkContext = Boolean(params.get('vk_app_id') || params.get('viewer_id') || params.get('vk_user_id') || params.get('source') === 'vk');
+
+  if (hasTelegramContext) {
+    return {
+      sourceChannel: 'telegram',
+      source: 'Telegram',
+      clientContext: { entry: 'telegram', hasInitData: Boolean(telegramWebApp?.initData) },
+    };
+  }
+
+  if (hasVkContext) {
+    return {
+      sourceChannel: 'vk',
+      source: 'VK',
+      clientContext: { entry: 'vk' },
+    };
+  }
+
+  return {
+    sourceChannel: 'web',
+    source: 'Web',
+    clientContext: { entry: 'public_page' },
+  };
+}
+
 async function parseJson<T>(response: Response) {
   return (await response.json()) as T;
 }
@@ -637,6 +671,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           body: JSON.stringify({
             masterSlug,
             values: buildBooking(masterSlug, values),
+            ...detectBookingClientChannel(),
           }),
         });
 
@@ -656,7 +691,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           };
         }
 
-        const payload = await parseJson<{ booking: Booking; telegram?: { url?: string | null } | null; vk?: { url?: string | null } | null; vkConfirmationUrl?: string | null }>(response);
+        const payload = await parseJson<{ booking: Booking; telegram?: { url?: string | null } | null; telegramConfirmationUrl?: string | null; vk?: { url?: string | null } | null; vkConfirmationUrl?: string | null }>(response);
 
         if (ownedProfile?.slug === masterSlug) {
           setStoredBookings((current) => [payload.booking, ...current]);
@@ -669,7 +704,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return {
           success: true,
           booking: payload.booking,
-          telegramConfirmationUrl: payload.telegram?.url ?? null,
+          telegramConfirmationUrl: payload.telegram?.url ?? payload.telegramConfirmationUrl ?? null,
           vkConfirmationUrl: payload.vk?.url ?? payload.vkConfirmationUrl ?? null,
         };
       } catch {

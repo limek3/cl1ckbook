@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { isSlotAvailable, normalizeAvailabilityDays, normalizeServiceDetails } from '@/lib/availability';
 import { buildWorkspaceSeed } from '@/lib/workspace-store';
 import type { Booking } from '@/lib/types';
+import type { ChatChannel } from '@/lib/chat-types';
 import { requireAuthUser } from '@/lib/server/require-auth-user';
 import { createClientTelegramBookingLink, notifyWorkspaceOwnerAboutBooking } from '@/lib/server/booking-telegram';
 import { createClientVkBookingLink, notifyWorkspaceOwnerAboutBookingVk } from '@/lib/server/booking-vk';
@@ -15,6 +16,7 @@ import {
   fetchChatThreadByPhone,
   updateChatThread,
 } from '@/lib/server/supabase-chats';
+import { upsertClientFromBooking, type ClientSourceChannel } from '@/lib/server/supabase-clients';
 import { listAvailabilityDays, listServices } from '@/lib/server/supabase-workspace-sections';
 import {
   fetchWorkspaceForUser,
@@ -25,7 +27,59 @@ import {
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-function buildClientBooking(masterSlug: string, values: Omit<Booking, 'id' | 'masterSlug' | 'status' | 'createdAt'>): Booking {
+type BookingSourceInfo = {
+  channel: ClientSourceChannel;
+  source: 'Web' | 'Telegram' | 'VK';
+  chatChannel: ChatChannel;
+  botConnected: boolean;
+  communicationScenario: string;
+};
+
+function normalizeIncomingChannel(value: unknown, source: unknown): ClientSourceChannel {
+  const raw = `${typeof value === 'string' ? value : ''} ${typeof source === 'string' ? source : ''}`.trim().toLowerCase();
+
+  if (raw.includes('vk') || raw.includes('вк')) return 'vk';
+  if (raw.includes('tg') || raw.includes('telegram') || raw.includes('телеграм')) return 'telegram';
+  return 'web';
+}
+
+function getBookingSourceInfo(value: unknown, source: unknown): BookingSourceInfo {
+  const channel = normalizeIncomingChannel(value, source);
+
+  if (channel === 'telegram') {
+    return {
+      channel,
+      source: 'Telegram',
+      chatChannel: 'Telegram',
+      botConnected: true,
+      communicationScenario: 'telegram_bot',
+    };
+  }
+
+  if (channel === 'vk') {
+    return {
+      channel,
+      source: 'VK',
+      chatChannel: 'VK',
+      botConnected: true,
+      communicationScenario: 'vk_bot',
+    };
+  }
+
+  return {
+    channel: 'web',
+    source: 'Web',
+    chatChannel: 'Web',
+    botConnected: false,
+    communicationScenario: 'phone_fallback_without_bot',
+  };
+}
+
+function buildClientBooking(
+  masterSlug: string,
+  values: Omit<Booking, 'id' | 'masterSlug' | 'status' | 'createdAt'>,
+  sourceInfo: BookingSourceInfo,
+): Booking {
   return {
     id: crypto.randomUUID(),
     masterSlug,
@@ -38,8 +92,14 @@ function buildClientBooking(masterSlug: string, values: Omit<Booking, 'id' | 'ma
     status: 'confirmed',
     createdAt: new Date().toISOString(),
     confirmedAt: new Date().toISOString(),
-    source: 'ТГ',
-    channel: 'telegram',
+    source: sourceInfo.source,
+    channel: sourceInfo.channel,
+    metadata: {
+      ...(values.metadata ?? {}),
+      sourceChannel: sourceInfo.channel,
+      communicationScenario: sourceInfo.communicationScenario,
+      clientWithoutBot: sourceInfo.channel === 'web',
+    },
   };
 }
 
@@ -106,6 +166,9 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       masterSlug?: string;
       values?: Omit<Booking, 'id' | 'masterSlug' | 'status' | 'createdAt'>;
+      sourceChannel?: string;
+      source?: string;
+      clientContext?: Record<string, unknown>;
     };
 
     if (!body.masterSlug || !body.values) {
@@ -133,7 +196,7 @@ export async function POST(request: Request) {
       ? storedServiceDetails
       : normalizedServices.length > 0
         ? normalizedServices
-        : seed.services;
+        : seed.services ?? [];
     const selectedServiceDetail = effectiveServiceDetails.find(
       (service) =>
         service.name === requestedService &&
@@ -152,7 +215,7 @@ export async function POST(request: Request) {
       : [];
     const normalizedAvailability = await listAvailabilityDays(workspace.id).catch(() => []);
     const availability = resolveAvailability({
-      seedAvailability: seed.availability,
+      seedAvailability: seed.availability ?? [],
       storedAvailability,
       normalizedAvailability,
     });
@@ -177,12 +240,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'slot_unavailable' }, { status: 409 });
     }
 
-    const booking = {
-      ...buildClientBooking(body.masterSlug, body.values),
+    const sourceInfo = getBookingSourceInfo(body.sourceChannel, body.source);
+    const booking: Booking = {
+      ...buildClientBooking(body.masterSlug, body.values, sourceInfo),
       durationMinutes: selectedServiceDetail?.duration,
       priceAmount: selectedServiceDetail?.price,
-      source: 'ТГ',
-      channel: 'telegram',
+      metadata: {
+        ...(body.values.metadata ?? {}),
+        sourceChannel: sourceInfo.channel,
+        source: sourceInfo.source,
+        clientContext: body.clientContext ?? {},
+        communicationScenario: sourceInfo.communicationScenario,
+        clientWithoutBot: sourceInfo.channel === 'web',
+      },
     };
 
     let persistedBooking = booking;
@@ -194,6 +264,30 @@ export async function POST(request: Request) {
       nextBookings = mergeBookings(refreshedTableBookings, [persistedBooking, ...jsonBookings]);
     } catch {
       nextBookings = [persistedBooking, ...currentBookings];
+    }
+
+    const clientRecord = await upsertClientFromBooking({
+      workspaceId: workspace.id,
+      booking: persistedBooking,
+      source: sourceInfo.source,
+      channel: sourceInfo.channel,
+      communicationScenario: sourceInfo.communicationScenario,
+      metadata: {
+        clientContext: body.clientContext ?? {},
+        sourceChannel: sourceInfo.channel,
+      },
+    }).catch(() => null);
+
+    if (clientRecord?.id) {
+      persistedBooking = {
+        ...persistedBooking,
+        metadata: {
+          ...(persistedBooking.metadata ?? {}),
+          clientId: clientRecord.id,
+          clientCardSynced: true,
+        },
+      };
+      nextBookings = nextBookings.map((item) => (item.id === persistedBooking.id ? persistedBooking : item));
     }
 
     await updateWorkspace(workspace.id, {
@@ -263,16 +357,16 @@ export async function POST(request: Request) {
         (await createChatThread(workspace.id, {
           clientName: persistedBooking.clientName,
           clientPhone: persistedBooking.clientPhone,
-          channel: 'Telegram',
+          channel: sourceInfo.chatChannel,
           segment: 'new',
-          source: 'Публичная страница',
+          source: sourceInfo.source,
           nextVisit: persistedBooking.date,
-          botConnected: true,
+          botConnected: sourceInfo.botConnected,
           unreadCount: 1,
           isPriority: false,
           lastMessagePreview: bookingSummary,
           lastMessageAt: persistedBooking.createdAt,
-          metadata: { bookingId: persistedBooking.id, bookingIds: [persistedBooking.id] },
+          metadata: { bookingId: persistedBooking.id, bookingIds: [persistedBooking.id], communicationScenario: sourceInfo.communicationScenario },
         }));
 
       if (thread) {
@@ -304,7 +398,7 @@ export async function POST(request: Request) {
           });
         }
 
-        const sentToClientTelegram = isNotificationEnabled(workspace, {
+        const sentToClientTelegram = sourceInfo.channel === 'telegram' && isNotificationEnabled(workspace, {
           id: 'visit-reminder',
           titleIncludes: 'напомин',
           audience: 'client',
@@ -327,7 +421,7 @@ export async function POST(request: Request) {
           lastMessagePreview: persistedBooking.comment || bookingSummary,
           lastMessageAt: persistedBooking.createdAt,
           unreadCount: (existingThread?.unreadCount ?? 0) + 1,
-          botConnected: sentToClientTelegram || thread.botConnected,
+          botConnected: sourceInfo.botConnected || sentToClientTelegram || thread.botConnected,
           metadata: {
             ...(thread.metadata ?? {}),
             bookingId: persistedBooking.id,
@@ -337,7 +431,8 @@ export async function POST(request: Request) {
                 persistedBooking.id,
               ]),
             ],
-            lastClientTelegramDelivery: sentToClientTelegram ? 'delivered' : 'pending_link',
+            lastClientTelegramDelivery: sentToClientTelegram ? 'delivered' : sourceInfo.channel === 'telegram' ? 'pending_link' : 'phone_fallback',
+            communicationScenario: sourceInfo.communicationScenario,
           },
         });
       }
@@ -370,6 +465,9 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'booking_id_and_status_required' }, { status: 400 });
     }
 
+    const nextStatus = body.status;
+    const bookingId = body.bookingId;
+
     const workspace = await fetchWorkspaceForUser(user);
 
     if (!workspace) {
@@ -381,15 +479,15 @@ export async function PATCH(request: Request) {
     const currentBookings = mergeBookings(tableBookings, jsonBookings);
     let updatedBooking: Booking | null = null;
     let nextBookings = currentBookings.map((bookingItem) =>
-      bookingItem.id === body.bookingId ? { ...bookingItem, status: body.status } : bookingItem,
+      bookingItem.id === bookingId ? { ...bookingItem, status: nextStatus } : bookingItem,
     );
 
     try {
-      updatedBooking = await updateBookingStatusRecord(workspace.id, body.bookingId, body.status);
+      updatedBooking = await updateBookingStatusRecord(workspace.id, bookingId, nextStatus);
       const refreshedTableBookings = await listBookingsByWorkspace(workspace.id).catch(() => [] as Booking[]);
       nextBookings = mergeBookings(refreshedTableBookings, nextBookings);
     } catch {
-      updatedBooking = nextBookings.find((bookingItem) => bookingItem.id === body.bookingId) ?? null;
+      updatedBooking = nextBookings.find((bookingItem) => bookingItem.id === bookingId) ?? null;
     }
 
     if (!updatedBooking) {

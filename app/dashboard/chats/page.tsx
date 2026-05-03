@@ -1928,6 +1928,7 @@ export default function DashboardChatsPage() {
     if (value === 'Telegram') return 'ТГ';
     if (value === 'Instagram') return 'Инстаграм';
     if (value === 'VK') return 'ВК';
+    if (value === 'Web') return 'Web';
     return value;
   };
 
@@ -2122,6 +2123,7 @@ export default function DashboardChatsPage() {
 
   const channelOptions = [
     { value: 'all', label: labels.allChannels },
+    { value: 'Web', label: 'Web' },
     { value: 'Telegram', label: locale === 'ru' ? 'ТГ' : 'Telegram' },
     { value: 'Instagram', label: locale === 'ru' ? 'Инстаграм' : 'Instagram' },
     { value: 'VK', label: locale === 'ru' ? 'ВК' : 'VK' },

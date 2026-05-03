@@ -265,6 +265,7 @@ function ModePanel({
               href={option.href}
               onClick={onNavigate}
               prefetch={false}
+              scroll={false}
               aria-current={active ? 'page' : undefined}
               title={option.title}
               className={cn(
@@ -330,6 +331,7 @@ function NavRow({
       title={item.label}
       aria-current={active ? 'page' : undefined}
       prefetch={false}
+      scroll={false}
       className={cn(
         'group relative flex h-8 items-center gap-2 rounded-[9px] px-2 text-[12px] font-medium tracking-[-0.025em] transition active:scale-[0.99]',
         active
@@ -420,6 +422,7 @@ function PublicLink({
       onClick={onNavigate}
       aria-current={active ? 'page' : undefined}
       prefetch={false}
+      scroll={false}
       className={cn(
         'group flex items-center justify-between gap-2 rounded-[11px] border p-2.5 transition active:scale-[0.99]',
         active
@@ -498,6 +501,7 @@ function ProfileScopeContent({
         href={backHref}
         onClick={onNavigate}
         prefetch={false}
+        scroll={false}
         className="group flex h-9 items-center gap-2 rounded-[10px] px-2 text-[12px] font-medium text-slate-500 transition hover:bg-black/[0.045] hover:text-slate-950 active:scale-[0.99] dark:text-white/36 dark:hover:bg-white/[0.055] dark:hover:text-white"
       >
         <ArrowLeft className="size-3.5 shrink-0 transition group-hover:-translate-x-0.5" />
@@ -586,11 +590,6 @@ function WorkspaceIdentityAvatar({
       ) : (
         identity.initial
       )}
-
-      <span
-        aria-hidden="true"
-        className="absolute -right-0.5 -top-0.5 size-2 rounded-full border-2 border-[#fbfbfa] bg-emerald-500 animate-pulse dark:border-[#101010]"
-      />
     </span>
   );
 }
@@ -733,6 +732,7 @@ function AccountMenuRow({
       <Link
         href={href}
         prefetch={false}
+        scroll={false}
         target={external ? '_blank' : undefined}
         rel={external ? 'noreferrer' : undefined}
         onClick={() => onClick?.()}
@@ -1553,6 +1553,7 @@ function MobileBottomItem({
       href={item.href}
       aria-current={active ? 'page' : undefined}
       prefetch={false}
+      scroll={false}
       className={cn(
         'relative flex h-[44px] flex-col items-center justify-center gap-0.5 rounded-[14px] text-[10px] font-medium transition active:scale-[0.98]',
         active
@@ -1627,11 +1628,12 @@ function SidebarContent({
           href={withDashboardDemoParam('/dashboard', selectedMode === 'demo')}
           onClick={onNavigate}
           prefetch={false}
+          scroll={false}
           aria-label={product}
           title={product}
           className="flex flex-col items-center justify-center rounded-[12px] py-1.5 transition hover:opacity-85 active:scale-[0.99]"
         >
-          <BrandLogo className="w-[82px]" />
+          <BrandLogo className="w-[138px]" />
 
           <span className="mt-1 text-[9.5px] text-slate-500 dark:text-white/32">
             {productHint}
@@ -1851,6 +1853,9 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
             overview: 'Основное',
             work: 'Работа',
             settings: 'Управление',
+            storefront: 'Витрина и запись',
+            channels: 'Каналы',
+            billing: 'Оплата и доступ',
           },
           actions: {
             openMenu: 'Открыть меню',
@@ -1894,6 +1899,9 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
             overview: 'Overview',
             work: 'Work',
             settings: 'Manage',
+            storefront: 'Storefront and booking',
+            channels: 'Channels',
+            billing: 'Billing and access',
           },
           actions: {
             openMenu: 'Open menu',
@@ -1983,6 +1991,9 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
         label: labels.items.clients,
         icon: Users2,
       },
+    ];
+
+    const storefront: NavigationItem[] = [
       {
         href: withDashboardDemoParam('/dashboard/services', demoMode),
         label: labels.items.services,
@@ -2000,11 +2011,45 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
       },
     ];
 
-    const settingsGroup: NavigationItem[] = [
+    const manage: NavigationItem[] = [
       {
         href: withDashboardDemoParam('/dashboard/profile', demoMode),
         label: labels.items.profile,
         icon: SquarePen,
+        exact: true,
+      },
+      {
+        href: withDashboardDemoParam('/dashboard/appearance', demoMode),
+        label: labels.items.appearance,
+        icon: LayoutPanelTop,
+      },
+      {
+        href: withDashboardDemoParam('/dashboard/notifications', demoMode),
+        label: labels.items.notifications,
+        icon: Bell,
+      },
+      {
+        href: withDashboardDemoParam('/dashboard/marketing', demoMode),
+        label: labels.items.marketing,
+        icon: Sparkles,
+      },
+    ];
+
+    const billing: NavigationItem[] = [
+      {
+        href: withDashboardDemoParam('/dashboard/payments', demoMode),
+        label: labels.items.payments,
+        icon: CheckCircle2,
+      },
+      {
+        href: withDashboardDemoParam('/dashboard/subscription', demoMode),
+        label: labels.items.subscription,
+        icon: Package2,
+      },
+      {
+        href: withDashboardDemoParam('/dashboard/limits', demoMode),
+        label: labels.items.limits,
+        icon: Settings2,
       },
     ];
 
@@ -2020,24 +2065,42 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
         items: work,
       },
       {
-        id: 'settings',
+        id: 'storefront',
+        title: labels.navigation.storefront,
+        items: storefront,
+      },
+      {
+        id: 'manage',
         title: labels.navigation.settings,
-        items: settingsGroup,
+        items: manage,
+      },
+      {
+        id: 'billing',
+        title: labels.navigation.billing,
+        items: billing,
       },
     ];
   }, [
     demoMode,
+    labels.items.appearance,
     labels.items.availability,
     labels.items.chats,
     labels.items.clients,
     labels.items.home,
+    labels.items.limits,
+    labels.items.marketing,
+    labels.items.notifications,
+    labels.items.payments,
     labels.items.profile,
     labels.items.services,
     labels.items.stats,
+    labels.items.subscription,
     labels.items.templates,
     labels.items.today,
+    labels.navigation.billing,
     labels.navigation.overview,
     labels.navigation.settings,
+    labels.navigation.storefront,
     labels.navigation.work,
     newBookings,
   ]);
@@ -2062,7 +2125,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
     isActive(pathname, path, path === '/dashboard/profile'),
   );
 
-  const sidebarScope: SidebarScope = profileMenuActive ? 'profile' : 'main';
+  const sidebarScope: SidebarScope = 'main';
 
   const profileMenuGroups = useMemo<NavigationGroup[]>(() => {
     const profileCore: NavigationItem[] = [
@@ -2199,9 +2262,8 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
     () => [
       publicPageItem,
       ...navigationGroups.flatMap((group) => group.items),
-      ...profileMenuGroups.flatMap((group) => group.items),
     ],
-    [navigationGroups, profileMenuGroups, publicPageItem],
+    [navigationGroups, publicPageItem],
   );
 
   const activeItem = allItems.find(
@@ -2212,20 +2274,18 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
 
   const activeGroup = publicPageItem.forceActive
     ? { title: labels.navigation.publicPage }
-    : profileMenuActive
-      ? { title: labels.navigation.profile }
-      : navigationGroups.find((group) =>
-          group.items.some(
-            (item) =>
-              !item.skipActiveMatch &&
-              isActive(pathname, item.href, item.exact),
-          ),
-        );
+    : navigationGroups.find((group) =>
+        group.items.some(
+          (item) =>
+            !item.skipActiveMatch &&
+            isActive(pathname, item.href, item.exact),
+        ),
+      );
 
   const findItem = (path: string) => {
     if (getPathOnly(publicPageItem.href) === path) return publicPageItem;
 
-    return [...navigationGroups, ...profileMenuGroups]
+    return navigationGroups
       .flatMap((group) => group.items)
       .find((item) => getPathOnly(item.href) === path);
   };
@@ -2313,10 +2373,11 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
               <Link
                 href={withDashboardDemoParam('/dashboard', demoMode)}
                 prefetch={false}
+                scroll={false}
                 className="flex min-w-0 items-center gap-2"
               >
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-[10px] border border-black/[0.08] bg-[#fbfbfa] dark:border-white/[0.08] dark:bg-[#101010]">
-                  <BrandLogo className="w-[23px]" />
+                <span className="flex h-8 w-[82px] shrink-0 items-center justify-center rounded-[10px] border border-black/[0.08] bg-[#fbfbfa] px-2 dark:border-white/[0.08] dark:bg-[#101010]">
+                  <BrandLogo className="w-[66px]" />
                 </span>
 
                 <span className="min-w-0">
@@ -2335,6 +2396,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
               href={publicPageItem.href}
               aria-label={labels.items.publicPage}
               prefetch={false}
+              scroll={false}
               className={cn(
                 'flex size-8 shrink-0 items-center justify-center rounded-[10px] transition',
                 publicPageItem.forceActive

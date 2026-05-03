@@ -1,4 +1,4 @@
-export type ChatChannel = 'Telegram' | 'Instagram' | 'VK';
+export type ChatChannel = 'Telegram' | 'Instagram' | 'VK' | 'Web';
 export type ChatAuthor = 'client' | 'master' | 'system';
 export type ChatDeliveryState = 'queued' | 'sent' | 'delivered' | 'read' | 'failed';
 export type ChatSegment = 'new' | 'active' | 'followup';
