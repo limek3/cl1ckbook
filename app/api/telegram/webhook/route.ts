@@ -13,6 +13,7 @@ import {
   createChatMessage,
   createChatThread,
   fetchChatThreadByBookingId,
+  listChatsForWorkspace,
   updateChatThread,
 } from '@/lib/server/supabase-chats';
 import { bookingMessageText, bookingSelectionLabel, bookingShortContext, bookingThreadMetadata } from '@/lib/server/booking-context';
@@ -159,7 +160,21 @@ function telegramClientMenuReplyMarkup() {
     ],
     resize_keyboard: true,
     one_time_keyboard: false,
+    input_field_placeholder: 'Выберите действие или напишите сообщение…',
   };
+}
+
+function normalizeTelegramMenuText(value?: string) {
+  return (value ?? '').trim().toLowerCase().replace(/ё/g, 'е');
+}
+
+function telegramMenuActionFromText(value?: string): 'bookings' | 'choose' | 'help' | null {
+  const text = normalizeTelegramMenuText(value);
+  if (!text) return null;
+  if (text.includes('мои записи') || text === 'записи' || text === '/bookings') return 'bookings';
+  if (text.includes('выбрать запись') || text.includes('написать по записи') || text === '/choose') return 'choose';
+  if (text.includes('помощ') || text === '/help') return 'help';
+  return null;
 }
 
 function extractTelegramMessageId(response: unknown) {
@@ -221,6 +236,48 @@ async function rememberClientMenuMessage(links: BookingLinkRow[], messageId: num
       logWebhookError('remember client menu metadata failed', error);
     }
   }
+}
+
+function getStoredClientKeyboardMessageId(links: BookingLinkRow[]) {
+  for (const link of links) {
+    const messageId = linkMetadata(link).clientKeyboardMessageId;
+    if (typeof messageId === 'number') return messageId;
+  }
+  return null;
+}
+
+async function rememberClientKeyboardMessage(links: BookingLinkRow[], messageId: number | null) {
+  if (!messageId || links.length === 0) return;
+  const admin = createSupabaseAdminClient();
+
+  for (const link of links) {
+    const metadata = linkMetadata(link);
+    const { error } = await admin
+      .from('sloty_booking_telegram_links')
+      .update({ metadata: { ...metadata, clientKeyboardMessageId: messageId } })
+      .eq('token', link.token);
+
+    if (error) logWebhookError('remember client keyboard metadata failed', error);
+  }
+}
+
+async function ensureTelegramClientPersistentMenu(chatId: number | string, links?: BookingLinkRow[]) {
+  const knownLinks = links ?? (await getConfirmedTelegramBookingLinks(chatId, 8));
+  const previousMessageId = getStoredClientKeyboardMessageId(knownLinks);
+
+  if (previousMessageId) {
+    await safeTask('delete previous client reply keyboard message', () =>
+      deleteTelegramMessage({ chatId, messageId: previousMessageId }),
+    );
+  }
+
+  const response = await sendTelegramMessage({
+    chatId,
+    text: 'Меню клиента включено. Кнопки доступны под полем ввода.',
+    replyMarkup: telegramClientMenuReplyMarkup(),
+  });
+
+  await rememberClientKeyboardMessage(knownLinks, extractTelegramMessageId(response));
 }
 
 
@@ -989,9 +1046,9 @@ async function handleBookingStart(params: {
     }
   }
 
-  const existingThread = await fetchChatThreadByBookingId(link.workspace_id, booking.id).catch(
+  const existingThread = await findTelegramClientThread(link.workspace_id, booking, params.chatId).catch(
     (error) => {
-      logWebhookError('handleBookingStart fetch thread failed', error);
+      logWebhookError('handleBookingStart fetch client thread failed', error);
       return null;
     },
   );
@@ -1001,11 +1058,8 @@ async function handleBookingStart(params: {
         channel: 'Telegram',
         source: existingThread.source ?? booking.source ?? 'Web',
         botConnected: true,
-        metadata: {
-          ...bookingThreadMetadata(booking, profile, existingThread.metadata ?? {}),
-          clientTelegramChatId: params.chatId,
-          clientTelegramId: params.from.id,
-        },
+        nextVisit: existingThread.nextVisit ?? booking.date,
+        metadata: mergeTelegramBookingMetadata(existingThread.metadata ?? {}, booking, profile, params.chatId, params.from.id),
       }).catch((error) => {
         logWebhookError('handleBookingStart update thread failed', error);
         return existingThread;
@@ -1022,11 +1076,7 @@ async function handleBookingStart(params: {
           'Клиент подключил Telegram для подтверждений и напоминаний.',
         lastMessageAt: confirmedAt,
         unreadCount: 0,
-        metadata: {
-          ...bookingThreadMetadata(booking, profile),
-          clientTelegramChatId: params.chatId,
-          clientTelegramId: params.from.id,
-        },
+        metadata: mergeTelegramBookingMetadata(bookingThreadMetadata(booking, profile), booking, profile, params.chatId, params.from.id),
       }).catch((error) => {
         logWebhookError('handleBookingStart create thread failed', error);
         return null;
@@ -1046,13 +1096,14 @@ async function handleBookingStart(params: {
   await safeTask('sendClientBookingConfirmation', async () => {
     const clientLinks = await getConfirmedTelegramBookingLinks(params.chatId, 2);
 
-    return sendClientBookingConfirmation({
+    await sendClientBookingConfirmation({
       chatId: params.chatId,
       booking,
       profile,
       bookingToken: link.token,
       hasMultipleBookings: clientLinks.length > 1,
     });
+    await ensureTelegramClientPersistentMenu(params.chatId, clientLinks.length ? clientLinks : [link]);
   });
 }
 
@@ -1103,6 +1154,78 @@ async function getBookingFromLink(link: BookingLinkRow) {
   return { booking, profile };
 }
 
+
+function normalizePhone(value?: string | null) {
+  return String(value ?? '').replace(/\D+/g, '');
+}
+
+function normalizeName(value?: string | null) {
+  return String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function telegramThreadMatchesBooking(thread: Awaited<ReturnType<typeof listChatsForWorkspace>>[number], booking: Booking, chatId: number | string) {
+  const phone = normalizePhone(booking.clientPhone);
+  const threadPhone = normalizePhone(thread.clientPhone);
+  const name = normalizeName(booking.clientName);
+  const threadName = normalizeName(thread.clientName);
+  const metadataChatId = thread.metadata?.clientTelegramChatId;
+
+  return Boolean(
+    String(metadataChatId ?? '') === String(chatId) ||
+    (phone && threadPhone && phone === threadPhone) ||
+    (name && threadName && name === threadName),
+  );
+}
+
+async function findTelegramClientThread(workspaceId: string, booking: Booking, chatId: number | string) {
+  const threads = await listChatsForWorkspace(workspaceId).catch(() => [] as Awaited<ReturnType<typeof listChatsForWorkspace>>);
+  const byBooking = threads.find((thread) => {
+    const bookingIds = Array.isArray(thread.metadata?.bookingIds)
+      ? thread.metadata.bookingIds.filter((item): item is string => typeof item === 'string')
+      : [];
+    return thread.metadata?.bookingId === booking.id || bookingIds.includes(booking.id);
+  });
+  if (byBooking) return byBooking;
+
+  return threads.find((thread) => telegramThreadMatchesBooking(thread, booking, chatId)) ?? null;
+}
+
+function mergeTelegramBookingMetadata(base: Record<string, unknown> | null | undefined, booking: Booking, profile: MasterProfile | null, chatId: number | string, telegramId: number | string) {
+  const bookingMetadata = bookingThreadMetadata(booking, profile, base ?? {});
+  const currentIds = Array.isArray(base?.bookingIds)
+    ? base.bookingIds.filter((item): item is string => typeof item === 'string')
+    : [];
+  const currentContexts = Array.isArray(base?.bookingContexts) ? base.bookingContexts : [];
+  const nextContext = {
+    id: booking.id,
+    bookingId: booking.id,
+    code: bookingMetadata.bookingCode,
+    bookingCode: bookingMetadata.bookingCode,
+    service: booking.service,
+    services: bookingMetadata.services,
+    date: booking.date,
+    bookingDate: booking.date,
+    time: booking.time,
+    bookingTime: booking.time,
+    masterName: bookingMetadata.masterName,
+  };
+
+  const contexts = [
+    ...currentContexts.filter((item) => !(item && typeof item === 'object' && (item as Record<string, unknown>).id === booking.id)),
+    nextContext,
+  ];
+
+  return {
+    ...(base ?? {}),
+    ...bookingMetadata,
+    bookingIds: Array.from(new Set([...currentIds, booking.id])),
+    bookingContexts: contexts,
+    activeBookingId: booking.id,
+    clientTelegramChatId: chatId,
+    clientTelegramId: telegramId,
+  };
+}
+
 async function sendTelegramBookingDetails(params: {
   chatId: number | string;
   link: BookingLinkRow;
@@ -1124,7 +1247,7 @@ async function sendTelegramBookingDetails(params: {
     title: params.title || 'Детали записи',
     booking,
     profile,
-    footer: 'Нажмите «Написать по этой записи», затем отправьте следующее сообщение — мастер увидит контекст услуги.',
+    footer: 'Нажмите «Написать по этой записи» и отправьте сообщение. Мастер увидит нужную услугу.',
   });
   const replyMarkup = {
     inline_keyboard: [
@@ -1142,6 +1265,7 @@ async function sendTelegramBookingDetails(params: {
         replyMarkup,
       }),
     );
+    await ensureTelegramClientPersistentMenu(params.chatId, params.knownLinks ?? [params.link]);
     return;
   }
 
@@ -1160,6 +1284,7 @@ async function sendTelegramBookingDetails(params: {
     replyMarkup,
   });
   await rememberClientMenuMessage(knownLinks, extractTelegramMessageId(response));
+  await ensureTelegramClientPersistentMenu(params.chatId, knownLinks);
 }
 
 async function showConfirmedBookingListForChat(
@@ -1238,6 +1363,7 @@ async function sendTelegramBookingChoice(params: {
         replyMarkup,
       }),
     );
+    await ensureTelegramClientPersistentMenu(params.chatId, params.links);
     return;
   }
 
@@ -1252,6 +1378,7 @@ async function sendTelegramBookingChoice(params: {
     replyMarkup,
   });
   await rememberClientMenuMessage(params.links, extractTelegramMessageId(response));
+  await ensureTelegramClientPersistentMenu(params.chatId, params.links);
 }
 
 async function handleTelegramChatContextCallback(params: {
@@ -1378,7 +1505,18 @@ async function handleClientChatMessage(params: {
   text?: string;
 }) {
   const text = params.text?.trim();
-  if (!text || text.startsWith('/')) return;
+  if (!text) return;
+
+  const menuAction = telegramMenuActionFromText(text);
+  if (menuAction === 'help') {
+    await sendClientLinkingHelp(params.chatId);
+    return;
+  }
+  if (menuAction === 'bookings' || menuAction === 'choose') {
+    await showConfirmedBookingListForChat(params.chatId);
+    return;
+  }
+  if (text.startsWith('/')) return;
 
   const admin = createSupabaseAdminClient();
 
@@ -1492,9 +1630,9 @@ async function handleClientChatMessage(params: {
 
   if (!booking) return;
 
-  const existingThread = await fetchChatThreadByBookingId(link.workspace_id, booking.id).catch(
+  const existingThread = await findTelegramClientThread(link.workspace_id, booking, params.chatId).catch(
     (error) => {
-      logWebhookError('handleClientChatMessage fetch thread failed', error);
+      logWebhookError('handleClientChatMessage fetch client thread failed', error);
       return null;
     },
   );
@@ -1509,11 +1647,7 @@ async function handleClientChatMessage(params: {
         lastMessagePreview: text,
         lastMessageAt: now,
         unreadCount: (existingThread.unreadCount ?? 0) + 1,
-        metadata: {
-          ...bookingThreadMetadata(booking, null, existingThread.metadata ?? {}),
-          clientTelegramChatId: params.chatId,
-          clientTelegramId: params.from.id,
-        },
+        metadata: mergeTelegramBookingMetadata(existingThread.metadata ?? {}, booking, null, params.chatId, params.from.id),
       }).catch((error) => {
         logWebhookError('handleClientChatMessage update existing thread failed', error);
         return existingThread;
@@ -1529,11 +1663,7 @@ async function handleClientChatMessage(params: {
         lastMessagePreview: text,
         lastMessageAt: now,
         unreadCount: 1,
-        metadata: {
-          ...bookingThreadMetadata(booking),
-          clientTelegramChatId: params.chatId,
-          clientTelegramId: params.from.id,
-        },
+        metadata: mergeTelegramBookingMetadata(bookingThreadMetadata(booking), booking, null, params.chatId, params.from.id),
       }).catch((error) => {
         logWebhookError('handleClientChatMessage create thread failed', error);
         return null;

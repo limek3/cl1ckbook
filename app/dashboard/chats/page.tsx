@@ -212,21 +212,23 @@ function mergeThreadSnapshots(
     } satisfies ChatThreadRecord;
   });
 
+  const compactMerged = mergeThreadsByClientForUi(merged);
+
   if (sortMode !== 'manual') {
-    return sortThreads(merged, 'recent');
+    return sortThreads(compactMerged, 'recent');
   }
 
   const ordered: ChatThreadRecord[] = [];
   const used = new Set<string>();
 
   for (const thread of currentThreads) {
-    const next = merged.find((item) => item.id === thread.id);
+    const next = compactMerged.find((item) => item.id === thread.id);
     if (!next) continue;
     ordered.push(next);
     used.add(next.id);
   }
 
-  const fresh = merged.filter((thread) => !used.has(thread.id));
+  const fresh = compactMerged.filter((thread) => !used.has(thread.id));
   return [...sortThreads(fresh, 'recent'), ...ordered];
 }
 
@@ -775,6 +777,113 @@ function createLocalMessage(
     createdAt: now,
     metadata: { optimistic: true },
   };
+}
+
+
+function chatThreadMetaString(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value)) return String(Math.trunc(value));
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  return '';
+}
+
+function normalizedClientNameForMerge(value?: string | null) {
+  return String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function threadClientMergeKeys(thread: ChatThreadRecord) {
+  const keys = new Set<string>();
+  const phone = thread.clientPhone.replace(/\D+/g, '');
+  const name = normalizedClientNameForMerge(thread.clientName);
+  const telegramChatId = chatThreadMetaString(thread.metadata?.clientTelegramChatId);
+  const vkPeerId = chatThreadMetaString(thread.metadata?.clientVkPeerId);
+  const vkUserId = chatThreadMetaString(thread.metadata?.clientVkUserId);
+
+  if (phone) keys.add(`phone:${phone}`);
+  if (telegramChatId) keys.add(`tg:${telegramChatId}`);
+  if (vkPeerId) keys.add(`vkpeer:${vkPeerId}`);
+  if (vkUserId) keys.add(`vk:${vkUserId}`);
+  if (name) keys.add(`name:${name}`);
+
+  return Array.from(keys);
+}
+
+function mergeBookingContextsForUi(contexts: ThreadBookingContext[]) {
+  const map = new Map<string, ThreadBookingContext>();
+
+  contexts.forEach((context) => {
+    if (!context.id) return;
+    const current = map.get(context.id);
+    const services = Array.from(new Set([...(current?.services ?? []), ...(context.services ?? []), context.service ?? ''].filter(Boolean)));
+    map.set(context.id, { ...(current ?? {}), ...context, services });
+  });
+
+  return Array.from(map.values()).sort((left, right) => `${right.date ?? ''} ${right.time ?? ''}`.localeCompare(`${left.date ?? ''} ${left.time ?? ''}`));
+}
+
+function mergeThreadsByClientForUi(items: ChatThreadRecord[]) {
+  const groups: ChatThreadRecord[][] = [];
+  const keyToGroupIndex = new Map<string, number>();
+
+  items.forEach((thread) => {
+    const keys = threadClientMergeKeys(thread);
+    if (keys.length === 0) {
+      groups.push([thread]);
+      return;
+    }
+
+    const indexes = Array.from(new Set(keys.map((key) => keyToGroupIndex.get(key)).filter((index): index is number => typeof index === 'number')));
+
+    if (indexes.length === 0) {
+      const index = groups.length;
+      groups.push([thread]);
+      keys.forEach((key) => keyToGroupIndex.set(key, index));
+      return;
+    }
+
+    const primaryIndex = indexes[0];
+    groups[primaryIndex].push(thread);
+    keys.forEach((key) => keyToGroupIndex.set(key, primaryIndex));
+  });
+
+  return groups.map((group) => {
+    const sorted = [...group].sort((left, right) => new Date(right.lastMessageAt).getTime() - new Date(left.lastMessageAt).getTime());
+    const primary = sorted[0];
+    const messages = dedupeMessages(sorted.flatMap((thread) => thread.messages ?? []));
+    const lastMessage = messages.at(-1);
+    const contexts = mergeBookingContextsForUi(sorted.flatMap((thread) => getThreadBookingContexts(thread)));
+    const bookingIds = Array.from(new Set([
+      ...sorted.flatMap((thread) => Array.isArray(thread.metadata?.bookingIds) ? thread.metadata.bookingIds.filter((item): item is string => typeof item === 'string') : []),
+      ...contexts.map((context) => context.id),
+      ...sorted.map((thread) => typeof thread.metadata?.bookingId === 'string' ? thread.metadata.bookingId : ''),
+    ].filter(Boolean)));
+
+    const bestPhone = sorted.find((thread) => thread.clientPhone.replace(/\D+/g, ''))?.clientPhone ?? primary.clientPhone;
+    const bestName = sorted.find((thread) => normalizedClientNameForMerge(thread.clientName))?.clientName ?? primary.clientName;
+    const bestChannel = sorted.find((thread) => thread.channel !== 'Web')?.channel ?? primary.channel;
+
+    return {
+      ...primary,
+      clientName: bestName,
+      clientPhone: bestPhone,
+      channel: bestChannel,
+      botConnected: sorted.some((thread) => thread.botConnected),
+      isPriority: sorted.some((thread) => thread.isPriority),
+      unreadCount: sorted.reduce((sum, thread) => sum + (thread.unreadCount ?? 0), 0),
+      lastMessagePreview: lastMessage?.body ?? primary.lastMessagePreview,
+      lastMessageAt: lastMessage?.createdAt ?? primary.lastMessageAt,
+      messages,
+      metadata: {
+        ...(primary.metadata ?? {}),
+        bookingId: typeof primary.metadata?.bookingId === 'string' ? primary.metadata.bookingId : bookingIds[0] ?? undefined,
+        bookingIds,
+        bookingContexts: contexts,
+        mergedThreadIds: sorted.map((thread) => thread.id),
+        clientTelegramChatId: sorted.find((thread) => thread.metadata?.clientTelegramChatId)?.metadata?.clientTelegramChatId ?? primary.metadata?.clientTelegramChatId,
+        clientVkPeerId: sorted.find((thread) => thread.metadata?.clientVkPeerId)?.metadata?.clientVkPeerId ?? primary.metadata?.clientVkPeerId,
+        clientVkUserId: sorted.find((thread) => thread.metadata?.clientVkUserId)?.metadata?.clientVkUserId ?? primary.metadata?.clientVkUserId,
+      },
+    } satisfies ChatThreadRecord;
+  }).sort((left, right) => new Date(right.lastMessageAt).getTime() - new Date(left.lastMessageAt).getTime());
 }
 
 function createLocalThread(
@@ -1652,7 +1761,7 @@ export default function DashboardChatsPage() {
         }
 
         const payload = (await response.json()) as ChatThreadListResponse;
-        const nextThreads = payload.threads ?? [];
+        const nextThreads = mergeThreadsByClientForUi(payload.threads ?? []);
 
         setThreads((current) =>
           background
@@ -2654,12 +2763,8 @@ export default function DashboardChatsPage() {
                   {bookingCode ? `${bookingCode} · ` : ''}{serviceLabel ?? contextLine ?? (locale === 'ru' ? 'Запись' : 'Booking')}
                 </div>
 
-                <div className={cn('mt-0.5 flex min-w-0 flex-wrap items-center gap-1.5 text-[9.5px] leading-4', mutedText(isLight))}>
-                  <span>{channelLabel(thread.channel)}</span>
-                  <span>•</span>
-                  <span>{formatDateLabel(thread.lastMessageAt, locale)}</span>
-                  <span>•</span>
-                  <span>{formatTimeLabel(thread.lastMessageAt, locale)}</span>
+                <div className={cn('mt-0.5 truncate text-[9.5px] leading-4', mutedText(isLight))}>
+                  {[channelLabel(thread.channel), formatDateLabel(thread.lastMessageAt, locale), formatTimeLabel(thread.lastMessageAt, locale)].filter(Boolean).join(' · ')}
                 </div>
               </div>
 
@@ -2692,23 +2797,23 @@ export default function DashboardChatsPage() {
               </div>
             ) : null}
 
-            <div className="mt-1.5 flex min-w-0 items-center gap-1.5 overflow-hidden text-[9.5px]">
+            <div className="mt-1 flex min-w-0 items-center gap-1 overflow-hidden text-[9px]">
               {thread.botConnected ? (
-                <MicroLabel light={isLight} className="h-5 max-w-[116px] px-1.5 py-0 text-[8.5px]">
+                <MicroLabel light={isLight} className="h-4 max-w-[92px] px-1 py-0 text-[8px]">
                   <Bot className="size-2.5" />
                   <span className="truncate">{locale === 'ru' ? 'бот' : 'bot'}</span>
                 </MicroLabel>
               ) : null}
 
               {thread.nextVisit ? (
-                <MicroLabel light={isLight} className="h-5 max-w-[92px] px-1.5 py-0 text-[8.5px]">
+                <MicroLabel light={isLight} className="h-4 max-w-[72px] px-1 py-0 text-[8px]">
                   <CalendarClock className="size-2.5" />
                   <span className="truncate">{formatDateLabel(thread.nextVisit, locale)}</span>
                 </MicroLabel>
               ) : null}
 
               {activeAlert ? (
-                <MicroLabel light={isLight} className={cn('h-5 px-1.5 py-0 text-[8.5px]', warningTone(isLight))}>
+                <MicroLabel light={isLight} className={cn('h-4 px-1 py-0 text-[8px]', warningTone(isLight))}>
                   <AlertTriangle className="size-2.5" />
                   {labels.rescheduleAlertShort}
                 </MicroLabel>

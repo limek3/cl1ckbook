@@ -70,10 +70,36 @@ function normalizeClientPhone(value?: string | null) {
   return String(value ?? '').replace(/\D+/g, '');
 }
 
-function clientThreadKey(thread: Pick<ChatThreadRecord, 'clientPhone' | 'clientName'>) {
+function clientThreadKey(thread: Pick<ChatThreadRecord, 'clientPhone' | 'clientName' | 'metadata'>) {
+  const keys = clientThreadKeys(thread as Pick<ChatThreadRecord, 'clientPhone' | 'clientName' | 'metadata'>);
+  return keys[0] ?? '';
+}
+
+function metadataString(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value)) return String(Math.trunc(value));
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  return '';
+}
+
+function normalizedName(value?: string | null) {
+  return String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function clientThreadKeys(thread: Pick<ChatThreadRecord, 'clientPhone' | 'clientName' | 'metadata'>) {
+  const keys = new Set<string>();
   const phone = normalizeClientPhone(thread.clientPhone);
-  if (phone) return `phone:${phone}`;
-  return `name:${String(thread.clientName || '').trim().toLowerCase()}`;
+  const name = normalizedName(thread.clientName);
+  const telegramChatId = metadataString(thread.metadata?.clientTelegramChatId);
+  const vkPeerId = metadataString(thread.metadata?.clientVkPeerId);
+  const vkUserId = metadataString(thread.metadata?.clientVkUserId);
+
+  if (phone) keys.add(`phone:${phone}`);
+  if (telegramChatId) keys.add(`tg:${telegramChatId}`);
+  if (vkPeerId) keys.add(`vkpeer:${vkPeerId}`);
+  if (vkUserId) keys.add(`vk:${vkUserId}`);
+  if (name) keys.add(`name:${name}`);
+
+  return Array.from(keys);
 }
 
 function uniqueStrings(values: unknown[]) {
@@ -189,43 +215,49 @@ function mergeThreadMessages(threads: ChatThreadRecord[]) {
 }
 
 function mergeThreadsByClient(threads: ChatThreadRecord[]) {
-  const groups = new Map<string, ChatThreadRecord[]>();
+  const groups: ChatThreadRecord[][] = [];
+  const keyToGroupIndex = new Map<string, number>();
 
   threads.forEach((thread) => {
-    const key = clientThreadKey(thread);
-    if (!key || key === 'name:') return;
-    const list = groups.get(key) ?? [];
-    list.push(thread);
-    groups.set(key, list);
-  });
+    const keys = clientThreadKeys(thread);
 
-  const result: ChatThreadRecord[] = [];
-  const consumed = new Set<string>();
-
-  threads.forEach((thread) => {
-    if (consumed.has(thread.id)) return;
-    const key = clientThreadKey(thread);
-    const group = groups.get(key) ?? [thread];
-    group.forEach((item) => consumed.add(item.id));
-
-    if (group.length === 1) {
-      const contexts = mergeBookingContexts(bookingContextsFromMetadata(thread.metadata));
-      result.push({
-        ...thread,
-        metadata: {
-          ...(thread.metadata ?? {}),
-          bookingIds: uniqueStrings([
-            ...(Array.isArray(thread.metadata?.bookingIds) ? thread.metadata.bookingIds : []),
-            ...(contexts.map((context) => context.id)),
-            typeof thread.metadata?.bookingId === 'string' ? thread.metadata.bookingId : '',
-          ]),
-          bookingContexts: contexts,
-          mergedThreadIds: [thread.id],
-        },
-      });
+    if (keys.length === 0) {
+      groups.push([thread]);
       return;
     }
 
+    const matchingIndexes = Array.from(new Set(keys
+      .map((key) => keyToGroupIndex.get(key))
+      .filter((index): index is number => typeof index === 'number')));
+
+    if (matchingIndexes.length === 0) {
+      const index = groups.length;
+      groups.push([thread]);
+      keys.forEach((key) => keyToGroupIndex.set(key, index));
+      return;
+    }
+
+    const primaryIndex = matchingIndexes[0];
+    groups[primaryIndex].push(thread);
+
+    for (const mergeIndex of matchingIndexes.slice(1).sort((a, b) => b - a)) {
+      if (mergeIndex === primaryIndex) continue;
+      const moving = groups[mergeIndex];
+      groups[primaryIndex].push(...moving);
+      groups.splice(mergeIndex, 1);
+
+      for (const [key, index] of Array.from(keyToGroupIndex.entries())) {
+        if (index === mergeIndex) keyToGroupIndex.set(key, primaryIndex);
+        if (index > mergeIndex) keyToGroupIndex.set(key, index - 1);
+      }
+    }
+
+    keys.forEach((key) => keyToGroupIndex.set(key, primaryIndex));
+  });
+
+  const result: ChatThreadRecord[] = [];
+
+  for (const group of groups) {
     const sorted = [...group].sort((left, right) => new Date(right.lastMessageAt).getTime() - new Date(left.lastMessageAt).getTime());
     const primary = sorted[0];
     const contexts = mergeBookingContexts(sorted.flatMap((item) => bookingContextsFromMetadata(item.metadata)));
@@ -234,11 +266,16 @@ function mergeThreadsByClient(threads: ChatThreadRecord[]) {
     const bookingIds = uniqueStrings([
       ...sorted.flatMap((item) => Array.isArray(item.metadata?.bookingIds) ? item.metadata.bookingIds : []),
       ...contexts.map((context) => context.id),
+      ...sorted.map((item) => typeof item.metadata?.bookingId === 'string' ? item.metadata.bookingId : ''),
     ]);
     const nonWebChannel = sorted.find((item) => item.channel !== 'Web')?.channel ?? primary.channel;
+    const bestPhone = sorted.find((item) => normalizeClientPhone(item.clientPhone))?.clientPhone ?? primary.clientPhone;
+    const bestName = sorted.find((item) => normalizedName(item.clientName))?.clientName ?? primary.clientName;
 
     result.push({
       ...primary,
+      clientName: bestName,
+      clientPhone: bestPhone,
       channel: nonWebChannel,
       botConnected: sorted.some((item) => item.botConnected),
       isPriority: sorted.some((item) => item.isPriority),
@@ -249,13 +286,17 @@ function mergeThreadsByClient(threads: ChatThreadRecord[]) {
       messages,
       metadata: {
         ...(primary.metadata ?? {}),
+        clientTelegramChatId: sorted.find((item) => item.metadata?.clientTelegramChatId)?.metadata?.clientTelegramChatId ?? primary.metadata?.clientTelegramChatId,
+        clientTelegramId: sorted.find((item) => item.metadata?.clientTelegramId)?.metadata?.clientTelegramId ?? primary.metadata?.clientTelegramId,
+        clientVkPeerId: sorted.find((item) => item.metadata?.clientVkPeerId)?.metadata?.clientVkPeerId ?? primary.metadata?.clientVkPeerId,
+        clientVkUserId: sorted.find((item) => item.metadata?.clientVkUserId)?.metadata?.clientVkUserId ?? primary.metadata?.clientVkUserId,
         bookingId: typeof primary.metadata?.bookingId === 'string' ? primary.metadata.bookingId : bookingIds[0] ?? undefined,
         bookingIds,
         bookingContexts: contexts,
         mergedThreadIds: sorted.map((item) => item.id),
       },
     });
-  });
+  }
 
   return result.sort((left, right) => new Date(right.lastMessageAt).getTime() - new Date(left.lastMessageAt).getTime());
 }
@@ -419,6 +460,50 @@ function findBookingForThread(threadId: string, bookings: Booking[]) {
   return bookings.find((booking) => booking.id === key) ?? null;
 }
 
+
+function threadMatchesBookingClient(thread: ChatThreadRecord, booking: Booking) {
+  const phone = normalizeClientPhone(booking.clientPhone);
+  const threadPhone = normalizeClientPhone(thread.clientPhone);
+  const name = normalizedName(booking.clientName);
+  const threadName = normalizedName(thread.clientName);
+
+  return Boolean(
+    (phone && threadPhone && phone === threadPhone) ||
+    (phone && Array.isArray(thread.metadata?.bookingContexts) && JSON.stringify(thread.metadata.bookingContexts).includes(phone)) ||
+    (name && threadName && name === threadName),
+  );
+}
+
+function appendBookingContextMetadata(base: Record<string, unknown> | null | undefined, booking: Booking) {
+  const currentContexts = bookingContextsFromMetadata(base ?? {});
+  const currentBookingIds = Array.isArray(base?.bookingIds)
+    ? base.bookingIds.filter((item): item is string => typeof item === 'string')
+    : [];
+  const nextContexts = mergeBookingContexts([...currentContexts, contextFromBooking(booking)]);
+
+  return {
+    ...(base ?? {}),
+    ...bookingThreadMetadata(booking, null, base ?? {}),
+    bookingIds: uniqueStrings([...currentBookingIds, booking.id]),
+    bookingContexts: nextContexts,
+    activeBookingId: booking.id,
+  };
+}
+
+async function findExistingClientThread(workspaceId: string, booking: Booking) {
+  const threads = await listChatsForWorkspace(workspaceId).catch(() => [] as ChatThreadRecord[]);
+  const byBooking = threads.find((thread) => {
+    const ids = Array.isArray(thread.metadata?.bookingIds)
+      ? thread.metadata.bookingIds.filter((item): item is string => typeof item === 'string')
+      : [];
+    return thread.metadata?.bookingId === booking.id || ids.includes(booking.id);
+  });
+
+  if (byBooking) return byBooking;
+
+  return threads.find((thread) => threadMatchesBookingClient(thread, booking)) ?? null;
+}
+
 async function resolveThreadForMessage(params: {
   workspaceId: string;
   threadId: string;
@@ -433,33 +518,24 @@ async function resolveThreadForMessage(params: {
 
   const bookingIds = [booking.id];
 
-  const existing = await fetchChatThreadByBookingId(params.workspaceId, booking.id).catch(() => null);
+  const existing = await findExistingClientThread(params.workspaceId, booking);
 
   if (existing) {
+    const metadata = appendBookingContextMetadata(existing.metadata, booking);
     await updateChatThread(params.workspaceId, existing.id, {
-      clientName: booking.clientName,
-      clientPhone: booking.clientPhone,
-      nextVisit: booking.date,
+      clientName: existing.clientName || booking.clientName,
+      clientPhone: existing.clientPhone || booking.clientPhone,
+      nextVisit: existing.nextVisit ?? booking.date,
       botConnected: existing.botConnected,
-      metadata: {
-        ...(existing.metadata ?? {}),
-        ...bookingThreadMetadata(booking),
-        bookingIds,
-        bookingContexts: [contextFromBooking(booking)],
-      },
+      metadata,
     }).catch(() => null);
     return {
       ...existing,
-      clientName: booking.clientName,
-      clientPhone: booking.clientPhone,
-      nextVisit: booking.date,
-      metadata: {
-        ...(existing.metadata ?? {}),
-        ...bookingThreadMetadata(booking),
-        bookingIds,
-        bookingContexts: [contextFromBooking(booking)],
-      },
-      messages: [],
+      clientName: existing.clientName || booking.clientName,
+      clientPhone: existing.clientPhone || booking.clientPhone,
+      nextVisit: existing.nextVisit ?? booking.date,
+      metadata,
+      messages: existing.messages ?? [],
     } satisfies ChatThreadRecord;
   }
 
@@ -477,9 +553,7 @@ async function resolveThreadForMessage(params: {
     lastMessageAt: booking.createdAt,
     unreadCount: 0,
     metadata: {
-      ...bookingThreadMetadata(booking),
-      bookingIds,
-      bookingContexts: [contextFromBooking(booking)],
+      ...appendBookingContextMetadata(bookingThreadMetadata(booking), booking),
       createdFromFallbackThread: true,
     },
   });

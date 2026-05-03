@@ -171,6 +171,38 @@ export function buildVkKeyboard(buttons: Array<Array<VkBotButton>>) {
   };
 }
 
+export function buildVkReplyKeyboard(buttons: Array<Array<VkBotButton>>) {
+  return {
+    one_time: false,
+    inline: false,
+    buttons: buttons.map((row) =>
+      row.map((button) => ({
+        action: {
+          type: 'callback',
+          label: button.label,
+          payload: JSON.stringify({
+            action: button.action || 'noop',
+            ...(button.token ? { token: button.token } : {}),
+            ...(button.url ? { url: button.url } : {}),
+            ...(button.payload ?? {}),
+          }),
+        },
+        color: button.color ?? 'secondary',
+      })),
+    ),
+  };
+}
+
+export function buildVkClientPersistentKeyboard(token?: string | null) {
+  return buildVkReplyKeyboard([
+    [{ label: '📋 Мои записи', action: 'client_bookings', token: token ?? null, color: 'primary' }],
+    [
+      { label: '💬 Выбрать запись', action: 'client_bookings', token: token ?? null, color: 'secondary' },
+      { label: '🆘 Помощь', action: 'support', token: token ?? null, color: 'secondary' },
+    ],
+  ]);
+}
+
 export function buildVkLoginKeyboard(token: string) {
   return buildVkKeyboard([
     [{ label: 'Открыть кабинет', action: 'open_dashboard', token, color: 'positive' }],

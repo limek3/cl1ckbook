@@ -18,10 +18,11 @@ import {
   sendVkLoginConfirmedMessage,
   sendVkMessage,
   buildVkKeyboard,
+  buildVkClientPersistentKeyboard,
 } from '@/lib/server/vk-bot';
 import { handleClientBookingAction } from '@/lib/server/booking-client-actions';
 import { handleRescheduleProposalAction } from '@/lib/server/booking-reschedule-proposals';
-import { createChatMessage, createChatThread, fetchChatThreadByBookingId, updateChatThread } from '@/lib/server/supabase-chats';
+import { createChatMessage, createChatThread, fetchChatThreadByBookingId, listChatsForWorkspace, updateChatThread } from '@/lib/server/supabase-chats';
 import { bookingMessageText, bookingSelectionLabel, bookingThreadMetadata } from '@/lib/server/booking-context';
 import type { Booking, MasterProfile } from '@/lib/types';
 import {
@@ -209,7 +210,7 @@ function isNotificationLikeText(value: unknown) {
 
 function isBookingsLikeText(value: unknown) {
   const text = normalizedText(value);
-  return text === 'записи' || text === '/bookings' || text === 'мои записи';
+  return text === 'записи' || text === '/bookings' || text === 'мои записи' || text.includes('мои записи') || text.includes('выбрать запись');
 }
 
 function normalizePayload(value: unknown): Record<string, unknown> | null {
@@ -576,6 +577,84 @@ function vkLinkMetadata(link: VkBookingLinkRow) {
   return link.metadata && typeof link.metadata === 'object' ? link.metadata : {};
 }
 
+
+function normalizePhone(value?: string | null) {
+  return String(value ?? '').replace(/\D+/g, '');
+}
+
+function normalizeName(value?: string | null) {
+  return String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function vkThreadMatchesBooking(thread: Awaited<ReturnType<typeof listChatsForWorkspace>>[number], booking: Booking, peerId: number | string, vkUserId?: number | string) {
+  const phone = normalizePhone(booking.clientPhone);
+  const threadPhone = normalizePhone(thread.clientPhone);
+  const name = normalizeName(booking.clientName);
+  const threadName = normalizeName(thread.clientName);
+
+  return Boolean(
+    String(thread.metadata?.clientVkPeerId ?? '') === String(peerId) ||
+    (vkUserId != null && String(thread.metadata?.clientVkUserId ?? '') === String(vkUserId)) ||
+    (phone && threadPhone && phone === threadPhone) ||
+    (name && threadName && name === threadName),
+  );
+}
+
+async function findVkClientThread(workspaceId: string, booking: Booking, peerId: number | string, vkUserId?: number | string) {
+  const threads = await listChatsForWorkspace(workspaceId).catch(() => [] as Awaited<ReturnType<typeof listChatsForWorkspace>>);
+  const byBooking = threads.find((thread) => {
+    const bookingIds = Array.isArray(thread.metadata?.bookingIds)
+      ? thread.metadata.bookingIds.filter((item): item is string => typeof item === 'string')
+      : [];
+    return thread.metadata?.bookingId === booking.id || bookingIds.includes(booking.id);
+  });
+  if (byBooking) return byBooking;
+
+  return threads.find((thread) => vkThreadMatchesBooking(thread, booking, peerId, vkUserId)) ?? null;
+}
+
+function mergeVkBookingMetadata(base: Record<string, unknown> | null | undefined, booking: Booking, peerId: number | string, vkUserId: number | string) {
+  const bookingMetadata = bookingThreadMetadata(booking, null, base ?? {});
+  const currentIds = Array.isArray(base?.bookingIds)
+    ? base.bookingIds.filter((item): item is string => typeof item === 'string')
+    : [];
+  const currentContexts = Array.isArray(base?.bookingContexts) ? base.bookingContexts : [];
+  const nextContext = {
+    id: booking.id,
+    bookingId: booking.id,
+    code: bookingMetadata.bookingCode,
+    bookingCode: bookingMetadata.bookingCode,
+    service: booking.service,
+    services: bookingMetadata.services,
+    date: booking.date,
+    bookingDate: booking.date,
+    time: booking.time,
+    bookingTime: booking.time,
+    masterName: bookingMetadata.masterName,
+  };
+
+  return {
+    ...(base ?? {}),
+    ...bookingMetadata,
+    bookingIds: Array.from(new Set([...currentIds, booking.id])),
+    bookingContexts: [
+      ...currentContexts.filter((item) => !(item && typeof item === 'object' && (item as Record<string, unknown>).id === booking.id)),
+      nextContext,
+    ],
+    activeBookingId: booking.id,
+    clientVkPeerId: peerId,
+    clientVkUserId: String(vkUserId),
+  };
+}
+
+async function sendVkClientPersistentMenu(peerId: number | string, token?: string | null) {
+  await sendVkMessage({
+    peerId,
+    message: 'Меню клиента включено. Кнопки доступны под полем ввода.',
+    keyboard: buildVkClientPersistentKeyboard(token),
+  }).catch((error) => logVkWebhookError('send vk persistent client menu', error));
+}
+
 async function getConfirmedVkBookingLinks(peerId: number | string, limit = 8) {
   const admin = createSupabaseAdminClient();
   const { data, error } = await admin
@@ -648,13 +727,14 @@ async function sendVkClientBookingDetails(params: {
       title: params.title || 'Детали записи',
       booking,
       profile,
-      footer: 'Нажмите «Написать по этой записи», затем отправьте следующее сообщение — мастер увидит контекст услуги.',
+      footer: 'Нажмите «Написать по этой записи» и отправьте сообщение. Мастер увидит нужную услугу.',
     }),
     keyboard: buildVkKeyboard([
       [{ label: '💬 Написать по этой записи', action: 'client_chat_context', token: params.link.token, color: 'primary' }],
       [{ label: '📋 Мои записи', action: 'client_bookings', color: 'secondary' }],
     ]),
   });
+  await sendVkClientPersistentMenu(params.peerId);
 }
 
 async function sendVkClientBookingChoice(peerId: number | string) {
@@ -767,7 +847,7 @@ async function handleClientVkChatMessage(params: {
   if (!booking) return false;
 
   const now = new Date().toISOString();
-  const existingThread = await fetchChatThreadByBookingId(link.workspace_id, booking.id).catch(() => null);
+  const existingThread = await findVkClientThread(link.workspace_id, booking, params.peerId, params.vkUserId).catch(() => null);
 
   const thread = existingThread
     ? await updateChatThread(link.workspace_id, existingThread.id, {
@@ -776,11 +856,7 @@ async function handleClientVkChatMessage(params: {
         lastMessagePreview: text,
         lastMessageAt: now,
         unreadCount: (existingThread.unreadCount ?? 0) + 1,
-        metadata: {
-          ...bookingThreadMetadata(booking, null, existingThread.metadata ?? {}),
-          clientVkPeerId: params.peerId,
-          clientVkUserId: String(params.vkUserId),
-        },
+        metadata: mergeVkBookingMetadata(existingThread.metadata ?? {}, booking, params.peerId, params.vkUserId),
       }).catch(() => existingThread)
     : await createChatThread(link.workspace_id, {
         clientName: booking.clientName,
@@ -793,11 +869,7 @@ async function handleClientVkChatMessage(params: {
         lastMessagePreview: text,
         lastMessageAt: now,
         unreadCount: 1,
-        metadata: {
-          ...bookingThreadMetadata(booking),
-          clientVkPeerId: params.peerId,
-          clientVkUserId: String(params.vkUserId),
-        },
+        metadata: mergeVkBookingMetadata(bookingThreadMetadata(booking), booking, params.peerId, params.vkUserId),
       }).catch(() => null);
 
   if (!thread?.id) return false;
