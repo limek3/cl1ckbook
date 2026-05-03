@@ -13,6 +13,7 @@ import {
   deleteChatThread,
   fetchChatThreadByBookingId,
   listChatsForWorkspace,
+  listChatMessages,
   updateChatThread,
 } from '@/lib/server/supabase-chats';
 import { fetchWorkspaceForUser, updateWorkspace } from '@/lib/server/supabase-workspaces';
@@ -270,6 +271,27 @@ function getThreadBookingId(thread: ChatThreadRecord | null, bookings: Booking[]
   return null;
 }
 
+function isDuplicateOutgoingMessage(params: {
+  author: 'master' | 'system';
+  text: string;
+  clientMessageKey?: string | null;
+  message: { author: string; body: string; createdAt: string; metadata?: Record<string, unknown> };
+}) {
+  if (params.message.author !== params.author) return false;
+
+  const metadata = params.message.metadata ?? {};
+  if (params.clientMessageKey && metadata.clientMessageKey === params.clientMessageKey) return true;
+
+  const left = (params.message.body ?? '').replace(/\s+/g, ' ').trim();
+  const right = params.text.replace(/\s+/g, ' ').trim();
+  if (!left || left !== right) return false;
+
+  const createdAt = new Date(params.message.createdAt).getTime();
+  if (!Number.isFinite(createdAt)) return true;
+
+  return Math.abs(Date.now() - createdAt) < 3 * 60 * 1000;
+}
+
 export async function GET() {
   try {
     const user = await requireAuthUser();
@@ -349,6 +371,8 @@ export async function POST(request: Request) {
       ? rescheduleProposal.time
       : '12:30';
 
+    const clientMessageKey = typeof body.clientMessageKey === 'string' ? body.clientMessageKey : null;
+
     const requestedDeliveryState: ChatDeliveryState | null =
       body.deliveryState === 'queued' ||
       body.deliveryState === 'sent' ||
@@ -371,6 +395,22 @@ export async function POST(request: Request) {
 
     if (!thread) {
       return NextResponse.json({ error: 'thread_not_found' }, { status: 404 });
+    }
+
+    const recentMessages = await listChatMessages(workspace.id, [thread.id]).catch(() => []);
+    const duplicateMessage = [...recentMessages]
+      .reverse()
+      .find((message) => isDuplicateOutgoingMessage({ author, text, clientMessageKey, message }));
+
+    if (duplicateMessage) {
+      return NextResponse.json({
+        message: duplicateMessage,
+        threadId: thread.id,
+        duplicate: true,
+        telegramDelivered: false,
+        vkDelivered: false,
+        rescheduleProposalId: null,
+      });
     }
 
     const canSendToClient = isNotificationEnabled(workspace, {
@@ -452,6 +492,7 @@ export async function POST(request: Request) {
         sentToClientTelegram: telegramDelivered,
         sentToClientVk: vkDelivered,
         sourceThreadId: threadId,
+        ...(clientMessageKey ? { clientMessageKey } : {}),
         ...(rescheduleProposalId ? { kind: 'reschedule_proposal', rescheduleProposalId, proposedDate, proposedTime } : {}),
       },
     });

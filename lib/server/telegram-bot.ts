@@ -74,6 +74,17 @@ export async function editTelegramMessageText(params: {
   });
 }
 
+
+export async function deleteTelegramMessage(params: {
+  chatId: number | string;
+  messageId: number;
+}) {
+  return telegramApi('deleteMessage', {
+    chat_id: params.chatId,
+    message_id: params.messageId,
+  });
+}
+
 export async function clearTelegramMessageReplyMarkup(params: {
   chatId: number | string;
   messageId: number;

@@ -120,14 +120,57 @@ function isOptimisticMessage(message: ChatMessageRecord) {
 function isSameMessageContent(left: ChatMessageRecord, right: ChatMessageRecord) {
   if (left.threadId !== right.threadId) return false;
   if (left.author !== right.author) return false;
-  if ((left.body ?? '').trim() !== (right.body ?? '').trim()) return false;
-  if (Boolean(left.viaBot) !== Boolean(right.viaBot)) return false;
+
+  const leftBody = (left.body ?? '').replace(/\s+/g, ' ').trim();
+  const rightBody = (right.body ?? '').replace(/\s+/g, ' ').trim();
+  if (!leftBody || leftBody !== rightBody) return false;
 
   const leftTime = new Date(left.createdAt).getTime();
   const rightTime = new Date(right.createdAt).getTime();
 
   if (!Number.isFinite(leftTime) || !Number.isFinite(rightTime)) return true;
-  return Math.abs(leftTime - rightTime) < 2 * 60 * 1000;
+  return Math.abs(leftTime - rightTime) < 3 * 60 * 1000;
+}
+
+function preferMessageRecord(left: ChatMessageRecord, right: ChatMessageRecord) {
+  if (isOptimisticMessage(left) && !isOptimisticMessage(right)) return right;
+  if (!isOptimisticMessage(left) && isOptimisticMessage(right)) return left;
+
+  const leftTime = new Date(left.createdAt).getTime();
+  const rightTime = new Date(right.createdAt).getTime();
+  const newer = Number.isFinite(rightTime) && (!Number.isFinite(leftTime) || rightTime >= leftTime) ? right : left;
+
+  return {
+    ...left,
+    ...newer,
+    deliveryState: newer.deliveryState ?? left.deliveryState,
+    metadata: {
+      ...(left.metadata ?? {}),
+      ...(newer.metadata ?? {}),
+      dedupedFrom: left.id === newer.id ? left.metadata?.dedupedFrom : left.id,
+    },
+  } satisfies ChatMessageRecord;
+}
+
+function dedupeMessages(messages: ChatMessageRecord[]) {
+  const sorted = [...messages].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
+  const result: ChatMessageRecord[] = [];
+
+  for (const message of sorted) {
+    const duplicateIndex = result.findIndex((item) => isSameMessageContent(item, message));
+
+    if (duplicateIndex >= 0) {
+      result[duplicateIndex] = preferMessageRecord(result[duplicateIndex], message);
+    } else {
+      result.push(message);
+    }
+  }
+
+  return result.sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
 }
 
 function mergeThreadMessages(
@@ -147,12 +190,10 @@ function mergeThreadMessages(
 
   for (const message of incoming) {
     const current = map.get(message.id);
-    map.set(message.id, current ? { ...current, ...message } : message);
+    map.set(message.id, current ? preferMessageRecord(current, message) : message);
   }
 
-  return Array.from(map.values()).sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-  );
+  return dedupeMessages(Array.from(map.values()));
 }
 
 function mergeThreadSnapshots(
@@ -1104,6 +1145,7 @@ export default function DashboardChatsPage() {
   const [mounted, setMounted] = useState(false);
   const demoMode = demoModeFromHook || isDashboardDemoEnabled(searchParams);
   const targetBookingId = searchParams.get('bookingId');
+  const targetThreadId = searchParams.get('threadId');
   const demoStorageKey = getDashboardDemoStorageKey('chats');
   const pinnedStorageKey = `${demoStorageKey}:pinned`;
 
@@ -1322,17 +1364,27 @@ export default function DashboardChatsPage() {
   }, [activeThreadId, threads]);
 
   useEffect(() => {
-    if (!targetBookingId || threads.length === 0) return;
+    if ((!targetBookingId && !targetThreadId) || threads.length === 0) return;
 
     const targetThread = threads.find((thread) => {
+      if (targetThreadId && thread.id === targetThreadId) return true;
+
       const bookingId = typeof thread.metadata?.bookingId === 'string' ? thread.metadata.bookingId : null;
-      return bookingId === targetBookingId || thread.id === `booking-thread-${targetBookingId}`;
+      const bookingIds = Array.isArray(thread.metadata?.bookingIds)
+        ? thread.metadata.bookingIds.filter((item): item is string => typeof item === 'string')
+        : [];
+
+      return (
+        bookingId === targetBookingId ||
+        (targetBookingId ? bookingIds.includes(targetBookingId) : false) ||
+        (targetBookingId ? thread.id === `booking-thread-${targetBookingId}` : false)
+      );
     });
 
     if (targetThread && targetThread.id !== activeThreadId) {
       setActiveThreadId(targetThread.id);
     }
-  }, [activeThreadId, targetBookingId, threads]);
+  }, [activeThreadId, targetBookingId, targetThreadId, threads]);
 
   const activeMessageSignature = useMemo(() => {
     if (!activeThread) return 'empty';
@@ -2034,6 +2086,7 @@ export default function DashboardChatsPage() {
           author: viaBot ? 'system' : 'master',
           deliveryState: 'sent',
           viaBot,
+          clientMessageKey: localMessage.id,
           ...(activeComposerFlow === 'reschedule' && activeTransferDate
             ? { rescheduleProposal: { date: activeTransferDate, time: activeTransferTime } }
             : {}),
@@ -2299,6 +2352,15 @@ export default function DashboardChatsPage() {
 
     setActiveThreadId(thread.id);
 
+    if (typeof window !== 'undefined' && window.location.search) {
+      const currentUrl = new URL(window.location.href);
+      if (currentUrl.searchParams.has('bookingId') || currentUrl.searchParams.has('threadId')) {
+        currentUrl.searchParams.delete('bookingId');
+        currentUrl.searchParams.delete('threadId');
+        window.history.replaceState({}, '', `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`);
+      }
+    }
+
     if (thread.unreadCount > 0) {
       void applyLocalThreadPatch(thread.id, { unreadCount: 0 });
     }
@@ -2377,6 +2439,9 @@ export default function DashboardChatsPage() {
     const activeAlert = getThreadActiveAlert(thread);
     const relatedThreadCount = relatedThreadsByClientKey.get(getThreadClientKey(thread))?.length ?? 0;
     const canDrag = !mobile && filteredThreads.length > 1 && !preview;
+    const contextLine = getThreadContextLine(thread, locale);
+    const serviceLabel = getThreadServiceLabel(thread);
+    const bookingCode = getThreadBookingCode(thread);
 
     return (
       <div
@@ -2402,7 +2467,7 @@ export default function DashboardChatsPage() {
         }
         className={cn(
           'group relative w-full overflow-hidden rounded-[10px] border text-left outline-none transition-[background,border-color,opacity,transform,filter] duration-150',
-          mobile ? 'px-3 py-2.5' : 'px-3 py-3',
+          mobile ? 'px-2.5 py-2' : 'px-2.5 py-2.5',
           active
             ? isLight
               ? 'border-black/[0.12] bg-white'
@@ -2422,7 +2487,7 @@ export default function DashboardChatsPage() {
           />
         ) : null}
 
-        <div className="flex items-start gap-2.5">
+        <div className="flex items-start gap-2">
           {canDrag ? (
             <button
               type="button"
@@ -2430,18 +2495,18 @@ export default function DashboardChatsPage() {
               aria-label={labels.dragThread}
               className={cn(
                 buttonBase(isLight),
-                'mt-1 size-8 cursor-grab px-0 opacity-70 transition-opacity group-hover:opacity-100 active:cursor-grabbing',
+                'mt-0.5 size-7 cursor-grab px-0 opacity-60 transition-opacity group-hover:opacity-100 active:cursor-grabbing',
               )}
               onClick={(event) => event.stopPropagation()}
               onPointerDown={(event) => beginThreadDrag(event, thread.id, index)}
             >
-              <GripVertical className="size-3.5" />
+              <GripVertical className="size-3" />
             </button>
           ) : null}
 
           <div
             className={cn(
-              'relative flex size-10 shrink-0 items-center justify-center rounded-[10px] border text-[11px] font-semibold',
+              'relative flex size-9 shrink-0 items-center justify-center rounded-[10px] border text-[11px] font-semibold',
               isLight
                 ? 'border-black/[0.07] bg-black/[0.025] text-black'
                 : 'border-white/[0.07] bg-white/[0.035] text-white',
@@ -2451,7 +2516,7 @@ export default function DashboardChatsPage() {
 
             {thread.unreadCount > 0 ? (
               <span
-                className="absolute -right-1 -top-1 inline-flex min-w-[17px] items-center justify-center rounded-[6px] px-1 py-[1px] text-[8px] text-white"
+                className="absolute -right-1 -top-1 inline-flex min-w-[16px] items-center justify-center rounded-[6px] px-1 py-[1px] text-[8px] text-white"
                 style={{ background: accentColor }}
               >
                 {thread.unreadCount}
@@ -2461,25 +2526,37 @@ export default function DashboardChatsPage() {
 
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-center gap-1.5">
-                  <div className={cn('truncate text-[12.5px] font-semibold', pageText(isLight))}>
+                  <div className={cn('truncate text-[12.5px] font-semibold leading-4', pageText(isLight))}>
                     {thread.clientName}
                   </div>
-
 
                   {thread.isPriority ? (
                     <Star className="size-3 shrink-0 fill-current" style={{ color: accentColor }} />
                   ) : null}
+
+                  {relatedThreadCount > 1 ? (
+                    <span
+                      className={cn(
+                        'inline-flex h-5 shrink-0 items-center gap-1 rounded-[7px] border px-1.5 text-[9px] font-semibold',
+                        isLight
+                          ? 'border-red-500/22 bg-red-500/[0.07] text-red-600'
+                          : 'border-red-300/20 bg-red-300/[0.08] text-red-200',
+                      )}
+                      title={locale === 'ru' ? `${relatedThreadCount} записи клиента` : `${relatedThreadCount} client bookings`}
+                    >
+                      <CalendarClock className="size-3" />
+                      {relatedThreadCount}
+                    </span>
+                  ) : null}
                 </div>
 
-                {getThreadContextLine(thread, locale) ? (
-                  <div className={cn('mt-1 truncate text-[10.5px] font-medium', pageText(isLight))}>
-                    {getThreadContextLine(thread, locale)}
-                  </div>
-                ) : null}
+                <div className={cn('mt-0.5 truncate text-[10.5px] font-semibold leading-4', pageText(isLight))}>
+                  {bookingCode ? `${bookingCode} · ` : ''}{serviceLabel ?? contextLine ?? (locale === 'ru' ? 'Запись' : 'Booking')}
+                </div>
 
-                <div className={cn('mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-[10px]', mutedText(isLight))}>
+                <div className={cn('mt-0.5 flex min-w-0 flex-wrap items-center gap-1.5 text-[10px] leading-4', mutedText(isLight))}>
                   <span>{channelLabel(thread.channel)}</span>
                   <span>•</span>
                   <span>{formatDateLabel(thread.lastMessageAt, locale)}</span>
@@ -2488,21 +2565,14 @@ export default function DashboardChatsPage() {
                 </div>
               </div>
 
-              <div className="flex shrink-0 items-center gap-1.5">
-                <MicroLabel light={isLight} className="h-7 px-2 py-0 text-[9px]">
+              <div className="flex shrink-0 items-center gap-1">
+                <MicroLabel light={isLight} className="h-6 px-1.5 py-0 text-[8.5px]">
                   {segmentBadgeLabel(thread.segment, locale)}
                 </MicroLabel>
 
-                {relatedThreadCount > 1 ? (
-                  <MicroLabel light={isLight} active className="h-7 px-2 py-0 text-[9px]">
-                    <CalendarClock className="size-3" />
-                    {relatedThreadCount}
-                  </MicroLabel>
-                ) : null}
-
                 <button
                   type="button"
-                  className={cn('flex size-8 items-center justify-center rounded-[9px] border transition', isLight ? 'border-black/[0.07] bg-white/70 text-black/34 hover:border-black/[0.12] hover:text-black/64' : 'border-white/[0.07] bg-white/[0.035] text-white/30 hover:border-white/[0.12] hover:text-white/62')}
+                  className={cn('flex size-7 items-center justify-center rounded-[9px] border transition', isLight ? 'border-black/[0.07] bg-white/70 text-black/34 hover:border-black/[0.12] hover:text-black/64' : 'border-white/[0.07] bg-white/[0.035] text-white/30 hover:border-white/[0.12] hover:text-white/62')}
                   onClick={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
@@ -2518,35 +2588,31 @@ export default function DashboardChatsPage() {
               </div>
             </div>
 
-            <div className={cn('mt-2 line-clamp-2 text-[10.5px] leading-[1.05rem]', mutedText(isLight))}>
-              {thread.lastMessagePreview || '—'}
-            </div>
+            {thread.lastMessagePreview ? (
+              <div className={cn('mt-1 line-clamp-1 text-[10.5px] leading-4', mutedText(isLight))}>
+                {thread.lastMessagePreview}
+              </div>
+            ) : null}
 
-            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[9.5px]">
-
+            <div className="mt-1.5 flex min-w-0 items-center gap-1.5 overflow-hidden text-[9.5px]">
               {thread.botConnected ? (
-                <MicroLabel light={isLight} className="h-6 px-2 py-0 text-[9px]">
-                  <Bot className="size-3" />{locale === 'ru' ? 'КликБук бот' : 'ClickBook bot'}
+                <MicroLabel light={isLight} className="h-5 max-w-[116px] px-1.5 py-0 text-[8.5px]">
+                  <Bot className="size-2.5" />
+                  <span className="truncate">{locale === 'ru' ? 'бот' : 'bot'}</span>
                 </MicroLabel>
               ) : null}
 
               {thread.nextVisit ? (
-                <MicroLabel light={isLight} className="h-6 px-2 py-0 text-[9px]">
-                  <CalendarClock className="size-3" />
-                  {formatDateLabel(thread.nextVisit, locale)}
-                </MicroLabel>
-              ) : null}
-
-              {relatedThreadCount > 1 ? (
-                <MicroLabel light={isLight} active className="h-6 px-2 py-0 text-[9px]">
-                  {locale === 'ru' ? `${relatedThreadCount} записи` : `${relatedThreadCount} bookings`}
+                <MicroLabel light={isLight} className="h-5 max-w-[92px] px-1.5 py-0 text-[8.5px]">
+                  <CalendarClock className="size-2.5" />
+                  <span className="truncate">{formatDateLabel(thread.nextVisit, locale)}</span>
                 </MicroLabel>
               ) : null}
 
               {activeAlert ? (
-                <MicroLabel light={isLight} className={cn('h-6 px-2 py-0 text-[9px]', warningTone(isLight))}>
-                  <AlertTriangle className="size-3" />
-                  {labels.rescheduleAlert}
+                <MicroLabel light={isLight} className={cn('h-5 px-1.5 py-0 text-[8.5px]', warningTone(isLight))}>
+                  <AlertTriangle className="size-2.5" />
+                  {labels.rescheduleAlertShort}
                 </MicroLabel>
               ) : null}
             </div>
@@ -3180,7 +3246,7 @@ export default function DashboardChatsPage() {
                 </div>
 
                 {getThreadContextLine(activeThread, locale) ? (
-                  <div className={cn('mt-1 truncate text-[12px] font-semibold', pageText(isLight))}>
+                  <div className={cn('mt-1 truncate text-[11.5px] font-semibold', pageText(isLight))}>
                     {getThreadContextLine(activeThread, locale)}
                   </div>
                 ) : null}
@@ -3195,7 +3261,7 @@ export default function DashboardChatsPage() {
                           type="button"
                           onClick={() => handleSelectThread(thread)}
                           className={cn(
-                            'inline-flex max-w-[240px] shrink-0 items-center gap-1.5 rounded-[9px] border px-2.5 py-1.5 text-[10.5px] font-semibold transition active:scale-[0.985]',
+                            'inline-flex max-w-[190px] shrink-0 items-center gap-1.5 rounded-[8px] border px-2 py-1 text-[10px] font-semibold transition active:scale-[0.985]',
                             selected
                               ? 'cb-accent-pill-active'
                               : isLight
