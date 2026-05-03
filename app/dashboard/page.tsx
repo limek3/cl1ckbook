@@ -1933,7 +1933,7 @@ export default function DashboardPage() {
             className={cn(
               'relative w-full max-w-[520px] overflow-hidden rounded-[18px] border p-5',
               isLight
-                ? 'border-black/[0.09] bg-[#fbfbfa] text-[#0e0e0e] shadow-[0_34px_90px_rgba(0,0,0,0.18)]'
+                ? 'border-black/[0.09] bg-[var(--cb-surface)] text-[#0e0e0e] shadow-[0_34px_90px_rgba(0,0,0,0.18)]'
                 : 'border-white/[0.10] bg-[#101010] text-white shadow-[0_34px_90px_rgba(0,0,0,0.55)]',
             )}
           >

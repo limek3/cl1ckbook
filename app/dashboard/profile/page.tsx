@@ -694,7 +694,7 @@ function ConnectedAccountsCard({
                     className={cn(
                       'flex size-8 shrink-0 items-center justify-center rounded-[9px] border',
                       light
-                        ? 'border-black/[0.07] bg-[#fbfbfa] text-black/56'
+                        ? 'border-black/[0.07] bg-[var(--cb-surface)] text-black/56'
                         : 'border-white/[0.08] bg-[#101010] text-white/54',
                     )}
                   >

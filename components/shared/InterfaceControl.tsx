@@ -107,7 +107,7 @@ function OptionRow({
           className={cn(
             'flex size-8 shrink-0 items-center justify-center rounded-[10px] border',
             active
-              ? 'border-black/[0.08] bg-[#fbfbfa] text-black dark:border-white/[0.10] dark:bg-white/[0.09] dark:text-white'
+              ? 'border-black/[0.08] bg-[var(--cb-surface)] text-black dark:border-white/[0.10] dark:bg-white/[0.09] dark:text-white'
               : 'border-black/[0.06] bg-black/[0.025] text-black/48 group-hover:text-black/70 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-white/46 dark:group-hover:text-white/72',
           )}
         >

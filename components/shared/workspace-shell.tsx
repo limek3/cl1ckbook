@@ -581,7 +581,7 @@ function WorkspaceIdentityAvatar({
         size === 'md'
           ? 'size-9 rounded-[11px] text-[12px]'
           : 'size-8 rounded-[10px] text-[11px]',
-        'border-black/[0.08] bg-[#fbfbfa] text-black/72',
+        'border-black/[0.08] bg-[var(--cb-surface)] text-black/72',
         'dark:border-white/[0.09] dark:bg-[#101010] dark:text-white/78',
       )}
     >
@@ -643,7 +643,7 @@ function AccountInlineSegment<T extends string>({
             className={cn(
               'relative flex h-7 min-w-8 items-center justify-center gap-1 rounded-[8px] px-2 text-[10px] font-semibold transition active:scale-[0.96]',
               active
-                ? 'bg-[#fbfbfa] text-black shadow-[0_8px_20px_rgba(15,15,15,0.07)] dark:bg-white/[0.115] dark:text-white dark:shadow-none'
+                ? 'bg-[var(--cb-surface)] text-black shadow-[0_8px_20px_rgba(15,15,15,0.07)] dark:bg-white/[0.115] dark:text-white dark:shadow-none'
                 : 'text-black/38 hover:bg-black/[0.035] hover:text-black dark:text-white/34 dark:hover:bg-white/[0.06] dark:hover:text-white',
             )}
           >
@@ -2401,7 +2401,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
                 'flex size-8 shrink-0 items-center justify-center rounded-[10px] transition',
                 publicPageItem.forceActive
                   ? 'cb-neutral-primary'
-                  : 'border border-black/[0.08] bg-[#fbfbfa] text-slate-500 hover:text-slate-950 dark:border-white/[0.08] dark:bg-[#101010] dark:text-white/40 dark:hover:text-white',
+                  : 'border border-black/[0.08] bg-[var(--cb-surface)] text-slate-500 hover:text-slate-950 dark:border-white/[0.08] dark:bg-[#101010] dark:text-white/40 dark:hover:text-white',
               )}
             >
               <Globe2 className="size-3.5" />
