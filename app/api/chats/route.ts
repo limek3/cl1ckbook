@@ -22,7 +22,7 @@ import {
   buildVkRescheduleProposalKeyboard,
   createRescheduleProposal,
 } from '@/lib/server/booking-reschedule-proposals';
-import { bookingShortContext, bookingThreadMetadata } from '@/lib/server/booking-context';
+import { bookingMessageText, bookingShortContext, bookingThreadMetadata } from '@/lib/server/booking-context';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -55,6 +55,219 @@ function botConnectedFromChannel(channel: ChatChannel) {
   return channel !== 'Web';
 }
 
+
+type ChatBookingContext = {
+  id: string;
+  code?: string | null;
+  service?: string | null;
+  services?: string[];
+  date?: string | null;
+  time?: string | null;
+  masterName?: string | null;
+};
+
+function normalizeClientPhone(value?: string | null) {
+  return String(value ?? '').replace(/\D+/g, '');
+}
+
+function clientThreadKey(thread: Pick<ChatThreadRecord, 'clientPhone' | 'clientName'>) {
+  const phone = normalizeClientPhone(thread.clientPhone);
+  if (phone) return `phone:${phone}`;
+  return `name:${String(thread.clientName || '').trim().toLowerCase()}`;
+}
+
+function uniqueStrings(values: unknown[]) {
+  const seen = new Set<string>();
+  const next: string[] = [];
+
+  values.forEach((value) => {
+    if (typeof value !== 'string') return;
+    const trimmed = value.trim();
+    if (!trimmed || seen.has(trimmed)) return;
+    seen.add(trimmed);
+    next.push(trimmed);
+  });
+
+  return next;
+}
+
+function bookingContextsFromMetadata(metadata?: Record<string, unknown> | null) {
+  const contexts: ChatBookingContext[] = [];
+
+  const rawContexts = metadata?.bookingContexts;
+  if (Array.isArray(rawContexts)) {
+    rawContexts.forEach((item) => {
+      if (!item || typeof item !== 'object') return;
+      const row = item as Record<string, unknown>;
+      const id = typeof row.id === 'string' ? row.id : typeof row.bookingId === 'string' ? row.bookingId : '';
+      if (!id) return;
+      contexts.push({
+        id,
+        code: typeof row.code === 'string' ? row.code : typeof row.bookingCode === 'string' ? row.bookingCode : null,
+        service: typeof row.service === 'string' ? row.service : null,
+        services: Array.isArray(row.services)
+          ? row.services.filter((service): service is string => typeof service === 'string' && service.trim().length > 0)
+          : typeof row.service === 'string'
+            ? [row.service]
+            : [],
+        date: typeof row.date === 'string' ? row.date : typeof row.bookingDate === 'string' ? row.bookingDate : null,
+        time: typeof row.time === 'string' ? row.time : typeof row.bookingTime === 'string' ? row.bookingTime : null,
+        masterName: typeof row.masterName === 'string' ? row.masterName : null,
+      });
+    });
+  }
+
+  const bookingId = typeof metadata?.bookingId === 'string' ? metadata.bookingId : '';
+  if (bookingId && !contexts.some((context) => context.id === bookingId)) {
+    const services = Array.isArray(metadata?.services)
+      ? metadata.services.filter((service): service is string => typeof service === 'string' && service.trim().length > 0)
+      : typeof metadata?.service === 'string'
+        ? [metadata.service]
+        : [];
+
+    contexts.push({
+      id: bookingId,
+      code: typeof metadata?.bookingCode === 'string' ? metadata.bookingCode : null,
+      service: typeof metadata?.service === 'string' ? metadata.service : services[0] ?? null,
+      services,
+      date: typeof metadata?.bookingDate === 'string' ? metadata.bookingDate : null,
+      time: typeof metadata?.bookingTime === 'string' ? metadata.bookingTime : null,
+      masterName: typeof metadata?.masterName === 'string' ? metadata.masterName : null,
+    });
+  }
+
+  return contexts;
+}
+
+function contextFromBooking(booking: Booking): ChatBookingContext {
+  const metadata = bookingThreadMetadata(booking);
+  return {
+    id: booking.id,
+    code: typeof metadata.bookingCode === 'string' ? metadata.bookingCode : null,
+    service: booking.service,
+    services: Array.isArray(metadata.services) ? metadata.services as string[] : [booking.service].filter(Boolean),
+    date: booking.date,
+    time: booking.time,
+    masterName: typeof metadata.masterName === 'string' ? metadata.masterName : null,
+  };
+}
+
+function mergeBookingContexts(contexts: ChatBookingContext[]) {
+  const map = new Map<string, ChatBookingContext>();
+
+  contexts.forEach((context) => {
+    if (!context.id) return;
+    const current = map.get(context.id);
+    map.set(context.id, {
+      ...(current ?? {}),
+      ...context,
+      services: uniqueStrings([...(current?.services ?? []), ...(context.services ?? []), context.service ?? '']),
+    });
+  });
+
+  return Array.from(map.values()).sort((left, right) => {
+    const leftDate = `${left.date ?? ''} ${left.time ?? ''}`;
+    const rightDate = `${right.date ?? ''} ${right.time ?? ''}`;
+    return rightDate.localeCompare(leftDate);
+  });
+}
+
+function mergeThreadMessages(threads: ChatThreadRecord[]) {
+  const seen = new Set<string>();
+  const messages = threads.flatMap((thread) => thread.messages ?? []);
+
+  return messages
+    .filter((message) => {
+      const normalizedBody = message.body.replace(/\s+/g, ' ').trim();
+      const key = [message.author, normalizedBody, Math.floor(new Date(message.createdAt).getTime() / 1000)].join('|');
+      if (seen.has(message.id) || seen.has(key)) return false;
+      seen.add(message.id);
+      seen.add(key);
+      return true;
+    })
+    .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
+}
+
+function mergeThreadsByClient(threads: ChatThreadRecord[]) {
+  const groups = new Map<string, ChatThreadRecord[]>();
+
+  threads.forEach((thread) => {
+    const key = clientThreadKey(thread);
+    if (!key || key === 'name:') return;
+    const list = groups.get(key) ?? [];
+    list.push(thread);
+    groups.set(key, list);
+  });
+
+  const result: ChatThreadRecord[] = [];
+  const consumed = new Set<string>();
+
+  threads.forEach((thread) => {
+    if (consumed.has(thread.id)) return;
+    const key = clientThreadKey(thread);
+    const group = groups.get(key) ?? [thread];
+    group.forEach((item) => consumed.add(item.id));
+
+    if (group.length === 1) {
+      const contexts = mergeBookingContexts(bookingContextsFromMetadata(thread.metadata));
+      result.push({
+        ...thread,
+        metadata: {
+          ...(thread.metadata ?? {}),
+          bookingIds: uniqueStrings([
+            ...(Array.isArray(thread.metadata?.bookingIds) ? thread.metadata.bookingIds : []),
+            ...(contexts.map((context) => context.id)),
+            typeof thread.metadata?.bookingId === 'string' ? thread.metadata.bookingId : '',
+          ]),
+          bookingContexts: contexts,
+          mergedThreadIds: [thread.id],
+        },
+      });
+      return;
+    }
+
+    const sorted = [...group].sort((left, right) => new Date(right.lastMessageAt).getTime() - new Date(left.lastMessageAt).getTime());
+    const primary = sorted[0];
+    const contexts = mergeBookingContexts(sorted.flatMap((item) => bookingContextsFromMetadata(item.metadata)));
+    const messages = mergeThreadMessages(sorted);
+    const lastMessage = messages.at(-1);
+    const bookingIds = uniqueStrings([
+      ...sorted.flatMap((item) => Array.isArray(item.metadata?.bookingIds) ? item.metadata.bookingIds : []),
+      ...contexts.map((context) => context.id),
+    ]);
+    const nonWebChannel = sorted.find((item) => item.channel !== 'Web')?.channel ?? primary.channel;
+
+    result.push({
+      ...primary,
+      channel: nonWebChannel,
+      botConnected: sorted.some((item) => item.botConnected),
+      isPriority: sorted.some((item) => item.isPriority),
+      segment: sorted.some((item) => item.segment === 'new') ? 'new' : primary.segment,
+      unreadCount: sorted.reduce((sum, item) => sum + (item.unreadCount ?? 0), 0),
+      lastMessagePreview: lastMessage?.body ?? primary.lastMessagePreview,
+      lastMessageAt: lastMessage?.createdAt ?? primary.lastMessageAt,
+      messages,
+      metadata: {
+        ...(primary.metadata ?? {}),
+        bookingId: typeof primary.metadata?.bookingId === 'string' ? primary.metadata.bookingId : bookingIds[0] ?? undefined,
+        bookingIds,
+        bookingContexts: contexts,
+        mergedThreadIds: sorted.map((item) => item.id),
+      },
+    });
+  });
+
+  return result.sort((left, right) => new Date(right.lastMessageAt).getTime() - new Date(left.lastMessageAt).getTime());
+}
+
+function bookingContextMessagePrefix(booking: Booking, text: string) {
+  return bookingMessageText({
+    title: 'Сообщение от мастера',
+    booking,
+    footer: ['Сообщение:', text].join('\n'),
+  });
+}
+
 function synthesizeThreadsFromBookings(workspaceId: string, bookings: Booking[]): ChatThreadRecord[] {
   return bookings.map((booking) => {
     const body = `Новая запись: ${bookingShortContext(booking)}`;
@@ -79,6 +292,7 @@ function synthesizeThreadsFromBookings(workspaceId: string, bookings: Booking[])
       metadata: {
         fallback: true,
         ...bookingThreadMetadata(booking),
+        bookingContexts: [contextFromBooking(booking)],
       },
       messages: [
         {
@@ -149,9 +363,15 @@ function getDeletedChatKeys(workspace: { data?: Record<string, unknown> | null }
 
 function chatDeleteKeys(thread: Pick<ChatThreadRecord, 'id' | 'clientPhone' | 'clientName' | 'metadata'>) {
   const bookingId = typeof thread.metadata?.bookingId === 'string' ? thread.metadata.bookingId : null;
+  const bookingIds = Array.isArray(thread.metadata?.bookingIds)
+    ? thread.metadata.bookingIds.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    : [];
+
   return [
     `id:${thread.id}`,
+    `client:${clientThreadKey(thread)}`,
     bookingId ? `booking:${bookingId}` : null,
+    ...bookingIds.map((id) => `booking:${id}`),
   ].filter(Boolean) as string[];
 }
 
@@ -171,13 +391,13 @@ function mergePersistedAndFallbackThreads(
     chatThreadIdentities(thread).forEach((identity) => seen.add(identity));
   });
 
-  return [
+  return mergeThreadsByClient([
     ...visibleThreads,
     ...fallbackThreads.filter((thread) => {
       const identities = Array.from(chatThreadIdentities(thread));
       return !identities.some((identity) => seen.has(identity)) && !isThreadDeleted(thread, deletedKeys);
     }),
-  ].sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime());
+  ]);
 }
 
 async function getMergedBookings(workspace: NonNullable<Awaited<ReturnType<typeof fetchWorkspaceForUser>>>) {
@@ -225,6 +445,7 @@ async function resolveThreadForMessage(params: {
         ...(existing.metadata ?? {}),
         ...bookingThreadMetadata(booking),
         bookingIds,
+        bookingContexts: [contextFromBooking(booking)],
       },
     }).catch(() => null);
     return {
@@ -236,6 +457,7 @@ async function resolveThreadForMessage(params: {
         ...(existing.metadata ?? {}),
         ...bookingThreadMetadata(booking),
         bookingIds,
+        bookingContexts: [contextFromBooking(booking)],
       },
       messages: [],
     } satisfies ChatThreadRecord;
@@ -257,6 +479,7 @@ async function resolveThreadForMessage(params: {
     metadata: {
       ...bookingThreadMetadata(booking),
       bookingIds,
+      bookingContexts: [contextFromBooking(booking)],
       createdFromFallbackThread: true,
     },
   });
@@ -264,11 +487,22 @@ async function resolveThreadForMessage(params: {
   return created ? { ...created, messages: [] } : null;
 }
 
-function getThreadBookingId(thread: ChatThreadRecord | null, bookings: Booking[]) {
+function getThreadBookingId(thread: ChatThreadRecord | null, bookings: Booking[], requestedBookingId?: string | null) {
+  const bookingIds = Array.isArray(thread?.metadata?.bookingIds)
+    ? thread?.metadata?.bookingIds.filter((item): item is string => typeof item === 'string')
+    : [];
+
+  if (requestedBookingId && (bookingIds.includes(requestedBookingId) || bookings.some((booking) => booking.id === requestedBookingId))) {
+    return requestedBookingId;
+  }
+
+  const activeBookingId = typeof thread?.metadata?.activeBookingId === 'string' ? thread.metadata.activeBookingId : null;
+  if (activeBookingId && (bookingIds.length === 0 || bookingIds.includes(activeBookingId))) return activeBookingId;
+
   const metadataBookingId = typeof thread?.metadata?.bookingId === 'string' ? thread.metadata.bookingId : null;
   if (metadataBookingId) return metadataBookingId;
 
-  return null;
+  return bookingIds[0] ?? null;
 }
 
 function isDuplicateOutgoingMessage(params: {
@@ -313,7 +547,7 @@ export async function GET() {
     } catch {
       return NextResponse.json({
         workspaceId: workspace.id,
-        threads: fallbackThreads.filter((thread) => !isThreadDeleted(thread, getDeletedChatKeys(workspace))),
+        threads: mergeThreadsByClient(fallbackThreads.filter((thread) => !isThreadDeleted(thread, getDeletedChatKeys(workspace)))),
       });
     }
   } catch (error) {
@@ -372,6 +606,7 @@ export async function POST(request: Request) {
       : '12:30';
 
     const clientMessageKey = typeof body.clientMessageKey === 'string' ? body.clientMessageKey : null;
+    const requestedBookingId = typeof body.bookingId === 'string' ? body.bookingId : null;
 
     const requestedDeliveryState: ChatDeliveryState | null =
       body.deliveryState === 'queued' ||
@@ -420,7 +655,7 @@ export async function POST(request: Request) {
       fallback: true,
     });
 
-    const bookingId = getThreadBookingId(thread, bookings);
+    const bookingId = getThreadBookingId(thread, bookings, requestedBookingId);
     let outgoingText = text;
     let rescheduleProposalId: string | null = null;
     let telegramReplyMarkup: Record<string, unknown> | undefined;
@@ -442,6 +677,12 @@ export async function POST(request: Request) {
         telegramReplyMarkup = buildTelegramRescheduleProposalReplyMarkup(proposal.proposal.id);
         vkKeyboard = buildVkRescheduleProposalKeyboard(proposal.proposal.id);
       }
+    }
+
+    const bookingForOutgoing = bookingId ? bookings.find((booking) => booking.id === bookingId) ?? null : null;
+
+    if (bookingForOutgoing && !rescheduleProposalId && author === 'master') {
+      outgoingText = bookingContextMessagePrefix(bookingForOutgoing, text);
     }
 
     const telegramDelivered = canSendToClient && thread.channel === 'Telegram'
@@ -489,6 +730,7 @@ export async function POST(request: Request) {
       deliveryState,
       viaBot: viaBot || deliveredToClient,
       metadata: {
+        bookingId,
         sentToClientTelegram: telegramDelivered,
         sentToClientVk: vkDelivered,
         sourceThreadId: threadId,
@@ -505,6 +747,7 @@ export async function POST(request: Request) {
       botConnected: deliveredToClient || thread.botConnected,
       metadata: {
         ...(thread.metadata ?? {}),
+        ...(bookingId ? { activeBookingId: bookingId } : {}),
         lastTelegramDelivery: telegramDelivered ? 'delivered' : thread.channel === 'Telegram' ? 'queued' : 'not_needed',
         lastVkDelivery: vkDelivered ? 'delivered' : thread.channel === 'VK' ? 'queued' : 'not_needed',
         webFallback: thread.channel === 'Web' ? 'phone_contact_required' : undefined,

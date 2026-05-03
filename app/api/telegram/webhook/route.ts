@@ -223,6 +223,41 @@ async function rememberClientMenuMessage(links: BookingLinkRow[], messageId: num
   }
 }
 
+
+function getStoredClientMenuMessageId(links: BookingLinkRow[]) {
+  for (const link of links) {
+    const metadata = linkMetadata(link);
+    const messageId = metadata.clientMenuMessageId;
+    if (typeof messageId === 'number') return messageId;
+  }
+
+  return null;
+}
+
+async function editStoredClientMenuMessage(params: {
+  chatId: number | string;
+  links: BookingLinkRow[];
+  text: string;
+  replyMarkup: Record<string, unknown>;
+}) {
+  const messageId = getStoredClientMenuMessageId(params.links);
+  if (!messageId) return false;
+
+  try {
+    await editTelegramMessageText({
+      chatId: params.chatId,
+      messageId,
+      text: params.text,
+      replyMarkup: params.replyMarkup,
+    });
+    await rememberClientMenuMessage(params.links, messageId);
+    return true;
+  } catch (error) {
+    logWebhookError('edit stored client menu failed', error);
+    return false;
+  }
+}
+
 async function sendClientLinkingHelp(chatId: number | string) {
   await sendTelegramMessage({
     chatId,
@@ -1089,12 +1124,12 @@ async function sendTelegramBookingDetails(params: {
     title: params.title || 'Детали записи',
     booking,
     profile,
-    footer: 'Чтобы написать мастеру именно по этой записи, нажмите кнопку ниже и отправьте следующее сообщение.',
+    footer: 'Нажмите «Написать по этой записи», затем отправьте следующее сообщение — мастер увидит контекст услуги.',
   });
   const replyMarkup = {
     inline_keyboard: [
       [{ text: '💬 Написать по этой записи', callback_data: `chatctx:${params.link.token}` }],
-      [{ text: '📋 Мои записи и услуги', callback_data: 'bookings:list' }],
+      [{ text: '📋 Мои записи', callback_data: 'bookings:list' }, { text: '🆘 Помощь', callback_data: 'bookings:help' }],
     ],
   };
 
@@ -1111,14 +1146,20 @@ async function sendTelegramBookingDetails(params: {
   }
 
   const links = params.knownLinks ?? (await getConfirmedTelegramBookingLinks(params.chatId, 8));
-  await forgetClientMenuMessage(params.chatId, links);
+  const knownLinks = links.length ? links : [params.link];
+
+  if (await editStoredClientMenuMessage({ chatId: params.chatId, links: knownLinks, text, replyMarkup })) {
+    return;
+  }
+
+  await forgetClientMenuMessage(params.chatId, knownLinks);
 
   const response = await sendTelegramMessage({
     chatId: params.chatId,
     text,
     replyMarkup,
   });
-  await rememberClientMenuMessage(links.length ? links : [params.link], extractTelegramMessageId(response));
+  await rememberClientMenuMessage(knownLinks, extractTelegramMessageId(response));
 }
 
 async function showConfirmedBookingListForChat(
@@ -1170,12 +1211,8 @@ async function sendTelegramBookingChoice(params: {
 
     rows.push([
       {
-        text: `💬 ${bookingSelectionLabel(booking, profile)}`.slice(0, 58),
+        text: `💬 ${bookingSelectionLabel(booking, profile)}`.slice(0, 62),
         callback_data: `chatctx:${link.token}`,
-      },
-      {
-        text: 'ℹ️',
-        callback_data: `bookingdetails:${link.token}`,
       },
     ]);
   }
@@ -1185,7 +1222,12 @@ async function sendTelegramBookingChoice(params: {
     '',
     'Выберите запись — следующее сообщение уйдёт мастеру именно по выбранной услуге.',
   ].join('\n');
-  const replyMarkup = { inline_keyboard: rows };
+  const replyMarkup = {
+    inline_keyboard: [
+      ...rows,
+      [{ text: '📋 Обновить список', callback_data: 'bookings:list' }, { text: '🆘 Помощь', callback_data: 'bookings:help' }],
+    ],
+  };
 
   if (params.messageId) {
     await safeTask('edit booking choice menu', () =>
@@ -1196,6 +1238,10 @@ async function sendTelegramBookingChoice(params: {
         replyMarkup,
       }),
     );
+    return;
+  }
+
+  if (await editStoredClientMenuMessage({ chatId: params.chatId, links: params.links, text, replyMarkup })) {
     return;
   }
 
@@ -1274,6 +1320,12 @@ async function handleTelegramBookingListCallback(params: {
   chatId?: number | string | null;
   messageId?: number | null;
 }) {
+  if (params.data === 'bookings:help') {
+    await answerTelegramCallbackQuery({ callbackQueryId: params.callbackQueryId, text: 'Помощь отправлена' });
+    if (params.chatId) await sendClientLinkingHelp(params.chatId);
+    return true;
+  }
+
   if (params.data !== 'bookings:list') return false;
 
   await answerTelegramCallbackQuery({

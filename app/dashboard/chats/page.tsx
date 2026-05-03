@@ -118,7 +118,6 @@ function isOptimisticMessage(message: ChatMessageRecord) {
 }
 
 function isSameMessageContent(left: ChatMessageRecord, right: ChatMessageRecord) {
-  if (left.threadId !== right.threadId) return false;
   if (left.author !== right.author) return false;
 
   const leftBody = (left.body ?? '').replace(/\s+/g, ' ').trim();
@@ -647,6 +646,77 @@ function getThreadServiceLabel(thread: ChatThreadRecord | null) {
 }
 
 
+type ThreadBookingContext = {
+  id: string;
+  code?: string | null;
+  service?: string | null;
+  services?: string[];
+  date?: string | null;
+  time?: string | null;
+  masterName?: string | null;
+};
+
+function getThreadBookingContexts(thread: ChatThreadRecord | null) {
+  if (!thread?.metadata) return [] as ThreadBookingContext[];
+
+  const raw = thread.metadata.bookingContexts;
+  const contexts: ThreadBookingContext[] = [];
+
+  if (Array.isArray(raw)) {
+    raw.forEach((item) => {
+      if (!item || typeof item !== 'object') return;
+      const row = item as Record<string, unknown>;
+      const id = typeof row.id === 'string' ? row.id : typeof row.bookingId === 'string' ? row.bookingId : '';
+      if (!id) return;
+      contexts.push({
+        id,
+        code: typeof row.code === 'string' ? row.code : typeof row.bookingCode === 'string' ? row.bookingCode : null,
+        service: typeof row.service === 'string' ? row.service : null,
+        services: Array.isArray(row.services)
+          ? row.services.filter((service): service is string => typeof service === 'string' && service.trim().length > 0)
+          : typeof row.service === 'string'
+            ? [row.service]
+            : [],
+        date: typeof row.date === 'string' ? row.date : typeof row.bookingDate === 'string' ? row.bookingDate : null,
+        time: typeof row.time === 'string' ? row.time : typeof row.bookingTime === 'string' ? row.bookingTime : null,
+        masterName: typeof row.masterName === 'string' ? row.masterName : null,
+      });
+    });
+  }
+
+  const bookingId = typeof thread.metadata.bookingId === 'string' ? thread.metadata.bookingId : '';
+  if (bookingId && !contexts.some((context) => context.id === bookingId)) {
+    const services = getThreadServices(thread);
+    contexts.push({
+      id: bookingId,
+      code: typeof thread.metadata.bookingCode === 'string' ? thread.metadata.bookingCode : null,
+      service: typeof thread.metadata.service === 'string' ? thread.metadata.service : services[0] ?? null,
+      services,
+      date: typeof thread.metadata.bookingDate === 'string' ? thread.metadata.bookingDate : thread.nextVisit ?? null,
+      time: typeof thread.metadata.bookingTime === 'string' ? thread.metadata.bookingTime : null,
+      masterName: typeof thread.metadata.masterName === 'string' ? thread.metadata.masterName : null,
+    });
+  }
+
+  return contexts;
+}
+
+function getBookingContextLabel(context: ThreadBookingContext, locale: 'ru' | 'en') {
+  const firstService = context.services?.[0] || context.service || (locale === 'ru' ? 'запись' : 'booking');
+  const serviceLabel = context.services && context.services.length > 1 ? `${firstService} +${context.services.length - 1}` : firstService;
+  const dateLabel = context.date ? formatDateLabel(context.date, locale) : null;
+  const timeLabel = context.time ?? null;
+  return [context.code, serviceLabel, dateLabel && timeLabel ? `${dateLabel} · ${timeLabel}` : dateLabel].filter(Boolean).join(' · ');
+}
+
+function getBookingContextShortLabel(context: ThreadBookingContext, locale: 'ru' | 'en') {
+  const firstService = context.services?.[0] || context.service || (locale === 'ru' ? 'запись' : 'booking');
+  const serviceLabel = context.services && context.services.length > 1 ? `${firstService} +${context.services.length - 1}` : firstService;
+  const dateLabel = context.date ? formatDateLabel(context.date, locale) : null;
+  return [context.code ?? 'CB', serviceLabel, dateLabel].filter(Boolean).join(' · ');
+}
+
+
 function sortThreads(
   items: ChatThreadRecord[],
   sortMode: SortMode,
@@ -1159,6 +1229,7 @@ export default function DashboardChatsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const [selectedBookingByThreadId, setSelectedBookingByThreadId] = useState<Record<string, string>>({});
   const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>('all');
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>('all');
   const [sortMode, setSortMode] = useState<SortMode>('recent');
@@ -1381,8 +1452,14 @@ export default function DashboardChatsPage() {
       );
     });
 
-    if (targetThread && targetThread.id !== activeThreadId) {
-      setActiveThreadId(targetThread.id);
+    if (targetThread) {
+      if (targetThread.id !== activeThreadId) {
+        setActiveThreadId(targetThread.id);
+      }
+
+      if (targetBookingId) {
+        setSelectedBookingByThreadId((current) => ({ ...current, [targetThread.id]: targetBookingId }));
+      }
     }
   }, [activeThreadId, targetBookingId, targetThreadId, threads]);
 
@@ -1747,6 +1824,21 @@ export default function DashboardChatsPage() {
   }, [activeThread, relatedThreadsByClientKey]);
 
 
+  const activeBookingContexts = useMemo(() => getThreadBookingContexts(activeThread), [activeThread]);
+
+  const selectedBookingId = useMemo(() => {
+    if (!activeThread) return null;
+    const selected = selectedBookingByThreadId[activeThread.id];
+    if (selected && activeBookingContexts.some((context) => context.id === selected)) return selected;
+    return activeBookingContexts[0]?.id ?? (typeof activeThread.metadata?.bookingId === 'string' ? activeThread.metadata.bookingId : null);
+  }, [activeBookingContexts, activeThread, selectedBookingByThreadId]);
+
+  const selectedBookingContext = useMemo(() => {
+    if (!selectedBookingId) return activeBookingContexts[0] ?? null;
+    return activeBookingContexts.find((context) => context.id === selectedBookingId) ?? activeBookingContexts[0] ?? null;
+  }, [activeBookingContexts, selectedBookingId]);
+
+
   const setThreadItemRef = useMemo(
     () => (id: string) => (node: HTMLDivElement | null) => {
       itemRefs.current[id] = node;
@@ -2087,6 +2179,7 @@ export default function DashboardChatsPage() {
           deliveryState: 'sent',
           viaBot,
           clientMessageKey: localMessage.id,
+          ...(selectedBookingId ? { bookingId: selectedBookingId } : {}),
           ...(activeComposerFlow === 'reschedule' && activeTransferDate
             ? { rescheduleProposal: { date: activeTransferDate, time: activeTransferTime } }
             : {}),
@@ -2352,6 +2445,11 @@ export default function DashboardChatsPage() {
 
     setActiveThreadId(thread.id);
 
+    const contexts = getThreadBookingContexts(thread);
+    if (contexts.length && !selectedBookingByThreadId[thread.id]) {
+      setSelectedBookingByThreadId((current) => ({ ...current, [thread.id]: contexts[0].id }));
+    }
+
     if (typeof window !== 'undefined' && window.location.search) {
       const currentUrl = new URL(window.location.href);
       if (currentUrl.searchParams.has('bookingId') || currentUrl.searchParams.has('threadId')) {
@@ -2437,7 +2535,7 @@ export default function DashboardChatsPage() {
     const active = thread.id === activeThreadId;
     const pinned = isThreadPinned(thread.id);
     const activeAlert = getThreadActiveAlert(thread);
-    const relatedThreadCount = relatedThreadsByClientKey.get(getThreadClientKey(thread))?.length ?? 0;
+    const bookingContextCount = getThreadBookingContexts(thread).length;
     const canDrag = !mobile && filteredThreads.length > 1 && !preview;
     const contextLine = getThreadContextLine(thread, locale);
     const serviceLabel = getThreadServiceLabel(thread);
@@ -2467,7 +2565,7 @@ export default function DashboardChatsPage() {
         }
         className={cn(
           'group relative w-full overflow-hidden rounded-[10px] border text-left outline-none transition-[background,border-color,opacity,transform,filter] duration-150',
-          mobile ? 'px-2.5 py-2' : 'px-2.5 py-2.5',
+          mobile ? 'px-2.5 py-2' : 'px-2.5 py-2',
           active
             ? isLight
               ? 'border-black/[0.12] bg-white'
@@ -2506,7 +2604,7 @@ export default function DashboardChatsPage() {
 
           <div
             className={cn(
-              'relative flex size-9 shrink-0 items-center justify-center rounded-[10px] border text-[11px] font-semibold',
+              'relative flex size-8 shrink-0 items-center justify-center rounded-[10px] border text-[11px] font-semibold',
               isLight
                 ? 'border-black/[0.07] bg-black/[0.025] text-black'
                 : 'border-white/[0.07] bg-white/[0.035] text-white',
@@ -2528,7 +2626,7 @@ export default function DashboardChatsPage() {
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-center gap-1.5">
-                  <div className={cn('truncate text-[12.5px] font-semibold leading-4', pageText(isLight))}>
+                  <div className={cn('truncate text-[12px] font-semibold leading-4', pageText(isLight))}>
                     {thread.clientName}
                   </div>
 
@@ -2536,7 +2634,7 @@ export default function DashboardChatsPage() {
                     <Star className="size-3 shrink-0 fill-current" style={{ color: accentColor }} />
                   ) : null}
 
-                  {relatedThreadCount > 1 ? (
+                  {bookingContextCount > 1 ? (
                     <span
                       className={cn(
                         'inline-flex h-5 shrink-0 items-center gap-1 rounded-[7px] border px-1.5 text-[9px] font-semibold',
@@ -2544,19 +2642,19 @@ export default function DashboardChatsPage() {
                           ? 'border-red-500/22 bg-red-500/[0.07] text-red-600'
                           : 'border-red-300/20 bg-red-300/[0.08] text-red-200',
                       )}
-                      title={locale === 'ru' ? `${relatedThreadCount} записи клиента` : `${relatedThreadCount} client bookings`}
+                      title={locale === 'ru' ? `${bookingContextCount} записи клиента` : `${bookingContextCount} client bookings`}
                     >
                       <CalendarClock className="size-3" />
-                      {relatedThreadCount}
+                      {bookingContextCount}
                     </span>
                   ) : null}
                 </div>
 
-                <div className={cn('mt-0.5 truncate text-[10.5px] font-semibold leading-4', pageText(isLight))}>
+                <div className={cn('mt-0.5 truncate text-[10px] font-semibold leading-4', pageText(isLight))}>
                   {bookingCode ? `${bookingCode} · ` : ''}{serviceLabel ?? contextLine ?? (locale === 'ru' ? 'Запись' : 'Booking')}
                 </div>
 
-                <div className={cn('mt-0.5 flex min-w-0 flex-wrap items-center gap-1.5 text-[10px] leading-4', mutedText(isLight))}>
+                <div className={cn('mt-0.5 flex min-w-0 flex-wrap items-center gap-1.5 text-[9.5px] leading-4', mutedText(isLight))}>
                   <span>{channelLabel(thread.channel)}</span>
                   <span>•</span>
                   <span>{formatDateLabel(thread.lastMessageAt, locale)}</span>
@@ -2589,7 +2687,7 @@ export default function DashboardChatsPage() {
             </div>
 
             {thread.lastMessagePreview ? (
-              <div className={cn('mt-1 line-clamp-1 text-[10.5px] leading-4', mutedText(isLight))}>
+              <div className={cn('mt-1 line-clamp-1 text-[10px] leading-4', mutedText(isLight))}>
                 {thread.lastMessagePreview}
               </div>
             ) : null}
@@ -3245,34 +3343,36 @@ export default function DashboardChatsPage() {
                   ) : null}
                 </div>
 
-                {getThreadContextLine(activeThread, locale) ? (
+                {selectedBookingContext ? (
+                  <div className={cn('mt-1 truncate text-[11.5px] font-semibold', pageText(isLight))}>
+                    {getBookingContextLabel(selectedBookingContext, locale)}
+                  </div>
+                ) : getThreadContextLine(activeThread, locale) ? (
                   <div className={cn('mt-1 truncate text-[11.5px] font-semibold', pageText(isLight))}>
                     {getThreadContextLine(activeThread, locale)}
                   </div>
                 ) : null}
 
-                {activeRelatedThreads.length > 1 ? (
+                {activeBookingContexts.length > 1 ? (
                   <div className="mt-2 flex max-w-full gap-1.5 overflow-x-auto pb-1">
-                    {activeRelatedThreads.map((thread) => {
-                      const selected = thread.id === activeThread.id;
+                    {activeBookingContexts.map((context) => {
+                      const selected = context.id === selectedBookingId;
                       return (
                         <button
-                          key={thread.id}
+                          key={context.id}
                           type="button"
-                          onClick={() => handleSelectThread(thread)}
+                          onClick={() => setSelectedBookingByThreadId((current) => ({ ...current, [activeThread.id]: context.id }))}
                           className={cn(
-                            'inline-flex max-w-[190px] shrink-0 items-center gap-1.5 rounded-[8px] border px-2 py-1 text-[10px] font-semibold transition active:scale-[0.985]',
+                            'inline-flex max-w-[220px] shrink-0 items-center gap-1.5 rounded-[8px] border px-2 py-1 text-[10px] font-semibold transition active:scale-[0.985]',
                             selected
                               ? 'cb-accent-pill-active'
                               : isLight
                                 ? 'border-black/[0.08] bg-white text-black/48 hover:text-black'
                                 : 'border-white/[0.08] bg-white/[0.04] text-white/42 hover:text-white',
                           )}
-                          title={getThreadContextLine(thread, locale) ?? thread.clientName}
+                          title={getBookingContextLabel(context, locale)}
                         >
-                          <span className="truncate">
-                            {getThreadBookingCode(thread) ?? 'CB'} · {getThreadServiceLabel(thread) ?? (locale === 'ru' ? 'запись' : 'booking')}
-                          </span>
+                          <span className="truncate">{getBookingContextShortLabel(context, locale)}</span>
                         </button>
                       );
                     })}
