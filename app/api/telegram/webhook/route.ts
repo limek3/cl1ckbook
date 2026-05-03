@@ -140,6 +140,28 @@ function isPlainStart(text?: string) {
   return /^\/start(?:@\w+)?\s*$/i.test(text?.trim() ?? '');
 }
 
+function isLikelyBookingCodeAttempt(text?: string) {
+  const value = text?.trim() ?? '';
+  return /booking[_\s-]?[a-f0-9]{6,}/i.test(value) || /^\/start(?:@\w+)?\s+booking/i.test(value);
+}
+
+async function sendClientLinkingHelp(chatId: number | string) {
+  await sendTelegramMessage({
+    chatId,
+    text: [
+      'Я пока не вижу связанную запись.',
+      '',
+      'Как подключить Telegram к заявке:',
+      '1. Вернитесь на страницу записи.',
+      '2. Нажмите «Подключить Telegram».',
+      '3. Если бот просто открылся без привязки — скопируйте код со страницы заявки и отправьте его сюда одним сообщением.',
+      '',
+      'Важно: обычный /start без кода не связывает запись с клиентом.',
+    ].join('\n'),
+  });
+}
+
+
 function mapBookingRow(row: BookingRow): Booking {
   return {
     id: row.id,
@@ -725,7 +747,7 @@ async function handleBookingStart(params: {
     await safeTask('send booking link not found message', () =>
       sendTelegramMessage({
         chatId: params.chatId,
-        text: 'Ссылка подтверждения уже использована или устарела. Вернитесь на страницу записи и создайте новую заявку.',
+        text: 'Код уже использован или устарел. Вернитесь на страницу записи и нажмите «Подключить Telegram» ещё раз.',
       }),
     );
 
@@ -748,7 +770,7 @@ async function handleBookingStart(params: {
     await safeTask('send booking expired message', () =>
       sendTelegramMessage({
         chatId: params.chatId,
-        text: 'Ссылка подтверждения устарела. Но запись уже создана — мастер получил заявку.',
+        text: 'Код подключения устарел. Запись уже создана — мастер получил заявку. Чтобы подключить уведомления, вернитесь на страницу записи и нажмите «Подключить Telegram» ещё раз.',
       }),
     );
 
@@ -815,7 +837,7 @@ async function handleBookingStart(params: {
 
   const { error: confirmBookingError } = await admin
     .from('sloty_bookings')
-    .update({ status: 'confirmed', source: 'ТГ', channel: 'telegram', updated_at: confirmedAt })
+    .update({ status: 'confirmed', channel: 'telegram', updated_at: confirmedAt })
     .eq('id', booking.id)
     .eq('workspace_id', link.workspace_id);
 
@@ -837,7 +859,6 @@ async function handleBookingStart(params: {
       ? {
           ...item,
           status: 'confirmed' as Booking['status'],
-          source: 'ТГ',
           channel: 'telegram',
           clientTelegramConnected: true,
         }
@@ -867,7 +888,7 @@ async function handleBookingStart(params: {
   const thread = existingThread
     ? await updateChatThread(link.workspace_id, existingThread.id, {
         channel: 'Telegram',
-        source: 'ТГ',
+        source: existingThread.source ?? booking.source ?? 'Web',
         botConnected: true,
         metadata: {
           ...(existingThread.metadata ?? {}),
@@ -884,7 +905,7 @@ async function handleBookingStart(params: {
         clientPhone: booking.clientPhone,
         channel: 'Telegram',
         segment: 'active',
-        source: 'ТГ',
+        source: booking.source ?? 'Web',
         nextVisit: booking.date,
         botConnected: true,
         lastMessagePreview:
@@ -998,7 +1019,10 @@ async function handleClientChatMessage(params: {
           | undefined)
       : null;
 
-    if (!thread?.id || !thread.workspace_id) return;
+    if (!thread?.id || !thread.workspace_id) {
+      await safeTask('send unlinked client message help', () => sendClientLinkingHelp(params.chatId));
+      return;
+    }
 
     const now = new Date().toISOString();
 
@@ -1059,7 +1083,7 @@ async function handleClientChatMessage(params: {
   const thread = existingThread
     ? await updateChatThread(link.workspace_id, existingThread.id, {
         channel: 'Telegram',
-        source: 'ТГ',
+        source: existingThread.source ?? booking.source ?? 'Web',
         botConnected: true,
         lastMessagePreview: text,
         lastMessageAt: now,
@@ -1079,7 +1103,7 @@ async function handleClientChatMessage(params: {
         clientPhone: booking.clientPhone,
         channel: 'Telegram',
         segment: 'active',
-        source: 'Telegram',
+        source: booking.source ?? 'Web',
         nextVisit: booking.date,
         botConnected: true,
         lastMessagePreview: text,
@@ -1200,6 +1224,11 @@ export async function POST(request: Request) {
         chatId: message.chat.id,
       });
 
+      return NextResponse.json({ ok: true });
+    }
+
+    if (isLikelyBookingCodeAttempt(message.text)) {
+      await safeTask('send malformed booking code help', () => sendClientLinkingHelp(message.chat.id));
       return NextResponse.json({ ok: true });
     }
 

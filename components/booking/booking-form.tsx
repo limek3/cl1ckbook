@@ -17,6 +17,7 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  Copy,
   ChevronLeft,
   Clock3,
   MessageCircleMore,
@@ -700,6 +701,95 @@ function FieldLabel({
   );
 }
 
+
+function extractTelegramStartPayload(url?: string | null) {
+  if (!url) return null;
+
+  try {
+    const parsed = new URL(url);
+    return parsed.searchParams.get('start');
+  } catch {
+    const match = url.match(/[?&]start=([^&]+)/i);
+    return match?.[1] ? decodeURIComponent(match[1]) : null;
+  }
+}
+
+function ManualTelegramCodeBox({
+  code,
+  light,
+  labels,
+}: {
+  code: string;
+  light: boolean;
+  labels: {
+    telegramManualTitle: string;
+    telegramManualText: string;
+    telegramManualCopy: string;
+    telegramManualCopied: string;
+  };
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const copyCode = async () => {
+    try {
+      await navigator.clipboard?.writeText(code);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <div
+      className={cn(
+        'mt-3 rounded-[12px] border p-3',
+        light
+          ? 'border-black/[0.08] bg-white/72'
+          : 'border-white/[0.08] bg-[#101010]/72',
+      )}
+    >
+      <div className={cn('text-[12px] font-semibold', pageText(light))}>
+        {labels.telegramManualTitle}
+      </div>
+      <p className={cn('mt-1 text-[11px] leading-4', mutedText(light))}>
+        {labels.telegramManualText}
+      </p>
+
+      <div
+        className={cn(
+          'mt-2 flex items-center gap-2 rounded-[10px] border px-2.5 py-2',
+          light
+            ? 'border-black/[0.08] bg-black/[0.025]'
+            : 'border-white/[0.08] bg-white/[0.035]',
+        )}
+      >
+        <code
+          className={cn(
+            'min-w-0 flex-1 truncate text-[11px] font-semibold leading-5',
+            pageText(light),
+          )}
+        >
+          {code}
+        </code>
+        <button
+          type="button"
+          onClick={copyCode}
+          className={cn(
+            'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[9px] border px-2.5 text-[10.5px] font-semibold transition active:scale-[0.98]',
+            light
+              ? 'border-black/[0.08] bg-white text-black/58 hover:text-black'
+              : 'border-white/[0.08] bg-white/[0.04] text-white/52 hover:text-white',
+          )}
+        >
+          <Copy className="size-3.5" />
+          {copied ? labels.telegramManualCopied : labels.telegramManualCopy}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function SuccessView({
   booking,
   labels,
@@ -719,6 +809,10 @@ function SuccessView({
     newRequest: string;
     telegramConfirm: string;
     telegramConfirmHint: string;
+    telegramManualTitle: string;
+    telegramManualText: string;
+    telegramManualCopy: string;
+    telegramManualCopied: string;
     vkConfirm: string;
     vkConfirmHint: string;
   };
@@ -729,6 +823,9 @@ function SuccessView({
   embedded: boolean;
   onNew: () => void;
 }) {
+  const telegramPayload = extractTelegramStartPayload(telegramUrl);
+  const telegramManualCommand = telegramPayload ? `/start ${telegramPayload}` : null;
+
   return (
     <div
       className={cn(
@@ -829,6 +926,14 @@ function SuccessView({
               </a>
             ) : null}
           </div>
+        ) : null}
+
+        {telegramManualCommand ? (
+          <ManualTelegramCodeBox
+            code={telegramManualCommand}
+            light={light}
+            labels={labels}
+          />
         ) : null}
 
         {telegramUrl || vkUrl ? (
@@ -950,10 +1055,14 @@ export function BookingForm({
           successDescription:
             'Заявка сохранена и уже попала мастеру в базу и карточку клиента. Если Telegram/VK нет — ничего делать не нужно: мастер свяжется по телефону, который вы указали.',
           connectTitle: 'Необязательно: подключите канал для уведомлений',
-          connectText: 'Без Telegram/VK запись всё равно сохранена. Нажмите кнопку только если хотите получать статус, напоминания и маршрут в боте.',
+          connectText: 'Без Telegram/VK запись всё равно сохранена. Если Telegram просто открыл бота и ничего не связалось — отправьте код ниже одним сообщением в бот.',
           telegramConfirm: 'Подключить Telegram',
           telegramConfirmHint:
             'Telegram-бот отправит статус, напоминание и маршрут.',
+          telegramManualTitle: 'Если бот открылся без привязки',
+          telegramManualText: 'Скопируйте эту строку и отправьте её одним сообщением в Telegram-бот. Не отправляйте обычный /start без кода.',
+          telegramManualCopy: 'Скопировать',
+          telegramManualCopied: 'Скопировано',
           vkConfirm: 'Подключить VK',
           vkConfirmHint: 'VK-бот продублирует статус, напоминание и маршрут.',
           newRequest: 'Новая заявка',
@@ -993,10 +1102,14 @@ export function BookingForm({
           successDescription:
             'The request is saved and already added to the master client base. If you do not use Telegram/VK, you do not need to do anything: the master will contact you by phone.',
           connectTitle: 'Optional: connect a notification channel',
-          connectText: 'Without Telegram/VK the booking is still saved. Tap only if you want status, reminders, and route details in a bot.',
+          connectText: 'Without Telegram/VK the booking is still saved. If Telegram only opened the bot and did not link the booking, send the code below as one message to the bot.',
           telegramConfirm: 'Connect Telegram',
           telegramConfirmHint:
             'Telegram bot will send status, reminder, and route.',
+          telegramManualTitle: 'If the bot opened without linking',
+          telegramManualText: 'Copy this line and send it as one message to the Telegram bot. Do not send plain /start without the code.',
+          telegramManualCopy: 'Copy',
+          telegramManualCopied: 'Copied',
           vkConfirm: 'Connect VK',
           vkConfirmHint: 'VK bot can also send status, reminder, and route.',
           newRequest: 'New request',

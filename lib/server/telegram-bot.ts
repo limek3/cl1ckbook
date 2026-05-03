@@ -130,8 +130,15 @@ export function buildMasterMenuReplyMarkup() {
 export async function sendMasterMenu(chatId: number | string) {
   return sendTelegramMessage({
     chatId,
-    text:
-      'КликБук готов. Откройте кабинет как Telegram Mini App или войдите в веб-кабинет на сайте.',
+    text: [
+      'КликБук на связи.',
+      '',
+      'Если вы клиент и хотите подключить уведомления к записи — вернитесь на страницу заявки и нажмите «Подключить Telegram».',
+      '',
+      'Если Telegram просто открыл этот чат без привязки, скопируйте код со страницы заявки и отправьте его сюда одним сообщением.',
+      '',
+      'Если вы мастер — откройте кабинет кнопкой ниже.',
+    ].join('\n'),
     replyMarkup: buildMasterMenuReplyMarkup(),
   });
 }
