@@ -1065,6 +1065,9 @@ export default function DashboardChatsPage() {
   const dragOverIndexRef = useRef<number | null>(null);
   const dragThresholdRef = useRef(6);
   const threadsRefreshInFlightRef = useRef(false);
+  const desktopMessageScrollRef = useRef<HTMLDivElement | null>(null);
+  const mobileMessageScrollRef = useRef<HTMLDivElement | null>(null);
+  const messageBottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -1234,6 +1237,85 @@ export default function DashboardChatsPage() {
   const activeThread = useMemo(() => {
     return threads.find((item) => item.id === activeThreadId) ?? null;
   }, [activeThreadId, threads]);
+
+  const activeMessageSignature = useMemo(() => {
+    if (!activeThread) return 'empty';
+
+    const lastMessage = activeThread.messages.at(-1);
+
+    return [
+      activeThread.id,
+      activeThread.messages.length,
+      lastMessage?.id ?? '',
+      lastMessage?.createdAt ?? '',
+      lastMessage?.deliveryState ?? '',
+    ].join(':');
+  }, [activeThread]);
+
+  const getActiveMessageScrollNode = useCallback(() => {
+    if (isMobile && mobileThreadOpen) {
+      return mobileMessageScrollRef.current;
+    }
+
+    return desktopMessageScrollRef.current;
+  }, [isMobile, mobileThreadOpen]);
+
+  const scrollMessagesToBottom = useCallback(
+    (behavior: ScrollBehavior = 'auto') => {
+      if (typeof window === 'undefined') return;
+
+      const scrollNode = getActiveMessageScrollNode();
+      if (!scrollNode) return;
+
+      const run = () => {
+        scrollNode.scrollTop = scrollNode.scrollHeight;
+        messageBottomRef.current?.scrollIntoView({ block: 'end', behavior });
+      };
+
+      run();
+      window.requestAnimationFrame(run);
+      window.requestAnimationFrame(() => window.setTimeout(run, 0));
+    },
+    [getActiveMessageScrollNode],
+  );
+
+  useEffect(() => {
+    scrollMessagesToBottom('auto');
+  }, [activeMessageSignature, activeThreadId, isMobile, mobileThreadOpen, scrollMessagesToBottom]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const scrollNode = getActiveMessageScrollNode();
+    if (!scrollNode) return;
+
+    scrollMessagesToBottom('auto');
+
+    const resizeObserver = new ResizeObserver(() => {
+      scrollMessagesToBottom('auto');
+    });
+
+    resizeObserver.observe(scrollNode);
+
+    if (scrollNode.firstElementChild instanceof HTMLElement) {
+      resizeObserver.observe(scrollNode.firstElementChild);
+    }
+
+    const mutationObserver = new MutationObserver(() => {
+      scrollMessagesToBottom('auto');
+    });
+
+    mutationObserver.observe(scrollNode, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+
+    return () => {
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+    };
+  }, [activeMessageSignature, getActiveMessageScrollNode, scrollMessagesToBottom]);
 
   const contextThreadRaw = useMemo(() => {
     if (!threadContextMenu) return null;
@@ -2578,6 +2660,8 @@ export default function DashboardChatsPage() {
             </div>
           );
         })}
+
+        <div ref={messageBottomRef} className="h-px shrink-0" aria-hidden />
       </div>
     );
   };
@@ -3416,7 +3500,10 @@ export default function DashboardChatsPage() {
                   </Panel>
                 </header>
 
-                <div className="relative min-h-0 flex-1 overflow-y-auto px-2.5 py-2.5">
+                <div
+                  ref={mobileMessageScrollRef}
+                  className="relative min-h-0 flex-1 overflow-y-auto px-2.5 py-2.5"
+                >
                   {renderMessageFeed(true)}
                 </div>
 
@@ -3500,6 +3587,7 @@ export default function DashboardChatsPage() {
                 {renderChatHeader()}
 
                 <div
+                  ref={desktopMessageScrollRef}
                   className={cn(
                     'min-h-0 overflow-y-auto px-3 py-3',
                     isLight ? 'bg-black/[0.012]' : 'bg-white/[0.018]',
