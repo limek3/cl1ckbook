@@ -158,6 +158,20 @@ async function resolveProfile(
   return (data?.profile as MasterProfile | undefined) ?? null;
 }
 
+
+function clientTelegramMenuReplyMarkup() {
+  return {
+    keyboard: [
+      [{ text: '📋 Мои записи' }, { text: '💬 Написать мастеру' }],
+      [{ text: '🔁 Перенос / отмена' }, { text: '🆘 Помощь' }],
+    ],
+    resize_keyboard: true,
+    one_time_keyboard: false,
+    is_persistent: true,
+    input_field_placeholder: 'Выберите действие или напишите сообщение…',
+  };
+}
+
 async function sendReminder(params: {
   chatId: number;
   booking: Booking;
@@ -185,19 +199,12 @@ async function sendReminder(params: {
       ...placeLines,
       '',
       params.hoursBefore >= 24
-        ? 'Подтвердите запись или запросите перенос кнопкой ниже.\nЕсли выбрать перенос, слот освободится, а мастер подберёт новое время.'
+        ? 'Для подтверждения, переноса или сообщения мастеру используйте нижнее меню.'
         : 'Скоро визит.\nНиже адрес и маршрут, если приём проходит по адресу. Хорошего визита!',
     ]
       .filter(Boolean)
       .join('\n'),
-    replyMarkup: params.hoursBefore >= 24
-      ? {
-          inline_keyboard: [
-            [{ text: '✅ Подтвердить', callback_data: `client_booking:${params.booking.id}:confirm` }],
-            [{ text: '❌ Нужен перенос', callback_data: `client_booking:${params.booking.id}:reschedule` }],
-          ],
-        }
-      : undefined,
+    replyMarkup: clientTelegramMenuReplyMarkup(),
   });
 }
 

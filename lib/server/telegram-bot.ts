@@ -217,6 +217,20 @@ export async function sendMasterBookingNotification(params: {
   });
 }
 
+
+function buildClientTelegramMenuReplyMarkup() {
+  return {
+    keyboard: [
+      [{ text: '📋 Мои записи' }, { text: '💬 Написать мастеру' }],
+      [{ text: '🔁 Перенос / отмена' }, { text: '🆘 Помощь' }],
+    ],
+    resize_keyboard: true,
+    one_time_keyboard: false,
+    is_persistent: true,
+    input_field_placeholder: 'Выберите действие или напишите сообщение…',
+  };
+}
+
 export async function sendClientBookingConfirmation(params: {
   chatId: number | string;
   booking: Booking;
@@ -225,8 +239,8 @@ export async function sendClientBookingConfirmation(params: {
   hasMultipleBookings?: boolean;
 }) {
   const footer = params.hasMultipleBookings
-    ? 'У вас несколько записей. Откройте «Мои записи», чтобы выбрать нужную для переписки.'
-    : 'Мы пришлём напоминание до визита.';
+    ? 'У вас несколько записей. Через нижнее меню выберите нужную запись для переписки.'
+    : 'Мы пришлём напоминание до визита. Для действий используйте нижнее меню.';
 
   return sendTelegramMessage({
     chatId: params.chatId,
@@ -236,14 +250,7 @@ export async function sendClientBookingConfirmation(params: {
       profile: params.profile,
       footer,
     }),
-    replyMarkup: {
-      inline_keyboard: [
-        ...(params.bookingToken
-          ? [[{ text: '💬 Написать по этой записи', callback_data: `chatctx:${params.bookingToken}` }]]
-          : []),
-        [{ text: '📋 Мои записи', callback_data: 'bookings:list' }],
-      ],
-    },
+    replyMarkup: buildClientTelegramMenuReplyMarkup(),
   });
 }
 

@@ -197,9 +197,10 @@ export function buildVkClientMenuKeyboard(token?: string | null) {
   return buildVkKeyboard([
     [{ label: '📋 Мои записи', action: 'client_bookings', token: token ?? null, color: 'primary' }],
     [
-      { label: '💬 Выбрать запись', action: 'client_bookings', token: token ?? null, color: 'secondary' },
-      { label: '🆘 Помощь', action: 'support', token: token ?? null, color: 'secondary' },
+      { label: '💬 Написать мастеру', action: 'client_write', token: token ?? null, color: 'secondary' },
+      { label: '🔁 Перенос / отмена', action: 'client_reschedule_cancel', token: token ?? null, color: 'secondary' },
     ],
+    [{ label: '🆘 Помощь', action: 'support', token: token ?? null, color: 'secondary' }],
   ]);
 }
 
@@ -662,7 +663,7 @@ export async function sendClientVkBookingConfirmation(params: {
       title: 'Запись создана ✅',
       booking: params.booking,
       profile: params.profile,
-      footer: 'Мы пришлём напоминание до визита.',
+      footer: 'Для действий используйте меню ниже.'
     }),
     keyboard: buildVkClientMenuKeyboard(),
   });
@@ -693,12 +694,12 @@ export async function sendClientVkBookingReminder(params: {
       ...placeLines,
       '',
       params.hoursBefore >= 24
-        ? 'Подтвердите запись или запросите перенос кнопкой ниже.\nЕсли выбрать перенос, слот освободится, а мастер подберёт новое время.'
+        ? 'Для подтверждения, переноса или сообщения мастеру используйте меню ниже.'
         : 'Скоро визит.\nНиже адрес и маршрут, если приём проходит по адресу. Хорошего визита!',
     ]
       .filter(Boolean)
       .join('\n'),
-    keyboard: params.hoursBefore >= 24 ? buildVkClientBookingKeyboard(params.booking.id) : undefined,
+    keyboard: buildVkClientMenuKeyboard(),
   });
 }
 
