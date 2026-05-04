@@ -8,11 +8,11 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type ReactNode,
   type InputHTMLAttributes,
+  type ReactNode,
   type TextareaHTMLAttributes,
-  type FormEvent,
 } from 'react';
+import { useTheme } from 'next-themes';
 import {
   BarChart3,
   Bell,
@@ -23,12 +23,9 @@ import {
   Clock3,
   Copy,
   ExternalLink,
-  Eye,
-  Heart,
   LayoutDashboard,
   MessageCircle,
   MoreHorizontal,
-  Palette,
   Phone,
   Plus,
   RefreshCcw,
@@ -36,7 +33,6 @@ import {
   Scissors,
   Send,
   Settings,
-  ShieldCheck,
   Sparkles,
   Star,
   Trash2,
@@ -56,20 +52,19 @@ import {
   hasTelegramMiniAppRuntime,
 } from '@/lib/telegram-miniapp-auth-client';
 import { cn } from '@/lib/utils';
-import type { AvailabilityDayInsight, ClientInsight, ServiceInsight, WorkspaceDataset } from '@/lib/master-workspace';
+import type {
+  AvailabilityDayInsight,
+  ClientInsight,
+  ServiceInsight,
+  WorkspaceDataset,
+} from '@/lib/master-workspace';
 import type { ChatThreadListResponse, ChatThreadRecord } from '@/lib/chat-types';
 import type { Booking, BookingStatus, MasterProfile, MasterProfileFormValues } from '@/lib/types';
 
-type MiniScreen =
-  | 'today'
-  | 'schedule'
-  | 'services'
-  | 'chats'
-  | 'more'
-  | 'clients'
-  | 'analytics'
-  | 'profile'
-  | 'settings';
+type MiniScreen = 'workday' | 'calendar' | 'catalog' | 'dialogs' | 'hub' | 'clients' | 'analytics' | 'profile';
+type ThemeTone = { light: boolean; accent: string };
+type UpdateWorkspaceSection = <T>(section: string, value: T) => Promise<boolean>;
+type SaveProfile = (values: MiniProfileSaveValues) => Promise<{ success: boolean; error?: string; profile?: MasterProfile }>;
 
 type MiniProfileSaveValues = MasterProfileFormValues &
   Partial<
@@ -116,12 +111,20 @@ const RUB = new Intl.NumberFormat('ru-RU', {
   maximumFractionDigits: 0,
 });
 
-const STATUS_META: Record<BookingStatus, { label: string; dot: string; border: string; bg: string }> = {
-  new: { label: 'Новая', dot: 'bg-sky-400', border: 'border-sky-300/20', bg: 'bg-sky-400/10 text-sky-100' },
-  confirmed: { label: 'В плане', dot: 'bg-blue-400', border: 'border-blue-300/20', bg: 'bg-blue-400/10 text-blue-100' },
-  completed: { label: 'Пришла', dot: 'bg-emerald-400', border: 'border-emerald-300/20', bg: 'bg-emerald-400/10 text-emerald-100' },
-  no_show: { label: 'Не пришла', dot: 'bg-orange-400', border: 'border-orange-300/20', bg: 'bg-orange-400/10 text-orange-100' },
-  cancelled: { label: 'Отмена', dot: 'bg-rose-400', border: 'border-rose-300/20', bg: 'bg-rose-400/10 text-rose-100' },
+const STATUS_LABELS: Record<BookingStatus, string> = {
+  new: 'Новая',
+  confirmed: 'В плане',
+  completed: 'Пришла',
+  no_show: 'Не пришла',
+  cancelled: 'Отмена',
+};
+
+const STATUS_DOT: Record<BookingStatus, string> = {
+  new: '#8bbcff',
+  confirmed: '#b8c7ff',
+  completed: '#9ed7b7',
+  no_show: '#e9c077',
+  cancelled: '#eba3a3',
 };
 
 const WEEKDAYS: WeekdayEditor[] = [
@@ -179,17 +182,13 @@ function safeRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
-function safeArray<T>(value: unknown): T[] {
-  return Array.isArray(value) ? (value as T[]) : [];
-}
-
-function asText(value: unknown, fallback = '') {
-  return typeof value === 'string' ? value : typeof value === 'number' && Number.isFinite(value) ? String(value) : fallback;
-}
-
 function asNumber(value: unknown, fallback = 0) {
   const number = typeof value === 'number' ? value : Number(String(value ?? '').replace(/[^\d.]/g, ''));
   return Number.isFinite(number) ? number : fallback;
+}
+
+function makeId(prefix = 'item') {
+  return `${prefix}-${Date.now()}-${Math.round(Math.random() * 100000)}`;
 }
 
 function todayIso() {
@@ -203,10 +202,14 @@ function addDaysIso(base: string, days: number) {
   return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
 }
 
-function formatDay(dateIso: string) {
+function formatDateHuman(dateIso: string, long = false) {
   const date = new Date(`${dateIso}T12:00:00`);
   if (Number.isNaN(date.getTime())) return dateIso;
-  return date.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' });
+  return date.toLocaleDateString('ru-RU', {
+    weekday: long ? 'long' : 'short',
+    day: 'numeric',
+    month: 'short',
+  });
 }
 
 function formatTime(value?: string | null) {
@@ -221,11 +224,11 @@ function descByCreated(a: Booking, b: Booking) {
   return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
 }
 
-function countsAsActive(status: BookingStatus) {
+function activeStatus(status: BookingStatus) {
   return status === 'new' || status === 'confirmed' || status === 'completed';
 }
 
-function countsAsRevenue(status: BookingStatus) {
+function revenueStatus(status: BookingStatus) {
   return status === 'completed';
 }
 
@@ -349,29 +352,71 @@ async function copyText(value: string) {
   }
 }
 
-function MiniLabel({ children }: { children: ReactNode }) {
-  return <div className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/32">{children}</div>;
+function resolveAccent(workspaceData: Record<string, unknown>) {
+  const appearance = safeRecord(workspaceData.appearance);
+  const raw = String(appearance.accentTone || appearance.publicAccent || appearance.accent || '').toLowerCase();
+  if (raw.includes('blue')) return '#8bbcff';
+  if (raw.includes('rose') || raw.includes('pink')) return '#f0a7bd';
+  if (raw.includes('gold') || raw.includes('warm')) return '#e8c77a';
+  if (raw.includes('sage') || raw.includes('green')) return '#a8d5ba';
+  if (raw.includes('violet') || raw.includes('purple')) return '#c1adff';
+  return '#d8d8d1';
 }
 
-function MiniCard({ children, className, onClick }: { children: ReactNode; className?: string; onClick?: () => void }) {
+function toneClasses(light: boolean) {
+  return {
+    page: light ? 'bg-[#f4f4f2] text-[#0e0e0e]' : 'bg-[#090909] text-white',
+    card: light ? 'border-black/[0.08] bg-[#fbfbfa]' : 'border-white/[0.08] bg-[#101010]',
+    panel: light ? 'border-black/[0.07] bg-black/[0.025]' : 'border-white/[0.07] bg-white/[0.035]',
+    line: light ? 'border-black/[0.08]' : 'border-white/[0.08]',
+    text: light ? 'text-[#0e0e0e]' : 'text-white',
+    muted: light ? 'text-black/48' : 'text-white/42',
+    faint: light ? 'text-black/32' : 'text-white/26',
+    input: light
+      ? 'border-black/[0.08] bg-white/70 text-black placeholder:text-black/28 focus:border-black/[0.18] focus:bg-white'
+      : 'border-white/[0.08] bg-white/[0.045] text-white placeholder:text-white/24 focus:border-white/[0.18] focus:bg-white/[0.065]',
+    ghost: light
+      ? 'border-black/[0.08] bg-white/70 text-black/58 hover:border-black/[0.14] hover:bg-white hover:text-black'
+      : 'border-white/[0.08] bg-white/[0.04] text-white/55 hover:border-white/[0.14] hover:bg-white/[0.07] hover:text-white',
+  };
+}
+
+function accentStyle(color: string, light: boolean, amount = 20): CSSProperties {
+  return {
+    background: light
+      ? `color-mix(in srgb, ${color} ${amount}%, #ffffff)`
+      : `color-mix(in srgb, ${color} ${Math.min(42, amount + 14)}%, #101010)`,
+    borderColor: light
+      ? `color-mix(in srgb, ${color} 34%, rgba(0,0,0,0.08))`
+      : `color-mix(in srgb, ${color} 42%, rgba(255,255,255,0.08))`,
+    color: light
+      ? `color-mix(in srgb, ${color} 66%, #101010)`
+      : `color-mix(in srgb, ${color} 14%, #ffffff)`,
+  };
+}
+
+function MiniLabel({ children, light }: { children: ReactNode; light: boolean }) {
+  const tone = toneClasses(light);
+  return <div className={cn('text-[9px] font-bold uppercase tracking-[0.22em]', tone.faint)}>{children}</div>;
+}
+
+function MiniCard({ children, className, light, onClick }: { children: ReactNode; className?: string; light: boolean; onClick?: () => void }) {
+  const tone = toneClasses(light);
   return (
-    <div
+    <section
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
-      className={cn(
-        'rounded-[22px] border border-white/[0.075] bg-[#101010]/92 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-[22px]',
-        onClick && 'active:scale-[0.99]',
-        className,
-      )}
+      className={cn('rounded-[11px] border shadow-none', tone.card, onClick && 'active:scale-[0.99]', className)}
     >
       {children}
-    </div>
+    </section>
   );
 }
 
-function MiniPanel({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn('rounded-[18px] border border-white/[0.07] bg-white/[0.035]', className)}>{children}</div>;
+function MiniPanel({ children, className, light }: { children: ReactNode; className?: string; light: boolean }) {
+  const tone = toneClasses(light);
+  return <div className={cn('rounded-[10px] border', tone.panel, className)}>{children}</div>;
 }
 
 function MiniButton({
@@ -381,6 +426,7 @@ function MiniButton({
   variant = 'secondary',
   className,
   type = 'button',
+  theme,
 }: {
   children: ReactNode;
   onClick?: () => void;
@@ -388,18 +434,20 @@ function MiniButton({
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
   className?: string;
   type?: 'button' | 'submit';
+  theme: ThemeTone;
 }) {
+  const tone = toneClasses(theme.light);
   return (
     <button
       type={type}
       onClick={onClick}
       disabled={disabled}
+      style={variant === 'primary' ? accentStyle(theme.accent, theme.light, 22) : undefined}
       className={cn(
-        'inline-flex h-11 items-center justify-center gap-2 rounded-[15px] px-4 text-[12px] font-semibold tracking-[-0.035em] transition active:scale-[0.985] disabled:pointer-events-none disabled:opacity-45',
-        variant === 'primary' && 'bg-white text-black shadow-[0_14px_36px_rgba(255,255,255,0.10)]',
-        variant === 'secondary' && 'border border-white/[0.08] bg-white/[0.045] text-white/78 hover:bg-white/[0.065]',
-        variant === 'danger' && 'border border-rose-300/15 bg-rose-400/10 text-rose-100',
-        variant === 'ghost' && 'text-white/48 hover:bg-white/[0.04] hover:text-white/80',
+        'inline-flex h-9 items-center justify-center gap-2 rounded-[9px] border px-3 text-[12px] font-semibold tracking-[-0.035em] transition active:scale-[0.985] disabled:pointer-events-none disabled:opacity-45',
+        variant === 'secondary' && tone.ghost,
+        variant === 'ghost' && cn('border-transparent bg-transparent', tone.muted),
+        variant === 'danger' && (theme.light ? 'border-rose-300/35 bg-rose-50 text-rose-700' : 'border-rose-300/15 bg-rose-400/10 text-rose-100'),
         className,
       )}
     >
@@ -408,56 +456,76 @@ function MiniButton({
   );
 }
 
-function MiniInput({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
+function MiniInput({ className, light, ...props }: InputHTMLAttributes<HTMLInputElement> & { light: boolean }) {
+  const tone = toneClasses(light);
   return (
     <input
       {...props}
       className={cn(
-        'h-11 w-full rounded-[15px] border border-white/[0.08] bg-white/[0.045] px-3 text-[13px] font-medium tracking-[-0.03em] text-white outline-none placeholder:text-white/24 focus:border-white/[0.18] focus:bg-white/[0.065]',
+        'h-10 w-full rounded-[9px] border px-3 text-[13px] font-medium tracking-[-0.03em] outline-none transition',
+        tone.input,
         className,
       )}
     />
   );
 }
 
-function MiniTextarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+function MiniTextarea({ className, light, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement> & { light: boolean }) {
+  const tone = toneClasses(light);
   return (
     <textarea
       {...props}
       className={cn(
-        'min-h-[88px] w-full resize-none rounded-[15px] border border-white/[0.08] bg-white/[0.045] px-3 py-3 text-[13px] font-medium leading-5 tracking-[-0.03em] text-white outline-none placeholder:text-white/24 focus:border-white/[0.18] focus:bg-white/[0.065]',
+        'min-h-[86px] w-full resize-none rounded-[9px] border px-3 py-2.5 text-[13px] font-medium leading-5 tracking-[-0.03em] outline-none transition',
+        tone.input,
         className,
       )}
     />
   );
 }
 
-function StatusBadge({ status }: { status: BookingStatus }) {
-  const meta = STATUS_META[status] ?? STATUS_META.new;
+function AvatarMark({ profile, light, className }: { profile?: MasterProfile | null; light: boolean; className?: string }) {
+  const tone = toneClasses(light);
   return (
-    <span className={cn('inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[10px] font-bold tracking-[-0.02em]', meta.border, meta.bg)}>
-      <span className={cn('size-1.5 rounded-full', meta.dot)} />
-      {meta.label}
+    <div className={cn('flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-[10px] border', tone.panel, className)}>
+      {profile?.avatar ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={profile.avatar} alt="" className="size-full object-cover" />
+      ) : (
+        <span className="text-[11px] font-black tracking-[-0.05em]">{getInitials(profile?.name)}</span>
+      )}
+    </div>
+  );
+}
+
+function StatusPill({ status, theme }: { status: BookingStatus; theme: ThemeTone }) {
+  const tone = toneClasses(theme.light);
+  return (
+    <span className={cn('inline-flex h-7 items-center gap-1.5 rounded-[9px] border px-2.5 text-[10px] font-bold tracking-[-0.02em]', tone.panel)}>
+      <span className="size-1.5 rounded-full" style={{ backgroundColor: STATUS_DOT[status] ?? theme.accent }} />
+      {STATUS_LABELS[status] ?? 'Статус'}
     </span>
   );
 }
 
-function StatTile({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
+function StatBox({ label, value, theme, hint }: { label: string; value: ReactNode; theme: ThemeTone; hint?: string }) {
+  const tone = toneClasses(theme.light);
   return (
-    <MiniPanel className="p-3">
-      <div className="text-[10px] font-semibold tracking-[-0.025em] text-white/34">{label}</div>
-      <div className="mt-1 text-[20px] font-semibold leading-none tracking-[-0.075em] text-white">{value}</div>
-      {hint ? <div className="mt-1.5 truncate text-[10px] text-white/28">{hint}</div> : null}
+    <MiniPanel light={theme.light} className="p-3">
+      <div className={cn('text-[10px] font-semibold tracking-[-0.02em]', tone.faint)}>{label}</div>
+      <div className={cn('mt-1 text-[19px] font-semibold leading-none tracking-[-0.075em]', tone.text)}>{value}</div>
+      {hint ? <div className={cn('mt-1 truncate text-[10px]', tone.faint)}>{hint}</div> : null}
     </MiniPanel>
   );
 }
 
-function EmptyBlock({ title, text, icon }: { title: string; text: string; icon: ReactNode }) {
+function EmptyBlock({ title, text, icon, theme }: { title: string; text: string; icon: ReactNode; theme: ThemeTone }) {
+  const tone = toneClasses(theme.light);
   return (
-    <MiniCard className="flex flex-col items-center px-5 py-8 text-center">
-      <div className="flex size-12 items-center justify-center rounded-[18px] border border-white/[0.08] bg-white/[0.045] text-white/42">{icon}</div>
-      <div className="mt-4 text-[17px] font-semibold tracking-[-0.06em] text-white">{title}</div>
-      <div className="mt-2 max-w-[260px] text-[12px] leading-5 text-white/38">{text}</div>
+    <MiniCard light={theme.light} className="flex flex-col items-center px-5 py-8 text-center">
+      <div className={cn('flex size-12 items-center justify-center rounded-[10px] border', tone.panel, tone.muted)}>{icon}</div>
+      <div className={cn('mt-4 text-[17px] font-semibold tracking-[-0.06em]', tone.text)}>{title}</div>
+      <div className={cn('mt-2 max-w-[270px] text-[12px] leading-5', tone.muted)}>{text}</div>
     </MiniCard>
   );
 }
@@ -465,28 +533,13 @@ function EmptyBlock({ title, text, icon }: { title: string; text: string; icon: 
 function MiniLoading() {
   return (
     <main className="flex min-h-[100svh] items-center justify-center bg-[#090909] px-5 text-white">
-      <MiniCard className="w-full max-w-[330px] px-5 py-6 text-center">
-        <div className="mx-auto flex size-12 items-center justify-center rounded-[18px] border border-white/[0.08] bg-white/[0.045]">
-          <div className="size-5 animate-spin rounded-full border border-white/[0.12] border-t-white/70" />
-        </div>
-        <div className="mt-4 text-[17px] font-semibold tracking-[-0.06em]">Открываем mini app</div>
-        <div className="mt-2 text-[12px] leading-5 text-white/38">Подтягиваем профиль, записи, услуги, чаты и график.</div>
-      </MiniCard>
+      <div className="w-full max-w-[330px] rounded-[14px] border border-white/[0.08] bg-[#101010] px-5 py-6 text-center">
+        <BrandLogo />
+        <div className="mx-auto mt-5 size-8 animate-spin rounded-full border border-white/[0.12] border-t-white/70" />
+        <div className="mt-5 text-[16px] font-semibold tracking-[-0.06em]">Открываем mini app</div>
+        <div className="mt-2 text-[12px] leading-5 text-white/42">Подтягиваем профиль, записи, услуги, график и чаты.</div>
+      </div>
     </main>
-  );
-}
-
-function AvatarMark({ profile, size = 'md' }: { profile?: MasterProfile | null; size?: 'sm' | 'md' | 'lg' }) {
-  const sizeClass = size === 'lg' ? 'size-16 rounded-[22px]' : size === 'sm' ? 'size-10 rounded-[15px]' : 'size-12 rounded-[18px]';
-  return (
-    <div className={cn('flex shrink-0 items-center justify-center overflow-hidden border border-white/[0.08] bg-white/[0.055]', sizeClass)}>
-      {profile?.avatar ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={profile.avatar} alt="" className="size-full object-cover" />
-      ) : (
-        <span className="text-[11px] font-black tracking-[-0.05em] text-white">{getInitials(profile?.name)}</span>
-      )}
-    </div>
   );
 }
 
@@ -494,83 +547,65 @@ function MiniShell({
   screen,
   setScreen,
   profile,
-  accent,
+  theme,
   onRefresh,
   children,
 }: {
   screen: MiniScreen;
   setScreen: (screen: MiniScreen) => void;
   profile: MasterProfile;
-  accent: string;
+  theme: ThemeTone;
   onRefresh: () => void;
   children: ReactNode;
 }) {
+  const tone = toneClasses(theme.light);
+  const moreActive = screen === 'hub' || screen === 'clients' || screen === 'analytics' || screen === 'profile';
   const nav = [
-    { id: 'today' as const, label: 'Сегодня', icon: <LayoutDashboard className="size-4" /> },
-    { id: 'schedule' as const, label: 'График', icon: <Clock3 className="size-4" /> },
-    { id: 'services' as const, label: 'Услуги', icon: <Scissors className="size-4" /> },
-    { id: 'chats' as const, label: 'Чаты', icon: <MessageCircle className="size-4" /> },
-    { id: 'more' as const, label: 'Ещё', icon: <MoreHorizontal className="size-4" /> },
+    { id: 'workday' as const, label: 'Сегодня', icon: <LayoutDashboard className="size-4" /> },
+    { id: 'calendar' as const, label: 'График', icon: <Clock3 className="size-4" /> },
+    { id: 'catalog' as const, label: 'Услуги', icon: <Scissors className="size-4" /> },
+    { id: 'dialogs' as const, label: 'Чаты', icon: <MessageCircle className="size-4" /> },
+    { id: 'hub' as const, label: 'Ещё', icon: <MoreHorizontal className="size-4" /> },
   ];
 
-  const moreActive = ['more', 'clients', 'analytics', 'profile', 'settings'].includes(screen);
-
   return (
-    <main
-      className="min-h-[100svh] bg-[#090909] px-3 pt-[calc(var(--tg-safe-top,0px)+12px)] text-white"
-      style={{ '--mini-accent': accent } as CSSProperties}
-    >
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(255,255,255,0.065),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.018),transparent_24%)]" />
-      <div className="relative mx-auto w-full max-w-[430px] pb-[calc(var(--tg-safe-bottom,0px)+96px)]">
-        <header className="mb-4 flex items-center justify-between gap-3">
-          <button type="button" onClick={() => setScreen('profile')} className="flex min-w-0 items-center gap-2.5 text-left active:scale-[0.99]">
-            <AvatarMark profile={profile} size="sm" />
-            <div className="min-w-0">
-              <div className="truncate text-[14px] font-semibold tracking-[-0.055em] text-white">{profile.name}</div>
-              <div className="mt-0.5 flex items-center gap-1.5 text-[10px] font-semibold tracking-[-0.03em] text-white/34">
-                <span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_0_4px_rgba(52,211,153,0.10)]" />
-                mini app мастера
+    <main className={cn('min-h-[100svh]', tone.page)} style={{ '--mini-accent': theme.accent } as CSSProperties}>
+      <div className="mx-auto flex min-h-[100svh] w-full max-w-[440px] flex-col px-3 pb-[calc(var(--tg-safe-bottom,0px)+92px)] pt-[calc(var(--tg-safe-top,0px)+10px)]">
+        <header className={cn('sticky top-0 z-30 -mx-3 border-b px-3 pb-2 pt-[calc(var(--tg-safe-top,0px)+8px)] backdrop-blur-[18px]', tone.page, tone.line)}>
+          <div className="flex items-center gap-3">
+            <AvatarMark profile={profile} light={theme.light} />
+            <div className="min-w-0 flex-1">
+              <div className={cn('truncate text-[14px] font-semibold tracking-[-0.055em]', tone.text)}>{profile.name}</div>
+              <div className={cn('mt-0.5 flex items-center gap-1.5 text-[10px] font-medium', tone.muted)}>
+                <span className="size-1.5 rounded-full" style={{ backgroundColor: theme.accent }} />
+                <span className="truncate">@{profile.slug} · mini app</span>
               </div>
             </div>
-          </button>
-
-          <div className="flex items-center gap-1.5">
-            <Link
-              href={`/m/${profile.slug}`}
-              className="flex size-9 items-center justify-center rounded-[14px] border border-white/[0.08] bg-white/[0.045] text-white/55 active:scale-95"
-            >
-              <Eye className="size-4" />
-            </Link>
-            <button
-              type="button"
-              onClick={onRefresh}
-              className="flex size-9 items-center justify-center rounded-[14px] border border-white/[0.08] bg-white/[0.045] text-white/55 active:scale-95"
-            >
+            <button type="button" onClick={onRefresh} className={cn('flex size-9 items-center justify-center rounded-[9px] border transition active:scale-[0.985]', tone.ghost)}>
               <RefreshCcw className="size-4" />
             </button>
           </div>
         </header>
 
-        {children}
+        <div className="flex-1 py-3">{children}</div>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-[430px] px-3 pb-[calc(var(--tg-safe-bottom,0px)+10px)]">
-        <div className="grid grid-cols-5 gap-1 rounded-[24px] border border-white/[0.09] bg-[#101010]/88 p-1.5 shadow-[0_18px_70px_rgba(0,0,0,0.52)] backdrop-blur-[26px]">
+      <nav className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(var(--tg-safe-bottom,0px)+10px)]">
+        <div className={cn('mx-auto grid h-[64px] max-w-[440px] grid-cols-5 gap-1 rounded-[16px] border p-1 shadow-[0_18px_70px_rgba(0,0,0,0.18)] backdrop-blur-[22px]', theme.light ? 'border-black/[0.08] bg-[#fbfbfa]/88' : 'border-white/[0.10] bg-[#101010]/88')}>
           {nav.map((item) => {
-            const active = item.id === 'more' ? moreActive : screen === item.id;
+            const active = item.id === 'hub' ? moreActive : screen === item.id;
             return (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => setScreen(item.id)}
                 className={cn(
-                  'flex h-[52px] min-h-[52px] flex-col items-center justify-center gap-1 rounded-[18px] text-[9.5px] font-bold tracking-[-0.04em] transition active:scale-[0.97]',
-                  active ? 'bg-white/[0.075] text-white' : 'text-white/36 hover:bg-white/[0.035] hover:text-white/64',
+                  'flex min-h-0 flex-col items-center justify-center gap-1 rounded-[12px] text-[9.5px] font-bold tracking-[-0.04em] transition active:scale-[0.97]',
+                  active ? (theme.light ? 'bg-black/[0.045] text-black' : 'bg-white/[0.075] text-white') : tone.faint,
                 )}
               >
-                <span style={active ? { color: 'var(--mini-accent)' } : undefined}>{item.icon}</span>
+                <span style={active ? { color: theme.accent } : undefined}>{item.icon}</span>
                 <span>{item.label}</span>
-                <span className={cn('size-1 rounded-full', active ? 'opacity-100' : 'opacity-0')} style={{ backgroundColor: 'var(--mini-accent)' }} />
               </button>
             );
           })}
@@ -580,143 +615,189 @@ function MiniShell({
   );
 }
 
-function BookingRow({ booking, onOpen, services }: { booking: Booking; onOpen: (booking: Booking) => void; services: ServiceInsight[] }) {
+function BookingRow({ booking, onOpen, services, theme }: { booking: Booking; onOpen: (booking: Booking) => void; services: ServiceInsight[]; theme: ThemeTone }) {
+  const tone = toneClasses(theme.light);
   return (
-    <button type="button" onClick={() => onOpen(booking)} className="group flex w-full items-center gap-3 rounded-[18px] border border-white/[0.06] bg-white/[0.026] p-3 text-left active:scale-[0.99]">
-      <div className="flex w-[58px] shrink-0 flex-col items-center rounded-[14px] border border-white/[0.07] bg-white/[0.035] py-2">
-        <div className="text-[15px] font-semibold leading-none tracking-[-0.06em] text-white">{formatTime(booking.time)}</div>
-        <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.12em] text-white/28">{formatDay(booking.date).split(',')[0]}</div>
+    <button type="button" onClick={() => onOpen(booking)} className={cn('flex w-full items-center gap-3 rounded-[10px] border p-2.5 text-left transition active:scale-[0.99]', tone.panel)}>
+      <div className={cn('flex w-[58px] shrink-0 flex-col items-center rounded-[9px] border py-2', tone.panel)}>
+        <div className={cn('text-[15px] font-semibold leading-none tracking-[-0.06em]', tone.text)}>{formatTime(booking.time)}</div>
+        <div className={cn('mt-1 text-[9px] font-bold uppercase tracking-[0.12em]', tone.faint)}>{formatDateHuman(booking.date).split(',')[0]}</div>
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <div className="truncate text-[14px] font-semibold tracking-[-0.045em] text-white">{booking.clientName}</div>
-            <div className="mt-1 truncate text-[11px] text-white/36">{booking.service}</div>
+            <div className={cn('truncate text-[14px] font-semibold tracking-[-0.045em]', tone.text)}>{booking.clientName}</div>
+            <div className={cn('mt-1 truncate text-[11px]', tone.muted)}>{booking.service}</div>
           </div>
-          <StatusBadge status={booking.status} />
+          <StatusPill status={booking.status} theme={theme} />
         </div>
-        <div className="mt-2 flex items-center justify-between gap-2 text-[10px] font-semibold tracking-[-0.02em] text-white/28">
+        <div className={cn('mt-2 flex items-center justify-between gap-2 text-[10px] font-semibold tracking-[-0.02em]', tone.faint)}>
           <span className="truncate">{booking.source || booking.channel || 'Клиент'}</span>
           <span>{getBookingAmount(booking, services) > 0 ? RUB.format(getBookingAmount(booking, services)) : '—'}</span>
         </div>
       </div>
-      <ChevronRight className="size-4 shrink-0 text-white/18 group-hover:text-white/40" />
+      <ChevronRight className={cn('size-4 shrink-0', tone.faint)} />
     </button>
   );
 }
 
-function TodayScreen({
+function DayStrip({ selectedDate, onSelect, theme }: { selectedDate: string; onSelect: (date: string) => void; theme: ThemeTone }) {
+  const today = todayIso();
+  const tone = toneClasses(theme.light);
+  const days = Array.from({ length: 7 }, (_, index) => addDaysIso(today, index));
+  return (
+    <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {days.map((date) => {
+        const active = date === selectedDate;
+        const parsed = new Date(`${date}T12:00:00`);
+        return (
+          <button
+            key={date}
+            type="button"
+            onClick={() => onSelect(date)}
+            style={active ? accentStyle(theme.accent, theme.light, 20) : undefined}
+            className={cn('min-w-[58px] rounded-[10px] border px-2 py-2 text-center transition active:scale-[0.98]', active ? '' : tone.panel)}
+          >
+            <div className="text-[10px] font-bold uppercase tracking-[0.08em] opacity-60">{parsed.toLocaleDateString('ru-RU', { weekday: 'short' }).replace('.', '')}</div>
+            <div className="mt-1 text-[17px] font-semibold leading-none tracking-[-0.07em]">{parsed.getDate()}</div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function WorkdayScreen({
   profile,
   bookings,
   dataset,
   onOpenBooking,
   setScreen,
+  getPublicPath,
+  theme,
 }: {
   profile: MasterProfile;
   bookings: Booking[];
   dataset: WorkspaceDataset;
   onOpenBooking: (booking: Booking) => void;
   setScreen: (screen: MiniScreen) => void;
+  getPublicPath: (slug: string) => string;
+  theme: ThemeTone;
 }) {
+  const tone = toneClasses(theme.light);
+  const [selectedDate, setSelectedDate] = useState(todayIso());
   const today = todayIso();
-  const todayBookings = bookings.filter((booking) => booking.date === today).sort(sortByDateTime);
-  const tomorrowBookings = bookings.filter((booking) => booking.date === addDaysIso(today, 1)).sort(sortByDateTime);
+  const selectedBookings = bookings.filter((booking) => booking.date === selectedDate).sort(sortByDateTime);
+  const activeSelected = selectedBookings.filter((booking) => activeStatus(booking.status));
+  const completedSelected = selectedBookings.filter((booking) => booking.status === 'completed');
+  const revenueSelected = completedSelected.reduce((sum, booking) => sum + getBookingAmount(booking, dataset.services), 0);
   const upcoming = bookings
     .filter((booking) => `${booking.date} ${booking.time}` >= `${today} 00:00` && booking.status !== 'cancelled')
-    .sort(sortByDateTime)
-    .slice(0, 8);
-  const completedToday = todayBookings.filter((booking) => booking.status === 'completed').length;
-  const activeToday = todayBookings.filter((booking) => countsAsActive(booking.status)).length;
-  const revenueToday = todayBookings.filter((booking) => countsAsRevenue(booking.status)).reduce((sum, booking) => sum + getBookingAmount(booking, dataset.services), 0);
+    .sort(sortByDateTime);
   const nextBooking = upcoming[0];
 
+  async function copyPublicLink() {
+    const origin = typeof window === 'undefined' ? '' : window.location.origin;
+    await copyText(`${origin}${getPublicPath(profile.slug)}`);
+  }
+
   return (
-    <div className="space-y-3.5">
-      <MiniCard className="overflow-hidden p-4">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <MiniLabel>сегодня</MiniLabel>
-            <div className="mt-2 text-[34px] font-semibold leading-[0.9] tracking-[-0.095em] text-white">{activeToday}</div>
-            <div className="mt-2 text-[12px] leading-5 text-white/40">активных записей на {formatDay(today)}</div>
-          </div>
-          <div className="rounded-full border border-white/[0.08] bg-white/[0.045] px-3 py-2 text-[10px] font-bold tracking-[-0.02em] text-white/54">
-            @{profile.slug}
+    <div className="space-y-3">
+      <MiniCard light={theme.light} className="overflow-hidden">
+        <div className={cn('border-b px-4 py-3', tone.line)}>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <MiniLabel light={theme.light}>рабочий экран</MiniLabel>
+              <div className={cn('mt-2 text-[30px] font-semibold leading-[0.95] tracking-[-0.095em]', tone.text)}>Сегодня</div>
+              <div className={cn('mt-2 text-[12px] leading-5', tone.muted)}>Записи, ближайший клиент и быстрые действия без лишних страниц.</div>
+            </div>
+            <button type="button" onClick={copyPublicLink} className={cn('flex h-8 shrink-0 items-center gap-1.5 rounded-[9px] border px-2.5 text-[10px] font-bold', tone.ghost)}>
+              <Copy className="size-3.5" /> ссылка
+            </button>
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          <StatTile label="Пришли" value={completedToday} />
-          <StatTile label="Выручка" value={RUB.format(revenueToday)} />
-          <StatTile label="Конверсия" value={`${dataset.totals.conversion || 0}%`} />
+        <div className="p-3">
+          <DayStrip selectedDate={selectedDate} onSelect={setSelectedDate} theme={theme} />
         </div>
       </MiniCard>
 
       {nextBooking ? (
-        <MiniCard className="p-4">
+        <MiniCard light={theme.light} className="p-3">
           <div className="flex items-center justify-between gap-3">
-            <div>
-              <MiniLabel>следующая запись</MiniLabel>
-              <div className="mt-2 text-[20px] font-semibold tracking-[-0.07em] text-white">{nextBooking.clientName}</div>
-              <div className="mt-1 text-[12px] text-white/38">{formatDay(nextBooking.date)} · {formatTime(nextBooking.time)} · {nextBooking.service}</div>
+            <div className="min-w-0">
+              <MiniLabel light={theme.light}>следующая запись</MiniLabel>
+              <div className={cn('mt-2 flex items-baseline gap-2', tone.text)}>
+                <span className="text-[28px] font-semibold leading-none tracking-[-0.09em]">{formatTime(nextBooking.time)}</span>
+                <span className={cn('truncate text-[12px] font-medium', tone.muted)}>{formatDateHuman(nextBooking.date)}</span>
+              </div>
+              <div className={cn('mt-2 truncate text-[15px] font-semibold tracking-[-0.055em]', tone.text)}>{nextBooking.clientName}</div>
+              <div className={cn('mt-1 truncate text-[12px]', tone.muted)}>{nextBooking.service}</div>
             </div>
-            <MiniButton variant="primary" onClick={() => onOpenBooking(nextBooking)} className="h-10 px-3">
+            <MiniButton theme={theme} variant="primary" onClick={() => onOpenBooking(nextBooking)} className="shrink-0">
               Открыть
             </MiniButton>
           </div>
         </MiniCard>
       ) : (
-        <MiniCard className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex size-11 items-center justify-center rounded-[16px] border border-white/[0.08] bg-white/[0.045] text-white/42">
-              <CalendarClock className="size-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-[15px] font-semibold tracking-[-0.055em]">Свободный день</div>
-              <div className="mt-1 text-[11px] leading-4 text-white/35">Открой график или услуги, чтобы клиент видел свободное время.</div>
-            </div>
-          </div>
-        </MiniCard>
+        <EmptyBlock theme={theme} title="Ближайших записей нет" text="Открой график и услуги — клиент сможет выбрать свободное окно на публичной странице." icon={<CalendarClock className="size-5" />} />
       )}
 
       <div className="grid grid-cols-3 gap-2">
-        <button type="button" onClick={() => setScreen('schedule')} className="rounded-[20px] border border-white/[0.07] bg-white/[0.035] p-3 text-left active:scale-[0.98]">
-          <Clock3 className="size-4 text-white/44" />
-          <div className="mt-3 text-[12px] font-semibold tracking-[-0.045em]">График</div>
-          <div className="mt-1 text-[10px] text-white/30">слоты</div>
+        <StatBox theme={theme} label="Записей" value={activeSelected.length} hint={formatDateHuman(selectedDate)} />
+        <StatBox theme={theme} label="Пришли" value={completedSelected.length} />
+        <StatBox theme={theme} label="Выручка" value={RUB.format(revenueSelected)} />
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        <button type="button" onClick={() => setScreen('calendar')} className={cn('rounded-[10px] border p-3 text-left transition active:scale-[0.98]', tone.panel)}>
+          <Clock3 className={cn('size-4', tone.muted)} />
+          <div className={cn('mt-3 text-[12px] font-semibold tracking-[-0.045em]', tone.text)}>График</div>
+          <div className={cn('mt-1 text-[10px]', tone.faint)}>слоты</div>
         </button>
-        <button type="button" onClick={() => setScreen('services')} className="rounded-[20px] border border-white/[0.07] bg-white/[0.035] p-3 text-left active:scale-[0.98]">
-          <Scissors className="size-4 text-white/44" />
-          <div className="mt-3 text-[12px] font-semibold tracking-[-0.045em]">Услуги</div>
-          <div className="mt-1 text-[10px] text-white/30">цены</div>
+        <button type="button" onClick={() => setScreen('catalog')} className={cn('rounded-[10px] border p-3 text-left transition active:scale-[0.98]', tone.panel)}>
+          <Scissors className={cn('size-4', tone.muted)} />
+          <div className={cn('mt-3 text-[12px] font-semibold tracking-[-0.045em]', tone.text)}>Услуги</div>
+          <div className={cn('mt-1 text-[10px]', tone.faint)}>цены</div>
         </button>
-        <button type="button" onClick={() => setScreen('chats')} className="rounded-[20px] border border-white/[0.07] bg-white/[0.035] p-3 text-left active:scale-[0.98]">
-          <MessageCircle className="size-4 text-white/44" />
-          <div className="mt-3 text-[12px] font-semibold tracking-[-0.045em]">Чаты</div>
-          <div className="mt-1 text-[10px] text-white/30">ответы</div>
+        <button type="button" onClick={() => setScreen('dialogs')} className={cn('rounded-[10px] border p-3 text-left transition active:scale-[0.98]', tone.panel)}>
+          <MessageCircle className={cn('size-4', tone.muted)} />
+          <div className={cn('mt-3 text-[12px] font-semibold tracking-[-0.045em]', tone.text)}>Чаты</div>
+          <div className={cn('mt-1 text-[10px]', tone.faint)}>ответы</div>
         </button>
       </div>
 
-      <section className="space-y-2.5">
+      <section className="space-y-2">
         <div className="flex items-center justify-between px-1">
-          <MiniLabel>лента записей</MiniLabel>
-          <div className="text-[10px] font-semibold text-white/30">завтра: {tomorrowBookings.length}</div>
+          <MiniLabel light={theme.light}>{selectedDate === today ? 'лента сегодня' : formatDateHuman(selectedDate)}</MiniLabel>
+          <div className={cn('text-[10px] font-semibold', tone.faint)}>{selectedBookings.length} записей</div>
         </div>
-        {upcoming.length > 0 ? (
+        {selectedBookings.length > 0 ? (
           <div className="space-y-2">
-            {upcoming.map((booking) => (
-              <BookingRow key={booking.id} booking={booking} services={dataset.services} onOpen={onOpenBooking} />
+            {selectedBookings.map((booking) => (
+              <BookingRow key={booking.id} booking={booking} services={dataset.services} onOpen={onOpenBooking} theme={theme} />
             ))}
           </div>
         ) : (
-          <EmptyBlock title="Записей пока нет" text="Когда клиент запишется через публичную ссылку, запись появится здесь сразу." icon={<Bell className="size-5" />} />
+          <MiniCard light={theme.light} className="p-4">
+            <div className="flex items-center gap-3">
+              <div className={cn('flex size-10 items-center justify-center rounded-[10px] border', tone.panel, tone.muted)}><Bell className="size-4" /></div>
+              <div>
+                <div className={cn('text-[14px] font-semibold tracking-[-0.05em]', tone.text)}>На этот день пусто</div>
+                <div className={cn('mt-1 text-[11px] leading-4', tone.muted)}>Новые записи появятся здесь автоматически.</div>
+              </div>
+            </div>
+          </MiniCard>
         )}
       </section>
     </div>
   );
 }
 
-function ScheduleScreen({ availability, updateWorkspaceSection }: { availability: AvailabilityDayInsight[]; updateWorkspaceSection: <T>(section: string, value: T) => Promise<boolean> }) {
+function CalendarScreen({ availability, updateWorkspaceSection, theme }: { availability: AvailabilityDayInsight[]; updateWorkspaceSection: UpdateWorkspaceSection; theme: ThemeTone }) {
+  const tone = toneClasses(theme.light);
   const [days, setDays] = useState(() => normalizeWeekAvailability(availability));
+  const [activeId, setActiveId] = useState('mon');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -724,10 +805,12 @@ function ScheduleScreen({ availability, updateWorkspaceSection }: { availability
     setDays(normalizeWeekAvailability(availability));
   }, [availability]);
 
-  const updateDay = useCallback((id: string, patch: Partial<WeekdayEditor>) => {
+  const activeDay = days.find((day) => day.id === activeId) ?? days[0];
+
+  function patchDay(id: string, patch: Partial<WeekdayEditor>) {
     setDays((current) => current.map((day) => (day.id === id ? { ...day, ...patch } : day)));
     setSaved(false);
-  }, []);
+  }
 
   async function save() {
     setSaving(true);
@@ -736,250 +819,263 @@ function ScheduleScreen({ availability, updateWorkspaceSection }: { availability
     setSaved(ok);
   }
 
-  function openWeekdays() {
-    setDays((current) => current.map((day) => (day.weekdayIndex <= 4 ? { ...day, status: 'workday', start: day.start || '10:00', end: day.end || '20:00' } : day)));
+  function applyWeekPreset() {
+    setDays((current) => current.map((day) => (day.weekdayIndex <= 4 ? { ...day, status: 'workday', start: '10:00', end: '20:00', breakStart: '14:00', breakEnd: '15:00' } : { ...day, status: 'day-off' })));
     setSaved(false);
   }
-
-  function closeWeekend() {
-    setDays((current) => current.map((day) => (day.weekdayIndex >= 5 ? { ...day, status: 'day-off' } : day)));
-    setSaved(false);
-  }
-
-  const openDays = days.filter((day) => day.status !== 'day-off').length;
-  const totalSlots = days.reduce((sum, day) => (day.status === 'day-off' ? sum : sum + 1), 0);
 
   return (
-    <div className="space-y-3.5">
-      <MiniCard className="p-4">
+    <div className="space-y-3">
+      <MiniCard light={theme.light} className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <MiniLabel>график</MiniLabel>
-            <div className="mt-2 text-[27px] font-semibold leading-none tracking-[-0.085em]">Неделя</div>
-            <div className="mt-2 text-[12px] leading-5 text-white/38">Одна понятная сетка для клиента: рабочее окно + перерыв.</div>
+            <MiniLabel light={theme.light}>график</MiniLabel>
+            <div className={cn('mt-2 text-[28px] font-semibold leading-none tracking-[-0.085em]', tone.text)}>Рабочая неделя</div>
+            <div className={cn('mt-2 text-[12px] leading-5', tone.muted)}>Один день — одно рабочее окно. Перерыв не отдаётся клиентам как свободный слот.</div>
           </div>
-          <div className="text-right text-[10px] font-semibold text-white/32">
-            {openDays} дн. открыто<br />{totalSlots} окон
-          </div>
-        </div>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <MiniButton variant="secondary" onClick={openWeekdays}>Будни открыть</MiniButton>
-          <MiniButton variant="secondary" onClick={closeWeekend}>Выходные закрыть</MiniButton>
+          <MiniButton theme={theme} variant="secondary" onClick={applyWeekPreset} className="h-8 px-2.5 text-[10px]">шаблон</MiniButton>
         </div>
       </MiniCard>
 
-      <div className="space-y-2.5">
-        {days.map((day) => (
-          <MiniCard key={day.id} className="p-3.5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className={cn('flex size-10 items-center justify-center rounded-[15px] border text-[12px] font-bold', day.status === 'day-off' ? 'border-white/[0.06] bg-white/[0.025] text-white/28' : 'border-white/[0.08] bg-white/[0.055] text-white')}>
-                  {day.short}
-                </div>
-                <div>
-                  <div className="text-[14px] font-semibold tracking-[-0.05em]">{day.label}</div>
-                  <div className="mt-0.5 text-[10px] text-white/30">{day.status === 'day-off' ? 'закрыто' : `${day.start}–${day.end}`}</div>
-                </div>
-              </div>
-              <select
-                value={day.status}
-                onChange={(event) => updateDay(day.id, { status: event.target.value as WeekdayEditor['status'] })}
-                className="h-9 rounded-[13px] border border-white/[0.08] bg-[#171717] px-2 text-[11px] font-semibold text-white outline-none"
+      <MiniCard light={theme.light} className="p-3">
+        <div className="grid grid-cols-7 gap-1.5">
+          {days.map((day) => {
+            const active = day.id === activeId;
+            return (
+              <button
+                key={day.id}
+                type="button"
+                onClick={() => setActiveId(day.id)}
+                style={active ? accentStyle(theme.accent, theme.light, 18) : undefined}
+                className={cn('rounded-[9px] border px-1 py-2 text-center transition active:scale-[0.98]', active ? '' : tone.panel)}
               >
-                <option value="workday">рабочий</option>
-                <option value="short">короткий</option>
-                <option value="day-off">выходной</option>
-              </select>
-            </div>
-            {day.status !== 'day-off' ? (
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <MiniInput type="time" value={day.start} onChange={(event) => updateDay(day.id, { start: event.target.value })} />
-                <MiniInput type="time" value={day.end} onChange={(event) => updateDay(day.id, { end: event.target.value })} />
-                <MiniInput type="time" value={day.breakStart} onChange={(event) => updateDay(day.id, { breakStart: event.target.value })} placeholder="перерыв с" />
-                <MiniInput type="time" value={day.breakEnd} onChange={(event) => updateDay(day.id, { breakEnd: event.target.value })} placeholder="перерыв до" />
-              </div>
-            ) : null}
-          </MiniCard>
-        ))}
-      </div>
+                <div className="text-[10px] font-bold">{day.short}</div>
+                <div className="mt-1 flex justify-center"><span className="size-1.5 rounded-full" style={{ backgroundColor: day.status === 'day-off' ? (theme.light ? 'rgba(0,0,0,.22)' : 'rgba(255,255,255,.22)') : theme.accent }} /></div>
+              </button>
+            );
+          })}
+        </div>
+      </MiniCard>
 
-      <MiniButton variant="primary" className="sticky bottom-[92px] z-20 w-full" onClick={() => void save()} disabled={saving}>
-        <Save className="size-4" />
-        {saving ? 'Сохраняю...' : saved ? 'Сохранено' : 'Сохранить график'}
-      </MiniButton>
+      <MiniCard light={theme.light} className="overflow-hidden">
+        <div className={cn('border-b px-4 py-3', tone.line)}>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className={cn('text-[18px] font-semibold tracking-[-0.07em]', tone.text)}>{activeDay.label}</div>
+              <div className={cn('mt-1 text-[11px]', tone.muted)}>{activeDay.status === 'day-off' ? 'выходной' : `${activeDay.start}–${activeDay.end}`}</div>
+            </div>
+            <div className="flex gap-1.5">
+              {(['workday', 'short', 'day-off'] as const).map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => patchDay(activeDay.id, { status })}
+                  style={activeDay.status === status ? accentStyle(theme.accent, theme.light, 18) : undefined}
+                  className={cn('h-8 rounded-[9px] border px-2 text-[10px] font-bold', activeDay.status === status ? '' : tone.ghost)}
+                >
+                  {status === 'workday' ? 'день' : status === 'short' ? 'коротко' : 'выход'}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3 p-4">
+          <div className="grid grid-cols-2 gap-2">
+            <label className="space-y-1.5">
+              <span className={cn('text-[10px] font-bold uppercase tracking-[0.14em]', tone.faint)}>начало</span>
+              <MiniInput light={theme.light} type="time" value={activeDay.start} onChange={(event) => patchDay(activeDay.id, { start: event.target.value })} disabled={activeDay.status === 'day-off'} />
+            </label>
+            <label className="space-y-1.5">
+              <span className={cn('text-[10px] font-bold uppercase tracking-[0.14em]', tone.faint)}>конец</span>
+              <MiniInput light={theme.light} type="time" value={activeDay.end} onChange={(event) => patchDay(activeDay.id, { end: event.target.value })} disabled={activeDay.status === 'day-off'} />
+            </label>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="space-y-1.5">
+              <span className={cn('text-[10px] font-bold uppercase tracking-[0.14em]', tone.faint)}>перерыв с</span>
+              <MiniInput light={theme.light} type="time" value={activeDay.breakStart} onChange={(event) => patchDay(activeDay.id, { breakStart: event.target.value })} disabled={activeDay.status === 'day-off'} />
+            </label>
+            <label className="space-y-1.5">
+              <span className={cn('text-[10px] font-bold uppercase tracking-[0.14em]', tone.faint)}>до</span>
+              <MiniInput light={theme.light} type="time" value={activeDay.breakEnd} onChange={(event) => patchDay(activeDay.id, { breakEnd: event.target.value })} disabled={activeDay.status === 'day-off'} />
+            </label>
+          </div>
+
+          <MiniPanel light={theme.light} className="p-3">
+            <div className={cn('text-[11px] leading-5', tone.muted)}>
+              Клиент увидит рабочее окно <b className={tone.text}>{activeDay.status === 'day-off' ? 'закрыто' : `${activeDay.start}–${activeDay.end}`}</b>{activeDay.breakStart && activeDay.breakEnd ? <> без перерыва <b className={tone.text}>{activeDay.breakStart}–{activeDay.breakEnd}</b></> : null}.
+            </div>
+          </MiniPanel>
+
+          <MiniButton theme={theme} variant="primary" onClick={() => void save()} disabled={saving} className="w-full">
+            <Save className="size-4" /> {saved ? 'Сохранено' : saving ? 'Сохраняю' : 'Сохранить график'}
+          </MiniButton>
+        </div>
+      </MiniCard>
     </div>
   );
 }
 
-function normalizeServices(profile: MasterProfile, services: ServiceInsight[]) {
-  const source = services.length > 0
-    ? services
-    : profile.services.map((name, index) => ({
-        id: `service-${index}`,
-        name,
-        duration: 60,
-        price: 0,
-        category: 'Основное',
-        status: 'active' as const,
-        visible: true,
-        bookings: 0,
-        revenue: 0,
-        popularity: 0,
-      }));
+function normalizeEditableServices(profile: MasterProfile, services: ServiceInsight[]): EditableService[] {
+  if (services.length > 0) {
+    return services.map((service, index) => ({
+      id: service.id || `service-${index}`,
+      name: service.name,
+      duration: service.duration || 60,
+      price: service.price || 0,
+      category: service.category || 'Основное',
+      status: service.status || 'active',
+      visible: service.visible !== false,
+    }));
+  }
 
-  return source.map((service, index) => ({
-    id: service.id || `service-${index}`,
-    name: service.name || `Услуга ${index + 1}`,
-    duration: Number.isFinite(service.duration) ? service.duration : 60,
-    price: Number.isFinite(service.price) ? service.price : 0,
-    category: service.category || 'Основное',
-    status: service.status === 'draft' || service.status === 'seasonal' ? service.status : 'active',
-    visible: service.visible !== false,
-  } satisfies EditableService));
+  return profile.services.map((name, index) => ({
+    id: `profile-service-${index}`,
+    name,
+    duration: 60,
+    price: 0,
+    category: 'Основное',
+    status: 'active',
+    visible: true,
+  }));
 }
 
-function ServicesScreen({
+function CatalogScreen({
   profile,
   services,
   onSaveProfile,
   updateWorkspaceSection,
+  theme,
 }: {
   profile: MasterProfile;
   services: ServiceInsight[];
-  onSaveProfile: (values: MiniProfileSaveValues) => Promise<{ success: boolean; error?: string }>;
-  updateWorkspaceSection: <T>(section: string, value: T) => Promise<boolean>;
+  onSaveProfile: SaveProfile;
+  updateWorkspaceSection: UpdateWorkspaceSection;
+  theme: ThemeTone;
 }) {
-  const [items, setItems] = useState(() => normalizeServices(profile, services));
+  const tone = toneClasses(theme.light);
+  const [items, setItems] = useState(() => normalizeEditableServices(profile, services));
+  const [draft, setDraft] = useState({ name: '', price: '', duration: '60', category: 'Основное' });
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState('');
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    setItems(normalizeServices(profile, services));
+    setItems(normalizeEditableServices(profile, services));
   }, [profile, services]);
 
   function updateItem(id: string, patch: Partial<EditableService>) {
     setItems((current) => current.map((item) => (item.id === id ? { ...item, ...patch } : item)));
-    setMessage('');
+    setSaved(false);
   }
 
   function addService() {
+    const name = draft.name.trim();
+    if (!name) return;
     setItems((current) => [
-      ...current,
       {
-        id: `service-${Date.now()}`,
-        name: 'Новая услуга',
-        duration: 60,
-        price: 0,
-        category: 'Основное',
-        status: 'draft',
+        id: makeId('service'),
+        name,
+        duration: Math.max(15, asNumber(draft.duration, 60)),
+        price: Math.max(0, asNumber(draft.price, 0)),
+        category: draft.category.trim() || 'Основное',
+        status: 'active',
         visible: true,
       },
+      ...current,
     ]);
-    setMessage('');
+    setDraft({ name: '', price: '', duration: '60', category: 'Основное' });
+    setSaved(false);
   }
 
   async function save() {
-    const cleaned = items
-      .map((item, index) => ({
-        id: item.id || `service-${index}`,
+    const clean = items
+      .map((item) => ({
+        ...item,
         name: item.name.trim(),
-        duration: Math.max(15, Math.round(item.duration || 60)),
-        price: Math.max(0, Math.round(item.price || 0)),
+        duration: Math.max(15, asNumber(item.duration, 60)),
+        price: Math.max(0, asNumber(item.price, 0)),
         category: item.category.trim() || 'Основное',
-        status: item.status,
-        visible: item.visible,
-        bookings: 0,
-        revenue: 0,
-        popularity: 0,
       }))
       .filter((item) => item.name);
 
-    if (cleaned.length === 0) {
-      setMessage('Добавь хотя бы одну услугу.');
-      return;
-    }
-
     setSaving(true);
-    const ok = await updateWorkspaceSection('services', cleaned);
-    const profileResult = await onSaveProfile(profileSavePayload(profile, {
-      servicesText: cleaned.map((item) => item.name).join('\n'),
-    }));
+    const ok = await updateWorkspaceSection('services', clean);
+    await onSaveProfile(profileSavePayload(profile, { servicesText: clean.filter((item) => item.visible).map((item) => item.name).join('\n') }));
     setSaving(false);
-    setMessage(ok && profileResult.success ? 'Услуги сохранены и попадут на страницу клиента.' : profileResult.error || 'Не получилось сохранить услуги.');
+    setSaved(ok);
   }
 
-  const activeCount = items.filter((item) => item.visible && item.status !== 'draft').length;
-  const averagePrice = activeCount > 0 ? Math.round(items.filter((item) => item.visible && item.status !== 'draft').reduce((sum, item) => sum + item.price, 0) / activeCount) : 0;
-
   return (
-    <div className="space-y-3.5">
-      <MiniCard className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <MiniLabel>услуги</MiniLabel>
-            <div className="mt-2 text-[27px] font-semibold leading-none tracking-[-0.085em]">Прайс</div>
-            <div className="mt-2 text-[12px] leading-5 text-white/38">То, что клиент выбирает на публичной странице.</div>
-          </div>
-          <MiniButton variant="secondary" onClick={addService} className="h-10 px-3">
-            <Plus className="size-4" />
-            Добавить
-          </MiniButton>
-        </div>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <StatTile label="Видимых" value={activeCount} />
-          <StatTile label="Средний чек" value={averagePrice > 0 ? RUB.format(averagePrice) : '—'} />
-        </div>
+    <div className="space-y-3">
+      <MiniCard light={theme.light} className="p-4">
+        <MiniLabel light={theme.light}>услуги</MiniLabel>
+        <div className={cn('mt-2 text-[28px] font-semibold leading-none tracking-[-0.085em]', tone.text)}>Каталог</div>
+        <div className={cn('mt-2 text-[12px] leading-5', tone.muted)}>Эти услуги сохраняются в общий профиль и подтягиваются на публичную страницу клиента.</div>
       </MiniCard>
 
-      <div className="space-y-2.5">
-        {items.map((item) => (
-          <MiniCard key={item.id} className="p-3.5">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <MiniInput value={item.name} onChange={(event) => updateItem(item.id, { name: event.target.value })} placeholder="Название услуги" />
+      <MiniCard light={theme.light} className="p-3">
+        <div className="grid grid-cols-[1fr_92px] gap-2">
+          <MiniInput light={theme.light} value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} placeholder="Название услуги" />
+          <MiniInput light={theme.light} value={draft.price} onChange={(event) => setDraft((current) => ({ ...current, price: event.target.value }))} placeholder="Цена" inputMode="numeric" />
+        </div>
+        <div className="mt-2 grid grid-cols-[1fr_92px] gap-2">
+          <MiniInput light={theme.light} value={draft.category} onChange={(event) => setDraft((current) => ({ ...current, category: event.target.value }))} placeholder="Категория" />
+          <MiniInput light={theme.light} value={draft.duration} onChange={(event) => setDraft((current) => ({ ...current, duration: event.target.value }))} placeholder="Мин" inputMode="numeric" />
+        </div>
+        <MiniButton theme={theme} variant="primary" onClick={addService} disabled={!draft.name.trim()} className="mt-2 w-full">
+          <Plus className="size-4" /> Добавить услугу
+        </MiniButton>
+      </MiniCard>
+
+      <div className="space-y-2">
+        {items.length === 0 ? (
+          <EmptyBlock theme={theme} title="Каталог пустой" text="Добавь первую услугу, чтобы клиент понимал цену, длительность и мог записаться." icon={<Scissors className="size-5" />} />
+        ) : (
+          items.map((item) => (
+            <MiniCard key={item.id} light={theme.light} className="p-3">
+              <div className="flex items-start gap-2">
+                <div className="min-w-0 flex-1 space-y-2">
+                  <MiniInput light={theme.light} value={item.name} onChange={(event) => updateItem(item.id, { name: event.target.value })} />
+                  <div className="grid grid-cols-[1fr_82px_82px] gap-2">
+                    <MiniInput light={theme.light} value={item.category} onChange={(event) => updateItem(item.id, { category: event.target.value })} />
+                    <MiniInput light={theme.light} value={String(item.duration)} onChange={(event) => updateItem(item.id, { duration: asNumber(event.target.value, 60) })} inputMode="numeric" />
+                    <MiniInput light={theme.light} value={String(item.price)} onChange={(event) => updateItem(item.id, { price: asNumber(event.target.value, 0) })} inputMode="numeric" />
+                  </div>
+                </div>
+                <button type="button" onClick={() => setItems((current) => current.filter((service) => service.id !== item.id))} className={cn('flex size-10 shrink-0 items-center justify-center rounded-[9px] border', tone.ghost)}>
+                  <Trash2 className="size-4" />
+                </button>
               </div>
-              <button type="button" onClick={() => setItems((current) => current.filter((row) => row.id !== item.id))} className="flex size-11 shrink-0 items-center justify-center rounded-[15px] border border-white/[0.08] bg-white/[0.045] text-white/40 active:scale-95">
-                <Trash2 className="size-4" />
-              </button>
-            </div>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <MiniInput inputMode="numeric" value={item.price ? String(item.price) : ''} onChange={(event) => updateItem(item.id, { price: asNumber(event.target.value) })} placeholder="Цена" />
-              <MiniInput inputMode="numeric" value={String(item.duration)} onChange={(event) => updateItem(item.id, { duration: asNumber(event.target.value, 60) })} placeholder="Минут" />
-            </div>
-            <div className="mt-2 grid grid-cols-[1fr_auto] gap-2">
-              <MiniInput value={item.category} onChange={(event) => updateItem(item.id, { category: event.target.value })} placeholder="Категория" />
-              <select value={item.status} onChange={(event) => updateItem(item.id, { status: event.target.value as EditableService['status'] })} className="h-11 rounded-[15px] border border-white/[0.08] bg-[#171717] px-3 text-[11px] font-semibold text-white outline-none">
-                <option value="active">активна</option>
-                <option value="seasonal">сезон</option>
-                <option value="draft">черновик</option>
-              </select>
-            </div>
-            <button type="button" onClick={() => updateItem(item.id, { visible: !item.visible })} className="mt-2 flex h-10 w-full items-center justify-between rounded-[14px] border border-white/[0.07] bg-white/[0.032] px-3 text-[11px] font-semibold text-white/56">
-              <span>{item.visible ? 'Показывается клиентам' : 'Скрыта со страницы клиента'}</span>
-              <span className={cn('size-2 rounded-full', item.visible ? 'bg-emerald-400' : 'bg-white/20')} />
-            </button>
-          </MiniCard>
-        ))}
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <button type="button" onClick={() => updateItem(item.id, { visible: !item.visible })} className={cn('h-8 rounded-[9px] border px-2.5 text-[10px] font-bold', tone.ghost)}>
+                  {item.visible ? 'видно клиенту' : 'скрыто'}
+                </button>
+                <div className={cn('text-[11px] font-semibold', tone.muted)}>{item.duration} мин · {item.price ? RUB.format(item.price) : 'цена не указана'}</div>
+              </div>
+            </MiniCard>
+          ))
+        )}
       </div>
 
-      {message ? <div className="rounded-[16px] border border-white/[0.07] bg-white/[0.035] px-3 py-2 text-[12px] text-white/50">{message}</div> : null}
-      <MiniButton variant="primary" className="sticky bottom-[92px] z-20 w-full" onClick={() => void save()} disabled={saving}>
-        <Save className="size-4" />
-        {saving ? 'Сохраняю...' : 'Сохранить услуги'}
+      <MiniButton theme={theme} variant="primary" onClick={() => void save()} disabled={saving} className="w-full">
+        <Save className="size-4" /> {saved ? 'Сохранено' : saving ? 'Сохраняю' : 'Сохранить каталог'}
       </MiniButton>
     </div>
   );
 }
 
-function ChatsScreen() {
+function DialogsScreen({ theme }: { theme: ThemeTone }) {
+  const tone = toneClasses(theme.light);
   const [threads, setThreads] = useState<ChatThreadRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<ChatThreadRecord | null>(null);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [query, setQuery] = useState('');
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (showLoader = true) => {
+    if (showLoader) setLoading(true);
     try {
       const response = await fetch('/api/chats', {
         credentials: 'include',
@@ -988,11 +1084,14 @@ function ChatsScreen() {
       });
       if (!response.ok) throw new Error('failed');
       const payload = (await response.json()) as ChatThreadListResponse;
-      setThreads(Array.isArray(payload.threads) ? payload.threads : []);
+      const next = Array.isArray(payload.threads) ? payload.threads : [];
+      setThreads(next);
+      return next;
     } catch {
       setThreads([]);
+      return [];
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
     }
   }, []);
 
@@ -1023,99 +1122,162 @@ function ChatsScreen() {
       });
       if (!response.ok) throw new Error('send_failed');
       setDraft('');
-      await load();
-      setActive((current) => threads.find((thread) => thread.id === current?.id) ?? current);
+      const next = await load(false);
+      setActive((current) => next.find((thread) => thread.id === current?.id) ?? current);
     } catch {
-      // stay in the chat, user keeps the draft
+      // draft stays in input
     } finally {
       setSending(false);
     }
   }
 
-  const ordered = useMemo(() => [...threads].sort((a, b) => new Date(b.lastMessageAt || b.updatedAt).getTime() - new Date(a.lastMessageAt || a.updatedAt).getTime()), [threads]);
+  const ordered = useMemo(() => {
+    const search = query.trim().toLowerCase();
+    return [...threads]
+      .filter((thread) => `${thread.clientName} ${thread.clientPhone} ${thread.lastMessagePreview ?? ''}`.toLowerCase().includes(search))
+      .sort((a, b) => new Date(b.lastMessageAt || b.updatedAt).getTime() - new Date(a.lastMessageAt || a.updatedAt).getTime());
+  }, [query, threads]);
 
   if (loading) {
-    return <EmptyBlock title="Загружаю чаты" text="Проверяю сообщения и заявки из Telegram, VK и публичной страницы." icon={<MessageCircle className="size-5" />} />;
+    return <EmptyBlock theme={theme} title="Загружаю чаты" text="Проверяю сообщения и заявки из Telegram, VK и публичной страницы." icon={<MessageCircle className="size-5" />} />;
   }
 
   return (
-    <div className="space-y-3.5">
-      <MiniCard className="p-4">
+    <div className="space-y-3">
+      <MiniCard light={theme.light} className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <MiniLabel>чаты</MiniLabel>
-            <div className="mt-2 text-[27px] font-semibold leading-none tracking-[-0.085em]">Диалоги</div>
-            <div className="mt-2 text-[12px] leading-5 text-white/38">Все заявки и сообщения в короткой мобильной ленте.</div>
+            <MiniLabel light={theme.light}>чаты</MiniLabel>
+            <div className={cn('mt-2 text-[28px] font-semibold leading-none tracking-[-0.085em]', tone.text)}>Диалоги</div>
+            <div className={cn('mt-2 text-[12px] leading-5', tone.muted)}>Короткая мобильная лента всех клиентов.</div>
           </div>
-          <MiniButton variant="secondary" className="h-10 px-3" onClick={() => void load()}>
+          <MiniButton theme={theme} variant="secondary" className="h-8 px-2.5" onClick={() => void load()}>
             <RefreshCcw className="size-4" />
           </MiniButton>
+        </div>
+        <div className="mt-3">
+          <MiniInput light={theme.light} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск по клиенту или сообщению" />
         </div>
       </MiniCard>
 
       {ordered.length === 0 ? (
-        <EmptyBlock title="Чатов пока нет" text="Когда появится запись или клиент напишет через бота, диалог подтянется сюда." icon={<MessageCircle className="size-5" />} />
+        <EmptyBlock theme={theme} title="Чатов пока нет" text="Когда клиент напишет или появится запись, диалог подтянется сюда." icon={<MessageCircle className="size-5" />} />
       ) : (
         <div className="space-y-2">
-          {ordered.map((thread) => (
-            <button key={thread.id} type="button" onClick={() => setActive(thread)} className="flex w-full items-center gap-3 rounded-[20px] border border-white/[0.07] bg-white/[0.035] p-3 text-left active:scale-[0.99]">
-              <div className="flex size-11 shrink-0 items-center justify-center rounded-[16px] border border-white/[0.08] bg-white/[0.045] text-[11px] font-black tracking-[-0.05em] text-white">
-                {getInitials(thread.clientName)}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="truncate text-[14px] font-semibold tracking-[-0.05em]">{thread.clientName}</div>
-                  <span className="rounded-full border border-white/[0.07] bg-white/[0.035] px-2 py-1 text-[9px] font-bold text-white/36">{thread.channel}</span>
+          {ordered.map((thread) => {
+            const lastMessage = thread.lastMessagePreview || thread.messages?.[thread.messages.length - 1]?.body || 'Диалог открыт';
+            return (
+              <button key={thread.id} type="button" onClick={() => setActive(thread)} className={cn('flex w-full items-center gap-3 rounded-[10px] border p-3 text-left transition active:scale-[0.99]', tone.panel)}>
+                <div className={cn('flex size-10 shrink-0 items-center justify-center rounded-[10px] border text-[11px] font-black tracking-[-0.05em]', tone.panel)}>{getInitials(thread.clientName)}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className={cn('truncate text-[14px] font-semibold tracking-[-0.05em]', tone.text)}>{thread.clientName}</div>
+                    <span className={cn('rounded-[8px] border px-2 py-1 text-[9px] font-bold', tone.panel, tone.faint)}>{thread.channel}</span>
+                  </div>
+                  <div className={cn('mt-1 truncate text-[11px]', tone.muted)}>{lastMessage}</div>
                 </div>
-                <div className="mt-1 truncate text-[11px] text-white/34">{thread.lastMessagePreview || thread.messages?.at(-1)?.body || 'Диалог открыт'}</div>
-              </div>
-              {thread.unreadCount > 0 ? <span className="flex size-5 items-center justify-center rounded-full bg-white text-[10px] font-bold text-black">{thread.unreadCount}</span> : null}
-            </button>
-          ))}
+                {thread.unreadCount > 0 ? <span className="flex size-5 items-center justify-center rounded-full text-[10px] font-bold" style={accentStyle(theme.accent, theme.light, 24)}>{thread.unreadCount}</span> : null}
+              </button>
+            );
+          })}
         </div>
       )}
 
       {active ? (
-        <div className="fixed inset-0 z-[80] flex items-end bg-black/55 px-3 pb-[calc(var(--tg-safe-bottom,0px)+10px)] backdrop-blur-[8px]">
-          <div className="mx-auto flex max-h-[82svh] w-full max-w-[430px] flex-col overflow-hidden rounded-[26px] border border-white/[0.10] bg-[#101010] shadow-[0_28px_90px_rgba(0,0,0,0.72)]">
-            <div className="flex items-center justify-between gap-3 border-b border-white/[0.08] p-4">
-              <div className="min-w-0">
-                <div className="text-[17px] font-semibold tracking-[-0.06em]">{active.clientName}</div>
-                <div className="mt-1 text-[11px] text-white/34">{active.clientPhone || active.channel}</div>
-              </div>
-              <button type="button" onClick={() => setActive(null)} className="flex size-9 items-center justify-center rounded-[13px] border border-white/[0.08] bg-white/[0.045] text-white/52">
-                <X className="size-4" />
-              </button>
-            </div>
+        <BottomSheet theme={theme} onClose={() => setActive(null)} title={active.clientName} subtitle={active.clientPhone || active.channel}>
+          <div className="flex max-h-[58svh] flex-col">
             <div className="flex-1 space-y-2 overflow-y-auto p-4">
               {(active.messages ?? []).length === 0 ? (
-                <div className="py-8 text-center text-[12px] text-white/32">Сообщений пока нет</div>
+                <div className={cn('py-8 text-center text-[12px]', tone.faint)}>Сообщений пока нет</div>
               ) : (
                 active.messages.map((message) => (
-                  <div key={message.id} className={cn('max-w-[86%] rounded-[18px] px-3 py-2 text-[12px] leading-5', message.author === 'master' ? 'ml-auto bg-white text-black' : message.author === 'system' ? 'mx-auto bg-white/[0.05] text-white/42' : 'bg-white/[0.055] text-white/76')}>
+                  <div
+                    key={message.id}
+                    className={cn(
+                      'max-w-[86%] rounded-[10px] px-3 py-2 text-[12px] leading-5',
+                      message.author === 'master'
+                        ? 'ml-auto'
+                        : message.author === 'system'
+                          ? 'mx-auto'
+                          : '',
+                      message.author === 'master'
+                        ? (theme.light ? 'bg-black text-white' : 'bg-white text-black')
+                        : cn(tone.panel, 'border'),
+                    )}
+                  >
                     {message.body}
                   </div>
                 ))
               )}
             </div>
-            <div className="border-t border-white/[0.08] p-3">
+            <div className={cn('border-t p-3', tone.line)}>
               <div className="flex gap-2">
-                <MiniInput value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Ответ клиенту" onKeyDown={(event) => {
-                  if (event.key === 'Enter') void send();
-                }} />
-                <MiniButton variant="primary" disabled={sending || !draft.trim()} onClick={() => void send()} className="h-11 w-12 shrink-0 px-0">
+                <MiniInput light={theme.light} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Ответ клиенту" onKeyDown={(event) => { if (event.key === 'Enter') void send(); }} />
+                <MiniButton theme={theme} variant="primary" disabled={sending || !draft.trim()} onClick={() => void send()} className="h-10 w-11 shrink-0 px-0">
                   <Send className="size-4" />
                 </MiniButton>
               </div>
             </div>
           </div>
-        </div>
+        </BottomSheet>
       ) : null}
     </div>
   );
 }
 
-function ClientsScreen({ clients, updateWorkspaceSection, workspaceData }: { clients: ClientInsight[]; updateWorkspaceSection: <T>(section: string, value: T) => Promise<boolean>; workspaceData: Record<string, unknown> }) {
+function HubScreen({ profile, dataset, setScreen, getPublicPath, theme }: { profile: MasterProfile; dataset: WorkspaceDataset; setScreen: (screen: MiniScreen) => void; getPublicPath: (slug: string) => string; theme: ThemeTone }) {
+  const tone = toneClasses(theme.light);
+  async function copyPublicLink() {
+    const origin = typeof window === 'undefined' ? '' : window.location.origin;
+    await copyText(`${origin}${getPublicPath(profile.slug)}`);
+  }
+
+  const tiles = [
+    { id: 'clients' as const, title: 'Клиенты', text: `${dataset.clients.length} в базе`, icon: <Users2 className="size-4" /> },
+    { id: 'analytics' as const, title: 'Аналитика', text: RUB.format(dataset.totals.revenue || 0), icon: <BarChart3 className="size-4" /> },
+    { id: 'profile' as const, title: 'Профиль', text: `@${profile.slug}`, icon: <UserRound className="size-4" /> },
+  ];
+
+  return (
+    <div className="space-y-3">
+      <MiniCard light={theme.light} className="p-4">
+        <MiniLabel light={theme.light}>ещё</MiniLabel>
+        <div className={cn('mt-2 text-[28px] font-semibold leading-none tracking-[-0.085em]', tone.text)}>Центр управления</div>
+        <div className={cn('mt-2 text-[12px] leading-5', tone.muted)}>Всё второстепенное убрано сюда, чтобы основные экраны не были перегружены.</div>
+      </MiniCard>
+
+      <div className="grid grid-cols-1 gap-2">
+        {tiles.map((tile) => (
+          <button key={tile.id} type="button" onClick={() => setScreen(tile.id)} className={cn('flex items-center gap-3 rounded-[10px] border p-3 text-left transition active:scale-[0.99]', tone.panel)}>
+            <div className={cn('flex size-10 items-center justify-center rounded-[9px] border', tone.panel)} style={{ color: theme.accent }}>{tile.icon}</div>
+            <div className="min-w-0 flex-1">
+              <div className={cn('text-[14px] font-semibold tracking-[-0.05em]', tone.text)}>{tile.title}</div>
+              <div className={cn('mt-1 text-[11px]', tone.muted)}>{tile.text}</div>
+            </div>
+            <ChevronRight className={cn('size-4', tone.faint)} />
+          </button>
+        ))}
+      </div>
+
+      <MiniCard light={theme.light} className="p-3">
+        <div className="grid grid-cols-2 gap-2">
+          <MiniButton theme={theme} variant="secondary" onClick={copyPublicLink} className="w-full">
+            <Copy className="size-4" /> Ссылка
+          </MiniButton>
+          <MiniButton theme={theme} variant="secondary" className="w-full" onClick={() => setScreen('profile')}>
+            <Settings className="size-4" /> Настроить
+          </MiniButton>
+        </div>
+        <MiniButton theme={theme} variant="primary" className="mt-2 w-full" onClick={() => { if (typeof window !== 'undefined') window.location.href = '/dashboard'; }}>
+          <ExternalLink className="size-4" /> Открыть полный кабинет
+        </MiniButton>
+      </MiniCard>
+    </div>
+  );
+}
+
+function ClientsScreen({ clients, workspaceData, updateWorkspaceSection, theme }: { clients: ClientInsight[]; workspaceData: Record<string, unknown>; updateWorkspaceSection: UpdateWorkspaceSection; theme: ThemeTone }) {
+  const tone = toneClasses(theme.light);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<ClientInsight | null>(null);
   const notes = safeRecord(workspaceData.clientNotes) as Record<string, string>;
@@ -1131,111 +1293,103 @@ function ClientsScreen({ clients, updateWorkspaceSection, workspaceData }: { cli
   }
 
   return (
-    <div className="space-y-3.5">
-      <MiniCard className="p-4">
-        <MiniLabel>клиенты</MiniLabel>
-        <div className="mt-2 text-[27px] font-semibold leading-none tracking-[-0.085em]">База</div>
-        <div className="mt-4"><MiniInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск по имени, телефону, услуге" /></div>
+    <div className="space-y-3">
+      <MiniCard light={theme.light} className="p-4">
+        <MiniLabel light={theme.light}>клиенты</MiniLabel>
+        <div className={cn('mt-2 text-[28px] font-semibold leading-none tracking-[-0.085em]', tone.text)}>База</div>
+        <div className="mt-3"><MiniInput light={theme.light} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск по имени, телефону, услуге" /></div>
       </MiniCard>
 
       {filtered.length === 0 ? (
-        <EmptyBlock title="Клиентов нет" text="Клиенты появятся после первых записей и сообщений." icon={<Users2 className="size-5" />} />
+        <EmptyBlock theme={theme} title="Клиентов нет" text="База появится после первых записей и сообщений." icon={<Users2 className="size-5" />} />
       ) : (
         <div className="space-y-2">
           {filtered.map((client) => (
-            <button key={client.id} type="button" onClick={() => setSelected(client)} className="flex w-full items-center gap-3 rounded-[20px] border border-white/[0.07] bg-white/[0.035] p-3 text-left active:scale-[0.99]">
-              <div className="flex size-11 shrink-0 items-center justify-center rounded-[16px] border border-white/[0.08] bg-white/[0.045] text-[11px] font-black tracking-[-0.05em]">{getInitials(client.name)}</div>
+            <button key={client.id} type="button" onClick={() => setSelected(client)} className={cn('flex w-full items-center gap-3 rounded-[10px] border p-3 text-left transition active:scale-[0.99]', tone.panel)}>
+              <div className={cn('flex size-10 shrink-0 items-center justify-center rounded-[10px] border text-[11px] font-black tracking-[-0.05em]', tone.panel)}>{getInitials(client.name)}</div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <div className="truncate text-[14px] font-semibold tracking-[-0.05em]">{client.name}</div>
-                  {(favorites[client.id] || client.favorite) ? <Star className="size-3.5 fill-white text-white" /> : null}
+                  <div className={cn('truncate text-[14px] font-semibold tracking-[-0.05em]', tone.text)}>{client.name}</div>
+                  {(favorites[client.id] || client.favorite) ? <Star className="size-3.5 fill-current" style={{ color: theme.accent }} /> : null}
                 </div>
-                <div className="mt-1 truncate text-[11px] text-white/34">{client.visits} визитов · {client.service || 'услуга'} · {client.phone}</div>
+                <div className={cn('mt-1 truncate text-[11px]', tone.muted)}>{client.visits} визитов · {client.service || 'услуга'} · {client.phone}</div>
               </div>
-              <ChevronRight className="size-4 shrink-0 text-white/20" />
+              <ChevronRight className={cn('size-4 shrink-0', tone.faint)} />
             </button>
           ))}
         </div>
       )}
 
       {selected ? (
-        <ClientSheet client={selected} note={notes[selected.id] ?? selected.note ?? ''} favorite={Boolean(favorites[selected.id] ?? selected.favorite)} onClose={() => setSelected(null)} onFavorite={() => void toggleFavorite(selected)} onSaveNote={(note) => void saveNote(selected, note)} />
+        <ClientSheet client={selected} note={notes[selected.id] ?? selected.note ?? ''} favorite={Boolean(favorites[selected.id] ?? selected.favorite)} onClose={() => setSelected(null)} onFavorite={() => void toggleFavorite(selected)} onSaveNote={(note) => void saveNote(selected, note)} theme={theme} />
       ) : null}
     </div>
   );
 }
 
-function ClientSheet({ client, note, favorite, onClose, onFavorite, onSaveNote }: { client: ClientInsight; note: string; favorite: boolean; onClose: () => void; onFavorite: () => void; onSaveNote: (note: string) => void }) {
+function ClientSheet({ client, note, favorite, onClose, onFavorite, onSaveNote, theme }: { client: ClientInsight; note: string; favorite: boolean; onClose: () => void; onFavorite: () => void; onSaveNote: (note: string) => void; theme: ThemeTone }) {
   const [draft, setDraft] = useState(note);
   useEffect(() => setDraft(note), [note]);
   return (
-    <div className="fixed inset-0 z-[80] flex items-end bg-black/55 px-3 pb-[calc(var(--tg-safe-bottom,0px)+10px)] backdrop-blur-[8px]">
-      <div className="mx-auto w-full max-w-[430px] overflow-hidden rounded-[26px] border border-white/[0.10] bg-[#101010] shadow-[0_28px_90px_rgba(0,0,0,0.72)]">
-        <div className="flex items-start justify-between gap-3 border-b border-white/[0.08] p-4">
-          <div>
-            <MiniLabel>клиент</MiniLabel>
-            <div className="mt-2 text-[24px] font-semibold leading-none tracking-[-0.08em]">{client.name}</div>
-            <div className="mt-2 text-[12px] text-white/40">{client.phone}</div>
-          </div>
-          <button type="button" onClick={onClose} className="flex size-9 items-center justify-center rounded-[13px] border border-white/[0.08] bg-white/[0.045] text-white/52"><X className="size-4" /></button>
+    <BottomSheet theme={theme} onClose={onClose} title={client.name} subtitle={client.phone}>
+      <div className="space-y-3 p-4">
+        <div className="grid grid-cols-3 gap-2">
+          <StatBox theme={theme} label="Визиты" value={client.visits} />
+          <StatBox theme={theme} label="Чек" value={client.averageCheck ? RUB.format(client.averageCheck) : '—'} />
+          <StatBox theme={theme} label="Сумма" value={client.totalRevenue ? RUB.format(client.totalRevenue) : '—'} />
         </div>
-        <div className="space-y-3 p-4">
-          <div className="grid grid-cols-3 gap-2">
-            <StatTile label="Визиты" value={client.visits} />
-            <StatTile label="Чек" value={client.averageCheck ? RUB.format(client.averageCheck) : '—'} />
-            <StatTile label="Выручка" value={client.totalRevenue ? RUB.format(client.totalRevenue) : '—'} />
-          </div>
-          <MiniTextarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Заметка по клиенту" />
-          <div className="grid grid-cols-2 gap-2">
-            <MiniButton variant="secondary" onClick={onFavorite}>{favorite ? <Star className="size-4 fill-white" /> : <Star className="size-4" />}{favorite ? 'VIP' : 'В VIP'}</MiniButton>
-            <MiniButton variant="primary" onClick={() => onSaveNote(draft)}>Сохранить</MiniButton>
-          </div>
+        <MiniTextarea light={theme.light} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Заметка по клиенту" />
+        <div className="grid grid-cols-2 gap-2">
+          <MiniButton theme={theme} variant="secondary" onClick={onFavorite}>{favorite ? <Star className="size-4 fill-current" /> : <Star className="size-4" />}{favorite ? 'VIP' : 'В VIP'}</MiniButton>
+          <MiniButton theme={theme} variant="primary" onClick={() => onSaveNote(draft)}>Сохранить</MiniButton>
         </div>
       </div>
-    </div>
+    </BottomSheet>
   );
 }
 
-function AnalyticsScreen({ dataset }: { dataset: WorkspaceDataset }) {
+function AnalyticsScreen({ dataset, theme }: { dataset: WorkspaceDataset; theme: ThemeTone }) {
+  const tone = toneClasses(theme.light);
   const maxDaily = Math.max(1, ...dataset.daily.map((day) => day.requests));
   const channels = dataset.channels.filter((channel) => channel.visitors > 0 || channel.bookings > 0).slice(0, 4);
 
   return (
-    <div className="space-y-3.5">
-      <MiniCard className="p-4">
-        <MiniLabel>аналитика</MiniLabel>
-        <div className="mt-2 text-[27px] font-semibold leading-none tracking-[-0.085em]">Пульс</div>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <StatTile label="Записи" value={dataset.totals.bookings} />
-          <StatTile label="Выручка" value={RUB.format(dataset.totals.revenue || 0)} />
-          <StatTile label="Средний чек" value={dataset.totals.averageCheck ? RUB.format(dataset.totals.averageCheck) : '—'} />
-          <StatTile label="Возврат" value={`${dataset.totals.returnRate || 0}%`} />
+    <div className="space-y-3">
+      <MiniCard light={theme.light} className="p-4">
+        <MiniLabel light={theme.light}>аналитика</MiniLabel>
+        <div className={cn('mt-2 text-[28px] font-semibold leading-none tracking-[-0.085em]', tone.text)}>Пульс</div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <StatBox theme={theme} label="Записи" value={dataset.totals.bookings} />
+          <StatBox theme={theme} label="Выручка" value={RUB.format(dataset.totals.revenue || 0)} />
+          <StatBox theme={theme} label="Средний чек" value={dataset.totals.averageCheck ? RUB.format(dataset.totals.averageCheck) : '—'} />
+          <StatBox theme={theme} label="Возврат" value={`${dataset.totals.returnRate || 0}%`} />
         </div>
       </MiniCard>
 
-      <MiniCard className="p-4">
-        <div className="flex items-center justify-between"><MiniLabel>по дням</MiniLabel><span className="text-[10px] text-white/30">последние дни</span></div>
+      <MiniCard light={theme.light} className="p-4">
+        <MiniLabel light={theme.light}>по дням</MiniLabel>
         <div className="mt-4 space-y-3">
-          {dataset.daily.slice(-7).map((day) => (
+          {(dataset.daily.length ? dataset.daily.slice(-7) : []).map((day) => (
             <div key={day.date} className="grid grid-cols-[74px_1fr_36px] items-center gap-2">
-              <div className="text-[10px] font-semibold text-white/34">{day.label}</div>
-              <div className="h-2 overflow-hidden rounded-full bg-white/[0.055]"><div className="h-full rounded-full bg-white/60" style={{ width: `${Math.max(5, (day.requests / maxDaily) * 100)}%` }} /></div>
-              <div className="text-right text-[10px] font-semibold text-white/44">{day.requests}</div>
+              <div className={cn('text-[10px] font-semibold', tone.muted)}>{day.label}</div>
+              <div className={cn('h-2 overflow-hidden rounded-full', theme.light ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}><div className="h-full rounded-full" style={{ width: `${Math.max(5, (day.requests / maxDaily) * 100)}%`, backgroundColor: theme.accent }} /></div>
+              <div className={cn('text-right text-[10px] font-semibold', tone.muted)}>{day.requests}</div>
             </div>
           ))}
+          {dataset.daily.length === 0 ? <div className={cn('text-[12px]', tone.muted)}>Данных пока нет.</div> : null}
         </div>
       </MiniCard>
 
-      <MiniCard className="p-4">
-        <MiniLabel>каналы</MiniLabel>
+      <MiniCard light={theme.light} className="p-4">
+        <MiniLabel light={theme.light}>каналы</MiniLabel>
         <div className="mt-3 space-y-2">
           {(channels.length ? channels : dataset.channels.slice(0, 4)).map((channel) => (
-            <div key={channel.id} className="flex items-center justify-between rounded-[16px] border border-white/[0.06] bg-white/[0.03] px-3 py-2.5">
+            <div key={channel.id} className={cn('flex items-center justify-between rounded-[10px] border px-3 py-2.5', tone.panel)}>
               <div>
-                <div className="text-[13px] font-semibold tracking-[-0.045em]">{channel.label}</div>
-                <div className="mt-0.5 text-[10px] text-white/30">{channel.visitors} визитов · {channel.conversion}%</div>
+                <div className={cn('text-[13px] font-semibold tracking-[-0.045em]', tone.text)}>{channel.label}</div>
+                <div className={cn('mt-1 text-[10px]', tone.faint)}>{channel.visitors} визитов · {channel.conversion}%</div>
               </div>
-              <div className="text-right text-[13px] font-semibold tracking-[-0.045em]">{channel.bookings}</div>
+              <div className={cn('text-[12px] font-semibold', tone.text)}>{channel.bookings}</div>
             </div>
           ))}
         </div>
@@ -1244,162 +1398,129 @@ function AnalyticsScreen({ dataset }: { dataset: WorkspaceDataset }) {
   );
 }
 
-function ProfileScreen({ profile, onSave, getPublicPath }: { profile: MasterProfile; onSave: (values: MiniProfileSaveValues) => Promise<{ success: boolean; error?: string }>; getPublicPath: (slug: string) => string }) {
+function ProfileScreen({ profile, onSave, getPublicPath, theme }: { profile: MasterProfile; onSave: SaveProfile; getPublicPath: (slug: string) => string; theme: ThemeTone }) {
+  const tone = toneClasses(theme.light);
   const [form, setForm] = useState(() => profileSavePayload(profile, {}));
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [message, setMessage] = useState('');
 
-  useEffect(() => setForm(profileSavePayload(profile, {})), [profile]);
-
-  const publicUrl = typeof window === 'undefined' ? getPublicPath(profile.slug) : `${window.location.origin}${getPublicPath(profile.slug)}`;
-
-  function patch(value: Partial<MiniProfileSaveValues>) {
-    setForm((current) => ({ ...current, ...value }));
-    setMessage('');
-  }
+  useEffect(() => {
+    setForm(profileSavePayload(profile, {}));
+  }, [profile]);
 
   async function save() {
     setSaving(true);
-    const result = await onSave(form);
+    await onSave(form);
     setSaving(false);
-    setMessage(result.success ? 'Профиль сохранён.' : result.error || 'Не удалось сохранить профиль.');
   }
 
   async function copyLink() {
-    const ok = await copyText(publicUrl);
+    const origin = typeof window === 'undefined' ? '' : window.location.origin;
+    const ok = await copyText(`${origin}${getPublicPath(form.slug || profile.slug)}`);
     setCopied(ok);
-    window.setTimeout(() => setCopied(false), 1600);
+    window.setTimeout(() => setCopied(false), 1400);
   }
 
   return (
-    <div className="space-y-3.5">
-      <MiniCard className="p-4">
-        <div className="flex items-center gap-3">
-          <AvatarMark profile={profile} size="lg" />
-          <div className="min-w-0 flex-1">
-            <MiniLabel>профиль</MiniLabel>
-            <div className="mt-2 truncate text-[24px] font-semibold leading-none tracking-[-0.085em]">{profile.name}</div>
-            <div className="mt-2 flex items-center gap-2 rounded-[14px] border border-white/[0.07] bg-white/[0.035] px-3 py-2 text-[11px] text-white/40">
-              <span className="min-w-0 flex-1 truncate">{publicUrl}</span>
-              <button type="button" onClick={() => void copyLink()} className="text-white/62"><Copy className="size-3.5" /></button>
-            </div>
-            {copied ? <div className="mt-1 text-[10px] text-white/38">Ссылка скопирована</div> : null}
-          </div>
+    <div className="space-y-3">
+      <MiniCard light={theme.light} className="p-4">
+        <MiniLabel light={theme.light}>профиль</MiniLabel>
+        <div className={cn('mt-2 text-[28px] font-semibold leading-none tracking-[-0.085em]', tone.text)}>Публичная карточка</div>
+        <div className="mt-3 flex gap-2">
+          <MiniButton theme={theme} variant="secondary" onClick={copyLink} className="flex-1"><Copy className="size-4" />{copied ? 'Скопировано' : 'Ссылка'}</MiniButton>
+          <MiniButton theme={theme} variant="secondary" className="flex-1" onClick={() => { if (typeof window !== 'undefined') window.open(getPublicPath(profile.slug), '_blank'); }}><ExternalLink className="size-4" />Открыть</MiniButton>
         </div>
       </MiniCard>
 
-      <MiniCard className="space-y-2 p-4">
-        <MiniInput value={form.name} onChange={(event) => patch({ name: event.target.value })} placeholder="Имя" />
-        <MiniInput value={form.profession} onChange={(event) => patch({ profession: event.target.value })} placeholder="Специализация" />
-        <MiniInput value={form.city} onChange={(event) => patch({ city: event.target.value })} placeholder="Город" />
-        <MiniTextarea value={form.bio} onChange={(event) => patch({ bio: event.target.value })} placeholder="Краткое описание" />
-        <MiniInput value={form.avatar} onChange={(event) => patch({ avatar: event.target.value })} placeholder="Ссылка на аватар" />
+      <MiniCard light={theme.light} className="space-y-2 p-3">
+        <MiniInput light={theme.light} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="Имя" />
+        <MiniInput light={theme.light} value={form.profession} onChange={(event) => setForm((current) => ({ ...current, profession: event.target.value }))} placeholder="Специализация" />
+        <MiniInput light={theme.light} value={form.city} onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))} placeholder="Город" />
+        <MiniInput light={theme.light} value={form.slug} onChange={(event) => setForm((current) => ({ ...current, slug: event.target.value }))} placeholder="slug" />
+        <MiniTextarea light={theme.light} value={form.bio} onChange={(event) => setForm((current) => ({ ...current, bio: event.target.value }))} placeholder="Описание для клиента" />
+        <div className="grid grid-cols-2 gap-2">
+          <MiniInput light={theme.light} value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} placeholder="Телефон" />
+          <MiniInput light={theme.light} value={form.telegram} onChange={(event) => setForm((current) => ({ ...current, telegram: event.target.value }))} placeholder="Telegram" />
+        </div>
+        <MiniButton theme={theme} variant="primary" onClick={() => void save()} disabled={saving} className="w-full"><Save className="size-4" />{saving ? 'Сохраняю' : 'Сохранить профиль'}</MiniButton>
       </MiniCard>
-
-      <MiniCard className="space-y-2 p-4">
-        <MiniLabel>контакты</MiniLabel>
-        <MiniInput value={form.phone} onChange={(event) => patch({ phone: event.target.value })} placeholder="Телефон" />
-        <MiniInput value={form.telegram} onChange={(event) => patch({ telegram: event.target.value })} placeholder="Telegram" />
-        <MiniInput value={form.whatsapp} onChange={(event) => patch({ whatsapp: event.target.value })} placeholder="WhatsApp / VK" />
-      </MiniCard>
-
-      {message ? <div className="rounded-[16px] border border-white/[0.07] bg-white/[0.035] px-3 py-2 text-[12px] text-white/50">{message}</div> : null}
-      <MiniButton variant="primary" className="sticky bottom-[92px] z-20 w-full" onClick={() => void save()} disabled={saving}>
-        <Save className="size-4" />
-        {saving ? 'Сохраняю...' : 'Сохранить профиль'}
-      </MiniButton>
     </div>
   );
 }
 
-function SettingsScreen({ workspaceData, updateWorkspaceSection }: { workspaceData: Record<string, unknown>; updateWorkspaceSection: <T>(section: string, value: T) => Promise<boolean> }) {
-  const [saving, setSaving] = useState<string | null>(null);
-  const quietHours = workspaceData.quietHours === true;
-  const fallbackEmail = workspaceData.fallbackEmail !== false;
-  const miniSettings = safeRecord(workspaceData.miniSettings);
+function BottomSheet({ children, theme, onClose, title, subtitle }: { children: ReactNode; theme: ThemeTone; onClose: () => void; title: string; subtitle?: string }) {
+  const tone = toneClasses(theme.light);
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end bg-black/45 px-3 pb-[calc(var(--tg-safe-bottom,0px)+10px)] backdrop-blur-[8px]">
+      <div className={cn('mx-auto max-h-[86svh] w-full max-w-[440px] overflow-hidden rounded-[16px] border shadow-[0_28px_90px_rgba(0,0,0,0.38)]', theme.light ? 'border-black/[0.09] bg-[#fbfbfa] text-black' : 'border-white/[0.10] bg-[#101010] text-white')}>
+        <div className={cn('flex items-start justify-between gap-3 border-b p-4', tone.line)}>
+          <div className="min-w-0">
+            <div className={cn('text-[19px] font-semibold leading-none tracking-[-0.075em]', tone.text)}>{title}</div>
+            {subtitle ? <div className={cn('mt-1.5 truncate text-[11px]', tone.muted)}>{subtitle}</div> : null}
+          </div>
+          <button type="button" onClick={onClose} className={cn('flex size-9 shrink-0 items-center justify-center rounded-[9px] border', tone.ghost)}><X className="size-4" /></button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
 
-  async function toggle(section: string, value: boolean) {
-    setSaving(section);
-    await updateWorkspaceSection(section, value);
+function BookingSheet({ booking, onClose, onStatus, services, theme }: { booking: Booking | null; onClose: () => void; onStatus: (bookingId: string, status: BookingStatus) => Promise<void>; services: ServiceInsight[]; theme: ThemeTone }) {
+  const tone = toneClasses(theme.light);
+  const [saving, setSaving] = useState<BookingStatus | null>(null);
+
+  if (!booking) return null;
+
+  async function changeStatus(status: BookingStatus) {
+    setSaving(status);
+    await onStatus(booking.id, status);
     setSaving(null);
+    onClose();
   }
 
-  async function saveMini(key: string, value: boolean) {
-    setSaving(key);
-    await updateWorkspaceSection('miniSettings', { ...miniSettings, [key]: value });
-    setSaving(null);
-  }
-
   return (
-    <div className="space-y-3.5">
-      <MiniCard className="p-4">
-        <MiniLabel>настройки</MiniLabel>
-        <div className="mt-2 text-[27px] font-semibold leading-none tracking-[-0.085em]">Mini app</div>
-        <div className="mt-2 text-[12px] leading-5 text-white/38">Тихие и аккуратные настройки без лишних экранов.</div>
-      </MiniCard>
-      <div className="space-y-2">
-        <SettingRow title="Тихие часы" text="Не шуметь уведомлениями ночью" enabled={quietHours} loading={saving === 'quietHours'} onClick={() => void toggle('quietHours', !quietHours)} />
-        <SettingRow title="Запасной email" text="Подстраховка, если бот не доставил сообщение" enabled={fallbackEmail} loading={saving === 'fallbackEmail'} onClick={() => void toggle('fallbackEmail', !fallbackEmail)} />
-        <SettingRow title="Компактный режим" text="Меньше текста, больше быстрых действий" enabled={miniSettings.compactMode === true} loading={saving === 'compactMode'} onClick={() => void saveMini('compactMode', miniSettings.compactMode !== true)} />
+    <BottomSheet theme={theme} onClose={onClose} title={booking.clientName} subtitle={`${formatDateHuman(booking.date, true)} · ${formatTime(booking.time)}`}>
+      <div className="space-y-3 p-4">
+        <MiniPanel light={theme.light} className="p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <MiniLabel light={theme.light}>услуга</MiniLabel>
+              <div className={cn('mt-2 text-[16px] font-semibold tracking-[-0.06em]', tone.text)}>{booking.service}</div>
+              <div className={cn('mt-1 text-[11px]', tone.muted)}>{booking.clientPhone || 'телефон не указан'}</div>
+            </div>
+            <StatusPill status={booking.status} theme={theme} />
+          </div>
+          {booking.comment ? <div className={cn('mt-3 rounded-[9px] border p-3 text-[12px] leading-5', tone.panel, tone.muted)}>{booking.comment}</div> : null}
+          <div className={cn('mt-3 flex items-center justify-between text-[12px] font-semibold', tone.text)}>
+            <span>Сумма</span>
+            <span>{getBookingAmount(booking, services) ? RUB.format(getBookingAmount(booking, services)) : '—'}</span>
+          </div>
+        </MiniPanel>
+
+        <div className="grid grid-cols-2 gap-2">
+          <MiniButton theme={theme} variant="primary" disabled={Boolean(saving)} onClick={() => void changeStatus('completed')}><CheckCircle2 className="size-4" />Пришла</MiniButton>
+          <MiniButton theme={theme} variant="secondary" disabled={Boolean(saving)} onClick={() => void changeStatus('confirmed')}><Check className="size-4" />В плане</MiniButton>
+          <MiniButton theme={theme} variant="secondary" disabled={Boolean(saving)} onClick={() => void changeStatus('no_show')}><XCircle className="size-4" />Не пришла</MiniButton>
+          <MiniButton theme={theme} variant="danger" disabled={Boolean(saving)} onClick={() => void changeStatus('cancelled')}><X className="size-4" />Отмена</MiniButton>
+        </div>
+
+        {booking.clientPhone ? (
+          <a href={`tel:${booking.clientPhone}`} className={cn('flex h-10 items-center justify-center gap-2 rounded-[9px] border text-[12px] font-semibold', tone.ghost)}><Phone className="size-4" />Позвонить клиенту</a>
+        ) : null}
       </div>
-    </div>
+    </BottomSheet>
   );
 }
 
-function SettingRow({ title, text, enabled, loading, onClick }: { title: string; text: string; enabled: boolean; loading?: boolean; onClick: () => void }) {
-  return (
-    <button type="button" onClick={onClick} disabled={loading} className="flex w-full items-center justify-between gap-3 rounded-[20px] border border-white/[0.07] bg-white/[0.035] p-3 text-left active:scale-[0.99] disabled:opacity-60">
-      <div className="min-w-0">
-        <div className="text-[14px] font-semibold tracking-[-0.05em]">{title}</div>
-        <div className="mt-1 text-[11px] text-white/34">{text}</div>
-      </div>
-      <div className={cn('flex h-7 w-12 items-center rounded-full border p-1 transition', enabled ? 'border-white/[0.12] bg-white' : 'border-white/[0.08] bg-white/[0.045]')}>
-        <span className={cn('size-5 rounded-full transition', enabled ? 'translate-x-5 bg-black' : 'bg-white/30')} />
-      </div>
-    </button>
-  );
-}
-
-function MoreScreen({ setScreen, dataset }: { setScreen: (screen: MiniScreen) => void; dataset: WorkspaceDataset }) {
-  const rows: Array<{ screen: MiniScreen; title: string; text: string; icon: ReactNode; value?: string | number }> = [
-    { screen: 'clients', title: 'Клиенты', text: 'База, VIP и заметки', icon: <Users2 className="size-4" />, value: dataset.clients.length },
-    { screen: 'analytics', title: 'Аналитика', text: 'Выручка, каналы, дни', icon: <BarChart3 className="size-4" />, value: dataset.totals.bookings },
-    { screen: 'profile', title: 'Профиль', text: 'Имя, контакты, ссылка', icon: <UserRound className="size-4" /> },
-    { screen: 'settings', title: 'Настройки', text: 'Уведомления и режимы', icon: <Settings className="size-4" /> },
-  ];
-
-  return (
-    <div className="space-y-3.5">
-      <MiniCard className="p-4">
-        <MiniLabel>ещё</MiniLabel>
-        <div className="mt-2 text-[27px] font-semibold leading-none tracking-[-0.085em]">Управление</div>
-        <div className="mt-2 text-[12px] leading-5 text-white/38">Всё второстепенное собрали сюда, чтобы главный экран не был перегружен.</div>
-      </MiniCard>
-      <div className="space-y-2">
-        {rows.map((row) => (
-          <button key={row.screen} type="button" onClick={() => setScreen(row.screen)} className="flex w-full items-center gap-3 rounded-[20px] border border-white/[0.07] bg-white/[0.035] p-3 text-left active:scale-[0.99]">
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-[16px] border border-white/[0.08] bg-white/[0.045] text-white/46">{row.icon}</span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[14px] font-semibold tracking-[-0.05em]">{row.title}</span>
-              <span className="mt-1 block truncate text-[11px] text-white/34">{row.text}</span>
-            </span>
-            {row.value !== undefined ? <span className="text-[12px] font-semibold text-white/40">{row.value}</span> : null}
-            <ChevronRight className="size-4 shrink-0 text-white/20" />
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function MiniOnboarding({ onSave }: { onSave: (values: MiniProfileSaveValues) => Promise<{ success: boolean; error?: string }> }) {
+function MiniOnboarding({ onSave, theme }: { onSave: SaveProfile; theme: ThemeTone }) {
+  const tone = toneClasses(theme.light);
   const [form, setForm] = useState<MiniProfileSaveValues>({
     name: '',
     profession: '',
     city: '',
     bio: '',
-    servicesText: 'Консультация\nОсновная услуга',
+    servicesText: '',
     phone: '',
     telegram: '',
     whatsapp: '',
@@ -1413,95 +1534,39 @@ function MiniOnboarding({ onSave }: { onSave: (values: MiniProfileSaveValues) =>
     avatar: '',
   });
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
 
-  function patch(value: Partial<MiniProfileSaveValues>) {
-    setForm((current) => ({ ...current, ...value }));
-    setError('');
-  }
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
+  async function save() {
+    if (!form.name.trim()) return;
     setSaving(true);
-    const result = await onSave(form);
+    await onSave({
+      ...form,
+      profession: form.profession.trim() || 'Специалист',
+      city: form.city.trim() || 'Город',
+      bio: form.bio.trim() || 'Онлайн-запись через КликБук',
+      servicesText: form.servicesText.trim() || 'Консультация',
+      slug: form.slug.trim() || form.name,
+    });
     setSaving(false);
-    if (!result.success) setError(result.error || 'Не получилось создать профиль.');
   }
 
   return (
-    <main className="min-h-[100svh] bg-[#090909] px-3 py-[calc(var(--tg-safe-top,0px)+14px)] text-white">
-      <div className="mx-auto w-full max-w-[430px] space-y-3.5 pb-[calc(var(--tg-safe-bottom,0px)+20px)]">
-        <MiniCard className="p-5">
+    <main className={cn('min-h-[100svh] px-4 py-[calc(var(--tg-safe-top,0px)+16px)]', tone.page)}>
+      <div className="mx-auto w-full max-w-[440px] space-y-3">
+        <MiniCard light={theme.light} className="p-5">
           <BrandLogo />
-          <div className="mt-5 text-[31px] font-semibold leading-[0.93] tracking-[-0.095em]">Соберём профиль для mini app</div>
-          <div className="mt-3 text-[12px] leading-5 text-white/40">Минимум полей, чтобы запустить страницу клиента, услуги и запись.</div>
+          <div className={cn('mt-5 text-[30px] font-semibold leading-[0.95] tracking-[-0.095em]', tone.text)}>Создай мобильный профиль</div>
+          <div className={cn('mt-3 text-[12px] leading-5', tone.muted)}>Мини-апп подключится к тем же услугам, графику, заявкам и чатам.</div>
         </MiniCard>
-        <form onSubmit={(event) => void submit(event)} className="space-y-3">
-          <MiniCard className="space-y-2 p-4">
-            <MiniInput value={form.name} onChange={(event) => patch({ name: event.target.value })} placeholder="Имя мастера / салона" />
-            <MiniInput value={form.profession} onChange={(event) => patch({ profession: event.target.value })} placeholder="Специализация" />
-            <MiniInput value={form.city} onChange={(event) => patch({ city: event.target.value })} placeholder="Город" />
-            <MiniTextarea value={form.bio} onChange={(event) => patch({ bio: event.target.value })} placeholder="Коротко о себе" />
-            <MiniTextarea value={form.servicesText} onChange={(event) => patch({ servicesText: event.target.value })} placeholder="Услуги, каждая с новой строки" />
-          </MiniCard>
-          {error ? <div className="rounded-[16px] border border-rose-300/15 bg-rose-400/10 px-3 py-2 text-[12px] text-rose-100">{error}</div> : null}
-          <MiniButton type="submit" variant="primary" className="w-full" disabled={saving}>
-            {saving ? 'Создаю...' : 'Создать mini app'}
-          </MiniButton>
-        </form>
+        <MiniCard light={theme.light} className="space-y-2 p-3">
+          <MiniInput light={theme.light} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="Имя или название" />
+          <MiniInput light={theme.light} value={form.profession} onChange={(event) => setForm((current) => ({ ...current, profession: event.target.value }))} placeholder="Специализация" />
+          <MiniInput light={theme.light} value={form.city} onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))} placeholder="Город" />
+          <MiniTextarea light={theme.light} value={form.servicesText} onChange={(event) => setForm((current) => ({ ...current, servicesText: event.target.value }))} placeholder={'Услуги, каждая с новой строки'} />
+          <MiniButton theme={theme} variant="primary" onClick={() => void save()} disabled={saving || !form.name.trim()} className="w-full"><Sparkles className="size-4" />{saving ? 'Создаю' : 'Создать профиль'}</MiniButton>
+        </MiniCard>
       </div>
     </main>
   );
-}
-
-function BookingSheet({ booking, onClose, onStatus, services }: { booking: Booking | null; onClose: () => void; onStatus: (id: string, status: BookingStatus) => Promise<void>; services: ServiceInsight[] }) {
-  const [updating, setUpdating] = useState<BookingStatus | null>(null);
-  if (!booking) return null;
-
-  async function update(status: BookingStatus) {
-    setUpdating(status);
-    await onStatus(booking.id, status);
-    setUpdating(null);
-  }
-
-  return (
-    <div className="fixed inset-0 z-[90] flex items-end bg-black/55 px-3 pb-[calc(var(--tg-safe-bottom,0px)+10px)] backdrop-blur-[8px]">
-      <div className="mx-auto w-full max-w-[430px] overflow-hidden rounded-[26px] border border-white/[0.10] bg-[#101010] shadow-[0_28px_90px_rgba(0,0,0,0.72)]">
-        <div className="flex items-start justify-between gap-3 border-b border-white/[0.08] p-4">
-          <div className="min-w-0">
-            <MiniLabel>запись</MiniLabel>
-            <div className="mt-2 truncate text-[26px] font-semibold leading-none tracking-[-0.085em]">{booking.clientName}</div>
-            <div className="mt-2 text-[12px] text-white/40">{formatDay(booking.date)} · {formatTime(booking.time)}</div>
-          </div>
-          <button type="button" onClick={onClose} className="flex size-9 items-center justify-center rounded-[13px] border border-white/[0.08] bg-white/[0.045] text-white/52"><X className="size-4" /></button>
-        </div>
-        <div className="space-y-3 p-4">
-          <MiniPanel className="p-3">
-            <div className="text-[11px] text-white/32">Услуга</div>
-            <div className="mt-1 text-[15px] font-semibold tracking-[-0.045em]">{booking.service}</div>
-            <div className="mt-1 text-[11px] text-white/32">{getBookingAmount(booking, services) > 0 ? RUB.format(getBookingAmount(booking, services)) : 'без цены'} · {booking.clientPhone}</div>
-          </MiniPanel>
-          {booking.comment ? <MiniPanel className="p-3 text-[12px] leading-5 text-white/50">{booking.comment}</MiniPanel> : null}
-          <div className="grid grid-cols-2 gap-2">
-            <MiniButton variant="primary" disabled={Boolean(updating)} onClick={() => void update('completed')}><CheckCircle2 className="size-4" />Пришла</MiniButton>
-            <MiniButton variant="secondary" disabled={Boolean(updating)} onClick={() => void update('confirmed')}><ShieldCheck className="size-4" />Подтвердить</MiniButton>
-            <MiniButton variant="secondary" disabled={Boolean(updating)} onClick={() => void update('new')}><Bell className="size-4" />Новая</MiniButton>
-            <MiniButton variant="danger" disabled={Boolean(updating)} onClick={() => void update('no_show')}><XCircle className="size-4" />Не пришла</MiniButton>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function resolveAccent(workspaceData: Record<string, unknown>) {
-  const appearance = safeRecord(workspaceData.appearance);
-  const raw = String(appearance.accentTone || appearance.publicAccent || appearance.accent || '').toLowerCase();
-  if (raw.includes('blue')) return '#8bbcff';
-  if (raw.includes('rose') || raw.includes('pink')) return '#f5a3bd';
-  if (raw.includes('gold') || raw.includes('warm')) return '#e8c77a';
-  if (raw.includes('sage') || raw.includes('green')) return '#a8d5ba';
-  return '#ffffff';
 }
 
 export function MiniAppEntry() {
@@ -1517,13 +1582,15 @@ export function MiniAppEntry() {
     getPublicPath,
   } = useApp();
   const { locale } = useLocale();
-  const [screen, setScreen] = useState<MiniScreen>('today');
+  const { resolvedTheme } = useTheme();
+  const light = resolvedTheme !== 'dark';
+  const [screen, setScreen] = useState<MiniScreen>('workday');
   const [bootState, setBootState] = useState<'loading' | 'ready'>('loading');
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const bootedRef = useRef(false);
 
   const workspaceRecord = safeRecord(workspaceData);
-  const accent = resolveAccent(workspaceRecord);
+  const theme = useMemo<ThemeTone>(() => ({ light, accent: resolveAccent(workspaceRecord) }), [light, workspaceRecord]);
 
   const dataset = useMemo(() => {
     if (!ownedProfile) return FALLBACK_DATASET;
@@ -1560,29 +1627,28 @@ export function MiniAppEntry() {
   }
 
   if (!ownedProfile) {
-    return <MiniOnboarding onSave={saveProfile} />;
+    return <MiniOnboarding onSave={saveProfile} theme={theme} />;
   }
 
   return (
     <>
-      <MiniShell screen={screen} setScreen={setScreen} profile={ownedProfile} accent={accent} onRefresh={() => void refreshWorkspace()}>
-        {screen === 'today' ? (
-          <TodayScreen profile={ownedProfile} bookings={orderedBookings} dataset={dataset} onOpenBooking={setSelectedBooking} setScreen={setScreen} />
+      <MiniShell screen={screen} setScreen={setScreen} profile={ownedProfile} theme={theme} onRefresh={() => void refreshWorkspace()}>
+        {screen === 'workday' ? (
+          <WorkdayScreen profile={ownedProfile} bookings={orderedBookings} dataset={dataset} onOpenBooking={setSelectedBooking} setScreen={setScreen} getPublicPath={getPublicPath} theme={theme} />
         ) : null}
-        {screen === 'schedule' ? (
-          <ScheduleScreen availability={dataset.availability} updateWorkspaceSection={updateWorkspaceSection} />
+        {screen === 'calendar' ? (
+          <CalendarScreen availability={dataset.availability} updateWorkspaceSection={updateWorkspaceSection} theme={theme} />
         ) : null}
-        {screen === 'services' ? (
-          <ServicesScreen profile={ownedProfile} services={dataset.services} onSaveProfile={saveProfile} updateWorkspaceSection={updateWorkspaceSection} />
+        {screen === 'catalog' ? (
+          <CatalogScreen profile={ownedProfile} services={dataset.services} onSaveProfile={saveProfile} updateWorkspaceSection={updateWorkspaceSection} theme={theme} />
         ) : null}
-        {screen === 'chats' ? <ChatsScreen /> : null}
-        {screen === 'more' ? <MoreScreen setScreen={setScreen} dataset={dataset} /> : null}
-        {screen === 'clients' ? <ClientsScreen clients={dataset.clients} workspaceData={workspaceRecord} updateWorkspaceSection={updateWorkspaceSection} /> : null}
-        {screen === 'analytics' ? <AnalyticsScreen dataset={dataset} /> : null}
-        {screen === 'profile' ? <ProfileScreen profile={ownedProfile} onSave={saveProfile} getPublicPath={getPublicPath} /> : null}
-        {screen === 'settings' ? <SettingsScreen workspaceData={workspaceRecord} updateWorkspaceSection={updateWorkspaceSection} /> : null}
+        {screen === 'dialogs' ? <DialogsScreen theme={theme} /> : null}
+        {screen === 'hub' ? <HubScreen profile={ownedProfile} dataset={dataset} setScreen={setScreen} getPublicPath={getPublicPath} theme={theme} /> : null}
+        {screen === 'clients' ? <ClientsScreen clients={dataset.clients} workspaceData={workspaceRecord} updateWorkspaceSection={updateWorkspaceSection} theme={theme} /> : null}
+        {screen === 'analytics' ? <AnalyticsScreen dataset={dataset} theme={theme} /> : null}
+        {screen === 'profile' ? <ProfileScreen profile={ownedProfile} onSave={saveProfile} getPublicPath={getPublicPath} theme={theme} /> : null}
       </MiniShell>
-      <BookingSheet booking={selectedBooking} onClose={() => setSelectedBooking(null)} onStatus={updateBookingStatus} services={dataset.services} />
+      <BookingSheet booking={selectedBooking} onClose={() => setSelectedBooking(null)} onStatus={updateBookingStatus} services={dataset.services} theme={theme} />
     </>
   );
 }
