@@ -15,7 +15,9 @@ import { createClient as createSupabaseBrowserClient } from '@/lib/supabase/clie
 import {
   CLICKBOOK_AUTH_SESSION_READY_EVENT,
   authorizeTelegramMiniAppSession,
+  getStoredTelegramAppSessionToken,
   getTelegramAppSessionHeaders,
+  hasTelegramMiniAppRuntime,
 } from '@/lib/telegram-miniapp-auth-client';
 import { parseServices, slugify } from '@/lib/utils';
 import { buildWorkspaceSeed, type WorkspaceSections, type WorkspaceSnapshot } from '@/lib/workspace-store';
@@ -113,7 +115,6 @@ function buildProfile(values: SaveProfileValues, previous?: MasterProfile | null
     createdAt: previous?.createdAt ?? new Date().toISOString(),
   };
 }
-
 
 const BOOKING_STATUSES: BookingStatus[] = ['new', 'confirmed', 'completed', 'no_show', 'cancelled'];
 
@@ -323,7 +324,6 @@ function buildBooking(masterSlug: string, values: BookingFormValues): Omit<Booki
   };
 }
 
-
 function detectBookingClientChannel() {
   if (typeof window === 'undefined') {
     return { sourceChannel: 'web', source: 'Web', clientContext: {} as Record<string, unknown> };
@@ -395,6 +395,15 @@ function mergeHeaders(...sources: Array<HeadersInit | undefined>) {
   return headers;
 }
 
+async function ensureTelegramMiniAppSessionIfNeeded(options?: { force?: boolean; waitMs?: number }) {
+  if (!hasTelegramMiniAppRuntime()) return;
+
+  const hasStoredToken = Boolean(getStoredTelegramAppSessionToken());
+  if (hasStoredToken && !options?.force) return;
+
+  await authorizeTelegramMiniAppSession(options);
+}
+
 async function fetchWithTelegramMiniAppRetry(input: RequestInfo | URL, init?: RequestInit) {
   const response = await fetch(input, init);
 
@@ -402,9 +411,9 @@ async function fetchWithTelegramMiniAppRetry(input: RequestInfo | URL, init?: Re
     return response;
   }
 
-  const auth = await authorizeTelegramMiniAppSession({ force: true, waitMs: 2600 });
+  await ensureTelegramMiniAppSessionIfNeeded({ force: true, waitMs: 2600 });
 
-  if (!auth.ok && Object.keys(getTelegramAppSessionHeaders()).length === 0) {
+  if (Object.keys(getTelegramAppSessionHeaders()).length === 0) {
     return response;
   }
 
@@ -446,7 +455,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const refreshWorkspace = useCallback(async () => {
     try {
-      await authorizeTelegramMiniAppSession({ waitMs: 1400 });
+      await ensureTelegramMiniAppSessionIfNeeded({ waitMs: 1400 });
 
       const response = await fetchWithTelegramMiniAppRetry('/api/workspace', {
         credentials: 'include',
@@ -496,6 +505,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (typeof window === 'undefined') return;
 
     const handleAuthReady = () => {
+      if (pathname === '/app') return;
       void refreshWorkspace();
     };
 
@@ -504,7 +514,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => {
       window.removeEventListener(CLICKBOOK_AUTH_SESSION_READY_EVENT, handleAuthReady);
     };
-  }, [refreshWorkspace]);
+  }, [pathname, refreshWorkspace]);
 
   const profiles = useMemo(() => {
     return ownedProfile ? [ownedProfile] : [];
@@ -757,16 +767,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           return false;
         }
 
-        // Do not apply the full returned snapshot here. Multiple quick saves
-        // can finish out of order and older snapshots used to overwrite the
-        // latest slots/services on screen. The optimistic state above remains
-        // the client source; /api/workspace/section persists the same value.
         return true;
       } catch {
         return false;
       }
     },
-    [workspaceId],
+    [workspaceId, refreshWorkspace],
   );
 
   const updateBookingStatus = useCallback(

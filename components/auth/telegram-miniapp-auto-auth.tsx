@@ -17,13 +17,7 @@ function normalizeRedirect(value: string | null) {
 }
 
 function shouldForceTelegramSession(pathname: string) {
-  return (
-    pathname === '/login' ||
-    pathname === '/dashboard' ||
-    pathname.startsWith('/dashboard/') ||
-    pathname === '/create-profile' ||
-    pathname.startsWith('/create-profile/')
-  );
+  return pathname === '/login';
 }
 
 export function TelegramMiniAppAutoAuth() {

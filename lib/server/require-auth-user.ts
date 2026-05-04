@@ -28,23 +28,6 @@ async function getRequestAuthHeaders() {
   }
 }
 
-async function getUserFromBearerToken(token: string): Promise<User | null> {
-  const tokenSupabase = createSupabaseClient(
-    getSupabaseUrl(),
-    getSupabasePublishableKey(),
-    {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-      },
-    },
-  );
-
-  const { data, error } = await tokenSupabase.auth.getUser(token);
-  return !error && data.user ? data.user : null;
-}
-
 export async function requireAuthUser(): Promise<User> {
   const serverSupabase = await createServerSupabaseClient();
   const { data, error } = await serverSupabase.auth.getUser();
@@ -53,23 +36,39 @@ export async function requireAuthUser(): Promise<User> {
     return data.user;
   }
 
-  const { bearerToken, appSessionToken } = await getRequestAuthHeaders();
+  const { bearerToken: token, appSessionToken } = await getRequestAuthHeaders();
 
-  // Реальная Supabase-сессия всегда главнее, чтобы VK/Google/пароль не
-  // перебивались старым Telegram-токеном из localStorage.
-  if (bearerToken) {
-    const bearerUser = await getUserFromBearerToken(bearerToken);
-    if (bearerUser) return bearerUser;
+  if (token) {
+    const tokenSupabase = createSupabaseClient(
+      getSupabaseUrl(),
+      getSupabasePublishableKey(),
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+        },
+      },
+    );
+
+    const { data: tokenData, error: tokenError } = await tokenSupabase.auth.getUser(token);
+
+    if (!tokenError && tokenData.user) {
+      return tokenData.user;
+    }
   }
 
-  // Telegram/VK Mini App живут на собственной подписанной app-session.
-  // Не пытаемся на каждом API-запросе пересоздавать auth.users: именно это
-  // давало повторяющиеся "Supabase Auth user create failed" и тормозило кабинет.
   const headerAppSessionUser = getAppSessionUserFromToken(appSessionToken);
-  if (headerAppSessionUser) return headerAppSessionUser;
 
-  const cookieAppSessionUser = await getAppSessionUser();
-  if (cookieAppSessionUser) return cookieAppSessionUser;
+  if (headerAppSessionUser) {
+    return headerAppSessionUser;
+  }
+
+  const appSessionUser = await getAppSessionUser();
+
+  if (appSessionUser) {
+    return appSessionUser;
+  }
 
   throw new Error('unauthorized');
 }

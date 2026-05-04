@@ -160,14 +160,11 @@ export async function authorizeTelegramMiniAppSession(options?: { force?: boolea
   }
 
   if (hasSuccessfulAuth && !options?.force) {
-    const payload = {
+    return {
       ok: true,
       app_session: true,
       appSessionToken: getStoredTelegramAppSessionToken() || undefined,
     } satisfies TelegramMiniAppAuthPayload;
-
-    dispatchAuthReady(payload);
-    return payload;
   }
 
   if (cachedAuthPromise && !options?.force) {

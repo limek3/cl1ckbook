@@ -1,0 +1,10 @@
+var R=require("../../../../chunks/[turbopack]_runtime.js")("server/app/api/telegram/webhook/route.js")
+R.c("server/chunks/lib_server_3d026bd1._.js")
+R.c("server/chunks/lib_server_3b9ea308._.js")
+R.c("server/chunks/[root-of-the-server]__cdfbc0d5._.js")
+R.c("server/chunks/4d4ea_@supabase_supabase-js_dist_index_mjs_80222416._.js")
+R.c("server/chunks/979b6_next_dist_esm_build_templates_app-route_0108374b.js")
+R.c("server/chunks/[root-of-the-server]__8ecb8e44._.js")
+R.c("server/chunks/_next-internal_server_app_api_telegram_webhook_route_actions_1710f968.js")
+R.m(4045)
+module.exports=R.m(4045).exports

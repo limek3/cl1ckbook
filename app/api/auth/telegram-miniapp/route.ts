@@ -12,10 +12,17 @@ type TelegramMiniAppAuthBody = {
   initData?: string;
 };
 
-function stableTelegramUserId(telegramId: number, accountUserId?: unknown) {
-  return typeof accountUserId === 'string' && accountUserId.trim()
-    ? accountUserId.trim()
-    : createTelegramVirtualUserId(telegramId);
+function normalizeUserId(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function normalizeChatId(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value);
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return Math.trunc(parsed);
+  }
+  return null;
 }
 
 export async function POST(request: Request) {
@@ -32,14 +39,8 @@ export async function POST(request: Request) {
 
     if (accountError) throw accountError;
 
-    // ВАЖНО:
-    // Mini App не обязан создавать Supabase Auth user. Раньше именно вызов
-    // admin.auth.admin.createUser() часто отдавал GoTrue "Internal Server Error",
-    // из-за чего кабинет начинал тупить и повторно пытался чинить пользователя
-    // на /api/workspace и /api/chats. Для Mini App держим собственную подписанную
-    // app-session: если аккаунт уже был связан — сохраняем его user_id, если нет —
-    // используем стабильный детерминированный UUID по telegram_id.
-    const userId = stableTelegramUserId(verified.user.id, existingAccount?.user_id);
+    const userId = normalizeUserId(existingAccount?.user_id) ?? createTelegramVirtualUserId(verified.user.id);
+    const chatId = normalizeChatId(existingAccount?.chat_id);
 
     await upsertTelegramAccount(admin, {
       userId,
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
       firstName: verified.user.first_name ?? null,
       lastName: verified.user.last_name ?? null,
       photoUrl: verified.user.photo_url ?? null,
-      chatId: typeof existingAccount?.chat_id === 'number' ? existingAccount.chat_id : null,
+      chatId,
       authDate: verified.authDate.toISOString(),
     });
 
