@@ -11290,15 +11290,3 @@ html[data-tg-miniapp='true'] body {
   box-shadow: 0 0 0 999px #141414 inset !important;
   -webkit-text-fill-color: #ffffff !important;
 }
-
-html[data-tg-miniapp='true'] body {
-  min-height: var(--tg-viewport-height, 100svh);
-  overscroll-behavior-y: none;
-}
-
-.cb-mini-app-root {
-  min-height: var(--tg-viewport-height, 100svh);
-  padding-left: max(0.75rem, var(--tg-safe-left, 0px));
-  padding-right: max(0.75rem, var(--tg-safe-right, 0px));
-  overscroll-behavior-y: contain;
-}

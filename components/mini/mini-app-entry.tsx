@@ -47,8 +47,8 @@ import { useApp } from '@/lib/app-context';
 import {
   authorizeTelegramMiniAppSession,
   getTelegramAppSessionHeaders,
+  hasTelegramMiniAppRuntime,
 } from '@/lib/telegram-miniapp-auth-client';
-import { getPhoneHref } from '@/lib/contact-links';
 import { cn } from '@/lib/utils';
 import type {
   Booking,
@@ -91,13 +91,16 @@ type AvailabilityDay = {
   id: string;
   label: string;
   short: string;
+  weekdayIndex: number;
   enabled: boolean;
+  status: 'workday' | 'short' | 'day-off';
   start: string;
   end: string;
   interval: number;
   breakStart?: string;
   breakEnd?: string;
   slots: string[];
+  breaks: string[];
 };
 
 type ServiceItem = {
@@ -108,6 +111,9 @@ type ServiceItem = {
   category: string;
   status: 'active' | 'seasonal' | 'draft';
   visible: boolean;
+  bookings: number;
+  revenue: number;
+  popularity: number;
 };
 
 type MiniChatMessage = {
@@ -202,100 +208,113 @@ const DEFAULT_AVAILABILITY: AvailabilityDay[] = [
     id: 'mon',
     label: 'Понедельник',
     short: 'Пн',
+    weekdayIndex: 0,
     enabled: true,
+    status: 'workday',
     start: '10:00',
     end: '20:00',
     interval: 60,
     breakStart: '14:00',
     breakEnd: '15:00',
-    slots: ['10:00', '11:00', '12:00', '13:00', '15:00', '16:00', '17:00', '18:00', '19:00'],
+    slots: [],
+    breaks: ['14:00–15:00'],
   },
   {
     id: 'tue',
     label: 'Вторник',
     short: 'Вт',
+    weekdayIndex: 1,
     enabled: true,
+    status: 'workday',
     start: '10:00',
     end: '20:00',
     interval: 60,
     breakStart: '14:00',
     breakEnd: '15:00',
-    slots: ['10:00', '11:00', '12:00', '13:00', '15:00', '16:00', '17:00', '18:00', '19:00'],
+    slots: [],
+    breaks: ['14:00–15:00'],
   },
   {
     id: 'wed',
     label: 'Среда',
     short: 'Ср',
+    weekdayIndex: 2,
     enabled: true,
+    status: 'workday',
     start: '10:00',
     end: '20:00',
     interval: 60,
     breakStart: '14:00',
     breakEnd: '15:00',
-    slots: ['10:00', '11:00', '12:00', '13:00', '15:00', '16:00', '17:00', '18:00', '19:00'],
+    slots: [],
+    breaks: ['14:00–15:00'],
   },
   {
     id: 'thu',
     label: 'Четверг',
     short: 'Чт',
+    weekdayIndex: 3,
     enabled: true,
+    status: 'workday',
     start: '10:00',
     end: '20:00',
     interval: 60,
     breakStart: '14:00',
     breakEnd: '15:00',
-    slots: ['10:00', '11:00', '12:00', '13:00', '15:00', '16:00', '17:00', '18:00', '19:00'],
+    slots: [],
+    breaks: ['14:00–15:00'],
   },
   {
     id: 'fri',
     label: 'Пятница',
     short: 'Пт',
+    weekdayIndex: 4,
     enabled: true,
+    status: 'workday',
     start: '10:00',
     end: '19:00',
     interval: 60,
     breakStart: '14:00',
     breakEnd: '15:00',
-    slots: ['10:00', '11:00', '12:00', '13:00', '15:00', '16:00', '17:00', '18:00'],
+    slots: [],
+    breaks: ['14:00–15:00'],
   },
   {
     id: 'sat',
     label: 'Суббота',
     short: 'Сб',
+    weekdayIndex: 5,
     enabled: true,
+    status: 'short',
     start: '11:00',
     end: '17:00',
     interval: 60,
-    slots: ['11:00', '12:00', '13:00', '14:00', '15:00', '16:00'],
+    slots: [],
+    breaks: [],
   },
   {
     id: 'sun',
     label: 'Воскресенье',
     short: 'Вс',
+    weekdayIndex: 6,
     enabled: false,
+    status: 'day-off',
     start: '11:00',
     end: '17:00',
     interval: 60,
     slots: [],
+    breaks: [],
   },
-];
+].map((day) => ({
+  ...day,
+  slots: generateSlots(day),
+}));
 
 const RUB = new Intl.NumberFormat('ru-RU', {
   style: 'currency',
   currency: 'RUB',
   maximumFractionDigits: 0,
 });
-
-const MINI_SCREEN_STORAGE_KEY = 'clickbook-mini-screen';
-
-function formatMiniSyncTime(value: number | null) {
-  if (!value) return 'без синхронизации';
-
-  return new Date(value).toLocaleTimeString('ru-RU', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 function todayKey() {
   const date = new Date();
@@ -404,9 +423,79 @@ function toMinutes(value: string) {
 }
 
 function fromMinutes(value: number) {
-  const h = Math.floor(value / 60);
-  const m = value % 60;
+  const normalized = Math.max(0, Math.min(24 * 60, Math.round(value)));
+  const h = Math.floor(normalized / 60);
+  const m = normalized % 60;
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function splitTimeRange(value: string) {
+  const [start, end] = value
+    .replace(/—/g, '–')
+    .replace(/-/g, '–')
+    .split('–')
+    .map((part) => part.trim());
+
+  return {
+    start: start || '',
+    end: end || '',
+  };
+}
+
+function formatTimeRange(start: string, end: string) {
+  return `${start}–${end}`;
+}
+
+function rangeToMinutes(value: string) {
+  const range = splitTimeRange(value);
+  const start = range.start ? toMinutes(range.start) : null;
+  const end = range.end ? toMinutes(range.end) : null;
+
+  if (start === null || end === null || !range.start || !range.end || end <= start) return null;
+
+  return { start, end };
+}
+
+function rangesOverlap(left: { start: number; end: number }, right: { start: number; end: number }) {
+  return left.start < right.end && right.start < left.end;
+}
+
+function getSlotStart(slot: string) {
+  return splitTimeRange(slot).start || slot.slice(0, 5);
+}
+
+function normalizeBreaks(day: Pick<AvailabilityDay, 'breakStart' | 'breakEnd'>) {
+  return day.breakStart && day.breakEnd && day.breakEnd > day.breakStart
+    ? [formatTimeRange(day.breakStart, day.breakEnd)]
+    : [];
+}
+
+function inferAvailabilityBounds(
+  row: Record<string, unknown>,
+  fallback: Pick<AvailabilityDay, 'start' | 'end'>,
+) {
+  const rawSlots = safeArray<string>(row.slots);
+  const ranges = rawSlots.map(rangeToMinutes).filter(Boolean) as Array<{ start: number; end: number }>;
+
+  if (ranges.length === 0) {
+    return {
+      start: getString(row.start, fallback.start),
+      end: getString(row.end, fallback.end),
+    };
+  }
+
+  const start = Math.min(...ranges.map((range) => range.start));
+  const end = Math.max(...ranges.map((range) => range.end));
+
+  return {
+    start: getString(row.start, fromMinutes(start)),
+    end: getString(row.end, fromMinutes(end)),
+  };
+}
+
+function normalizeStatusFromDay(day: Pick<AvailabilityDay, 'enabled' | 'slots'>): AvailabilityDay['status'] {
+  if (!day.enabled) return 'day-off';
+  return day.slots.length <= 5 ? 'short' : 'workday';
 }
 
 function generateSlots(day: AvailabilityDay) {
@@ -414,22 +503,74 @@ function generateSlots(day: AvailabilityDay) {
 
   const start = toMinutes(day.start);
   const end = toMinutes(day.end);
-  const breakStart = day.breakStart ? toMinutes(day.breakStart) : null;
-  const breakEnd = day.breakEnd ? toMinutes(day.breakEnd) : null;
   const interval = Math.max(15, Number(day.interval) || 60);
+  const breakRanges = normalizeBreaks(day).map(rangeToMinutes).filter(Boolean) as Array<{ start: number; end: number }>;
 
   const slots: string[] = [];
 
-  for (let current = start; current < end; current += interval) {
-    const insideBreak =
-      breakStart !== null && breakEnd !== null && current >= breakStart && current < breakEnd;
-
-    if (!insideBreak) {
-      slots.push(fromMinutes(current));
-    }
+  for (let current = start; current + interval <= end; current += interval) {
+    const candidate = { start: current, end: current + interval };
+    if (breakRanges.some((breakRange) => rangesOverlap(candidate, breakRange))) continue;
+    slots.push(formatTimeRange(fromMinutes(candidate.start), fromMinutes(candidate.end)));
   }
 
   return slots;
+}
+
+function normalizeStoredSlots(
+  row: Record<string, unknown>,
+  day: AvailabilityDay,
+) {
+  const rawSlots = safeArray<string>(row.slots).filter(Boolean);
+  const normalizedRanges = rawSlots
+    .map((slot) => {
+      const range = splitTimeRange(slot);
+      if (range.start && range.end) return formatTimeRange(range.start, range.end);
+      if (range.start) {
+        const start = toMinutes(range.start);
+        const interval = Math.max(15, Number(day.interval) || 60);
+        return formatTimeRange(fromMinutes(start), fromMinutes(start + interval));
+      }
+      return '';
+    })
+    .filter(Boolean);
+
+  if (normalizedRanges.length === 0) return generateSlots(day);
+
+  const interval = Math.max(15, Number(day.interval) || 60);
+  const hasLongWindow = normalizedRanges.some((slot) => {
+    const range = rangeToMinutes(slot);
+    return range ? range.end - range.start > interval + 5 : false;
+  });
+
+  if (!hasLongWindow) return normalizedRanges;
+
+  return generateSlots(day);
+}
+
+function serializeAvailabilityDays(days: AvailabilityDay[]) {
+  return days.map((day) => {
+    const slots = generateSlots(day);
+    const status = normalizeStatusFromDay({ ...day, slots });
+    const breaks = normalizeBreaks(day);
+
+    return {
+      id: day.id,
+      label: day.label,
+      short: day.short,
+      weekdayIndex: day.weekdayIndex,
+      enabled: day.enabled,
+      status,
+      start: day.start,
+      end: day.end,
+      interval: day.interval,
+      breakStart: day.breakStart,
+      breakEnd: day.breakEnd,
+      slots,
+      breaks,
+      custom: false,
+    };
+  });
 }
 
 function normalizeAvailability(value: unknown): AvailabilityDay[] {
@@ -438,22 +579,9 @@ function normalizeAvailability(value: unknown): AvailabilityDay[] {
   const byId = new Map(
     value.map((item) => {
       const row = safeRecord(item);
+      const id = String(row.id || '');
 
-      return [
-        String(row.id || ''),
-        {
-          id: String(row.id || ''),
-          label: String(row.label || ''),
-          short: String(row.short || ''),
-          enabled: row.enabled !== false,
-          start: String(row.start || '10:00'),
-          end: String(row.end || '20:00'),
-          interval: Number(row.interval || 60),
-          breakStart: typeof row.breakStart === 'string' ? row.breakStart : undefined,
-          breakEnd: typeof row.breakEnd === 'string' ? row.breakEnd : undefined,
-          slots: safeArray<string>(row.slots),
-        } satisfies AvailabilityDay,
-      ] as const;
+      return [id, row] as const;
     }),
   );
 
@@ -461,12 +589,44 @@ function normalizeAvailability(value: unknown): AvailabilityDay[] {
     const saved = byId.get(fallback.id);
     if (!saved) return fallback;
 
-    return {
+    const breaks = safeArray<string>(saved.breaks);
+    const firstBreak = breaks[0] ? splitTimeRange(breaks[0]) : null;
+    const bounds = inferAvailabilityBounds(saved, fallback);
+    const enabled = typeof saved.enabled === 'boolean'
+      ? saved.enabled
+      : saved.status !== 'day-off';
+
+    const base: AvailabilityDay = {
       ...fallback,
-      ...saved,
-      label: fallback.label,
-      short: fallback.short,
-      slots: saved.slots.length > 0 ? saved.slots : generateSlots(saved),
+      enabled,
+      status:
+        saved.status === 'short' || saved.status === 'day-off' || saved.status === 'workday'
+          ? saved.status
+          : enabled
+            ? fallback.status
+            : 'day-off',
+      start: bounds.start,
+      end: bounds.end,
+      interval: Number(saved.interval || fallback.interval || 60),
+      breakStart: typeof saved.breakStart === 'string' ? saved.breakStart : firstBreak?.start || fallback.breakStart,
+      breakEnd: typeof saved.breakEnd === 'string' ? saved.breakEnd : firstBreak?.end || fallback.breakEnd,
+      breaks: breaks.length > 0 ? breaks : normalizeBreaks(fallback),
+      weekdayIndex:
+        typeof saved.weekdayIndex === 'number'
+          ? saved.weekdayIndex
+          : typeof saved.weekday_index === 'number'
+            ? saved.weekday_index
+            : fallback.weekdayIndex,
+      slots: [],
+    };
+
+    const slots = normalizeStoredSlots(saved, base);
+
+    return {
+      ...base,
+      status: normalizeStatusFromDay({ ...base, slots }),
+      breaks: normalizeBreaks(base),
+      slots,
     };
   });
 }
@@ -484,22 +644,38 @@ function getAccentFromWorkspace(workspaceData: Record<string, unknown>) {
   return ACCENT_OPTIONS.find((item) => item.id === id) ?? ACCENT_OPTIONS[0];
 }
 
-function parseServicesFromProfile(profile: MasterProfile | null, workspaceData: Record<string, unknown>) {
-  const stored = safeArray<Record<string, unknown>>(workspaceData.serviceCatalog);
+function serviceNumber(value: unknown, fallback = 0) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const clean = value.replace(/\s/g, '').replace(',', '.');
+    if (!clean) return fallback;
+    const parsed = Number(clean);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
+}
 
-  if (stored.length > 0) {
+function serviceStatus(value: unknown): ServiceItem['status'] {
+  return value === 'seasonal' || value === 'draft' || value === 'active' ? value : 'active';
+}
+
+function parseServicesFromProfile(profile: MasterProfile | null, workspaceData: Record<string, unknown>) {
+  const stored = [workspaceData.services, workspaceData.serviceCatalog]
+    .find((value) => Array.isArray(value) && value.length > 0) as Record<string, unknown>[] | undefined;
+
+  if (stored && stored.length > 0) {
     return stored.map((item, index) => ({
       id: String(item.id || `service-${index}`),
       name: String(item.name || item.title || `Услуга ${index + 1}`),
-      price: String(item.price || item.priceAmount || ''),
-      duration: String(item.duration || item.durationMinutes || ''),
+      price: String(item.price ?? item.priceAmount ?? ''),
+      duration: String(item.duration ?? item.durationMinutes ?? '60'),
       category: String(item.category || 'Основное'),
-      status:
-        item.status === 'seasonal' || item.status === 'draft'
-          ? item.status
-          : 'active',
+      status: serviceStatus(item.status),
       visible: item.visible !== false,
-    })) as ServiceItem[];
+      bookings: serviceNumber(item.bookings, 0),
+      revenue: serviceNumber(item.revenue, 0),
+      popularity: serviceNumber(item.popularity, 0),
+    })) satisfies ServiceItem[];
   }
 
   return (profile?.services ?? []).map((service, index) => {
@@ -510,17 +686,38 @@ function parseServicesFromProfile(profile: MasterProfile | null, workspaceData: 
       id: `service-${index}`,
       name: service.replace(/\s*[—-]\s*\d[\d\s]*\s*₽?/, '').trim() || service,
       price,
-      duration: '',
+      duration: '60',
       category: 'Основное',
       status: 'active',
       visible: true,
+      bookings: 0,
+      revenue: 0,
+      popularity: 0,
     } satisfies ServiceItem;
   });
 }
 
+function serviceItemsToWorkspaceServices(items: ServiceItem[]) {
+  return items
+    .filter((item) => item.name.trim())
+    .map((item, index) => ({
+      id: item.id || `service-${index}`,
+      name: item.name.trim(),
+      price: serviceNumber(item.price, 0),
+      duration: Math.max(5, Math.round(serviceNumber(item.duration, 60))),
+      category: item.category.trim() || 'Основное',
+      status: item.status,
+      visible: item.visible,
+      bookings: Math.max(0, Math.round(item.bookings || 0)),
+      revenue: Math.max(0, item.revenue || 0),
+      popularity: Math.max(0, Math.round(item.popularity || 0)),
+      sortOrder: index,
+    }));
+}
+
 function serviceItemsToText(items: ServiceItem[]) {
   return items
-    .filter((item) => item.visible && item.name.trim())
+    .filter((item) => item.visible && item.status !== 'draft' && item.name.trim())
     .map((item) => {
       const price = item.price.trim() ? ` — ${item.price.trim()} ₽` : '';
       return `${item.name.trim()}${price}`;
@@ -528,29 +725,58 @@ function serviceItemsToText(items: ServiceItem[]) {
     .join('\n');
 }
 
+function normalizeMessageAuthor(message: Record<string, unknown>): MiniChatMessage['from'] {
+  const author = message.from ?? message.sender ?? message.author;
+
+  if (author === 'master') return 'master';
+  if (author === 'system') return 'system';
+  return 'client';
+}
+
+function firstArray(...values: unknown[]) {
+  return values.find((value): value is unknown[] => Array.isArray(value)) ?? [];
+}
+
 function normalizeChatThread(value: unknown, index: number): MiniChatThread {
   const row = safeRecord(value);
   const messages = safeArray<Record<string, unknown>>(row.messages).map((message, messageIndex) => ({
     id: String(message.id || `message-${index}-${messageIndex}`),
-    from:
-      message.from === 'master' || message.sender === 'master'
-        ? 'master'
-        : message.from === 'system' || message.sender === 'system'
-          ? 'system'
-          : 'client',
+    from: normalizeMessageAuthor(message),
     text: String(message.text || message.body || message.message || ''),
     createdAt: String(message.createdAt || message.created_at || new Date().toISOString()),
   })) satisfies MiniChatMessage[];
 
+  const channel = String(row.channel || row.source || 'КликБук');
+  const lastMessage = String(
+    row.lastMessagePreview ||
+      row.lastMessage ||
+      row.last_message_preview ||
+      row.last_message ||
+      messages.at(-1)?.text ||
+      '',
+  );
+
   return {
     id: String(row.id || row.threadId || `thread-${index}`),
     clientName: String(row.clientName || row.client_name || row.name || `Клиент ${index + 1}`),
-    clientPhone: typeof row.clientPhone === 'string' ? row.clientPhone : typeof row.phone === 'string' ? row.phone : undefined,
-    source: typeof row.source === 'string' ? row.source : undefined,
-    priority: row.priority === 'high' || row.priority === 'low' ? row.priority : 'normal',
-    botConnected: row.botConnected !== false,
-    lastMessage: String(row.lastMessage || row.last_message || messages.at(-1)?.text || ''),
-    updatedAt: String(row.updatedAt || row.updated_at || new Date().toISOString()),
+    clientPhone:
+      typeof row.clientPhone === 'string'
+        ? row.clientPhone
+        : typeof row.client_phone === 'string'
+          ? row.client_phone
+          : typeof row.phone === 'string'
+            ? row.phone
+            : undefined,
+    source: channel,
+    priority:
+      row.priority === 'high' || row.isPriority === true || row.is_priority === true
+        ? 'high'
+        : row.priority === 'low'
+          ? 'low'
+          : 'normal',
+    botConnected: row.botConnected !== false && row.bot_connected !== false,
+    lastMessage,
+    updatedAt: String(row.lastMessageAt || row.updatedAt || row.last_message_at || row.updated_at || new Date().toISOString()),
     messages,
   };
 }
@@ -785,19 +1011,13 @@ function MiniShell({
   profile,
   onRefresh,
   accent,
-  online,
-  syncedAt,
-  refreshing,
 }: {
   screen: MiniScreen;
   setScreen: (screen: MiniScreen) => void;
   children: ReactNode;
   profile: MasterProfile | null;
-  onRefresh: () => Promise<void> | void;
+  onRefresh: () => void;
   accent: (typeof ACCENT_OPTIONS)[number];
-  online: boolean;
-  syncedAt: number | null;
-  refreshing: boolean;
 }) {
   const shellStyle = {
     paddingTop: 'calc(var(--tg-safe-top, 0px) + 10px)',
@@ -823,45 +1043,36 @@ function MiniShell({
       className="cb-mini-app-root min-h-screen bg-[#090909] px-3 text-white"
     >
       <div className="mx-auto w-full max-w-[430px]">
-        <header className="sticky top-[calc(var(--tg-safe-top,0px)+6px)] z-40 mb-4">
-          <div className="flex items-center justify-between gap-3 rounded-[22px] border border-white/[0.08] bg-[#101010]/88 px-3 py-2.5 shadow-[0_12px_40px_rgba(0,0,0,0.28)] backdrop-blur-[22px]">
-            <div className="flex min-w-0 items-center gap-2.5">
-              <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-[13px] border border-white/[0.08] bg-white/[0.055]">
-                {profile?.avatar ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={profile.avatar} alt="" className="size-full object-cover" />
-                ) : (
-                  <span className="text-[10px] font-bold text-white">
-                    {getInitials(profile?.name)}
-                  </span>
-                )}
-              </div>
-
-              <div className="min-w-0">
-                <div className="truncate text-[13px] font-semibold tracking-[-0.045em] text-white">
-                  {profile?.name || 'КликБук'}
-                </div>
-                <div className="flex items-center gap-1.5 truncate text-[10px] font-semibold tracking-[-0.03em] text-white/35">
-                  <span
-                    className={cn(
-                      'size-1.5 rounded-full transition-colors',
-                      online ? 'bg-emerald-400' : 'bg-rose-400',
-                    )}
-                  />
-                  {online ? 'онлайн' : 'офлайн'} · {refreshing ? 'обновляем…' : `синх. ${formatMiniSyncTime(syncedAt)}`}
-                </div>
-              </div>
+        <header className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-[11px] border border-white/[0.08] bg-white/[0.055]">
+              {profile?.avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={profile.avatar} alt="" className="size-full object-cover" />
+              ) : (
+                <span className="text-[10px] font-bold text-white">
+                  {getInitials(profile?.name)}
+                </span>
+              )}
             </div>
 
-            <button
-              type="button"
-              onClick={() => void onRefresh()}
-              disabled={refreshing}
-              className="flex size-9 items-center justify-center rounded-[13px] border border-white/[0.08] bg-white/[0.045] text-white/55 transition active:scale-95 disabled:opacity-45"
-            >
-              <RefreshCcw className={cn('size-3.5', refreshing && 'animate-spin')} />
-            </button>
+            <div className="min-w-0">
+              <div className="truncate text-[13px] font-semibold tracking-[-0.045em] text-white">
+                {profile?.name || 'КликБук'}
+              </div>
+              <div className="truncate text-[10px] font-semibold tracking-[-0.03em] text-white/35">
+                кабинет мастера
+              </div>
+            </div>
           </div>
+
+          <button
+            type="button"
+            onClick={onRefresh}
+            className="flex size-8 items-center justify-center rounded-[11px] border border-white/[0.08] bg-white/[0.045] text-white/55 active:scale-95"
+          >
+            <RefreshCcw className="size-3.5" />
+          </button>
         </header>
 
         {children}
@@ -1201,7 +1412,11 @@ function TodayScreen({
         </div>
 
         {nearest ? (
-          <div className="p-4">
+          <button
+            type="button"
+            onClick={() => onOpenBooking(nearest)}
+            className="block w-full p-4 text-left active:scale-[0.995]"
+          >
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-[34px] font-semibold leading-none tracking-[-0.08em]">
@@ -1217,23 +1432,15 @@ function TodayScreen({
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2">
-              <MiniButton variant="primary" onClick={() => onOpenBooking(nearest)}>
+              <span className="flex h-10 items-center justify-center rounded-[14px] bg-white text-[12px] font-semibold text-black">
                 Открыть
-              </MiniButton>
-              <MiniButton
-                disabled={!getPhoneHref(nearest.clientPhone)}
-                onClick={() => {
-                  const href = getPhoneHref(nearest.clientPhone);
-                  if (href) {
-                    window.location.href = href;
-                  }
-                }}
-              >
+              </span>
+              <span className="flex h-10 items-center justify-center gap-2 rounded-[14px] border border-white/[0.08] bg-white/[0.055] text-[12px] font-semibold text-white">
                 <Phone className="size-3.5" />
                 Позвонить
-              </MiniButton>
+              </span>
             </div>
-          </div>
+          </button>
         ) : (
           <div className="p-4">
             <EmptyState
@@ -1318,9 +1525,13 @@ function AvailabilityScreen({
           ...patch,
         };
 
+        const slots = generateSlots(next);
+
         return {
           ...next,
-          slots: generateSlots(next),
+          slots,
+          status: normalizeStatusFromDay({ ...next, slots }),
+          breaks: normalizeBreaks(next),
         };
       }),
     );
@@ -1330,10 +1541,15 @@ function AvailabilityScreen({
     setSaving(true);
     setMessage('');
 
-    const ok = await updateWorkspaceSection('availability', nextDays);
+    const serialized = serializeAvailabilityDays(nextDays);
+    const ok = await updateWorkspaceSection('availability', serialized);
+
+    if (ok) {
+      setDays(serialized);
+    }
 
     setSaving(false);
-    setMessage(ok ? 'График сохранён.' : 'Не удалось сохранить график.');
+    setMessage(ok ? 'График сохранён и доступен клиентам.' : 'Не удалось сохранить график.');
   }
 
   async function copyMonday() {
@@ -1352,9 +1568,13 @@ function AvailabilityScreen({
         breakEnd: monday.breakEnd,
       };
 
+      const slots = generateSlots(copy);
+
       return {
         ...copy,
-        slots: generateSlots(copy),
+        slots,
+        status: normalizeStatusFromDay({ ...copy, slots }),
+        breaks: normalizeBreaks(copy),
       };
     });
 
@@ -1486,7 +1706,7 @@ function AvailabilityScreen({
                     key={slot}
                     className="rounded-full border border-white/[0.08] bg-white/[0.045] px-3 py-1.5 text-[12px] font-semibold text-white/72"
                   >
-                    {slot}
+                    {getSlotStart(slot)}
                   </span>
                 ))
               ) : (
@@ -1525,7 +1745,6 @@ function ChatsScreen() {
   const [newClientName, setNewClientName] = useState('');
   const [newClientPhone, setNewClientPhone] = useState('');
   const [error, setError] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const selectedThread = threads.find((thread) => thread.id === selectedId) ?? null;
 
@@ -1541,10 +1760,7 @@ function ChatsScreen() {
       }
 
       const payload = await parseJsonSafe<Record<string, unknown>>(response);
-      const rawThreads =
-        safeArray(payload?.threads) ||
-        safeArray(payload?.chats) ||
-        safeArray(payload?.items);
+      const rawThreads = firstArray(payload?.threads, payload?.chats, payload?.items);
 
       const normalized = rawThreads.map(normalizeChatThread);
 
@@ -1560,13 +1776,6 @@ function ChatsScreen() {
   useEffect(() => {
     void loadChats();
   }, [loadChats]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({
-      block: 'end',
-      behavior: 'smooth',
-    });
-  }, [selectedThread?.id, selectedThread?.messages.length]);
 
   async function sendMessage(text = messageText) {
     const clean = text.trim();
@@ -1601,9 +1810,12 @@ function ChatsScreen() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          type: 'message',
           threadId: selectedThread.id,
-          message: clean,
-          text: clean,
+          body: clean,
+          author: 'master',
+          viaBot: true,
+          clientMessageKey: optimistic.id,
         }),
       });
 
@@ -1619,9 +1831,6 @@ function ChatsScreen() {
         setThreads((current) =>
           current.map((thread) => (thread.id === selectedThread.id ? normalized : thread)),
         );
-        setSelectedId(normalized.id);
-      } else {
-        void loadChats();
       }
     } catch {
       setError('Сообщение добавлено локально, но API чата не ответил.');
@@ -1631,13 +1840,24 @@ function ChatsScreen() {
   async function createThread() {
     const name = newClientName.trim();
     const phone = newClientPhone.trim();
-    if (!name) return;
 
-    const localThreadId = `local-thread-${Date.now()}`;
+    if (!name) {
+      setError('Укажите имя клиента.');
+      return;
+    }
+
+    if (!phone) {
+      setError('Для нового чата нужен телефон клиента.');
+      return;
+    }
+
+    setError('');
+
     const localThread: MiniChatThread = {
-      id: localThreadId,
+      id: `local-thread-${Date.now()}`,
       clientName: name,
       clientPhone: phone,
+      source: 'Telegram',
       priority: 'normal',
       botConnected: true,
       lastMessage: 'Новый диалог',
@@ -1664,30 +1884,26 @@ function ChatsScreen() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          type: 'thread',
           clientName: name,
           clientPhone: phone,
-          message: 'Диалог создан из Mini App.',
+          channel: 'Telegram',
         }),
       });
 
       if (!response.ok) {
-        throw new Error('create_thread_failed');
+        throw new Error('thread_create_failed');
       }
 
       const payload = await parseJsonSafe<Record<string, unknown>>(response);
-      const maybeThread = payload?.thread || payload?.chat;
+      const created = payload?.thread ? normalizeChatThread(payload.thread, 0) : null;
 
-      if (maybeThread) {
-        const normalized = normalizeChatThread(maybeThread, 0);
-        setThreads((current) =>
-          current.map((thread) => (thread.id === localThreadId ? normalized : thread)),
-        );
-        setSelectedId(normalized.id);
-      } else {
-        void loadChats();
+      if (created) {
+        setThreads((current) => current.map((thread) => (thread.id === localThread.id ? created : thread)));
+        setSelectedId(created.id);
       }
     } catch {
-      // Локальный поток уже создан.
+      setError('Чат создан локально, но API пока не подтвердил сохранение.');
     }
   }
 
@@ -1765,7 +1981,6 @@ function ChatsScreen() {
                 icon={<MessageCircle className="size-5" />}
               />
             )}
-            <div ref={messagesEndRef} />
           </div>
 
           <div className="border-t border-white/[0.08] p-3">
@@ -1788,12 +2003,6 @@ function ChatsScreen() {
               <input
                 value={messageText}
                 onChange={(event) => setMessageText(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' && !event.shiftKey) {
-                    event.preventDefault();
-                    void sendMessage();
-                  }
-                }}
                 placeholder="Сообщение клиенту..."
                 className="h-11 rounded-[15px] border border-white/[0.08] bg-[#141414] px-3 text-[14px] font-medium text-white outline-none placeholder:text-white/25"
               />
@@ -1837,6 +2046,11 @@ function ChatsScreen() {
           onChange={setNewClientPhone}
           placeholder="+7..."
         />
+        {error ? (
+          <div className="rounded-[15px] border border-white/[0.08] bg-white/[0.035] p-3 text-[12px] leading-5 text-white/58">
+            {error}
+          </div>
+        ) : null}
         <MiniButton variant="accent" onClick={() => void createThread()}>
           <Plus className="size-4" />
           Создать чат
@@ -1964,7 +2178,6 @@ function ClientsScreen({
 
   if (selectedClient) {
     const favorite = favoriteKeys.includes(selectedClient.key);
-    const phoneHref = getPhoneHref(selectedClient.phone);
 
     return (
       <div className="space-y-3">
@@ -2002,14 +2215,7 @@ function ClientsScreen({
             <Star className="size-4" />
             {favorite ? 'VIP' : 'В VIP'}
           </MiniButton>
-          <MiniButton
-            disabled={!phoneHref}
-            onClick={() => {
-              if (phoneHref) {
-                window.location.href = phoneHref;
-              }
-            }}
-          >
+          <MiniButton>
             <Phone className="size-4" />
             Позвонить
           </MiniButton>
@@ -2434,6 +2640,9 @@ function ServicesScreen({
         category: 'Основное',
         status: 'active',
         visible: true,
+        bookings: 0,
+        revenue: 0,
+        popularity: 0,
       },
     ]);
   }
@@ -2447,16 +2656,24 @@ function ServicesScreen({
     setMessage('');
 
     const cleaned = items.filter((item) => item.name.trim());
+    const workspaceServices = serviceItemsToWorkspaceServices(cleaned);
     const base = profileToForm(profile);
 
-    const ok = await updateWorkspaceSection('serviceCatalog', cleaned);
+    const ok = await updateWorkspaceSection('services', workspaceServices);
+
+    if (!ok) {
+      setSaving(false);
+      setMessage('Не удалось сохранить услуги. Проверьте тариф и подключение.');
+      return;
+    }
+
     const result = await onSave({
       ...base,
       servicesText: serviceItemsToText(cleaned),
     });
 
     setSaving(false);
-    setMessage(ok && result.success ? 'Услуги сохранены.' : result.error || 'Не удалось сохранить.');
+    setMessage(ok && result.success ? 'Услуги сохранены и видны клиентам.' : result.error || 'Не удалось сохранить.');
   }
 
   return (
@@ -3106,17 +3323,6 @@ function BookingSheet({
 }) {
   const [updating, setUpdating] = useState<BookingStatus | null>(null);
 
-  useEffect(() => {
-    if (!booking || typeof document === 'undefined') return;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [booking]);
-
   if (!booking) return null;
 
   async function update(status: BookingStatus) {
@@ -3128,14 +3334,8 @@ function BookingSheet({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[80] flex items-end bg-black/55 px-3 pb-[calc(var(--tg-safe-bottom,0px)+10px)] backdrop-blur-[8px]"
-      onClick={onClose}
-    >
-      <div
-        className="mx-auto w-full max-w-[430px] overflow-hidden rounded-[26px] border border-white/[0.10] bg-[#101010] shadow-[0_28px_90px_rgba(0,0,0,0.72)]"
-        onClick={(event) => event.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-[80] flex items-end bg-black/55 px-3 pb-[calc(var(--tg-safe-bottom,0px)+10px)] backdrop-blur-[8px]">
+      <div className="mx-auto w-full max-w-[430px] overflow-hidden rounded-[26px] border border-white/[0.10] bg-[#101010] shadow-[0_28px_90px_rgba(0,0,0,0.72)]">
         <div className="flex items-start justify-between gap-4 border-b border-white/[0.08] p-4">
           <div>
             <MiniLabel>запись</MiniLabel>
@@ -3201,115 +3401,13 @@ export function MiniAppEntry() {
     getPublicPath,
   } = useApp();
 
-  const [screen, setScreenState] = useState<MiniScreen>('today');
+  const [screen, setScreen] = useState<MiniScreen>('today');
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [bootState, setBootState] = useState<'loading' | 'ready'>('loading');
-  const [refreshing, setRefreshing] = useState(false);
-  const [syncedAt, setSyncedAt] = useState<number | null>(null);
-  const [isOnline, setIsOnline] = useState(
-    typeof navigator === 'undefined' ? true : navigator.onLine,
-  );
   const bootedRef = useRef(false);
-  const refreshPromiseRef = useRef<Promise<void> | null>(null);
 
   const workspaceRecord = safeRecord(workspaceData);
   const accent = getAccentFromWorkspace(workspaceRecord);
-
-  const setScreen = useCallback((nextScreen: MiniScreen) => {
-    setScreenState(nextScreen);
-
-    if (typeof window === 'undefined') return;
-
-    try {
-      window.sessionStorage.setItem(MINI_SCREEN_STORAGE_KEY, nextScreen);
-    } catch {}
-
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
-
-  const refreshData = useCallback(
-    async (options?: { silent?: boolean }) => {
-      if (refreshPromiseRef.current) {
-        return refreshPromiseRef.current;
-      }
-
-      if (!options?.silent) {
-        setRefreshing(true);
-      }
-
-      const task = (async () => {
-        await refreshWorkspace();
-        setSyncedAt(Date.now());
-      })().finally(() => {
-        refreshPromiseRef.current = null;
-        setRefreshing(false);
-      });
-
-      refreshPromiseRef.current = task;
-      return task;
-    },
-    [refreshWorkspace],
-  );
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    try {
-      const storedScreen = window.sessionStorage.getItem(MINI_SCREEN_STORAGE_KEY);
-      if (
-        storedScreen === 'today' ||
-        storedScreen === 'availability' ||
-        storedScreen === 'chats' ||
-        storedScreen === 'clients' ||
-        storedScreen === 'more' ||
-        storedScreen === 'profile' ||
-        storedScreen === 'services' ||
-        storedScreen === 'analytics' ||
-        storedScreen === 'appearance' ||
-        storedScreen === 'settings'
-      ) {
-        setScreenState(storedScreen);
-      }
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const syncOnlineState = () => setIsOnline(window.navigator.onLine);
-    syncOnlineState();
-
-    window.addEventListener('online', syncOnlineState);
-    window.addEventListener('offline', syncOnlineState);
-
-    return () => {
-      window.removeEventListener('online', syncOnlineState);
-      window.removeEventListener('offline', syncOnlineState);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible' && (typeof navigator === 'undefined' || navigator.onLine)) {
-        void refreshData({ silent: true });
-      }
-    };
-
-    const intervalId = window.setInterval(() => {
-      if (document.visibilityState === 'visible' && (typeof navigator === 'undefined' || navigator.onLine)) {
-        void refreshData({ silent: true });
-      }
-    }, 60000);
-
-    document.addEventListener('visibilitychange', handleVisibility);
-
-    return () => {
-      window.clearInterval(intervalId);
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
-  }, [refreshData]);
 
   useEffect(() => {
     if (bootedRef.current) return;
@@ -3319,15 +3417,17 @@ export function MiniAppEntry() {
 
     async function boot() {
       try {
-        await authorizeTelegramMiniAppSession({
-          force: true,
-          waitMs: 2600,
-        });
+        if (hasTelegramMiniAppRuntime()) {
+          await authorizeTelegramMiniAppSession({
+            force: true,
+            waitMs: 2600,
+          });
+        }
       } catch {
         // Если Telegram initData недоступна, всё равно пробуем загрузить workspace по cookie/header.
       }
 
-      await refreshData();
+      await refreshWorkspace();
 
       if (!cancelled) {
         setBootState('ready');
@@ -3339,7 +3439,7 @@ export function MiniAppEntry() {
     return () => {
       cancelled = true;
     };
-  }, [refreshData]);
+  }, [refreshWorkspace]);
 
   if (!hasHydrated || bootState === 'loading') {
     return <MiniLoading />;
@@ -3355,11 +3455,8 @@ export function MiniAppEntry() {
         screen={screen}
         setScreen={setScreen}
         profile={ownedProfile}
-        onRefresh={refreshData}
+        onRefresh={() => void refreshWorkspace()}
         accent={accent}
-        online={isOnline}
-        syncedAt={syncedAt}
-        refreshing={refreshing}
       >
         {screen === 'today' ? (
           <TodayScreen bookings={bookings} onOpenBooking={setSelectedBooking} />

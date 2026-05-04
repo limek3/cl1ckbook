@@ -5,7 +5,6 @@ import Script from 'next/script';
 import './globals.css';
 import { Providers } from '@/components/app/providers';
 import { buildAppearancePreferenceScript } from '@/lib/appearance';
-import { TelegramMiniAppViewport } from '@/components/system/telegram-miniapp-viewport';
 
 export const metadata: Metadata = {
   title: 'КликБук — платформа для записи клиентов',
@@ -52,7 +51,6 @@ export default function RootLayout({
           src="https://telegram.org/js/telegram-web-app.js"
           strategy="beforeInteractive"
         />
-        <TelegramMiniAppViewport />
         <Suspense fallback={null}>
           <Providers>{children}</Providers>
         </Suspense>

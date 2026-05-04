@@ -44,9 +44,8 @@ export default function AppPage() {
 
     async function boot() {
       const phone = isPhoneViewport();
-      const telegramRuntime = hasTelegramMiniAppRuntime();
 
-      if (!phone && !telegramRuntime) {
+      if (!phone) {
         try {
           if (hasTelegramMiniAppRuntime()) {
             await authorizeTelegramMiniAppSession({
