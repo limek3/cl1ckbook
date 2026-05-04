@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Component, useEffect, useState, type ReactNode } from 'react';
 import { BrandLogo } from '@/components/brand/brand-logo';
 import { MiniAppEntry } from '@/components/mini/mini-app-entry';
 import {
@@ -9,6 +9,52 @@ import {
 } from '@/lib/telegram-miniapp-auth-client';
 
 type AppMode = 'checking' | 'mobile';
+
+type MiniRouteErrorBoundaryProps = {
+  children: ReactNode;
+};
+
+type MiniRouteErrorBoundaryState = {
+  hasError: boolean;
+};
+
+class MiniRouteErrorBoundary extends Component<MiniRouteErrorBoundaryProps, MiniRouteErrorBoundaryState> {
+  state: MiniRouteErrorBoundaryState = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: unknown) {
+    console.error('[ClickBook mini app]', error);
+  }
+
+  render() {
+    if (!this.state.hasError) return this.props.children;
+
+    return (
+      <main className="flex min-h-[100svh] items-center justify-center bg-[#090909] px-5 text-white">
+        <div className="w-full max-w-[340px] rounded-[18px] border border-white/[0.10] bg-[#101010] p-5 text-center shadow-[0_24px_80px_rgba(0,0,0,0.42)]">
+          <BrandLogo />
+          <div className="mt-5 text-[22px] font-semibold leading-none tracking-[-0.08em]">
+            Mini app перезагрузилась
+          </div>
+          <div className="mt-3 text-[12px] leading-5 text-white/45">
+            Telegram WebView поймал ошибку интерфейса. Нажми кнопку ниже — приложение откроется заново без белого экрана.
+          </div>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="mt-5 h-10 w-full rounded-[10px] border border-white/[0.12] bg-white text-[12px] font-bold text-black active:scale-[0.985]"
+          >
+            Перезагрузить
+          </button>
+        </div>
+      </main>
+    );
+  }
+}
+
 
 function isPhoneViewport() {
   if (typeof window === 'undefined') return false;
@@ -77,7 +123,11 @@ export default function AppPage() {
   }, []);
 
   if (mode === 'mobile') {
-    return <MiniAppEntry />;
+    return (
+      <MiniRouteErrorBoundary>
+        <MiniAppEntry />
+      </MiniRouteErrorBoundary>
+    );
   }
 
   return (
