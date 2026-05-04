@@ -11188,27 +11188,9 @@ html[data-sloty-mobile-scale='standard'] .workspace-main-shell {
   letter-spacing: 0.08em !important;
 }
 
-
-
-
-
-
-
-
-
-
+/* ClickBook Mini App: phone UI safe-area only. Never push the whole desktop body down. */
 :root {
-  --font-golos-ui:
-    "Golos Text",
-    "Golos UI",
-    Inter,
-    Arial,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
-
+  --font-golos-ui: 'Golos Text', 'Golos UI', Inter, Arial, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-sans: var(--font-golos-ui);
   --tg-safe-top: 0px;
   --tg-safe-bottom: 0px;
@@ -11216,17 +11198,24 @@ html[data-sloty-mobile-scale='standard'] .workspace-main-shell {
 
 html,
 body {
-  font-family: var(--font-golos-ui);
+  font-family: var(--font-golos-ui) !important;
 }
 
-body {
-  font-feature-settings:
-    "rlig" 1,
-    "calt" 1;
-  text-rendering: geometricPrecision;
+html[data-tg-miniapp='true'] body,
+html[data-tg-miniapp='false'] body {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
 }
 
-html[data-tg-miniapp='true'] body {
+.cb-mini-app-root {
   padding-top: var(--tg-safe-top);
-  padding-bottom: var(--tg-safe-bottom);
+  padding-bottom: calc(var(--tg-safe-bottom) + 86px);
+  overflow-x: hidden;
+}
+
+@media (min-width: 768px) {
+  .cb-mini-app-root {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
 }
