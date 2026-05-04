@@ -11187,3 +11187,46 @@ html[data-sloty-mobile-scale='standard'] .workspace-main-shell {
 .cb-profile-page .uppercase {
   letter-spacing: 0.08em !important;
 }
+
+
+
+
+
+
+
+
+
+
+:root {
+  --font-golos-ui:
+    "Golos Text",
+    "Golos UI",
+    Inter,
+    Arial,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+
+  --font-sans: var(--font-golos-ui);
+  --tg-safe-top: 0px;
+  --tg-safe-bottom: 0px;
+}
+
+html,
+body {
+  font-family: var(--font-golos-ui);
+}
+
+body {
+  font-feature-settings:
+    "rlig" 1,
+    "calt" 1;
+  text-rendering: geometricPrecision;
+}
+
+html[data-tg-miniapp='true'] body {
+  padding-top: var(--tg-safe-top);
+  padding-bottom: var(--tg-safe-bottom);
+}
