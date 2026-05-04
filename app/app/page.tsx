@@ -13,6 +13,9 @@ type AppMode = 'checking' | 'mobile';
 function isPhoneViewport() {
   if (typeof window === 'undefined') return false;
 
+  const params = new URLSearchParams(window.location.search || '');
+  if (params.get('mini') === '1' || params.has('tgWebAppData') || hasTelegramMiniAppRuntime()) return true;
+
   const viewportWidth = window.innerWidth || 0;
   const screenWidth = window.screen?.width || viewportWidth;
   const width = Math.min(viewportWidth, screenWidth);

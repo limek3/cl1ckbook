@@ -9,6 +9,9 @@ import {
   useState,
   type CSSProperties,
   type ReactNode,
+  type InputHTMLAttributes,
+  type TextareaHTMLAttributes,
+  type FormEvent,
 } from 'react';
 import {
   BarChart3,
@@ -21,14 +24,15 @@ import {
   Copy,
   ExternalLink,
   Eye,
+  Heart,
   LayoutDashboard,
-  MapPin,
   MessageCircle,
   MoreHorizontal,
   Palette,
   Phone,
   Plus,
   RefreshCcw,
+  Save,
   Scissors,
   Send,
   Settings,
@@ -44,30 +48,27 @@ import {
 
 import { BrandLogo } from '@/components/brand/brand-logo';
 import { useApp } from '@/lib/app-context';
+import { useLocale } from '@/lib/locale-context';
+import { buildWorkspaceDatasetFromStored } from '@/lib/workspace-store';
 import {
   authorizeTelegramMiniAppSession,
   getTelegramAppSessionHeaders,
   hasTelegramMiniAppRuntime,
 } from '@/lib/telegram-miniapp-auth-client';
 import { cn } from '@/lib/utils';
-import type {
-  Booking,
-  BookingStatus,
-  MasterProfile,
-  MasterProfileFormValues,
-  WorkGalleryItem,
-} from '@/lib/types';
+import type { AvailabilityDayInsight, ClientInsight, ServiceInsight, WorkspaceDataset } from '@/lib/master-workspace';
+import type { ChatThreadListResponse, ChatThreadRecord } from '@/lib/chat-types';
+import type { Booking, BookingStatus, MasterProfile, MasterProfileFormValues } from '@/lib/types';
 
 type MiniScreen =
   | 'today'
-  | 'availability'
-  | 'chats'
-  | 'clients'
-  | 'more'
-  | 'profile'
+  | 'schedule'
   | 'services'
+  | 'chats'
+  | 'more'
+  | 'clients'
   | 'analytics'
-  | 'appearance'
+  | 'profile'
   | 'settings';
 
 type MiniProfileSaveValues = MasterProfileFormValues &
@@ -87,228 +88,27 @@ type MiniProfileSaveValues = MasterProfileFormValues &
     >
   >;
 
-type AvailabilityDay = {
+type EditableService = {
+  id: string;
+  name: string;
+  duration: number;
+  price: number;
+  category: string;
+  status: 'active' | 'seasonal' | 'draft';
+  visible: boolean;
+};
+
+type WeekdayEditor = {
   id: string;
   label: string;
   short: string;
   weekdayIndex: number;
-  enabled: boolean;
   status: 'workday' | 'short' | 'day-off';
   start: string;
   end: string;
-  interval: number;
-  breakStart?: string;
-  breakEnd?: string;
-  slots: string[];
-  breaks: string[];
+  breakStart: string;
+  breakEnd: string;
 };
-
-type ServiceItem = {
-  id: string;
-  name: string;
-  price: string;
-  duration: string;
-  category: string;
-  status: 'active' | 'seasonal' | 'draft';
-  visible: boolean;
-  bookings: number;
-  revenue: number;
-  popularity: number;
-};
-
-type MiniChatMessage = {
-  id: string;
-  from: 'client' | 'master' | 'system';
-  text: string;
-  createdAt: string;
-};
-
-type MiniChatThread = {
-  id: string;
-  clientName: string;
-  clientPhone?: string;
-  source?: string;
-  priority?: 'normal' | 'high' | 'low';
-  botConnected?: boolean;
-  lastMessage?: string;
-  updatedAt?: string;
-  messages: MiniChatMessage[];
-};
-
-const STATUS_META: Record<
-  BookingStatus,
-  {
-    label: string;
-    dot: string;
-    pill: string;
-  }
-> = {
-  new: {
-    label: 'Новая',
-    dot: 'bg-sky-400',
-    pill: 'bg-sky-400/12 text-sky-100 border-sky-300/20',
-  },
-  confirmed: {
-    label: 'Запланирована',
-    dot: 'bg-blue-400',
-    pill: 'bg-blue-400/12 text-blue-100 border-blue-300/20',
-  },
-  completed: {
-    label: 'Пришла',
-    dot: 'bg-emerald-400',
-    pill: 'bg-emerald-400/12 text-emerald-100 border-emerald-300/20',
-  },
-  no_show: {
-    label: 'Не пришла',
-    dot: 'bg-orange-400',
-    pill: 'bg-orange-400/12 text-orange-100 border-orange-300/20',
-  },
-  cancelled: {
-    label: 'Отмена',
-    dot: 'bg-rose-400',
-    pill: 'bg-rose-400/12 text-rose-100 border-rose-300/20',
-  },
-};
-
-const ACCENT_OPTIONS = [
-  {
-    id: 'mono',
-    label: 'Моно',
-    value: '#ffffff',
-    soft: 'rgba(255,255,255,0.10)',
-  },
-  {
-    id: 'blue',
-    label: 'Синий',
-    value: '#8bbcff',
-    soft: 'rgba(139,188,255,0.14)',
-  },
-  {
-    id: 'rose',
-    label: 'Розовый',
-    value: '#f5a3bd',
-    soft: 'rgba(245,163,189,0.14)',
-  },
-  {
-    id: 'gold',
-    label: 'Золото',
-    value: '#e8c77a',
-    soft: 'rgba(232,199,122,0.14)',
-  },
-  {
-    id: 'sage',
-    label: 'Шалфей',
-    value: '#a8d5ba',
-    soft: 'rgba(168,213,186,0.14)',
-  },
-];
-
-const DEFAULT_AVAILABILITY: AvailabilityDay[] = [
-  {
-    id: 'mon',
-    label: 'Понедельник',
-    short: 'Пн',
-    weekdayIndex: 0,
-    enabled: true,
-    status: 'workday',
-    start: '10:00',
-    end: '20:00',
-    interval: 60,
-    breakStart: '14:00',
-    breakEnd: '15:00',
-    slots: [],
-    breaks: ['14:00–15:00'],
-  },
-  {
-    id: 'tue',
-    label: 'Вторник',
-    short: 'Вт',
-    weekdayIndex: 1,
-    enabled: true,
-    status: 'workday',
-    start: '10:00',
-    end: '20:00',
-    interval: 60,
-    breakStart: '14:00',
-    breakEnd: '15:00',
-    slots: [],
-    breaks: ['14:00–15:00'],
-  },
-  {
-    id: 'wed',
-    label: 'Среда',
-    short: 'Ср',
-    weekdayIndex: 2,
-    enabled: true,
-    status: 'workday',
-    start: '10:00',
-    end: '20:00',
-    interval: 60,
-    breakStart: '14:00',
-    breakEnd: '15:00',
-    slots: [],
-    breaks: ['14:00–15:00'],
-  },
-  {
-    id: 'thu',
-    label: 'Четверг',
-    short: 'Чт',
-    weekdayIndex: 3,
-    enabled: true,
-    status: 'workday',
-    start: '10:00',
-    end: '20:00',
-    interval: 60,
-    breakStart: '14:00',
-    breakEnd: '15:00',
-    slots: [],
-    breaks: ['14:00–15:00'],
-  },
-  {
-    id: 'fri',
-    label: 'Пятница',
-    short: 'Пт',
-    weekdayIndex: 4,
-    enabled: true,
-    status: 'workday',
-    start: '10:00',
-    end: '19:00',
-    interval: 60,
-    breakStart: '14:00',
-    breakEnd: '15:00',
-    slots: [],
-    breaks: ['14:00–15:00'],
-  },
-  {
-    id: 'sat',
-    label: 'Суббота',
-    short: 'Сб',
-    weekdayIndex: 5,
-    enabled: true,
-    status: 'short',
-    start: '11:00',
-    end: '17:00',
-    interval: 60,
-    slots: [],
-    breaks: [],
-  },
-  {
-    id: 'sun',
-    label: 'Воскресенье',
-    short: 'Вс',
-    weekdayIndex: 6,
-    enabled: false,
-    status: 'day-off',
-    start: '11:00',
-    end: '17:00',
-    interval: 60,
-    slots: [],
-    breaks: [],
-  },
-].map((day) => ({
-  ...day,
-  slots: generateSlots(day),
-}));
 
 const RUB = new Intl.NumberFormat('ru-RU', {
   style: 'currency',
@@ -316,53 +116,127 @@ const RUB = new Intl.NumberFormat('ru-RU', {
   maximumFractionDigits: 0,
 });
 
-function todayKey() {
-  const date = new Date();
+const STATUS_META: Record<BookingStatus, { label: string; dot: string; border: string; bg: string }> = {
+  new: { label: 'Новая', dot: 'bg-sky-400', border: 'border-sky-300/20', bg: 'bg-sky-400/10 text-sky-100' },
+  confirmed: { label: 'В плане', dot: 'bg-blue-400', border: 'border-blue-300/20', bg: 'bg-blue-400/10 text-blue-100' },
+  completed: { label: 'Пришла', dot: 'bg-emerald-400', border: 'border-emerald-300/20', bg: 'bg-emerald-400/10 text-emerald-100' },
+  no_show: { label: 'Не пришла', dot: 'bg-orange-400', border: 'border-orange-300/20', bg: 'bg-orange-400/10 text-orange-100' },
+  cancelled: { label: 'Отмена', dot: 'bg-rose-400', border: 'border-rose-300/20', bg: 'bg-rose-400/10 text-rose-100' },
+};
 
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0'),
-  ].join('-');
+const WEEKDAYS: WeekdayEditor[] = [
+  { id: 'mon', label: 'Понедельник', short: 'Пн', weekdayIndex: 0, status: 'workday', start: '10:00', end: '20:00', breakStart: '14:00', breakEnd: '15:00' },
+  { id: 'tue', label: 'Вторник', short: 'Вт', weekdayIndex: 1, status: 'workday', start: '10:00', end: '20:00', breakStart: '14:00', breakEnd: '15:00' },
+  { id: 'wed', label: 'Среда', short: 'Ср', weekdayIndex: 2, status: 'workday', start: '10:00', end: '20:00', breakStart: '14:00', breakEnd: '15:00' },
+  { id: 'thu', label: 'Четверг', short: 'Чт', weekdayIndex: 3, status: 'workday', start: '10:00', end: '20:00', breakStart: '14:00', breakEnd: '15:00' },
+  { id: 'fri', label: 'Пятница', short: 'Пт', weekdayIndex: 4, status: 'workday', start: '10:00', end: '19:00', breakStart: '14:00', breakEnd: '15:00' },
+  { id: 'sat', label: 'Суббота', short: 'Сб', weekdayIndex: 5, status: 'short', start: '11:00', end: '17:00', breakStart: '', breakEnd: '' },
+  { id: 'sun', label: 'Воскресенье', short: 'Вс', weekdayIndex: 6, status: 'day-off', start: '11:00', end: '16:00', breakStart: '', breakEnd: '' },
+];
+
+const FALLBACK_DATASET: WorkspaceDataset = {
+  services: [],
+  clients: [],
+  daily: [],
+  channels: [],
+  weeklyLoad: [],
+  peakHours: [],
+  templates: [],
+  availability: [],
+  integrations: [],
+  notifications: [],
+  payments: [],
+  plans: [],
+  subscription: {
+    id: null,
+    planId: 'start',
+    planName: 'Start',
+    status: 'active',
+    billingCycle: 'monthly',
+    currentPeriodStart: null,
+    currentPeriodEnd: null,
+    nextChargeLabel: '—',
+    paymentMethodLabel: '—',
+    cancelAtPeriodEnd: false,
+    provider: 'manual',
+  },
+  limits: [],
+  totals: {
+    bookings: 0,
+    confirmed: 0,
+    completed: 0,
+    cancelled: 0,
+    revenue: 0,
+    visitors: 0,
+    conversion: 0,
+    averageCheck: 0,
+    newClients: 0,
+    returnRate: 0,
+  },
+};
+
+function safeRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
-function addDaysKey(days: number) {
+function safeArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function asText(value: unknown, fallback = '') {
+  return typeof value === 'string' ? value : typeof value === 'number' && Number.isFinite(value) ? String(value) : fallback;
+}
+
+function asNumber(value: unknown, fallback = 0) {
+  const number = typeof value === 'number' ? value : Number(String(value ?? '').replace(/[^\d.]/g, ''));
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function todayIso() {
   const date = new Date();
+  return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+}
+
+function addDaysIso(base: string, days: number) {
+  const date = new Date(`${base}T12:00:00`);
   date.setDate(date.getDate() + days);
-
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0'),
-  ].join('-');
+  return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
 }
 
-function formatDayLabel(dateKey: string) {
-  const date = new Date(`${dateKey}T12:00:00`);
-
-  if (Number.isNaN(date.getTime())) return dateKey;
-
-  return date.toLocaleDateString('ru-RU', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  });
+function formatDay(dateIso: string) {
+  const date = new Date(`${dateIso}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return dateIso;
+  return date.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
-function formatTime(value: string) {
-  return value?.slice(0, 5) || '—';
+function formatTime(value?: string | null) {
+  return (value || '').slice(0, 5) || '—';
 }
 
-function getBookingAmount(booking: Booking) {
-  return typeof booking.priceAmount === 'number' && Number.isFinite(booking.priceAmount)
-    ? booking.priceAmount
-    : 0;
+function sortByDateTime(a: Booking, b: Booking) {
+  return `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`);
+}
+
+function descByCreated(a: Booking, b: Booking) {
+  return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+}
+
+function countsAsActive(status: BookingStatus) {
+  return status === 'new' || status === 'confirmed' || status === 'completed';
+}
+
+function countsAsRevenue(status: BookingStatus) {
+  return status === 'completed';
+}
+
+function getBookingAmount(booking: Booking, services: ServiceInsight[]) {
+  if (typeof booking.priceAmount === 'number' && Number.isFinite(booking.priceAmount)) return booking.priceAmount;
+  return services.find((service) => service.name === booking.service)?.price ?? 0;
 }
 
 function getInitials(name?: string | null) {
-  const safe = (name || 'КБ').trim();
-
-  return safe
+  const source = (name || 'КБ').trim();
+  return source
     .split(/\s+/)
     .slice(0, 2)
     .map((part) => part[0])
@@ -370,498 +244,163 @@ function getInitials(name?: string | null) {
     .toUpperCase();
 }
 
-function sortBookings(a: Booking, b: Booking) {
-  return `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`);
+function splitInterval(value?: string | null) {
+  const normalized = String(value ?? '').replace(/—/g, '–').replace(/-/g, '–');
+  const [start, end] = normalized.split('–').map((item) => item.trim());
+  return { start: (start || '10:00').slice(0, 5), end: (end || '20:00').slice(0, 5) };
 }
 
-function safeRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
+function timeToMinutes(value: string) {
+  const [hour, minute] = value.split(':').map(Number);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  return hour * 60 + minute;
 }
 
-function safeArray<T = unknown>(value: unknown): T[] {
-  return Array.isArray(value) ? (value as T[]) : [];
+function validTimeRange(start: string, end: string) {
+  const left = timeToMinutes(start);
+  const right = timeToMinutes(end);
+  return left !== null && right !== null && right > left;
 }
 
-function getString(value: unknown, fallback = '') {
-  return typeof value === 'string' ? value : fallback;
-}
-
-function profileToForm(profile: MasterProfile | null): MiniProfileSaveValues {
-  return {
-    name: profile?.name ?? '',
-    profession: profile?.profession ?? '',
-    city: profile?.city ?? '',
-    bio: profile?.bio ?? '',
-    servicesText: profile?.services?.join('\n') ?? '',
-    slug: profile?.slug ?? '',
-    phone: profile?.phone ?? '',
-    telegram: profile?.telegram ?? '',
-    whatsapp: profile?.whatsapp ?? '',
-    avatar: profile?.avatar ?? '',
-    hidePhone: Boolean(profile?.hidePhone),
-    hideTelegram: Boolean(profile?.hideTelegram),
-    hideWhatsapp: Boolean(profile?.hideWhatsapp),
-    priceHint: profile?.priceHint ?? '',
-    experienceLabel: profile?.experienceLabel ?? '',
-    responseTime: profile?.responseTime ?? '',
-    address: profile?.address ?? '',
-    mapUrl: profile?.mapUrl ?? '',
-    locationMode: profile?.locationMode ?? 'online',
-    workGallery: profile?.workGallery ?? [],
-    reviews: profile?.reviews ?? [],
-    rating: profile?.rating,
-    reviewCount: profile?.reviewCount,
-  };
-}
-
-function toMinutes(value: string) {
-  const [h, m] = value.split(':').map((part) => Number(part));
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return 0;
-  return h * 60 + m;
-}
-
-function fromMinutes(value: number) {
-  const normalized = Math.max(0, Math.min(24 * 60, Math.round(value)));
-  const h = Math.floor(normalized / 60);
-  const m = normalized % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
-
-function splitTimeRange(value: string) {
-  const [start, end] = value
-    .replace(/—/g, '–')
-    .replace(/-/g, '–')
-    .split('–')
-    .map((part) => part.trim());
-
-  return {
-    start: start || '',
-    end: end || '',
-  };
-}
-
-function formatTimeRange(start: string, end: string) {
-  return `${start}–${end}`;
-}
-
-function rangeToMinutes(value: string) {
-  const range = splitTimeRange(value);
-  const start = range.start ? toMinutes(range.start) : null;
-  const end = range.end ? toMinutes(range.end) : null;
-
-  if (start === null || end === null || !range.start || !range.end || end <= start) return null;
-
-  return { start, end };
-}
-
-function rangesOverlap(left: { start: number; end: number }, right: { start: number; end: number }) {
-  return left.start < right.end && right.start < left.end;
-}
-
-function getSlotStart(slot: string) {
-  return splitTimeRange(slot).start || slot.slice(0, 5);
-}
-
-function normalizeBreaks(day: Pick<AvailabilityDay, 'breakStart' | 'breakEnd'>) {
-  return day.breakStart && day.breakEnd && day.breakEnd > day.breakStart
-    ? [formatTimeRange(day.breakStart, day.breakEnd)]
-    : [];
-}
-
-function inferAvailabilityBounds(
-  row: Record<string, unknown>,
-  fallback: Pick<AvailabilityDay, 'start' | 'end'>,
-) {
-  const rawSlots = safeArray<string>(row.slots);
-  const ranges = rawSlots.map(rangeToMinutes).filter(Boolean) as Array<{ start: number; end: number }>;
-
-  if (ranges.length === 0) {
-    return {
-      start: getString(row.start, fallback.start),
-      end: getString(row.end, fallback.end),
-    };
-  }
-
-  const start = Math.min(...ranges.map((range) => range.start));
-  const end = Math.max(...ranges.map((range) => range.end));
-
-  return {
-    start: getString(row.start, fromMinutes(start)),
-    end: getString(row.end, fromMinutes(end)),
-  };
-}
-
-function normalizeStatusFromDay(day: Pick<AvailabilityDay, 'enabled' | 'slots'>): AvailabilityDay['status'] {
-  if (!day.enabled) return 'day-off';
-  return day.slots.length <= 5 ? 'short' : 'workday';
-}
-
-function generateSlots(day: AvailabilityDay) {
-  if (!day.enabled) return [];
-
-  const start = toMinutes(day.start);
-  const end = toMinutes(day.end);
-  const interval = Math.max(15, Number(day.interval) || 60);
-  const breakRanges = normalizeBreaks(day).map(rangeToMinutes).filter(Boolean) as Array<{ start: number; end: number }>;
-
-  const slots: string[] = [];
-
-  for (let current = start; current + interval <= end; current += interval) {
-    const candidate = { start: current, end: current + interval };
-    if (breakRanges.some((breakRange) => rangesOverlap(candidate, breakRange))) continue;
-    slots.push(formatTimeRange(fromMinutes(candidate.start), fromMinutes(candidate.end)));
-  }
-
-  return slots;
-}
-
-function normalizeStoredSlots(
-  row: Record<string, unknown>,
-  day: AvailabilityDay,
-) {
-  const rawSlots = safeArray<string>(row.slots).filter(Boolean);
-  const normalizedRanges = rawSlots
-    .map((slot) => {
-      const range = splitTimeRange(slot);
-      if (range.start && range.end) return formatTimeRange(range.start, range.end);
-      if (range.start) {
-        const start = toMinutes(range.start);
-        const interval = Math.max(15, Number(day.interval) || 60);
-        return formatTimeRange(fromMinutes(start), fromMinutes(start + interval));
-      }
-      return '';
-    })
-    .filter(Boolean);
-
-  if (normalizedRanges.length === 0) return generateSlots(day);
-
-  const interval = Math.max(15, Number(day.interval) || 60);
-  const hasLongWindow = normalizedRanges.some((slot) => {
-    const range = rangeToMinutes(slot);
-    return range ? range.end - range.start > interval + 5 : false;
+function normalizeWeekAvailability(items: AvailabilityDayInsight[]) {
+  const byIndex = new Map<number, AvailabilityDayInsight>();
+  items.forEach((item) => {
+    const record = safeRecord(item);
+    const index = typeof record.weekdayIndex === 'number'
+      ? record.weekdayIndex
+      : WEEKDAYS.find((day) => day.id === item.id || day.label === item.label || day.short === item.label)?.weekdayIndex;
+    if (typeof index === 'number' && index >= 0 && index <= 6 && !record.date) byIndex.set(index, item);
   });
 
-  if (!hasLongWindow) return normalizedRanges;
-
-  return generateSlots(day);
-}
-
-function serializeAvailabilityDays(days: AvailabilityDay[]) {
-  return days.map((day) => {
-    const slots = generateSlots(day);
-    const status = normalizeStatusFromDay({ ...day, slots });
-    const breaks = normalizeBreaks(day);
-
+  return WEEKDAYS.map((fallback) => {
+    const stored = byIndex.get(fallback.weekdayIndex);
+    if (!stored) return fallback;
+    const work = splitInterval(stored.slots?.[0]);
+    const pause = splitInterval(stored.breaks?.[0]);
     return {
-      id: day.id,
-      label: day.label,
-      short: day.short,
-      weekdayIndex: day.weekdayIndex,
-      enabled: day.enabled,
-      status,
-      start: day.start,
-      end: day.end,
-      interval: day.interval,
-      breakStart: day.breakStart,
-      breakEnd: day.breakEnd,
-      slots,
-      breaks,
-      custom: false,
-    };
-  });
-}
-
-function normalizeAvailability(value: unknown): AvailabilityDay[] {
-  if (!Array.isArray(value)) return DEFAULT_AVAILABILITY;
-
-  const byId = new Map(
-    value.map((item) => {
-      const row = safeRecord(item);
-      const id = String(row.id || '');
-
-      return [id, row] as const;
-    }),
-  );
-
-  return DEFAULT_AVAILABILITY.map((fallback) => {
-    const saved = byId.get(fallback.id);
-    if (!saved) return fallback;
-
-    const breaks = safeArray<string>(saved.breaks);
-    const firstBreak = breaks[0] ? splitTimeRange(breaks[0]) : null;
-    const bounds = inferAvailabilityBounds(saved, fallback);
-    const enabled = typeof saved.enabled === 'boolean'
-      ? saved.enabled
-      : saved.status !== 'day-off';
-
-    const base: AvailabilityDay = {
       ...fallback,
-      enabled,
-      status:
-        saved.status === 'short' || saved.status === 'day-off' || saved.status === 'workday'
-          ? saved.status
-          : enabled
-            ? fallback.status
-            : 'day-off',
-      start: bounds.start,
-      end: bounds.end,
-      interval: Number(saved.interval || fallback.interval || 60),
-      breakStart: typeof saved.breakStart === 'string' ? saved.breakStart : firstBreak?.start || fallback.breakStart,
-      breakEnd: typeof saved.breakEnd === 'string' ? saved.breakEnd : firstBreak?.end || fallback.breakEnd,
-      breaks: breaks.length > 0 ? breaks : normalizeBreaks(fallback),
-      weekdayIndex:
-        typeof saved.weekdayIndex === 'number'
-          ? saved.weekdayIndex
-          : typeof saved.weekday_index === 'number'
-            ? saved.weekday_index
-            : fallback.weekdayIndex,
-      slots: [],
-    };
-
-    const slots = normalizeStoredSlots(saved, base);
-
-    return {
-      ...base,
-      status: normalizeStatusFromDay({ ...base, slots }),
-      breaks: normalizeBreaks(base),
-      slots,
-    };
+      status: stored.status ?? fallback.status,
+      start: work.start || fallback.start,
+      end: work.end || fallback.end,
+      breakStart: stored.breaks?.[0] ? pause.start : '',
+      breakEnd: stored.breaks?.[0] ? pause.end : '',
+    } satisfies WeekdayEditor;
   });
 }
 
-function getAccentFromWorkspace(workspaceData: Record<string, unknown>) {
-  const appearance = safeRecord(workspaceData.appearance);
-  const id = String(
-    appearance.accentTone ||
-      appearance.publicAccent ||
-      appearance.accent ||
-      workspaceData.accentTone ||
-      'mono',
-  );
-
-  return ACCENT_OPTIONS.find((item) => item.id === id) ?? ACCENT_OPTIONS[0];
+function serializeWeekAvailability(days: WeekdayEditor[]) {
+  return days.map((day) => ({
+    id: day.id,
+    label: day.label,
+    weekdayIndex: day.weekdayIndex,
+    status: day.status,
+    slots: day.status === 'day-off' || !validTimeRange(day.start, day.end) ? [] : [`${day.start}–${day.end}`],
+    breaks: day.status === 'day-off' || !validTimeRange(day.breakStart, day.breakEnd) ? [] : [`${day.breakStart}–${day.breakEnd}`],
+  }));
 }
 
-function serviceNumber(value: unknown, fallback = 0) {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string') {
-    const clean = value.replace(/\s/g, '').replace(',', '.');
-    if (!clean) return fallback;
-    const parsed = Number(clean);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  return fallback;
-}
-
-function serviceStatus(value: unknown): ServiceItem['status'] {
-  return value === 'seasonal' || value === 'draft' || value === 'active' ? value : 'active';
-}
-
-function parseServicesFromProfile(profile: MasterProfile | null, workspaceData: Record<string, unknown>) {
-  const stored = [workspaceData.services, workspaceData.serviceCatalog]
-    .find((value) => Array.isArray(value) && value.length > 0) as Record<string, unknown>[] | undefined;
-
-  if (stored && stored.length > 0) {
-    return stored.map((item, index) => ({
-      id: String(item.id || `service-${index}`),
-      name: String(item.name || item.title || `Услуга ${index + 1}`),
-      price: String(item.price ?? item.priceAmount ?? ''),
-      duration: String(item.duration ?? item.durationMinutes ?? '60'),
-      category: String(item.category || 'Основное'),
-      status: serviceStatus(item.status),
-      visible: item.visible !== false,
-      bookings: serviceNumber(item.bookings, 0),
-      revenue: serviceNumber(item.revenue, 0),
-      popularity: serviceNumber(item.popularity, 0),
-    })) satisfies ServiceItem[];
-  }
-
-  return (profile?.services ?? []).map((service, index) => {
-    const priceMatch = service.match(/(\d[\d\s]*)\s*₽?/);
-    const price = priceMatch ? priceMatch[1].replace(/\s/g, '') : '';
-
-    return {
-      id: `service-${index}`,
-      name: service.replace(/\s*[—-]\s*\d[\d\s]*\s*₽?/, '').trim() || service,
-      price,
-      duration: '60',
-      category: 'Основное',
-      status: 'active',
-      visible: true,
-      bookings: 0,
-      revenue: 0,
-      popularity: 0,
-    } satisfies ServiceItem;
-  });
-}
-
-function serviceItemsToWorkspaceServices(items: ServiceItem[]) {
-  return items
-    .filter((item) => item.name.trim())
-    .map((item, index) => ({
-      id: item.id || `service-${index}`,
-      name: item.name.trim(),
-      price: serviceNumber(item.price, 0),
-      duration: Math.max(5, Math.round(serviceNumber(item.duration, 60))),
-      category: item.category.trim() || 'Основное',
-      status: item.status,
-      visible: item.visible,
-      bookings: Math.max(0, Math.round(item.bookings || 0)),
-      revenue: Math.max(0, item.revenue || 0),
-      popularity: Math.max(0, Math.round(item.popularity || 0)),
-      sortOrder: index,
-    }));
-}
-
-function serviceItemsToText(items: ServiceItem[]) {
-  return items
-    .filter((item) => item.visible && item.status !== 'draft' && item.name.trim())
-    .map((item) => {
-      const price = item.price.trim() ? ` — ${item.price.trim()} ₽` : '';
-      return `${item.name.trim()}${price}`;
-    })
-    .join('\n');
-}
-
-function normalizeMessageAuthor(message: Record<string, unknown>): MiniChatMessage['from'] {
-  const author = message.from ?? message.sender ?? message.author;
-
-  if (author === 'master') return 'master';
-  if (author === 'system') return 'system';
-  return 'client';
-}
-
-function firstArray(...values: unknown[]) {
-  return values.find((value): value is unknown[] => Array.isArray(value)) ?? [];
-}
-
-function normalizeChatThread(value: unknown, index: number): MiniChatThread {
-  const row = safeRecord(value);
-  const messages = safeArray<Record<string, unknown>>(row.messages).map((message, messageIndex) => ({
-    id: String(message.id || `message-${index}-${messageIndex}`),
-    from: normalizeMessageAuthor(message),
-    text: String(message.text || message.body || message.message || ''),
-    createdAt: String(message.createdAt || message.created_at || new Date().toISOString()),
-  })) satisfies MiniChatMessage[];
-
-  const channel = String(row.channel || row.source || 'КликБук');
-  const lastMessage = String(
-    row.lastMessagePreview ||
-      row.lastMessage ||
-      row.last_message_preview ||
-      row.last_message ||
-      messages.at(-1)?.text ||
-      '',
-  );
-
+function profileSavePayload(profile: MasterProfile, patch: Partial<MiniProfileSaveValues>): MiniProfileSaveValues {
   return {
-    id: String(row.id || row.threadId || `thread-${index}`),
-    clientName: String(row.clientName || row.client_name || row.name || `Клиент ${index + 1}`),
-    clientPhone:
-      typeof row.clientPhone === 'string'
-        ? row.clientPhone
-        : typeof row.client_phone === 'string'
-          ? row.client_phone
-          : typeof row.phone === 'string'
-            ? row.phone
-            : undefined,
-    source: channel,
-    priority:
-      row.priority === 'high' || row.isPriority === true || row.is_priority === true
-        ? 'high'
-        : row.priority === 'low'
-          ? 'low'
-          : 'normal',
-    botConnected: row.botConnected !== false && row.bot_connected !== false,
-    lastMessage,
-    updatedAt: String(row.lastMessageAt || row.updatedAt || row.last_message_at || row.updated_at || new Date().toISOString()),
-    messages,
+    name: profile.name,
+    profession: profile.profession,
+    city: profile.city,
+    bio: profile.bio,
+    servicesText: profile.services.join('\n'),
+    phone: profile.phone ?? '',
+    telegram: profile.telegram ?? '',
+    whatsapp: profile.whatsapp ?? '',
+    locationMode: profile.locationMode ?? 'online',
+    address: profile.address ?? '',
+    mapUrl: profile.mapUrl ?? '',
+    hidePhone: Boolean(profile.hidePhone),
+    hideTelegram: Boolean(profile.hideTelegram),
+    hideWhatsapp: Boolean(profile.hideWhatsapp),
+    slug: profile.slug,
+    avatar: profile.avatar ?? '',
+    priceHint: profile.priceHint,
+    experienceLabel: profile.experienceLabel,
+    responseTime: profile.responseTime,
+    workGallery: profile.workGallery,
+    reviews: profile.reviews,
+    rating: profile.rating,
+    reviewCount: profile.reviewCount,
+    ...patch,
   };
 }
 
-async function parseJsonSafe<T>(response: Response): Promise<T | null> {
-  const text = await response.text();
-  if (!text) return null;
-
+async function copyText(value: string) {
   try {
-    return JSON.parse(text) as T;
+    await navigator.clipboard.writeText(value);
+    return true;
   } catch {
-    return null;
+    try {
+      const input = document.createElement('textarea');
+      input.value = value;
+      input.style.position = 'fixed';
+      input.style.opacity = '0';
+      document.body.appendChild(input);
+      input.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(input);
+      return ok;
+    } catch {
+      return false;
+    }
   }
-}
-
-async function fetchMini(path: string, init?: RequestInit) {
-  const headers = new Headers(init?.headers);
-
-  Object.entries(getTelegramAppSessionHeaders()).forEach(([key, value]) => {
-    headers.set(key, value);
-  });
-
-  return fetch(path, {
-    ...init,
-    credentials: 'include',
-    cache: 'no-store',
-    headers,
-  });
-}
-
-function MiniCard({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <section
-      className={cn(
-        'rounded-[20px] border border-white/[0.08] bg-[#101010]/92 shadow-none backdrop-blur-[18px]',
-        className,
-      )}
-    >
-      {children}
-    </section>
-  );
 }
 
 function MiniLabel({ children }: { children: ReactNode }) {
+  return <div className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/32">{children}</div>;
+}
+
+function MiniCard({ children, className, onClick }: { children: ReactNode; className?: string; onClick?: () => void }) {
   return (
-    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">
+    <div
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      className={cn(
+        'rounded-[22px] border border-white/[0.075] bg-[#101010]/92 shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-[22px]',
+        onClick && 'active:scale-[0.99]',
+        className,
+      )}
+    >
       {children}
     </div>
   );
 }
 
+function MiniPanel({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cn('rounded-[18px] border border-white/[0.07] bg-white/[0.035]', className)}>{children}</div>;
+}
+
 function MiniButton({
   children,
   onClick,
-  variant = 'secondary',
   disabled,
+  variant = 'secondary',
+  className,
   type = 'button',
 }: {
   children: ReactNode;
   onClick?: () => void;
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'accent';
   disabled?: boolean;
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
+  className?: string;
   type?: 'button' | 'submit';
 }) {
   return (
     <button
       type={type}
-      disabled={disabled}
       onClick={onClick}
+      disabled={disabled}
       className={cn(
-        'flex h-10 items-center justify-center gap-2 rounded-[14px] px-3 text-[12px] font-semibold tracking-[-0.035em] transition active:scale-[0.985] disabled:pointer-events-none disabled:opacity-45',
-        variant === 'primary' && 'bg-white text-black hover:bg-white/90',
-        variant === 'accent' && 'bg-[var(--mini-accent)] text-black hover:opacity-90',
-        variant === 'secondary' &&
-          'border border-white/[0.08] bg-white/[0.055] text-white hover:bg-white/[0.08]',
-        variant === 'danger' &&
-          'border border-rose-300/15 bg-rose-400/10 text-rose-100 hover:bg-rose-400/14',
-        variant === 'ghost' &&
-          'bg-transparent text-white/55 hover:bg-white/[0.05] hover:text-white',
+        'inline-flex h-11 items-center justify-center gap-2 rounded-[15px] px-4 text-[12px] font-semibold tracking-[-0.035em] transition active:scale-[0.985] disabled:pointer-events-none disabled:opacity-45',
+        variant === 'primary' && 'bg-white text-black shadow-[0_14px_36px_rgba(255,255,255,0.10)]',
+        variant === 'secondary' && 'border border-white/[0.08] bg-white/[0.045] text-white/78 hover:bg-white/[0.065]',
+        variant === 'danger' && 'border border-rose-300/15 bg-rose-400/10 text-rose-100',
+        variant === 'ghost' && 'text-white/48 hover:bg-white/[0.04] hover:text-white/80',
+        className,
       )}
     >
       {children}
@@ -869,243 +408,169 @@ function MiniButton({
   );
 }
 
-function StatusPill({ status }: { status: BookingStatus }) {
-  const meta = STATUS_META[status] ?? STATUS_META.new;
-
+function MiniInput({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return (
-    <span
+    <input
+      {...props}
       className={cn(
-        'inline-flex h-6 items-center gap-1.5 rounded-full border px-2 text-[10px] font-semibold tracking-[-0.03em]',
-        meta.pill,
+        'h-11 w-full rounded-[15px] border border-white/[0.08] bg-white/[0.045] px-3 text-[13px] font-medium tracking-[-0.03em] text-white outline-none placeholder:text-white/24 focus:border-white/[0.18] focus:bg-white/[0.065]',
+        className,
       )}
-    >
+    />
+  );
+}
+
+function MiniTextarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return (
+    <textarea
+      {...props}
+      className={cn(
+        'min-h-[88px] w-full resize-none rounded-[15px] border border-white/[0.08] bg-white/[0.045] px-3 py-3 text-[13px] font-medium leading-5 tracking-[-0.03em] text-white outline-none placeholder:text-white/24 focus:border-white/[0.18] focus:bg-white/[0.065]',
+        className,
+      )}
+    />
+  );
+}
+
+function StatusBadge({ status }: { status: BookingStatus }) {
+  const meta = STATUS_META[status] ?? STATUS_META.new;
+  return (
+    <span className={cn('inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[10px] font-bold tracking-[-0.02em]', meta.border, meta.bg)}>
       <span className={cn('size-1.5 rounded-full', meta.dot)} />
       {meta.label}
     </span>
   );
 }
 
-function MiniInput({
-  label,
-  value,
-  onChange,
-  placeholder,
-  textarea,
-  type = 'text',
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  textarea?: boolean;
-  type?: string;
-}) {
-  const className =
-    'w-full rounded-[15px] border border-white/[0.08] !bg-[#141414] px-3 text-[14px] font-medium tracking-[-0.035em] !text-white outline-none placeholder:!text-white/25 focus:border-white/[0.16] focus:!bg-[#171717]';
-
+function StatTile({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return (
-    <label className="block">
-      <div className="mb-2 text-[11px] font-semibold tracking-[-0.03em] text-white/58">
-        {label}
-      </div>
-
-      {textarea ? (
-        <textarea
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={placeholder}
-          rows={4}
-          className={cn(className, 'min-h-[112px] resize-none py-3')}
-        />
-      ) : (
-        <input
-          type={type}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={placeholder}
-          className={cn(className, 'h-11')}
-        />
-      )}
-    </label>
+    <MiniPanel className="p-3">
+      <div className="text-[10px] font-semibold tracking-[-0.025em] text-white/34">{label}</div>
+      <div className="mt-1 text-[20px] font-semibold leading-none tracking-[-0.075em] text-white">{value}</div>
+      {hint ? <div className="mt-1.5 truncate text-[10px] text-white/28">{hint}</div> : null}
+    </MiniPanel>
   );
 }
 
-function MiniSelect({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: Array<{ value: string; label: string }>;
-  onChange: (value: string) => void;
-}) {
+function EmptyBlock({ title, text, icon }: { title: string; text: string; icon: ReactNode }) {
   return (
-    <label className="block">
-      <div className="mb-2 text-[11px] font-semibold tracking-[-0.03em] text-white/58">
-        {label}
-      </div>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-11 w-full rounded-[15px] border border-white/[0.08] bg-[#141414] px-3 text-[14px] font-medium tracking-[-0.035em] text-white outline-none focus:border-white/[0.16]"
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value} className="bg-[#141414] text-white">
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function EmptyState({
-  title,
-  text,
-  icon,
-}: {
-  title: string;
-  text: string;
-  icon?: ReactNode;
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center rounded-[18px] border border-dashed border-white/[0.08] bg-white/[0.025] px-5 py-7 text-center">
-      <div className="mb-3 flex size-10 items-center justify-center rounded-[14px] border border-white/[0.08] bg-white/[0.045] text-white/55">
-        {icon ?? <CalendarClock className="size-5" />}
-      </div>
-      <div className="text-[15px] font-semibold tracking-[-0.045em] text-white">
-        {title}
-      </div>
-      <div className="mt-1 max-w-[230px] text-[12px] leading-5 text-white/42">
-        {text}
-      </div>
-    </div>
+    <MiniCard className="flex flex-col items-center px-5 py-8 text-center">
+      <div className="flex size-12 items-center justify-center rounded-[18px] border border-white/[0.08] bg-white/[0.045] text-white/42">{icon}</div>
+      <div className="mt-4 text-[17px] font-semibold tracking-[-0.06em] text-white">{title}</div>
+      <div className="mt-2 max-w-[260px] text-[12px] leading-5 text-white/38">{text}</div>
+    </MiniCard>
   );
 }
 
 function MiniLoading() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#090909] px-6 text-white">
-      <div className="flex w-full max-w-[310px] flex-col items-center rounded-[22px] border border-white/[0.08] bg-[#101010]/92 px-5 py-6 text-center">
-        <BrandLogo />
-
-        <div className="mt-5 size-8 animate-spin rounded-full border border-white/[0.08] border-t-white/60" />
-
-        <div className="mt-5 text-[15px] font-semibold tracking-[-0.045em]">
-          Загружаем кабинет
+    <main className="flex min-h-[100svh] items-center justify-center bg-[#090909] px-5 text-white">
+      <MiniCard className="w-full max-w-[330px] px-5 py-6 text-center">
+        <div className="mx-auto flex size-12 items-center justify-center rounded-[18px] border border-white/[0.08] bg-white/[0.045]">
+          <div className="size-5 animate-spin rounded-full border border-white/[0.12] border-t-white/70" />
         </div>
-        <div className="mt-1 max-w-[230px] text-[12px] leading-5 text-white/42">
-          Проверяем Telegram-сессию и загружаем профиль мастера.
-        </div>
-      </div>
+        <div className="mt-4 text-[17px] font-semibold tracking-[-0.06em]">Открываем mini app</div>
+        <div className="mt-2 text-[12px] leading-5 text-white/38">Подтягиваем профиль, записи, услуги, чаты и график.</div>
+      </MiniCard>
     </main>
+  );
+}
+
+function AvatarMark({ profile, size = 'md' }: { profile?: MasterProfile | null; size?: 'sm' | 'md' | 'lg' }) {
+  const sizeClass = size === 'lg' ? 'size-16 rounded-[22px]' : size === 'sm' ? 'size-10 rounded-[15px]' : 'size-12 rounded-[18px]';
+  return (
+    <div className={cn('flex shrink-0 items-center justify-center overflow-hidden border border-white/[0.08] bg-white/[0.055]', sizeClass)}>
+      {profile?.avatar ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={profile.avatar} alt="" className="size-full object-cover" />
+      ) : (
+        <span className="text-[11px] font-black tracking-[-0.05em] text-white">{getInitials(profile?.name)}</span>
+      )}
+    </div>
   );
 }
 
 function MiniShell({
   screen,
   setScreen,
-  children,
   profile,
-  onRefresh,
   accent,
+  onRefresh,
+  children,
 }: {
   screen: MiniScreen;
   setScreen: (screen: MiniScreen) => void;
-  children: ReactNode;
-  profile: MasterProfile | null;
+  profile: MasterProfile;
+  accent: string;
   onRefresh: () => void;
-  accent: (typeof ACCENT_OPTIONS)[number];
+  children: ReactNode;
 }) {
-  const shellStyle = {
-    paddingTop: 'calc(var(--tg-safe-top, 0px) + 10px)',
-    paddingBottom: 'calc(var(--tg-safe-bottom, 0px) + 96px)',
-    '--mini-accent': accent.value,
-    '--mini-accent-soft': accent.soft,
-  } as CSSProperties & Record<string, string>;
-
-  const navItems: Array<{
-    id: MiniScreen;
-    label: string;
-    icon: ReactNode;
-  }> = [
-    { id: 'today', label: 'Сегодня', icon: <CalendarClock className="size-4" /> },
-    { id: 'availability', label: 'График', icon: <Clock3 className="size-4" /> },
-    { id: 'chats', label: 'Чаты', icon: <MessageCircle className="size-4" /> },
-    { id: 'more', label: 'Ещё', icon: <MoreHorizontal className="size-4" /> },
+  const nav = [
+    { id: 'today' as const, label: 'Сегодня', icon: <LayoutDashboard className="size-4" /> },
+    { id: 'schedule' as const, label: 'График', icon: <Clock3 className="size-4" /> },
+    { id: 'services' as const, label: 'Услуги', icon: <Scissors className="size-4" /> },
+    { id: 'chats' as const, label: 'Чаты', icon: <MessageCircle className="size-4" /> },
+    { id: 'more' as const, label: 'Ещё', icon: <MoreHorizontal className="size-4" /> },
   ];
+
+  const moreActive = ['more', 'clients', 'analytics', 'profile', 'settings'].includes(screen);
 
   return (
     <main
-      style={shellStyle}
-      className="cb-mini-app-root min-h-screen bg-[#090909] px-3 text-white"
+      className="min-h-[100svh] bg-[#090909] px-3 pt-[calc(var(--tg-safe-top,0px)+12px)] text-white"
+      style={{ '--mini-accent': accent } as CSSProperties}
     >
-      <div className="mx-auto w-full max-w-[430px]">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(255,255,255,0.065),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.018),transparent_24%)]" />
+      <div className="relative mx-auto w-full max-w-[430px] pb-[calc(var(--tg-safe-bottom,0px)+96px)]">
         <header className="mb-4 flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-[11px] border border-white/[0.08] bg-white/[0.055]">
-              {profile?.avatar ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={profile.avatar} alt="" className="size-full object-cover" />
-              ) : (
-                <span className="text-[10px] font-bold text-white">
-                  {getInitials(profile?.name)}
-                </span>
-              )}
-            </div>
-
+          <button type="button" onClick={() => setScreen('profile')} className="flex min-w-0 items-center gap-2.5 text-left active:scale-[0.99]">
+            <AvatarMark profile={profile} size="sm" />
             <div className="min-w-0">
-              <div className="truncate text-[13px] font-semibold tracking-[-0.045em] text-white">
-                {profile?.name || 'КликБук'}
-              </div>
-              <div className="truncate text-[10px] font-semibold tracking-[-0.03em] text-white/35">
-                кабинет мастера
+              <div className="truncate text-[14px] font-semibold tracking-[-0.055em] text-white">{profile.name}</div>
+              <div className="mt-0.5 flex items-center gap-1.5 text-[10px] font-semibold tracking-[-0.03em] text-white/34">
+                <span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_0_4px_rgba(52,211,153,0.10)]" />
+                mini app мастера
               </div>
             </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={onRefresh}
-            className="flex size-8 items-center justify-center rounded-[11px] border border-white/[0.08] bg-white/[0.045] text-white/55 active:scale-95"
-          >
-            <RefreshCcw className="size-3.5" />
           </button>
+
+          <div className="flex items-center gap-1.5">
+            <Link
+              href={`/m/${profile.slug}`}
+              className="flex size-9 items-center justify-center rounded-[14px] border border-white/[0.08] bg-white/[0.045] text-white/55 active:scale-95"
+            >
+              <Eye className="size-4" />
+            </Link>
+            <button
+              type="button"
+              onClick={onRefresh}
+              className="flex size-9 items-center justify-center rounded-[14px] border border-white/[0.08] bg-white/[0.045] text-white/55 active:scale-95"
+            >
+              <RefreshCcw className="size-4" />
+            </button>
+          </div>
         </header>
 
         {children}
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-[430px] px-3 pb-[calc(var(--tg-safe-bottom,0px)+10px)]">
-        <div className="grid grid-cols-4 gap-1 rounded-[22px] border border-white/[0.08] bg-[#101010]/90 p-1.5 shadow-[0_18px_60px_rgba(0,0,0,0.45)] backdrop-blur-[24px]">
-          {navItems.map((item) => {
-            const active =
-              screen === item.id ||
-              (item.id === 'more' &&
-                ['more', 'profile', 'services', 'analytics', 'appearance', 'settings', 'clients'].includes(screen));
-
+        <div className="grid grid-cols-5 gap-1 rounded-[24px] border border-white/[0.09] bg-[#101010]/88 p-1.5 shadow-[0_18px_70px_rgba(0,0,0,0.52)] backdrop-blur-[26px]">
+          {nav.map((item) => {
+            const active = item.id === 'more' ? moreActive : screen === item.id;
             return (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => setScreen(item.id)}
                 className={cn(
-                  'flex h-12 flex-col items-center justify-center gap-1 rounded-[16px] text-[10px] font-semibold tracking-[-0.04em] transition active:scale-[0.98]',
-                  active
-                    ? 'bg-white/[0.08] text-white'
-                    : 'text-white/42 hover:bg-white/[0.04] hover:text-white/72',
+                  'flex h-[52px] min-h-[52px] flex-col items-center justify-center gap-1 rounded-[18px] text-[9.5px] font-bold tracking-[-0.04em] transition active:scale-[0.97]',
+                  active ? 'bg-white/[0.075] text-white' : 'text-white/36 hover:bg-white/[0.035] hover:text-white/64',
                 )}
               >
-                <span className={cn(active && 'text-[var(--mini-accent)]')}>{item.icon}</span>
-                {item.label}
-                {active ? (
-                  <span
-                    className="size-1 rounded-full"
-                    style={{ backgroundColor: 'var(--mini-accent)' }}
-                  />
-                ) : null}
+                <span style={active ? { color: 'var(--mini-accent)' } : undefined}>{item.icon}</span>
+                <span>{item.label}</span>
+                <span className={cn('size-1 rounded-full', active ? 'opacity-100' : 'opacity-0')} style={{ backgroundColor: 'var(--mini-accent)' }} />
               </button>
             );
           })}
@@ -1115,2277 +580,928 @@ function MiniShell({
   );
 }
 
-function MiniOnboarding({
-  onSave,
-}: {
-  onSave: (values: MiniProfileSaveValues) => Promise<{ success: boolean; error?: string }>;
-}) {
-  const [step, setStep] = useState(0);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-
-  const [form, setForm] = useState<MiniProfileSaveValues>({
-    name: '',
-    profession: '',
-    city: '',
-    bio: '',
-    servicesText: '',
-    slug: '',
-    phone: '',
-    telegram: '',
-    whatsapp: '',
-    avatar: '',
-    hidePhone: false,
-    hideTelegram: false,
-    hideWhatsapp: false,
-    priceHint: '',
-    experienceLabel: '',
-    responseTime: '',
-    address: '',
-    mapUrl: '',
-    locationMode: 'online',
-    workGallery: [],
-    reviews: [],
-  });
-
-  const steps = [
-    {
-      title: 'Основное',
-      text: 'Имя, город и описание.',
-    },
-    {
-      title: 'Услуги',
-      text: 'Что клиент сможет выбрать.',
-    },
-    {
-      title: 'Контакты',
-      text: 'Телефон, Telegram и ссылка.',
-    },
-  ];
-
-  const update = <K extends keyof MiniProfileSaveValues>(
-    key: K,
-    value: MiniProfileSaveValues[K],
-  ) => {
-    setForm((current) => ({ ...current, [key]: value }));
-  };
-
-  async function handleNext() {
-    setError('');
-
-    if (step < steps.length - 1) {
-      setStep((current) => current + 1);
-      return;
-    }
-
-    setSaving(true);
-
-    const result = await onSave({
-      ...form,
-      slug: form.slug || form.name,
-      bio: form.bio || 'Онлайн-запись к мастеру через КликБук.',
-    });
-
-    setSaving(false);
-
-    if (!result.success) {
-      setError(result.error || 'Не удалось сохранить профиль.');
-    }
-  }
-
+function BookingRow({ booking, onOpen, services }: { booking: Booking; onOpen: (booking: Booking) => void; services: ServiceInsight[] }) {
   return (
-    <main
-      className="cb-mini-app-root min-h-screen bg-[#090909] px-3 text-white"
-      style={{
-        paddingTop: 'calc(var(--tg-safe-top, 0px) + 10px)',
-        paddingBottom: 'calc(var(--tg-safe-bottom, 0px) + 24px)',
-      }}
-    >
-      <div className="mx-auto w-full max-w-[430px]">
-        <header className="mb-5 flex items-center justify-between">
-          <BrandLogo />
-          <div className="rounded-full border border-white/[0.08] bg-white/[0.045] px-3 py-1 text-[10px] font-semibold text-white/52">
-            {step + 1}/{steps.length}
+    <button type="button" onClick={() => onOpen(booking)} className="group flex w-full items-center gap-3 rounded-[18px] border border-white/[0.06] bg-white/[0.026] p-3 text-left active:scale-[0.99]">
+      <div className="flex w-[58px] shrink-0 flex-col items-center rounded-[14px] border border-white/[0.07] bg-white/[0.035] py-2">
+        <div className="text-[15px] font-semibold leading-none tracking-[-0.06em] text-white">{formatTime(booking.time)}</div>
+        <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.12em] text-white/28">{formatDay(booking.date).split(',')[0]}</div>
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="truncate text-[14px] font-semibold tracking-[-0.045em] text-white">{booking.clientName}</div>
+            <div className="mt-1 truncate text-[11px] text-white/36">{booking.service}</div>
           </div>
-        </header>
-
-        <section className="mb-4">
-          <MiniLabel>быстрый старт</MiniLabel>
-          <h1 className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.075em]">
-            Создадим страницу
-          </h1>
-          <p className="mt-2 max-w-[320px] text-[13px] leading-5 text-white/45">
-            Заполните минимум. Остальное можно донастроить позже.
-          </p>
-        </section>
-
-        <MiniCard className="overflow-hidden">
-          <div className="border-b border-white/[0.08] p-4">
-            <div className="text-[20px] font-semibold tracking-[-0.06em]">
-              {steps[step].title}
-            </div>
-            <div className="mt-1 text-[12px] leading-5 text-white/42">
-              {steps[step].text}
-            </div>
-          </div>
-
-          <div className="space-y-4 p-4">
-            {step === 0 ? (
-              <>
-                <MiniInput
-                  label="Имя или название"
-                  value={form.name}
-                  onChange={(value) => update('name', value)}
-                  placeholder="Например, Анна Nails"
-                />
-                <MiniInput
-                  label="Специализация"
-                  value={form.profession}
-                  onChange={(value) => update('profession', value)}
-                  placeholder="Маникюр, тату, массаж..."
-                />
-                <MiniInput
-                  label="Город"
-                  value={form.city}
-                  onChange={(value) => update('city', value)}
-                  placeholder="Москва"
-                />
-                <MiniInput
-                  label="Описание"
-                  value={form.bio}
-                  onChange={(value) => update('bio', value)}
-                  placeholder="Коротко о себе"
-                  textarea
-                />
-              </>
-            ) : null}
-
-            {step === 1 ? (
-              <>
-                <MiniInput
-                  label="Услуги"
-                  value={form.servicesText}
-                  onChange={(value) => update('servicesText', value)}
-                  placeholder={'Маникюр — 2500 ₽\nПедикюр — 3000 ₽\nКоррекция — 2000 ₽'}
-                  textarea
-                />
-                <div className="rounded-[16px] border border-white/[0.08] bg-white/[0.035] p-3 text-[12px] leading-5 text-white/42">
-                  Каждую услугу лучше писать с новой строки.
-                </div>
-              </>
-            ) : null}
-
-            {step === 2 ? (
-              <>
-                <MiniInput
-                  label="Телефон"
-                  value={form.phone}
-                  onChange={(value) => update('phone', value)}
-                  placeholder="+7..."
-                />
-                <MiniInput
-                  label="Telegram"
-                  value={form.telegram}
-                  onChange={(value) => update('telegram', value)}
-                  placeholder="@username"
-                />
-                <MiniInput
-                  label="Ссылка"
-                  value={form.slug}
-                  onChange={(value) => update('slug', value)}
-                  placeholder="anna-nails"
-                />
-              </>
-            ) : null}
-
-            {error ? (
-              <div className="rounded-[16px] border border-rose-300/15 bg-rose-400/10 p-3 text-[12px] leading-5 text-rose-100">
-                {error}
-              </div>
-            ) : null}
-          </div>
-        </MiniCard>
-
-        <div className="mt-4 grid grid-cols-[96px_1fr] gap-2">
-          <MiniButton
-            variant="secondary"
-            disabled={step === 0 || saving}
-            onClick={() => setStep((current) => Math.max(0, current - 1))}
-          >
-            Назад
-          </MiniButton>
-          <MiniButton variant="primary" disabled={saving} onClick={handleNext}>
-            {saving ? 'Сохраняем...' : step === steps.length - 1 ? 'Сохранить' : 'Далее'}
-          </MiniButton>
+          <StatusBadge status={booking.status} />
+        </div>
+        <div className="mt-2 flex items-center justify-between gap-2 text-[10px] font-semibold tracking-[-0.02em] text-white/28">
+          <span className="truncate">{booking.source || booking.channel || 'Клиент'}</span>
+          <span>{getBookingAmount(booking, services) > 0 ? RUB.format(getBookingAmount(booking, services)) : '—'}</span>
         </div>
       </div>
-    </main>
+      <ChevronRight className="size-4 shrink-0 text-white/18 group-hover:text-white/40" />
+    </button>
   );
 }
 
 function TodayScreen({
+  profile,
   bookings,
+  dataset,
   onOpenBooking,
+  setScreen,
 }: {
+  profile: MasterProfile;
   bookings: Booking[];
+  dataset: WorkspaceDataset;
   onOpenBooking: (booking: Booking) => void;
+  setScreen: (screen: MiniScreen) => void;
 }) {
-  const today = todayKey();
-
-  const todayBookings = useMemo(
-    () => bookings.filter((booking) => booking.date === today).sort(sortBookings),
-    [bookings, today],
-  );
-
-  const upcomingBookings = useMemo(
-    () =>
-      bookings
-        .filter((booking) => `${booking.date} ${booking.time}` >= `${today} 00:00`)
-        .sort(sortBookings),
-    [bookings, today],
-  );
-
-  const list = todayBookings.length > 0 ? todayBookings : upcomingBookings.slice(0, 5);
-  const nearest = list[0] ?? null;
-  const revenue = todayBookings.reduce((sum, booking) => sum + getBookingAmount(booking), 0);
-  const riskCount = todayBookings.filter(
-    (booking) => booking.status === 'new' || booking.status === 'no_show',
-  ).length;
+  const today = todayIso();
+  const todayBookings = bookings.filter((booking) => booking.date === today).sort(sortByDateTime);
+  const tomorrowBookings = bookings.filter((booking) => booking.date === addDaysIso(today, 1)).sort(sortByDateTime);
+  const upcoming = bookings
+    .filter((booking) => `${booking.date} ${booking.time}` >= `${today} 00:00` && booking.status !== 'cancelled')
+    .sort(sortByDateTime)
+    .slice(0, 8);
+  const completedToday = todayBookings.filter((booking) => booking.status === 'completed').length;
+  const activeToday = todayBookings.filter((booking) => countsAsActive(booking.status)).length;
+  const revenueToday = todayBookings.filter((booking) => countsAsRevenue(booking.status)).reduce((sum, booking) => sum + getBookingAmount(booking, dataset.services), 0);
+  const nextBooking = upcoming[0];
 
   return (
-    <div className="space-y-3">
-      <section>
-        <MiniLabel>рабочий день</MiniLabel>
-        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
-          Сегодня
-        </h1>
-        <p className="mt-2 max-w-[320px] text-[12px] leading-5 text-white/42">
-          Ближайшая запись, статусы, клиенты и быстрые действия.
-        </p>
-      </section>
+    <div className="space-y-3.5">
+      <MiniCard className="overflow-hidden p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <MiniLabel>сегодня</MiniLabel>
+            <div className="mt-2 text-[34px] font-semibold leading-[0.9] tracking-[-0.095em] text-white">{activeToday}</div>
+            <div className="mt-2 text-[12px] leading-5 text-white/40">активных записей на {formatDay(today)}</div>
+          </div>
+          <div className="rounded-full border border-white/[0.08] bg-white/[0.045] px-3 py-2 text-[10px] font-bold tracking-[-0.02em] text-white/54">
+            @{profile.slug}
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          <StatTile label="Пришли" value={completedToday} />
+          <StatTile label="Выручка" value={RUB.format(revenueToday)} />
+          <StatTile label="Конверсия" value={`${dataset.totals.conversion || 0}%`} />
+        </div>
+      </MiniCard>
+
+      {nextBooking ? (
+        <MiniCard className="p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <MiniLabel>следующая запись</MiniLabel>
+              <div className="mt-2 text-[20px] font-semibold tracking-[-0.07em] text-white">{nextBooking.clientName}</div>
+              <div className="mt-1 text-[12px] text-white/38">{formatDay(nextBooking.date)} · {formatTime(nextBooking.time)} · {nextBooking.service}</div>
+            </div>
+            <MiniButton variant="primary" onClick={() => onOpenBooking(nextBooking)} className="h-10 px-3">
+              Открыть
+            </MiniButton>
+          </div>
+        </MiniCard>
+      ) : (
+        <MiniCard className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex size-11 items-center justify-center rounded-[16px] border border-white/[0.08] bg-white/[0.045] text-white/42">
+              <CalendarClock className="size-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[15px] font-semibold tracking-[-0.055em]">Свободный день</div>
+              <div className="mt-1 text-[11px] leading-4 text-white/35">Открой график или услуги, чтобы клиент видел свободное время.</div>
+            </div>
+          </div>
+        </MiniCard>
+      )}
 
       <div className="grid grid-cols-3 gap-2">
-        <MiniCard className="p-3">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
-            записи
-          </div>
-          <div className="mt-2 text-[22px] font-semibold tracking-[-0.07em]">
-            {todayBookings.length}
-          </div>
-          <div className="text-[10px] text-white/35">сегодня</div>
-        </MiniCard>
-
-        <MiniCard className="p-3">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
-            доход
-          </div>
-          <div className="mt-2 text-[22px] font-semibold tracking-[-0.07em]">
-            {RUB.format(revenue)}
-          </div>
-          <div className="text-[10px] text-white/35">услуги</div>
-        </MiniCard>
-
-        <MiniCard className="p-3">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
-            риск
-          </div>
-          <div className="mt-2 text-[22px] font-semibold tracking-[-0.07em]">
-            {riskCount}
-          </div>
-          <div className="text-[10px] text-white/35">контроль</div>
-        </MiniCard>
+        <button type="button" onClick={() => setScreen('schedule')} className="rounded-[20px] border border-white/[0.07] bg-white/[0.035] p-3 text-left active:scale-[0.98]">
+          <Clock3 className="size-4 text-white/44" />
+          <div className="mt-3 text-[12px] font-semibold tracking-[-0.045em]">График</div>
+          <div className="mt-1 text-[10px] text-white/30">слоты</div>
+        </button>
+        <button type="button" onClick={() => setScreen('services')} className="rounded-[20px] border border-white/[0.07] bg-white/[0.035] p-3 text-left active:scale-[0.98]">
+          <Scissors className="size-4 text-white/44" />
+          <div className="mt-3 text-[12px] font-semibold tracking-[-0.045em]">Услуги</div>
+          <div className="mt-1 text-[10px] text-white/30">цены</div>
+        </button>
+        <button type="button" onClick={() => setScreen('chats')} className="rounded-[20px] border border-white/[0.07] bg-white/[0.035] p-3 text-left active:scale-[0.98]">
+          <MessageCircle className="size-4 text-white/44" />
+          <div className="mt-3 text-[12px] font-semibold tracking-[-0.045em]">Чаты</div>
+          <div className="mt-1 text-[10px] text-white/30">ответы</div>
+        </button>
       </div>
 
-      <MiniCard className="overflow-hidden">
-        <div className="flex items-center justify-between border-b border-white/[0.08] p-4">
-          <div>
-            <MiniLabel>ближайшая</MiniLabel>
-            <div className="mt-1 text-[12px] text-white/42">что нужно сделать сейчас</div>
-          </div>
-
-          <Link
-            href="/dashboard"
-            className="flex h-8 items-center gap-1.5 rounded-[11px] border border-white/[0.08] bg-white/[0.045] px-2.5 text-[11px] font-semibold text-white/58"
-          >
-            ПК <ExternalLink className="size-3" />
-          </Link>
+      <section className="space-y-2.5">
+        <div className="flex items-center justify-between px-1">
+          <MiniLabel>лента записей</MiniLabel>
+          <div className="text-[10px] font-semibold text-white/30">завтра: {tomorrowBookings.length}</div>
         </div>
-
-        {nearest ? (
-          <button
-            type="button"
-            onClick={() => onOpenBooking(nearest)}
-            className="block w-full p-4 text-left active:scale-[0.995]"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-[34px] font-semibold leading-none tracking-[-0.08em]">
-                  {formatTime(nearest.time)}
-                </div>
-                <div className="mt-3 text-[19px] font-semibold tracking-[-0.06em]">
-                  {nearest.clientName}
-                </div>
-                <div className="mt-1 text-[12px] text-white/42">{nearest.service}</div>
-              </div>
-
-              <StatusPill status={nearest.status} />
-            </div>
-
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <span className="flex h-10 items-center justify-center rounded-[14px] bg-white text-[12px] font-semibold text-black">
-                Открыть
-              </span>
-              <span className="flex h-10 items-center justify-center gap-2 rounded-[14px] border border-white/[0.08] bg-white/[0.055] text-[12px] font-semibold text-white">
-                <Phone className="size-3.5" />
-                Позвонить
-              </span>
-            </div>
-          </button>
+        {upcoming.length > 0 ? (
+          <div className="space-y-2">
+            {upcoming.map((booking) => (
+              <BookingRow key={booking.id} booking={booking} services={dataset.services} onOpen={onOpenBooking} />
+            ))}
+          </div>
         ) : (
-          <div className="p-4">
-            <EmptyState
-              title="Сегодня свободно"
-              text="На сегодня нет записей. Можно проверить график или веб-кабинет."
-            />
-          </div>
+          <EmptyBlock title="Записей пока нет" text="Когда клиент запишется через публичную ссылку, запись появится здесь сразу." icon={<Bell className="size-5" />} />
         )}
-      </MiniCard>
-
-      <MiniCard className="overflow-hidden">
-        <div className="border-b border-white/[0.08] p-4">
-          <div className="text-[15px] font-semibold tracking-[-0.045em]">День</div>
-          <div className="mt-1 text-[11px] text-white/38">
-            компактный список записей
-          </div>
-        </div>
-
-        <div className="space-y-2 p-3">
-          {list.length > 0 ? (
-            list.map((booking) => (
-              <button
-                key={booking.id}
-                type="button"
-                onClick={() => onOpenBooking(booking)}
-                className="flex w-full items-center gap-3 rounded-[17px] border border-white/[0.07] bg-white/[0.035] p-3 text-left active:scale-[0.99]"
-              >
-                <div className="w-12 shrink-0 text-[17px] font-semibold tracking-[-0.06em]">
-                  {formatTime(booking.time)}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13px] font-semibold tracking-[-0.04em]">
-                    {booking.clientName}
-                  </div>
-                  <div className="mt-1 truncate text-[11px] text-white/38">
-                    {booking.service} · {RUB.format(getBookingAmount(booking))}
-                  </div>
-                </div>
-
-                <StatusPill status={booking.status} />
-                <ChevronRight className="size-4 shrink-0 text-white/26" />
-              </button>
-            ))
-          ) : (
-            <EmptyState
-              title="Записей пока нет"
-              text="Когда клиенты начнут записываться, они появятся здесь."
-            />
-          )}
-        </div>
-      </MiniCard>
+      </section>
     </div>
   );
 }
 
-function AvailabilityScreen({
-  workspaceData,
+function ScheduleScreen({ availability, updateWorkspaceSection }: { availability: AvailabilityDayInsight[]; updateWorkspaceSection: <T>(section: string, value: T) => Promise<boolean> }) {
+  const [days, setDays] = useState(() => normalizeWeekAvailability(availability));
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setDays(normalizeWeekAvailability(availability));
+  }, [availability]);
+
+  const updateDay = useCallback((id: string, patch: Partial<WeekdayEditor>) => {
+    setDays((current) => current.map((day) => (day.id === id ? { ...day, ...patch } : day)));
+    setSaved(false);
+  }, []);
+
+  async function save() {
+    setSaving(true);
+    const ok = await updateWorkspaceSection('availability', serializeWeekAvailability(days));
+    setSaving(false);
+    setSaved(ok);
+  }
+
+  function openWeekdays() {
+    setDays((current) => current.map((day) => (day.weekdayIndex <= 4 ? { ...day, status: 'workday', start: day.start || '10:00', end: day.end || '20:00' } : day)));
+    setSaved(false);
+  }
+
+  function closeWeekend() {
+    setDays((current) => current.map((day) => (day.weekdayIndex >= 5 ? { ...day, status: 'day-off' } : day)));
+    setSaved(false);
+  }
+
+  const openDays = days.filter((day) => day.status !== 'day-off').length;
+  const totalSlots = days.reduce((sum, day) => (day.status === 'day-off' ? sum : sum + 1), 0);
+
+  return (
+    <div className="space-y-3.5">
+      <MiniCard className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <MiniLabel>график</MiniLabel>
+            <div className="mt-2 text-[27px] font-semibold leading-none tracking-[-0.085em]">Неделя</div>
+            <div className="mt-2 text-[12px] leading-5 text-white/38">Одна понятная сетка для клиента: рабочее окно + перерыв.</div>
+          </div>
+          <div className="text-right text-[10px] font-semibold text-white/32">
+            {openDays} дн. открыто<br />{totalSlots} окон
+          </div>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <MiniButton variant="secondary" onClick={openWeekdays}>Будни открыть</MiniButton>
+          <MiniButton variant="secondary" onClick={closeWeekend}>Выходные закрыть</MiniButton>
+        </div>
+      </MiniCard>
+
+      <div className="space-y-2.5">
+        {days.map((day) => (
+          <MiniCard key={day.id} className="p-3.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className={cn('flex size-10 items-center justify-center rounded-[15px] border text-[12px] font-bold', day.status === 'day-off' ? 'border-white/[0.06] bg-white/[0.025] text-white/28' : 'border-white/[0.08] bg-white/[0.055] text-white')}>
+                  {day.short}
+                </div>
+                <div>
+                  <div className="text-[14px] font-semibold tracking-[-0.05em]">{day.label}</div>
+                  <div className="mt-0.5 text-[10px] text-white/30">{day.status === 'day-off' ? 'закрыто' : `${day.start}–${day.end}`}</div>
+                </div>
+              </div>
+              <select
+                value={day.status}
+                onChange={(event) => updateDay(day.id, { status: event.target.value as WeekdayEditor['status'] })}
+                className="h-9 rounded-[13px] border border-white/[0.08] bg-[#171717] px-2 text-[11px] font-semibold text-white outline-none"
+              >
+                <option value="workday">рабочий</option>
+                <option value="short">короткий</option>
+                <option value="day-off">выходной</option>
+              </select>
+            </div>
+            {day.status !== 'day-off' ? (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <MiniInput type="time" value={day.start} onChange={(event) => updateDay(day.id, { start: event.target.value })} />
+                <MiniInput type="time" value={day.end} onChange={(event) => updateDay(day.id, { end: event.target.value })} />
+                <MiniInput type="time" value={day.breakStart} onChange={(event) => updateDay(day.id, { breakStart: event.target.value })} placeholder="перерыв с" />
+                <MiniInput type="time" value={day.breakEnd} onChange={(event) => updateDay(day.id, { breakEnd: event.target.value })} placeholder="перерыв до" />
+              </div>
+            ) : null}
+          </MiniCard>
+        ))}
+      </div>
+
+      <MiniButton variant="primary" className="sticky bottom-[92px] z-20 w-full" onClick={() => void save()} disabled={saving}>
+        <Save className="size-4" />
+        {saving ? 'Сохраняю...' : saved ? 'Сохранено' : 'Сохранить график'}
+      </MiniButton>
+    </div>
+  );
+}
+
+function normalizeServices(profile: MasterProfile, services: ServiceInsight[]) {
+  const source = services.length > 0
+    ? services
+    : profile.services.map((name, index) => ({
+        id: `service-${index}`,
+        name,
+        duration: 60,
+        price: 0,
+        category: 'Основное',
+        status: 'active' as const,
+        visible: true,
+        bookings: 0,
+        revenue: 0,
+        popularity: 0,
+      }));
+
+  return source.map((service, index) => ({
+    id: service.id || `service-${index}`,
+    name: service.name || `Услуга ${index + 1}`,
+    duration: Number.isFinite(service.duration) ? service.duration : 60,
+    price: Number.isFinite(service.price) ? service.price : 0,
+    category: service.category || 'Основное',
+    status: service.status === 'draft' || service.status === 'seasonal' ? service.status : 'active',
+    visible: service.visible !== false,
+  } satisfies EditableService));
+}
+
+function ServicesScreen({
+  profile,
+  services,
+  onSaveProfile,
   updateWorkspaceSection,
 }: {
-  workspaceData: Record<string, unknown>;
+  profile: MasterProfile;
+  services: ServiceInsight[];
+  onSaveProfile: (values: MiniProfileSaveValues) => Promise<{ success: boolean; error?: string }>;
   updateWorkspaceSection: <T>(section: string, value: T) => Promise<boolean>;
 }) {
-  const [days, setDays] = useState(() => normalizeAvailability(workspaceData.availability));
-  const [selectedId, setSelectedId] = useState(days[0]?.id ?? 'mon');
+  const [items, setItems] = useState(() => normalizeServices(profile, services));
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
-  const selectedDay = days.find((day) => day.id === selectedId) ?? days[0];
-
   useEffect(() => {
-    setDays(normalizeAvailability(workspaceData.availability));
-  }, [workspaceData.availability]);
+    setItems(normalizeServices(profile, services));
+  }, [profile, services]);
 
-  function updateDay(patch: Partial<AvailabilityDay>) {
-    setDays((current) =>
-      current.map((day) => {
-        if (day.id !== selectedDay.id) return day;
-
-        const next = {
-          ...day,
-          ...patch,
-        };
-
-        const slots = generateSlots(next);
-
-        return {
-          ...next,
-          slots,
-          status: normalizeStatusFromDay({ ...next, slots }),
-          breaks: normalizeBreaks(next),
-        };
-      }),
-    );
+  function updateItem(id: string, patch: Partial<EditableService>) {
+    setItems((current) => current.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+    setMessage('');
   }
 
-  async function saveAvailability(nextDays = days) {
-    setSaving(true);
+  function addService() {
+    setItems((current) => [
+      ...current,
+      {
+        id: `service-${Date.now()}`,
+        name: 'Новая услуга',
+        duration: 60,
+        price: 0,
+        category: 'Основное',
+        status: 'draft',
+        visible: true,
+      },
+    ]);
     setMessage('');
+  }
 
-    const serialized = serializeAvailabilityDays(nextDays);
-    const ok = await updateWorkspaceSection('availability', serialized);
+  async function save() {
+    const cleaned = items
+      .map((item, index) => ({
+        id: item.id || `service-${index}`,
+        name: item.name.trim(),
+        duration: Math.max(15, Math.round(item.duration || 60)),
+        price: Math.max(0, Math.round(item.price || 0)),
+        category: item.category.trim() || 'Основное',
+        status: item.status,
+        visible: item.visible,
+        bookings: 0,
+        revenue: 0,
+        popularity: 0,
+      }))
+      .filter((item) => item.name);
 
-    if (ok) {
-      setDays(serialized);
+    if (cleaned.length === 0) {
+      setMessage('Добавь хотя бы одну услугу.');
+      return;
     }
 
+    setSaving(true);
+    const ok = await updateWorkspaceSection('services', cleaned);
+    const profileResult = await onSaveProfile(profileSavePayload(profile, {
+      servicesText: cleaned.map((item) => item.name).join('\n'),
+    }));
     setSaving(false);
-    setMessage(ok ? 'График сохранён и доступен клиентам.' : 'Не удалось сохранить график.');
+    setMessage(ok && profileResult.success ? 'Услуги сохранены и попадут на страницу клиента.' : profileResult.error || 'Не получилось сохранить услуги.');
   }
 
-  async function copyMonday() {
-    const monday = days.find((day) => day.id === 'mon') ?? days[0];
-
-    const next = days.map((day) => {
-      if (day.id === 'mon') return day;
-
-      const copy = {
-        ...day,
-        enabled: monday.enabled,
-        start: monday.start,
-        end: monday.end,
-        interval: monday.interval,
-        breakStart: monday.breakStart,
-        breakEnd: monday.breakEnd,
-      };
-
-      const slots = generateSlots(copy);
-
-      return {
-        ...copy,
-        slots,
-        status: normalizeStatusFromDay({ ...copy, slots }),
-        breaks: normalizeBreaks(copy),
-      };
-    });
-
-    setDays(next);
-    await saveAvailability(next);
-  }
+  const activeCount = items.filter((item) => item.visible && item.status !== 'draft').length;
+  const averagePrice = activeCount > 0 ? Math.round(items.filter((item) => item.visible && item.status !== 'draft').reduce((sum, item) => sum + item.price, 0) / activeCount) : 0;
 
   return (
-    <div className="space-y-3">
-      <section>
-        <MiniLabel>рабочее время</MiniLabel>
-        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
-          График
-        </h1>
-        <p className="mt-2 text-[12px] leading-5 text-white/42">
-          Управляйте днями, интервалами и слотами, которые увидит клиент.
-        </p>
-      </section>
-
-      <div className="-mx-3 overflow-x-auto px-3">
-        <div className="flex gap-2 pb-1">
-          {days.map((day) => {
-            const active = day.id === selectedDay.id;
-
-            return (
-              <button
-                key={day.id}
-                type="button"
-                onClick={() => setSelectedId(day.id)}
-                className={cn(
-                  'min-w-[72px] rounded-[18px] border p-3 text-left transition active:scale-[0.98]',
-                  active
-                    ? 'border-white/[0.16] bg-white text-black'
-                    : 'border-white/[0.08] bg-white/[0.045] text-white',
-                )}
-              >
-                <div className="text-[13px] font-semibold tracking-[-0.04em]">
-                  {day.short}
-                </div>
-                <div className={cn('mt-2 text-[20px] font-semibold tracking-[-0.07em]', active ? 'text-black' : 'text-white')}>
-                  {day.enabled ? day.slots.length : '—'}
-                </div>
-                <div className={cn('text-[10px]', active ? 'text-black/45' : 'text-white/35')}>
-                  слотов
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <MiniCard className="overflow-hidden">
-        <div className="flex items-start justify-between gap-3 border-b border-white/[0.08] p-4">
+    <div className="space-y-3.5">
+      <MiniCard className="p-4">
+        <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-[20px] font-semibold tracking-[-0.06em]">
-              {selectedDay.label}
-            </div>
-            <div className="mt-1 text-[12px] text-white/42">
-              {selectedDay.enabled ? `${selectedDay.slots.length} доступных слотов` : 'выходной'}
-            </div>
+            <MiniLabel>услуги</MiniLabel>
+            <div className="mt-2 text-[27px] font-semibold leading-none tracking-[-0.085em]">Прайс</div>
+            <div className="mt-2 text-[12px] leading-5 text-white/38">То, что клиент выбирает на публичной странице.</div>
           </div>
-
-          <button
-            type="button"
-            onClick={() => updateDay({ enabled: !selectedDay.enabled })}
-            className={cn(
-              'h-8 rounded-full border px-3 text-[11px] font-semibold',
-              selectedDay.enabled
-                ? 'border-[var(--mini-accent)] bg-[var(--mini-accent-soft)] text-white'
-                : 'border-white/[0.08] bg-white/[0.045] text-white/45',
-            )}
-          >
-            {selectedDay.enabled ? 'Рабочий' : 'Выходной'}
-          </button>
+          <MiniButton variant="secondary" onClick={addService} className="h-10 px-3">
+            <Plus className="size-4" />
+            Добавить
+          </MiniButton>
         </div>
-
-        <div className="space-y-4 p-4">
-          <div className="grid grid-cols-2 gap-3">
-            <MiniInput
-              label="Начало"
-              type="time"
-              value={selectedDay.start}
-              onChange={(value) => updateDay({ start: value })}
-            />
-            <MiniInput
-              label="Конец"
-              type="time"
-              value={selectedDay.end}
-              onChange={(value) => updateDay({ end: value })}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <MiniInput
-              label="Перерыв с"
-              type="time"
-              value={selectedDay.breakStart ?? ''}
-              onChange={(value) => updateDay({ breakStart: value })}
-            />
-            <MiniInput
-              label="Перерыв до"
-              type="time"
-              value={selectedDay.breakEnd ?? ''}
-              onChange={(value) => updateDay({ breakEnd: value })}
-            />
-          </div>
-
-          <MiniSelect
-            label="Шаг слота"
-            value={String(selectedDay.interval)}
-            onChange={(value) => updateDay({ interval: Number(value) })}
-            options={[
-              { value: '30', label: '30 минут' },
-              { value: '45', label: '45 минут' },
-              { value: '60', label: '60 минут' },
-              { value: '90', label: '90 минут' },
-              { value: '120', label: '120 минут' },
-            ]}
-          />
-
-          <div>
-            <div className="mb-2 text-[11px] font-semibold tracking-[-0.03em] text-white/58">
-              Слоты клиента
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {selectedDay.enabled && selectedDay.slots.length > 0 ? (
-                selectedDay.slots.map((slot) => (
-                  <span
-                    key={slot}
-                    className="rounded-full border border-white/[0.08] bg-white/[0.045] px-3 py-1.5 text-[12px] font-semibold text-white/72"
-                  >
-                    {getSlotStart(slot)}
-                  </span>
-                ))
-              ) : (
-                <div className="rounded-[16px] border border-white/[0.08] bg-white/[0.035] p-3 text-[12px] text-white/42">
-                  В этот день клиент не сможет выбрать время.
-                </div>
-              )}
-            </div>
-          </div>
-
-          {message ? (
-            <div className="rounded-[15px] border border-white/[0.08] bg-white/[0.035] p-3 text-[12px] text-white/58">
-              {message}
-            </div>
-          ) : null}
-
-          <div className="grid grid-cols-2 gap-2">
-            <MiniButton disabled={saving} onClick={() => void copyMonday()}>
-              Копировать Пн
-            </MiniButton>
-            <MiniButton variant="accent" disabled={saving} onClick={() => void saveAvailability()}>
-              {saving ? 'Сохраняем...' : 'Сохранить'}
-            </MiniButton>
-          </div>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <StatTile label="Видимых" value={activeCount} />
+          <StatTile label="Средний чек" value={averagePrice > 0 ? RUB.format(averagePrice) : '—'} />
         </div>
       </MiniCard>
+
+      <div className="space-y-2.5">
+        {items.map((item) => (
+          <MiniCard key={item.id} className="p-3.5">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <MiniInput value={item.name} onChange={(event) => updateItem(item.id, { name: event.target.value })} placeholder="Название услуги" />
+              </div>
+              <button type="button" onClick={() => setItems((current) => current.filter((row) => row.id !== item.id))} className="flex size-11 shrink-0 items-center justify-center rounded-[15px] border border-white/[0.08] bg-white/[0.045] text-white/40 active:scale-95">
+                <Trash2 className="size-4" />
+              </button>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <MiniInput inputMode="numeric" value={item.price ? String(item.price) : ''} onChange={(event) => updateItem(item.id, { price: asNumber(event.target.value) })} placeholder="Цена" />
+              <MiniInput inputMode="numeric" value={String(item.duration)} onChange={(event) => updateItem(item.id, { duration: asNumber(event.target.value, 60) })} placeholder="Минут" />
+            </div>
+            <div className="mt-2 grid grid-cols-[1fr_auto] gap-2">
+              <MiniInput value={item.category} onChange={(event) => updateItem(item.id, { category: event.target.value })} placeholder="Категория" />
+              <select value={item.status} onChange={(event) => updateItem(item.id, { status: event.target.value as EditableService['status'] })} className="h-11 rounded-[15px] border border-white/[0.08] bg-[#171717] px-3 text-[11px] font-semibold text-white outline-none">
+                <option value="active">активна</option>
+                <option value="seasonal">сезон</option>
+                <option value="draft">черновик</option>
+              </select>
+            </div>
+            <button type="button" onClick={() => updateItem(item.id, { visible: !item.visible })} className="mt-2 flex h-10 w-full items-center justify-between rounded-[14px] border border-white/[0.07] bg-white/[0.032] px-3 text-[11px] font-semibold text-white/56">
+              <span>{item.visible ? 'Показывается клиентам' : 'Скрыта со страницы клиента'}</span>
+              <span className={cn('size-2 rounded-full', item.visible ? 'bg-emerald-400' : 'bg-white/20')} />
+            </button>
+          </MiniCard>
+        ))}
+      </div>
+
+      {message ? <div className="rounded-[16px] border border-white/[0.07] bg-white/[0.035] px-3 py-2 text-[12px] text-white/50">{message}</div> : null}
+      <MiniButton variant="primary" className="sticky bottom-[92px] z-20 w-full" onClick={() => void save()} disabled={saving}>
+        <Save className="size-4" />
+        {saving ? 'Сохраняю...' : 'Сохранить услуги'}
+      </MiniButton>
     </div>
   );
 }
 
 function ChatsScreen() {
-  const [threads, setThreads] = useState<MiniChatThread[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [threads, setThreads] = useState<ChatThreadRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [messageText, setMessageText] = useState('');
-  const [newClientName, setNewClientName] = useState('');
-  const [newClientPhone, setNewClientPhone] = useState('');
-  const [error, setError] = useState('');
+  const [active, setActive] = useState<ChatThreadRecord | null>(null);
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
 
-  const selectedThread = threads.find((thread) => thread.id === selectedId) ?? null;
-
-  const loadChats = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true);
-    setError('');
-
     try {
-      const response = await fetchMini('/api/chats');
-
-      if (!response.ok) {
-        throw new Error('chats_load_failed');
-      }
-
-      const payload = await parseJsonSafe<Record<string, unknown>>(response);
-      const rawThreads = firstArray(payload?.threads, payload?.chats, payload?.items);
-
-      const normalized = rawThreads.map(normalizeChatThread);
-
-      setThreads(normalized);
-      setSelectedId((current) => current ?? normalized[0]?.id ?? null);
+      const response = await fetch('/api/chats', {
+        credentials: 'include',
+        cache: 'no-store',
+        headers: getTelegramAppSessionHeaders(),
+      });
+      if (!response.ok) throw new Error('failed');
+      const payload = (await response.json()) as ChatThreadListResponse;
+      setThreads(Array.isArray(payload.threads) ? payload.threads : []);
     } catch {
-      setError('Не удалось загрузить чаты. Проверьте подключение бота.');
+      setThreads([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void loadChats();
-  }, [loadChats]);
+    void load();
+  }, [load]);
 
-  async function sendMessage(text = messageText) {
-    const clean = text.trim();
-    if (!clean || !selectedThread) return;
-
-    const optimistic: MiniChatMessage = {
-      id: `local-${Date.now()}`,
-      from: 'master',
-      text: clean,
-      createdAt: new Date().toISOString(),
-    };
-
-    setThreads((current) =>
-      current.map((thread) =>
-        thread.id === selectedThread.id
-          ? {
-              ...thread,
-              lastMessage: clean,
-              updatedAt: optimistic.createdAt,
-              messages: [...thread.messages, optimistic],
-            }
-          : thread,
-      ),
-    );
-
-    setMessageText('');
-
+  async function send() {
+    const text = draft.trim();
+    if (!active || !text) return;
+    setSending(true);
     try {
-      const response = await fetchMini('/api/chats', {
+      const response = await fetch('/api/chats', {
         method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
         headers: {
           'Content-Type': 'application/json',
+          ...getTelegramAppSessionHeaders(),
         },
         body: JSON.stringify({
-          type: 'message',
-          threadId: selectedThread.id,
-          body: clean,
+          threadId: active.id,
+          body: text,
           author: 'master',
           viaBot: true,
-          clientMessageKey: optimistic.id,
+          clientMessageKey: `${active.id}-${Date.now()}`,
         }),
       });
-
-      if (!response.ok) {
-        throw new Error('message_send_failed');
-      }
-
-      const payload = await parseJsonSafe<Record<string, unknown>>(response);
-      const maybeThread = payload?.thread || payload?.chat;
-
-      if (maybeThread) {
-        const normalized = normalizeChatThread(maybeThread, 0);
-        setThreads((current) =>
-          current.map((thread) => (thread.id === selectedThread.id ? normalized : thread)),
-        );
-      }
+      if (!response.ok) throw new Error('send_failed');
+      setDraft('');
+      await load();
+      setActive((current) => threads.find((thread) => thread.id === current?.id) ?? current);
     } catch {
-      setError('Сообщение добавлено локально, но API чата не ответил.');
+      // stay in the chat, user keeps the draft
+    } finally {
+      setSending(false);
     }
   }
 
-  async function createThread() {
-    const name = newClientName.trim();
-    const phone = newClientPhone.trim();
+  const ordered = useMemo(() => [...threads].sort((a, b) => new Date(b.lastMessageAt || b.updatedAt).getTime() - new Date(a.lastMessageAt || a.updatedAt).getTime()), [threads]);
 
-    if (!name) {
-      setError('Укажите имя клиента.');
-      return;
-    }
-
-    if (!phone) {
-      setError('Для нового чата нужен телефон клиента.');
-      return;
-    }
-
-    setError('');
-
-    const localThread: MiniChatThread = {
-      id: `local-thread-${Date.now()}`,
-      clientName: name,
-      clientPhone: phone,
-      source: 'Telegram',
-      priority: 'normal',
-      botConnected: true,
-      lastMessage: 'Новый диалог',
-      updatedAt: new Date().toISOString(),
-      messages: [
-        {
-          id: `local-message-${Date.now()}`,
-          from: 'system',
-          text: 'Диалог создан из Mini App.',
-          createdAt: new Date().toISOString(),
-        },
-      ],
-    };
-
-    setThreads((current) => [localThread, ...current]);
-    setSelectedId(localThread.id);
-    setNewClientName('');
-    setNewClientPhone('');
-
-    try {
-      const response = await fetchMini('/api/chats', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          type: 'thread',
-          clientName: name,
-          clientPhone: phone,
-          channel: 'Telegram',
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('thread_create_failed');
-      }
-
-      const payload = await parseJsonSafe<Record<string, unknown>>(response);
-      const created = payload?.thread ? normalizeChatThread(payload.thread, 0) : null;
-
-      if (created) {
-        setThreads((current) => current.map((thread) => (thread.id === localThread.id ? created : thread)));
-        setSelectedId(created.id);
-      }
-    } catch {
-      setError('Чат создан локально, но API пока не подтвердил сохранение.');
-    }
+  if (loading) {
+    return <EmptyBlock title="Загружаю чаты" text="Проверяю сообщения и заявки из Telegram, VK и публичной страницы." icon={<MessageCircle className="size-5" />} />;
   }
 
-  if (selectedThread) {
-    return (
-      <div className="space-y-3">
-        <section className="flex items-start justify-between gap-3">
+  return (
+    <div className="space-y-3.5">
+      <MiniCard className="p-4">
+        <div className="flex items-start justify-between gap-3">
           <div>
-            <MiniLabel>диалог</MiniLabel>
-            <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
-              {selectedThread.clientName}
-            </h1>
-            <p className="mt-2 text-[12px] leading-5 text-white/42">
-              {selectedThread.clientPhone || 'контакт не указан'} · {selectedThread.source || 'КликБук'}
-            </p>
+            <MiniLabel>чаты</MiniLabel>
+            <div className="mt-2 text-[27px] font-semibold leading-none tracking-[-0.085em]">Диалоги</div>
+            <div className="mt-2 text-[12px] leading-5 text-white/38">Все заявки и сообщения в короткой мобильной ленте.</div>
           </div>
+          <MiniButton variant="secondary" className="h-10 px-3" onClick={() => void load()}>
+            <RefreshCcw className="size-4" />
+          </MiniButton>
+        </div>
+      </MiniCard>
 
-          <button
-            type="button"
-            onClick={() => setSelectedId(null)}
-            className="flex size-9 items-center justify-center rounded-[13px] border border-white/[0.08] bg-white/[0.045] text-white/55"
-          >
-            <X className="size-4" />
-          </button>
-        </section>
+      {ordered.length === 0 ? (
+        <EmptyBlock title="Чатов пока нет" text="Когда появится запись или клиент напишет через бота, диалог подтянется сюда." icon={<MessageCircle className="size-5" />} />
+      ) : (
+        <div className="space-y-2">
+          {ordered.map((thread) => (
+            <button key={thread.id} type="button" onClick={() => setActive(thread)} className="flex w-full items-center gap-3 rounded-[20px] border border-white/[0.07] bg-white/[0.035] p-3 text-left active:scale-[0.99]">
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-[16px] border border-white/[0.08] bg-white/[0.045] text-[11px] font-black tracking-[-0.05em] text-white">
+                {getInitials(thread.clientName)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="truncate text-[14px] font-semibold tracking-[-0.05em]">{thread.clientName}</div>
+                  <span className="rounded-full border border-white/[0.07] bg-white/[0.035] px-2 py-1 text-[9px] font-bold text-white/36">{thread.channel}</span>
+                </div>
+                <div className="mt-1 truncate text-[11px] text-white/34">{thread.lastMessagePreview || thread.messages?.at(-1)?.body || 'Диалог открыт'}</div>
+              </div>
+              {thread.unreadCount > 0 ? <span className="flex size-5 items-center justify-center rounded-full bg-white text-[10px] font-bold text-black">{thread.unreadCount}</span> : null}
+            </button>
+          ))}
+        </div>
+      )}
 
-        <MiniCard className="overflow-hidden">
-          <div className="flex items-center justify-between border-b border-white/[0.08] p-3">
-            <div className="flex items-center gap-2">
-              <span
-                className={cn(
-                  'size-2 rounded-full',
-                  selectedThread.botConnected ? 'bg-emerald-400' : 'bg-white/25',
-                )}
-              />
-              <span className="text-[11px] font-semibold text-white/48">
-                {selectedThread.botConnected ? 'бот подключен' : 'бот не подключен'}
-              </span>
+      {active ? (
+        <div className="fixed inset-0 z-[80] flex items-end bg-black/55 px-3 pb-[calc(var(--tg-safe-bottom,0px)+10px)] backdrop-blur-[8px]">
+          <div className="mx-auto flex max-h-[82svh] w-full max-w-[430px] flex-col overflow-hidden rounded-[26px] border border-white/[0.10] bg-[#101010] shadow-[0_28px_90px_rgba(0,0,0,0.72)]">
+            <div className="flex items-center justify-between gap-3 border-b border-white/[0.08] p-4">
+              <div className="min-w-0">
+                <div className="text-[17px] font-semibold tracking-[-0.06em]">{active.clientName}</div>
+                <div className="mt-1 text-[11px] text-white/34">{active.clientPhone || active.channel}</div>
+              </div>
+              <button type="button" onClick={() => setActive(null)} className="flex size-9 items-center justify-center rounded-[13px] border border-white/[0.08] bg-white/[0.045] text-white/52">
+                <X className="size-4" />
+              </button>
             </div>
-
-            <span className="rounded-full border border-white/[0.08] bg-white/[0.035] px-2 py-1 text-[10px] font-semibold text-white/45">
-              {selectedThread.priority === 'high' ? 'важный' : 'обычный'}
-            </span>
-          </div>
-
-          <div className="max-h-[360px] space-y-2 overflow-y-auto p-3">
-            {selectedThread.messages.length > 0 ? (
-              selectedThread.messages.map((message) => {
-                const mine = message.from === 'master';
-
-                return (
-                  <div
-                    key={message.id}
-                    className={cn('flex', mine ? 'justify-end' : 'justify-start')}
-                  >
-                    <div
-                      className={cn(
-                        'max-w-[78%] rounded-[17px] px-3 py-2 text-[13px] leading-5',
-                        mine
-                          ? 'bg-[var(--mini-accent)] text-black'
-                          : message.from === 'system'
-                            ? 'border border-white/[0.08] bg-white/[0.035] text-white/45'
-                            : 'bg-white/[0.065] text-white',
-                      )}
-                    >
-                      {message.text}
-                    </div>
+            <div className="flex-1 space-y-2 overflow-y-auto p-4">
+              {(active.messages ?? []).length === 0 ? (
+                <div className="py-8 text-center text-[12px] text-white/32">Сообщений пока нет</div>
+              ) : (
+                active.messages.map((message) => (
+                  <div key={message.id} className={cn('max-w-[86%] rounded-[18px] px-3 py-2 text-[12px] leading-5', message.author === 'master' ? 'ml-auto bg-white text-black' : message.author === 'system' ? 'mx-auto bg-white/[0.05] text-white/42' : 'bg-white/[0.055] text-white/76')}>
+                    {message.body}
                   </div>
-                );
-              })
-            ) : (
-              <EmptyState
-                title="Сообщений нет"
-                text="Напишите клиенту или выберите быстрый шаблон."
-                icon={<MessageCircle className="size-5" />}
-              />
-            )}
-          </div>
-
-          <div className="border-t border-white/[0.08] p-3">
-            <div className="mb-2 flex gap-2 overflow-x-auto">
-              {['Подтверждаю запись', 'Пришлите удобное время', 'Напомню адрес', 'Спасибо за визит'].map(
-                (template) => (
-                  <button
-                    key={template}
-                    type="button"
-                    onClick={() => void sendMessage(template)}
-                    className="shrink-0 rounded-full border border-white/[0.08] bg-white/[0.045] px-3 py-1.5 text-[11px] font-semibold text-white/55"
-                  >
-                    {template}
-                  </button>
-                ),
+                ))
               )}
             </div>
-
-            <div className="grid grid-cols-[1fr_44px] gap-2">
-              <input
-                value={messageText}
-                onChange={(event) => setMessageText(event.target.value)}
-                placeholder="Сообщение клиенту..."
-                className="h-11 rounded-[15px] border border-white/[0.08] bg-[#141414] px-3 text-[14px] font-medium text-white outline-none placeholder:text-white/25"
-              />
-              <button
-                type="button"
-                onClick={() => void sendMessage()}
-                className="flex h-11 items-center justify-center rounded-[15px] bg-[var(--mini-accent)] text-black"
-              >
-                <Send className="size-4" />
-              </button>
+            <div className="border-t border-white/[0.08] p-3">
+              <div className="flex gap-2">
+                <MiniInput value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Ответ клиенту" onKeyDown={(event) => {
+                  if (event.key === 'Enter') void send();
+                }} />
+                <MiniButton variant="primary" disabled={sending || !draft.trim()} onClick={() => void send()} className="h-11 w-12 shrink-0 px-0">
+                  <Send className="size-4" />
+                </MiniButton>
+              </div>
             </div>
           </div>
-        </MiniCard>
-      </div>
-    );
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ClientsScreen({ clients, updateWorkspaceSection, workspaceData }: { clients: ClientInsight[]; updateWorkspaceSection: <T>(section: string, value: T) => Promise<boolean>; workspaceData: Record<string, unknown> }) {
+  const [query, setQuery] = useState('');
+  const [selected, setSelected] = useState<ClientInsight | null>(null);
+  const notes = safeRecord(workspaceData.clientNotes) as Record<string, string>;
+  const favorites = safeRecord(workspaceData.clientFavorites) as Record<string, boolean>;
+  const filtered = clients.filter((client) => `${client.name} ${client.phone} ${client.service}`.toLowerCase().includes(query.toLowerCase().trim()));
+
+  async function toggleFavorite(client: ClientInsight) {
+    await updateWorkspaceSection('clientFavorites', { ...favorites, [client.id]: !favorites[client.id] });
+  }
+
+  async function saveNote(client: ClientInsight, note: string) {
+    await updateWorkspaceSection('clientNotes', { ...notes, [client.id]: note });
   }
 
   return (
-    <div className="space-y-3">
-      <section>
-        <MiniLabel>коммуникации</MiniLabel>
-        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
-          Чаты
-        </h1>
-        <p className="mt-2 text-[12px] leading-5 text-white/42">
-          Клиенты, быстрые сообщения и шаблоны.
-        </p>
-      </section>
-
-      <MiniCard className="space-y-3 p-4">
-        <div className="text-[15px] font-semibold tracking-[-0.045em]">Новый диалог</div>
-        <MiniInput
-          label="Имя клиента"
-          value={newClientName}
-          onChange={setNewClientName}
-          placeholder="Анна"
-        />
-        <MiniInput
-          label="Телефон"
-          value={newClientPhone}
-          onChange={setNewClientPhone}
-          placeholder="+7..."
-        />
-        {error ? (
-          <div className="rounded-[15px] border border-white/[0.08] bg-white/[0.035] p-3 text-[12px] leading-5 text-white/58">
-            {error}
-          </div>
-        ) : null}
-        <MiniButton variant="accent" onClick={() => void createThread()}>
-          <Plus className="size-4" />
-          Создать чат
-        </MiniButton>
+    <div className="space-y-3.5">
+      <MiniCard className="p-4">
+        <MiniLabel>клиенты</MiniLabel>
+        <div className="mt-2 text-[27px] font-semibold leading-none tracking-[-0.085em]">База</div>
+        <div className="mt-4"><MiniInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск по имени, телефону, услуге" /></div>
       </MiniCard>
 
-      <MiniCard className="overflow-hidden">
-        <div className="flex items-center justify-between border-b border-white/[0.08] p-4">
-          <div>
-            <div className="text-[15px] font-semibold tracking-[-0.045em]">Диалоги</div>
-            <div className="mt-1 text-[11px] text-white/38">
-              {loading ? 'загружаем...' : `${threads.length} чатов`}
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => void loadChats()}
-            className="flex size-8 items-center justify-center rounded-[11px] border border-white/[0.08] bg-white/[0.045] text-white/55"
-          >
-            <RefreshCcw className="size-3.5" />
-          </button>
+      {filtered.length === 0 ? (
+        <EmptyBlock title="Клиентов нет" text="Клиенты появятся после первых записей и сообщений." icon={<Users2 className="size-5" />} />
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((client) => (
+            <button key={client.id} type="button" onClick={() => setSelected(client)} className="flex w-full items-center gap-3 rounded-[20px] border border-white/[0.07] bg-white/[0.035] p-3 text-left active:scale-[0.99]">
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-[16px] border border-white/[0.08] bg-white/[0.045] text-[11px] font-black tracking-[-0.05em]">{getInitials(client.name)}</div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <div className="truncate text-[14px] font-semibold tracking-[-0.05em]">{client.name}</div>
+                  {(favorites[client.id] || client.favorite) ? <Star className="size-3.5 fill-white text-white" /> : null}
+                </div>
+                <div className="mt-1 truncate text-[11px] text-white/34">{client.visits} визитов · {client.service || 'услуга'} · {client.phone}</div>
+              </div>
+              <ChevronRight className="size-4 shrink-0 text-white/20" />
+            </button>
+          ))}
         </div>
+      )}
 
-        <div className="space-y-2 p-3">
-          {threads.length > 0 ? (
-            threads.map((thread) => (
-              <button
-                key={thread.id}
-                type="button"
-                onClick={() => setSelectedId(thread.id)}
-                className="flex w-full items-center gap-3 rounded-[17px] border border-white/[0.07] bg-white/[0.035] p-3 text-left"
-              >
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-[14px] border border-white/[0.08] bg-white/[0.055] text-[11px] font-bold">
-                  {getInitials(thread.clientName)}
-                </div>
+      {selected ? (
+        <ClientSheet client={selected} note={notes[selected.id] ?? selected.note ?? ''} favorite={Boolean(favorites[selected.id] ?? selected.favorite)} onClose={() => setSelected(null)} onFavorite={() => void toggleFavorite(selected)} onSaveNote={(note) => void saveNote(selected, note)} />
+      ) : null}
+    </div>
+  );
+}
 
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13px] font-semibold tracking-[-0.04em]">
-                    {thread.clientName}
-                  </div>
-                  <div className="mt-1 truncate text-[11px] text-white/38">
-                    {thread.lastMessage || 'Открыть диалог'}
-                  </div>
-                </div>
+function ClientSheet({ client, note, favorite, onClose, onFavorite, onSaveNote }: { client: ClientInsight; note: string; favorite: boolean; onClose: () => void; onFavorite: () => void; onSaveNote: (note: string) => void }) {
+  const [draft, setDraft] = useState(note);
+  useEffect(() => setDraft(note), [note]);
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end bg-black/55 px-3 pb-[calc(var(--tg-safe-bottom,0px)+10px)] backdrop-blur-[8px]">
+      <div className="mx-auto w-full max-w-[430px] overflow-hidden rounded-[26px] border border-white/[0.10] bg-[#101010] shadow-[0_28px_90px_rgba(0,0,0,0.72)]">
+        <div className="flex items-start justify-between gap-3 border-b border-white/[0.08] p-4">
+          <div>
+            <MiniLabel>клиент</MiniLabel>
+            <div className="mt-2 text-[24px] font-semibold leading-none tracking-[-0.08em]">{client.name}</div>
+            <div className="mt-2 text-[12px] text-white/40">{client.phone}</div>
+          </div>
+          <button type="button" onClick={onClose} className="flex size-9 items-center justify-center rounded-[13px] border border-white/[0.08] bg-white/[0.045] text-white/52"><X className="size-4" /></button>
+        </div>
+        <div className="space-y-3 p-4">
+          <div className="grid grid-cols-3 gap-2">
+            <StatTile label="Визиты" value={client.visits} />
+            <StatTile label="Чек" value={client.averageCheck ? RUB.format(client.averageCheck) : '—'} />
+            <StatTile label="Выручка" value={client.totalRevenue ? RUB.format(client.totalRevenue) : '—'} />
+          </div>
+          <MiniTextarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Заметка по клиенту" />
+          <div className="grid grid-cols-2 gap-2">
+            <MiniButton variant="secondary" onClick={onFavorite}>{favorite ? <Star className="size-4 fill-white" /> : <Star className="size-4" />}{favorite ? 'VIP' : 'В VIP'}</MiniButton>
+            <MiniButton variant="primary" onClick={() => onSaveNote(draft)}>Сохранить</MiniButton>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-                {thread.priority === 'high' ? (
-                  <span className="size-2 rounded-full bg-[var(--mini-accent)]" />
-                ) : null}
+function AnalyticsScreen({ dataset }: { dataset: WorkspaceDataset }) {
+  const maxDaily = Math.max(1, ...dataset.daily.map((day) => day.requests));
+  const channels = dataset.channels.filter((channel) => channel.visitors > 0 || channel.bookings > 0).slice(0, 4);
 
-                <ChevronRight className="size-4 text-white/25" />
-              </button>
-            ))
-          ) : (
-            <EmptyState
-              title={error || 'Чатов пока нет'}
-              text="Создайте диалог или дождитесь первого сообщения от клиента."
-              icon={<MessageCircle className="size-5" />}
-            />
-          )}
+  return (
+    <div className="space-y-3.5">
+      <MiniCard className="p-4">
+        <MiniLabel>аналитика</MiniLabel>
+        <div className="mt-2 text-[27px] font-semibold leading-none tracking-[-0.085em]">Пульс</div>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <StatTile label="Записи" value={dataset.totals.bookings} />
+          <StatTile label="Выручка" value={RUB.format(dataset.totals.revenue || 0)} />
+          <StatTile label="Средний чек" value={dataset.totals.averageCheck ? RUB.format(dataset.totals.averageCheck) : '—'} />
+          <StatTile label="Возврат" value={`${dataset.totals.returnRate || 0}%`} />
+        </div>
+      </MiniCard>
+
+      <MiniCard className="p-4">
+        <div className="flex items-center justify-between"><MiniLabel>по дням</MiniLabel><span className="text-[10px] text-white/30">последние дни</span></div>
+        <div className="mt-4 space-y-3">
+          {dataset.daily.slice(-7).map((day) => (
+            <div key={day.date} className="grid grid-cols-[74px_1fr_36px] items-center gap-2">
+              <div className="text-[10px] font-semibold text-white/34">{day.label}</div>
+              <div className="h-2 overflow-hidden rounded-full bg-white/[0.055]"><div className="h-full rounded-full bg-white/60" style={{ width: `${Math.max(5, (day.requests / maxDaily) * 100)}%` }} /></div>
+              <div className="text-right text-[10px] font-semibold text-white/44">{day.requests}</div>
+            </div>
+          ))}
+        </div>
+      </MiniCard>
+
+      <MiniCard className="p-4">
+        <MiniLabel>каналы</MiniLabel>
+        <div className="mt-3 space-y-2">
+          {(channels.length ? channels : dataset.channels.slice(0, 4)).map((channel) => (
+            <div key={channel.id} className="flex items-center justify-between rounded-[16px] border border-white/[0.06] bg-white/[0.03] px-3 py-2.5">
+              <div>
+                <div className="text-[13px] font-semibold tracking-[-0.045em]">{channel.label}</div>
+                <div className="mt-0.5 text-[10px] text-white/30">{channel.visitors} визитов · {channel.conversion}%</div>
+              </div>
+              <div className="text-right text-[13px] font-semibold tracking-[-0.045em]">{channel.bookings}</div>
+            </div>
+          ))}
         </div>
       </MiniCard>
     </div>
   );
 }
 
-function ClientsScreen({
-  bookings,
-  onOpenBooking,
-}: {
-  bookings: Booking[];
-  onOpenBooking: (booking: Booking) => void;
-}) {
-  const [selectedClientKey, setSelectedClientKey] = useState<string | null>(null);
-  const [favoriteKeys, setFavoriteKeys] = useState<string[]>([]);
-  const [notes, setNotes] = useState<Record<string, string>>({});
-
-  const clients = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        key: string;
-        name: string;
-        phone: string;
-        visits: number;
-        total: number;
-        last: string;
-        service: string;
-        bookings: Booking[];
-      }
-    >();
-
-    bookings.forEach((booking) => {
-      const key = booking.clientPhone || booking.clientName;
-      const current = map.get(key);
-
-      if (!current) {
-        map.set(key, {
-          key,
-          name: booking.clientName,
-          phone: booking.clientPhone,
-          visits: 1,
-          total: getBookingAmount(booking),
-          last: booking.date,
-          service: booking.service,
-          bookings: [booking],
-        });
-        return;
-      }
-
-      current.visits += 1;
-      current.total += getBookingAmount(booking);
-      current.bookings.push(booking);
-
-      if (booking.date > current.last) {
-        current.last = booking.date;
-        current.service = booking.service;
-      }
-    });
-
-    return Array.from(map.values()).sort((a, b) => b.last.localeCompare(a.last));
-  }, [bookings]);
-
-  const selectedClient = clients.find((client) => client.key === selectedClientKey) ?? null;
-
-  if (selectedClient) {
-    const favorite = favoriteKeys.includes(selectedClient.key);
-
-    return (
-      <div className="space-y-3">
-        <section className="flex items-start justify-between gap-3">
-          <div>
-            <MiniLabel>карточка клиента</MiniLabel>
-            <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
-              {selectedClient.name}
-            </h1>
-            <p className="mt-2 text-[12px] leading-5 text-white/42">
-              {selectedClient.visits} визита · {RUB.format(selectedClient.total)}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setSelectedClientKey(null)}
-            className="flex size-9 items-center justify-center rounded-[13px] border border-white/[0.08] bg-white/[0.045] text-white/55"
-          >
-            <X className="size-4" />
-          </button>
-        </section>
-
-        <div className="grid grid-cols-2 gap-2">
-          <MiniButton
-            variant={favorite ? 'accent' : 'secondary'}
-            onClick={() =>
-              setFavoriteKeys((current) =>
-                favorite
-                  ? current.filter((key) => key !== selectedClient.key)
-                  : [...current, selectedClient.key],
-              )
-            }
-          >
-            <Star className="size-4" />
-            {favorite ? 'VIP' : 'В VIP'}
-          </MiniButton>
-          <MiniButton>
-            <Phone className="size-4" />
-            Позвонить
-          </MiniButton>
-        </div>
-
-        <MiniCard className="space-y-3 p-4">
-          <MiniInput
-            label="Заметка мастера"
-            value={notes[selectedClient.key] ?? ''}
-            onChange={(value) =>
-              setNotes((current) => ({
-                ...current,
-                [selectedClient.key]: value,
-              }))
-            }
-            placeholder="Предпочтения, нюансы, что важно помнить..."
-            textarea
-          />
-        </MiniCard>
-
-        <MiniCard className="overflow-hidden">
-          <div className="border-b border-white/[0.08] p-4">
-            <div className="text-[15px] font-semibold tracking-[-0.045em]">История</div>
-            <div className="mt-1 text-[11px] text-white/38">записи клиента</div>
-          </div>
-
-          <div className="space-y-2 p-3">
-            {selectedClient.bookings.slice().sort(sortBookings).map((booking) => (
-              <button
-                key={booking.id}
-                type="button"
-                onClick={() => onOpenBooking(booking)}
-                className="flex w-full items-center gap-3 rounded-[17px] border border-white/[0.07] bg-white/[0.035] p-3 text-left"
-              >
-                <div className="w-16 text-[12px] font-semibold text-white/58">
-                  {formatDayLabel(booking.date)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13px] font-semibold tracking-[-0.04em]">
-                    {booking.service}
-                  </div>
-                  <div className="mt-1 text-[11px] text-white/38">
-                    {formatTime(booking.time)} · {RUB.format(getBookingAmount(booking))}
-                  </div>
-                </div>
-                <StatusPill status={booking.status} />
-              </button>
-            ))}
-          </div>
-        </MiniCard>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      <section>
-        <MiniLabel>база</MiniLabel>
-        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
-          Клиенты
-        </h1>
-        <p className="mt-2 text-[12px] leading-5 text-white/42">
-          Карточки клиентов, визиты, суммы и история.
-        </p>
-      </section>
-
-      <div className="grid grid-cols-3 gap-2">
-        <MiniCard className="p-3">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
-            всего
-          </div>
-          <div className="mt-2 text-[22px] font-semibold tracking-[-0.07em]">
-            {clients.length}
-          </div>
-        </MiniCard>
-        <MiniCard className="p-3">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
-            VIP
-          </div>
-          <div className="mt-2 text-[22px] font-semibold tracking-[-0.07em]">
-            {favoriteKeys.length}
-          </div>
-        </MiniCard>
-        <MiniCard className="p-3">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
-            визиты
-          </div>
-          <div className="mt-2 text-[22px] font-semibold tracking-[-0.07em]">
-            {bookings.length}
-          </div>
-        </MiniCard>
-      </div>
-
-      <MiniCard className="overflow-hidden">
-        <div className="space-y-2 p-3">
-          {clients.length > 0 ? (
-            clients.map((client) => (
-              <button
-                key={client.key}
-                type="button"
-                onClick={() => setSelectedClientKey(client.key)}
-                className="flex w-full items-center gap-3 rounded-[17px] border border-white/[0.07] bg-white/[0.035] p-3 text-left"
-              >
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-[14px] border border-white/[0.08] bg-white/[0.055] text-[11px] font-bold">
-                  {getInitials(client.name)}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <div className="truncate text-[13px] font-semibold tracking-[-0.04em]">
-                      {client.name}
-                    </div>
-                    {favoriteKeys.includes(client.key) ? (
-                      <Star className="size-3 fill-[var(--mini-accent)] text-[var(--mini-accent)]" />
-                    ) : null}
-                  </div>
-                  <div className="mt-1 truncate text-[11px] text-white/38">
-                    {client.visits} визита · {RUB.format(client.total)} · {formatDayLabel(client.last)}
-                  </div>
-                </div>
-
-                <ChevronRight className="size-4 text-white/25" />
-              </button>
-            ))
-          ) : (
-            <EmptyState
-              title="Клиентов пока нет"
-              text="Клиенты появятся после первых записей."
-              icon={<Users2 className="size-5" />}
-            />
-          )}
-        </div>
-      </MiniCard>
-    </div>
-  );
-}
-
-function ProfileScreen({
-  profile,
-  onSave,
-  getPublicPath,
-}: {
-  profile: MasterProfile | null;
-  onSave: (values: MiniProfileSaveValues) => Promise<{ success: boolean; error?: string }>;
-  getPublicPath: (slug: string) => string;
-}) {
-  const [tab, setTab] = useState<'base' | 'place' | 'portfolio' | 'reviews' | 'contacts'>('base');
-  const [form, setForm] = useState<MiniProfileSaveValues>(() => profileToForm(profile));
-  const [portfolioText, setPortfolioText] = useState(
-    (profile?.workGallery ?? []).map((item) => `${item.title || 'Работа'} | ${item.image || ''}`).join('\n'),
-  );
-  const [reviewsText, setReviewsText] = useState(
-    (profile?.reviews ?? []).map((item) => `${item.author}: ${item.text}`).join('\n'),
-  );
+function ProfileScreen({ profile, onSave, getPublicPath }: { profile: MasterProfile; onSave: (values: MiniProfileSaveValues) => Promise<{ success: boolean; error?: string }>; getPublicPath: (slug: string) => string }) {
+  const [form, setForm] = useState(() => profileSavePayload(profile, {}));
   const [saving, setSaving] = useState(false);
-  const [resultText, setResultText] = useState('');
   const [copied, setCopied] = useState(false);
+  const [message, setMessage] = useState('');
 
-  useEffect(() => {
-    setForm(profileToForm(profile));
-    setPortfolioText(
-      (profile?.workGallery ?? []).map((item) => `${item.title || 'Работа'} | ${item.image || ''}`).join('\n'),
-    );
-    setReviewsText((profile?.reviews ?? []).map((item) => `${item.author}: ${item.text}`).join('\n'));
-  }, [profile]);
+  useEffect(() => setForm(profileSavePayload(profile, {})), [profile]);
 
-  const publicUrl =
-    typeof window !== 'undefined' && profile?.slug
-      ? `${window.location.origin}${getPublicPath(profile.slug)}`
-      : '';
+  const publicUrl = typeof window === 'undefined' ? getPublicPath(profile.slug) : `${window.location.origin}${getPublicPath(profile.slug)}`;
 
-  const update = <K extends keyof MiniProfileSaveValues>(
-    key: K,
-    value: MiniProfileSaveValues[K],
-  ) => {
-    setForm((current) => ({ ...current, [key]: value }));
-  };
-
-  function parsePortfolio(): WorkGalleryItem[] {
-    return portfolioText
-      .split('\n')
-      .map((line, index) => {
-        const [title, image] = line.split('|').map((part) => part.trim());
-
-        if (!title && !image) return null;
-
-        return {
-          id: `work-${index}`,
-          title: title || `Работа ${index + 1}`,
-          image: image || '',
-        };
-      })
-      .filter((item): item is WorkGalleryItem => Boolean(item));
+  function patch(value: Partial<MiniProfileSaveValues>) {
+    setForm((current) => ({ ...current, ...value }));
+    setMessage('');
   }
 
-  function parseReviews() {
-    return reviewsText
-      .split('\n')
-      .map((line, index) => {
-        const [author, ...rest] = line.split(':');
-        const text = rest.join(':').trim();
-
-        if (!author.trim() && !text) return null;
-
-        return {
-          id: `review-${index}`,
-          author: author.trim() || 'Клиент',
-          text: text || line.trim(),
-          rating: 5,
-        };
-      })
-      .filter(Boolean) as NonNullable<MasterProfile['reviews']>;
-  }
-
-  async function handleSave() {
+  async function save() {
     setSaving(true);
-    setResultText('');
-
-    const result = await onSave({
-      ...form,
-      workGallery: parsePortfolio(),
-      reviews: parseReviews(),
-      reviewCount: parseReviews().length || form.reviewCount,
-    });
-
+    const result = await onSave(form);
     setSaving(false);
-    setResultText(
-      result.success ? 'Профиль сохранён.' : result.error || 'Не удалось сохранить профиль.',
-    );
+    setMessage(result.success ? 'Профиль сохранён.' : result.error || 'Не удалось сохранить профиль.');
   }
 
   async function copyLink() {
-    if (!publicUrl) return;
-
-    try {
-      await navigator.clipboard.writeText(publicUrl);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1400);
-    } catch {}
+    const ok = await copyText(publicUrl);
+    setCopied(ok);
+    window.setTimeout(() => setCopied(false), 1600);
   }
 
-  const tabs = [
-    { id: 'base', label: 'Основа' },
-    { id: 'place', label: 'Место' },
-    { id: 'portfolio', label: 'Портфолио' },
-    { id: 'reviews', label: 'Отзывы' },
-    { id: 'contacts', label: 'Контакты' },
-  ] as const;
-
   return (
-    <div className="space-y-3">
-      <section>
-        <MiniLabel>публичная страница</MiniLabel>
-        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
-          Профиль
-        </h1>
-        <p className="mt-2 text-[12px] leading-5 text-white/42">
-          Та же логика профиля, но компактно для телефона.
-        </p>
-      </section>
-
-      {publicUrl ? (
-        <MiniCard className="p-4">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/32">
-            ссылка
+    <div className="space-y-3.5">
+      <MiniCard className="p-4">
+        <div className="flex items-center gap-3">
+          <AvatarMark profile={profile} size="lg" />
+          <div className="min-w-0 flex-1">
+            <MiniLabel>профиль</MiniLabel>
+            <div className="mt-2 truncate text-[24px] font-semibold leading-none tracking-[-0.085em]">{profile.name}</div>
+            <div className="mt-2 flex items-center gap-2 rounded-[14px] border border-white/[0.07] bg-white/[0.035] px-3 py-2 text-[11px] text-white/40">
+              <span className="min-w-0 flex-1 truncate">{publicUrl}</span>
+              <button type="button" onClick={() => void copyLink()} className="text-white/62"><Copy className="size-3.5" /></button>
+            </div>
+            {copied ? <div className="mt-1 text-[10px] text-white/38">Ссылка скопирована</div> : null}
           </div>
-          <div className="mt-2 truncate text-[18px] font-semibold tracking-[-0.06em]">
-            {getPublicPath(profile?.slug || '')}
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <MiniButton onClick={copyLink}>
-              <Copy className="size-4" />
-              {copied ? 'Скопировано' : 'Копировать'}
-            </MiniButton>
-            <Link
-              href={publicUrl}
-              className="flex h-10 items-center justify-center gap-2 rounded-[14px] border border-white/[0.08] bg-white/[0.055] text-[12px] font-semibold tracking-[-0.035em] text-white"
-            >
-              <ExternalLink className="size-4" />
-              Открыть
-            </Link>
-          </div>
-        </MiniCard>
-      ) : null}
-
-      <div className="-mx-3 overflow-x-auto px-3">
-        <div className="flex gap-2 pb-1">
-          {tabs.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setTab(item.id)}
-              className={cn(
-                'h-9 shrink-0 rounded-full border px-3 text-[12px] font-semibold tracking-[-0.035em]',
-                tab === item.id
-                  ? 'border-[var(--mini-accent)] bg-[var(--mini-accent-soft)] text-white'
-                  : 'border-white/[0.08] bg-white/[0.045] text-white/45',
-              )}
-            >
-              {item.label}
-            </button>
-          ))}
         </div>
-      </div>
-
-      <MiniCard className="space-y-4 p-4">
-        {tab === 'base' ? (
-          <>
-            <MiniInput label="Фото / аватар" value={form.avatar} onChange={(value) => update('avatar', value)} placeholder="URL изображения" />
-            <MiniInput label="Имя" value={form.name} onChange={(value) => update('name', value)} />
-            <MiniInput label="Специализация" value={form.profession} onChange={(value) => update('profession', value)} />
-            <MiniInput label="Город" value={form.city} onChange={(value) => update('city', value)} />
-            <MiniInput label="Описание" value={form.bio} onChange={(value) => update('bio', value)} textarea />
-            <MiniInput label="Опыт" value={getString(form.experienceLabel)} onChange={(value) => update('experienceLabel', value)} placeholder="5 лет опыта" />
-            <MiniInput label="Средний чек / цена" value={getString(form.priceHint)} onChange={(value) => update('priceHint', value)} placeholder="от 2500 ₽" />
-          </>
-        ) : null}
-
-        {tab === 'place' ? (
-          <>
-            <MiniSelect
-              label="Формат работы"
-              value={getString(form.locationMode, 'online')}
-              onChange={(value) => update('locationMode', value as MasterProfile['locationMode'])}
-              options={[
-                { value: 'online', label: 'Без адреса / онлайн' },
-                { value: 'address', label: 'Показывать адрес' },
-              ]}
-            />
-            <MiniInput label="Адрес" value={getString(form.address)} onChange={(value) => update('address', value)} placeholder="Город, улица, дом" />
-            <MiniInput label="Ссылка на карту" value={getString(form.mapUrl)} onChange={(value) => update('mapUrl', value)} placeholder="https://..." />
-          </>
-        ) : null}
-
-        {tab === 'portfolio' ? (
-          <>
-            <MiniInput
-              label="Портфолио"
-              value={portfolioText}
-              onChange={setPortfolioText}
-              placeholder={'Маникюр нюд | https://...\nРабота после коррекции | https://...'}
-              textarea
-            />
-            <div className="rounded-[16px] border border-white/[0.08] bg-white/[0.035] p-3 text-[12px] leading-5 text-white/42">
-              Формат: название работы | ссылка на изображение.
-            </div>
-          </>
-        ) : null}
-
-        {tab === 'reviews' ? (
-          <>
-            <MiniInput
-              label="Отзывы"
-              value={reviewsText}
-              onChange={setReviewsText}
-              placeholder={'Анна: Очень аккуратная работа\nМария: Всё понравилось'}
-              textarea
-            />
-            <div className="rounded-[16px] border border-white/[0.08] bg-white/[0.035] p-3 text-[12px] leading-5 text-white/42">
-              Формат: имя клиента: текст отзыва.
-            </div>
-          </>
-        ) : null}
-
-        {tab === 'contacts' ? (
-          <>
-            <MiniInput label="Телефон" value={form.phone} onChange={(value) => update('phone', value)} />
-            <MiniInput label="Telegram" value={form.telegram} onChange={(value) => update('telegram', value)} />
-            <MiniInput label="WhatsApp / VK" value={form.whatsapp} onChange={(value) => update('whatsapp', value)} />
-            <MiniInput label="Ссылка" value={form.slug} onChange={(value) => update('slug', value)} />
-            <MiniInput label="Скорость ответа" value={getString(form.responseTime)} onChange={(value) => update('responseTime', value)} placeholder="обычно отвечаю за 15 минут" />
-          </>
-        ) : null}
-
-        {resultText ? (
-          <div className="rounded-[15px] border border-white/[0.08] bg-white/[0.035] p-3 text-[12px] text-white/58">
-            {resultText}
-          </div>
-        ) : null}
-
-        <MiniButton variant="accent" onClick={handleSave} disabled={saving}>
-          {saving ? 'Сохраняем...' : 'Сохранить профиль'}
-        </MiniButton>
       </MiniCard>
-    </div>
-  );
-}
 
-function ServicesScreen({
-  profile,
-  workspaceData,
-  onSave,
-  updateWorkspaceSection,
-}: {
-  profile: MasterProfile | null;
-  workspaceData: Record<string, unknown>;
-  onSave: (values: MiniProfileSaveValues) => Promise<{ success: boolean; error?: string }>;
-  updateWorkspaceSection: <T>(section: string, value: T) => Promise<boolean>;
-}) {
-  const [items, setItems] = useState<ServiceItem[]>(() => parseServicesFromProfile(profile, workspaceData));
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState('');
+      <MiniCard className="space-y-2 p-4">
+        <MiniInput value={form.name} onChange={(event) => patch({ name: event.target.value })} placeholder="Имя" />
+        <MiniInput value={form.profession} onChange={(event) => patch({ profession: event.target.value })} placeholder="Специализация" />
+        <MiniInput value={form.city} onChange={(event) => patch({ city: event.target.value })} placeholder="Город" />
+        <MiniTextarea value={form.bio} onChange={(event) => patch({ bio: event.target.value })} placeholder="Краткое описание" />
+        <MiniInput value={form.avatar} onChange={(event) => patch({ avatar: event.target.value })} placeholder="Ссылка на аватар" />
+      </MiniCard>
 
-  useEffect(() => {
-    setItems(parseServicesFromProfile(profile, workspaceData));
-  }, [profile, workspaceData]);
+      <MiniCard className="space-y-2 p-4">
+        <MiniLabel>контакты</MiniLabel>
+        <MiniInput value={form.phone} onChange={(event) => patch({ phone: event.target.value })} placeholder="Телефон" />
+        <MiniInput value={form.telegram} onChange={(event) => patch({ telegram: event.target.value })} placeholder="Telegram" />
+        <MiniInput value={form.whatsapp} onChange={(event) => patch({ whatsapp: event.target.value })} placeholder="WhatsApp / VK" />
+      </MiniCard>
 
-  function updateItem(id: string, patch: Partial<ServiceItem>) {
-    setItems((current) =>
-      current.map((item) => (item.id === id ? { ...item, ...patch } : item)),
-    );
-  }
-
-  function addItem() {
-    setItems((current) => [
-      ...current,
-      {
-        id: `service-${Date.now()}`,
-        name: '',
-        price: '',
-        duration: '60',
-        category: 'Основное',
-        status: 'active',
-        visible: true,
-        bookings: 0,
-        revenue: 0,
-        popularity: 0,
-      },
-    ]);
-  }
-
-  function removeItem(id: string) {
-    setItems((current) => current.filter((item) => item.id !== id));
-  }
-
-  async function handleSave() {
-    setSaving(true);
-    setMessage('');
-
-    const cleaned = items.filter((item) => item.name.trim());
-    const workspaceServices = serviceItemsToWorkspaceServices(cleaned);
-    const base = profileToForm(profile);
-
-    const ok = await updateWorkspaceSection('services', workspaceServices);
-
-    if (!ok) {
-      setSaving(false);
-      setMessage('Не удалось сохранить услуги. Проверьте тариф и подключение.');
-      return;
-    }
-
-    const result = await onSave({
-      ...base,
-      servicesText: serviceItemsToText(cleaned),
-    });
-
-    setSaving(false);
-    setMessage(ok && result.success ? 'Услуги сохранены и видны клиентам.' : result.error || 'Не удалось сохранить.');
-  }
-
-  return (
-    <div className="space-y-3">
-      <section>
-        <MiniLabel>витрина</MiniLabel>
-        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
-          Услуги
-        </h1>
-        <p className="mt-2 text-[12px] leading-5 text-white/42">
-          Услуги, цены, длительность и видимость для клиента.
-        </p>
-      </section>
-
-      <MiniButton variant="accent" onClick={addItem}>
-        <Plus className="size-4" />
-        Добавить услугу
-      </MiniButton>
-
-      <div className="space-y-3">
-        {items.length > 0 ? (
-          items.map((item, index) => (
-            <MiniCard key={item.id} className="space-y-3 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="flex size-7 items-center justify-center rounded-full border border-white/[0.08] text-[10px] font-semibold text-white/42">
-                    {index + 1}
-                  </span>
-                  <div>
-                    <div className="text-[14px] font-semibold tracking-[-0.045em]">
-                      {item.name || 'Новая услуга'}
-                    </div>
-                    <div className="mt-0.5 text-[11px] text-white/35">
-                      {item.visible ? 'видна клиентам' : 'скрыта'}
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => removeItem(item.id)}
-                  className="flex size-8 items-center justify-center rounded-[12px] border border-white/[0.08] bg-white/[0.035] text-white/45"
-                >
-                  <Trash2 className="size-3.5" />
-                </button>
-              </div>
-
-              <MiniInput label="Название" value={item.name} onChange={(value) => updateItem(item.id, { name: value })} />
-              <div className="grid grid-cols-2 gap-3">
-                <MiniInput label="Цена" value={item.price} onChange={(value) => updateItem(item.id, { price: value })} placeholder="2500" />
-                <MiniInput label="Минут" value={item.duration} onChange={(value) => updateItem(item.id, { duration: value })} placeholder="60" />
-              </div>
-              <MiniInput label="Категория" value={item.category} onChange={(value) => updateItem(item.id, { category: value })} placeholder="Основное" />
-              <MiniSelect
-                label="Статус"
-                value={item.status}
-                onChange={(value) => updateItem(item.id, { status: value as ServiceItem['status'] })}
-                options={[
-                  { value: 'active', label: 'Активная' },
-                  { value: 'seasonal', label: 'Сезонная' },
-                  { value: 'draft', label: 'Черновик' },
-                ]}
-              />
-
-              <button
-                type="button"
-                onClick={() => updateItem(item.id, { visible: !item.visible })}
-                className={cn(
-                  'flex h-10 items-center justify-center gap-2 rounded-[14px] border text-[12px] font-semibold',
-                  item.visible
-                    ? 'border-[var(--mini-accent)] bg-[var(--mini-accent-soft)] text-white'
-                    : 'border-white/[0.08] bg-white/[0.035] text-white/45',
-                )}
-              >
-                <Eye className="size-4" />
-                {item.visible ? 'Показывать клиентам' : 'Скрыто'}
-              </button>
-            </MiniCard>
-          ))
-        ) : (
-          <EmptyState
-            title="Услуги не заполнены"
-            text="Добавьте услуги, чтобы клиенты могли записываться."
-            icon={<Scissors className="size-5" />}
-          />
-        )}
-      </div>
-
-      {message ? (
-        <div className="rounded-[15px] border border-white/[0.08] bg-white/[0.035] p-3 text-[12px] text-white/58">
-          {message}
-        </div>
-      ) : null}
-
-      <MiniButton variant="accent" onClick={handleSave} disabled={saving}>
-        {saving ? 'Сохраняем...' : 'Сохранить услуги'}
+      {message ? <div className="rounded-[16px] border border-white/[0.07] bg-white/[0.035] px-3 py-2 text-[12px] text-white/50">{message}</div> : null}
+      <MiniButton variant="primary" className="sticky bottom-[92px] z-20 w-full" onClick={() => void save()} disabled={saving}>
+        <Save className="size-4" />
+        {saving ? 'Сохраняю...' : 'Сохранить профиль'}
       </MiniButton>
     </div>
   );
 }
 
-function AnalyticsScreen({ bookings }: { bookings: Booking[] }) {
-  const days = useMemo(() => Array.from({ length: 7 }, (_, index) => addDaysKey(index - 6)), []);
+function SettingsScreen({ workspaceData, updateWorkspaceSection }: { workspaceData: Record<string, unknown>; updateWorkspaceSection: <T>(section: string, value: T) => Promise<boolean> }) {
+  const [saving, setSaving] = useState<string | null>(null);
+  const quietHours = workspaceData.quietHours === true;
+  const fallbackEmail = workspaceData.fallbackEmail !== false;
+  const miniSettings = safeRecord(workspaceData.miniSettings);
 
-  const dayStats = useMemo(
-    () =>
-      days.map((day) => {
-        const dayBookings = bookings.filter((booking) => booking.date === day);
-        const revenue = dayBookings.reduce((sum, booking) => sum + getBookingAmount(booking), 0);
+  async function toggle(section: string, value: boolean) {
+    setSaving(section);
+    await updateWorkspaceSection(section, value);
+    setSaving(null);
+  }
 
-        return {
-          day,
-          count: dayBookings.length,
-          revenue,
-        };
-      }),
-    [bookings, days],
-  );
-
-  const statusStats = useMemo(() => {
-    const result: Array<{ status: BookingStatus; count: number }> = [
-      { status: 'new', count: 0 },
-      { status: 'confirmed', count: 0 },
-      { status: 'completed', count: 0 },
-      { status: 'no_show', count: 0 },
-      { status: 'cancelled', count: 0 },
-    ];
-
-    bookings.forEach((booking) => {
-      const row = result.find((item) => item.status === booking.status);
-      if (row) row.count += 1;
-    });
-
-    return result;
-  }, [bookings]);
-
-  const serviceStats = useMemo(() => {
-    const map = new Map<string, { name: string; count: number; revenue: number }>();
-
-    bookings.forEach((booking) => {
-      const current = map.get(booking.service) ?? {
-        name: booking.service,
-        count: 0,
-        revenue: 0,
-      };
-
-      current.count += 1;
-      current.revenue += getBookingAmount(booking);
-      map.set(booking.service, current);
-    });
-
-    return Array.from(map.values())
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 4);
-  }, [bookings]);
-
-  const totalBookings = bookings.length;
-  const totalRevenue = bookings.reduce((sum, booking) => sum + getBookingAmount(booking), 0);
-  const completed = bookings.filter((booking) => booking.status === 'completed').length;
-  const noShow = bookings.filter((booking) => booking.status === 'no_show').length;
-  const uniqueClients = new Set(bookings.map((booking) => booking.clientPhone || booking.clientName)).size;
-  const showRate = totalBookings > 0 ? Math.round((completed / totalBookings) * 100) : 0;
-  const maxCount = Math.max(1, ...dayStats.map((item) => item.count), ...statusStats.map((item) => item.count));
+  async function saveMini(key: string, value: boolean) {
+    setSaving(key);
+    await updateWorkspaceSection('miniSettings', { ...miniSettings, [key]: value });
+    setSaving(null);
+  }
 
   return (
-    <div className="space-y-3">
-      <section>
-        <MiniLabel>короткая аналитика</MiniLabel>
-        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
-          Аналитика
-        </h1>
-        <p className="mt-2 text-[12px] leading-5 text-white/42">
-          Записи, деньги, явка, клиенты и популярные услуги.
-        </p>
-      </section>
-
-      <div className="grid grid-cols-2 gap-2">
-        <MiniCard className="p-3">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
-            записи
-          </div>
-          <div className="mt-2 text-[26px] font-semibold tracking-[-0.08em]">
-            {totalBookings}
-          </div>
-          <div className="text-[10px] text-white/35">всего</div>
-        </MiniCard>
-
-        <MiniCard className="p-3">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
-            доход
-          </div>
-          <div className="mt-2 text-[26px] font-semibold tracking-[-0.08em]">
-            {RUB.format(totalRevenue)}
-          </div>
-          <div className="text-[10px] text-white/35">по записям</div>
-        </MiniCard>
-
-        <MiniCard className="p-3">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
-            явка
-          </div>
-          <div className="mt-2 text-[26px] font-semibold tracking-[-0.08em]">
-            {showRate}%
-          </div>
-          <div className="text-[10px] text-white/35">{completed} пришли</div>
-        </MiniCard>
-
-        <MiniCard className="p-3">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
-            клиенты
-          </div>
-          <div className="mt-2 text-[26px] font-semibold tracking-[-0.08em]">
-            {uniqueClients}
-          </div>
-          <div className="text-[10px] text-white/35">{noShow} неявки</div>
-        </MiniCard>
+    <div className="space-y-3.5">
+      <MiniCard className="p-4">
+        <MiniLabel>настройки</MiniLabel>
+        <div className="mt-2 text-[27px] font-semibold leading-none tracking-[-0.085em]">Mini app</div>
+        <div className="mt-2 text-[12px] leading-5 text-white/38">Тихие и аккуратные настройки без лишних экранов.</div>
+      </MiniCard>
+      <div className="space-y-2">
+        <SettingRow title="Тихие часы" text="Не шуметь уведомлениями ночью" enabled={quietHours} loading={saving === 'quietHours'} onClick={() => void toggle('quietHours', !quietHours)} />
+        <SettingRow title="Запасной email" text="Подстраховка, если бот не доставил сообщение" enabled={fallbackEmail} loading={saving === 'fallbackEmail'} onClick={() => void toggle('fallbackEmail', !fallbackEmail)} />
+        <SettingRow title="Компактный режим" text="Меньше текста, больше быстрых действий" enabled={miniSettings.compactMode === true} loading={saving === 'compactMode'} onClick={() => void saveMini('compactMode', miniSettings.compactMode !== true)} />
       </div>
-
-      <MiniCard className="p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-[15px] font-semibold tracking-[-0.045em]">
-              График недели
-            </div>
-            <div className="mt-1 text-[11px] text-white/38">записи по дням</div>
-          </div>
-          <BarChart3 className="size-5 text-white/35" />
-        </div>
-
-        <div className="mt-5 flex h-[150px] items-end gap-2">
-          {dayStats.map((item) => {
-            const height = Math.max(8, (item.count / maxCount) * 120);
-
-            return (
-              <div key={item.day} className="flex flex-1 flex-col items-center gap-2">
-                <div className="flex h-[120px] w-full items-end rounded-full bg-white/[0.035] p-1">
-                  <div
-                    className="w-full rounded-full bg-[var(--mini-accent)]"
-                    style={{ height }}
-                  />
-                </div>
-                <div className="text-[9px] font-semibold uppercase text-white/35">
-                  {new Date(`${item.day}T12:00:00`).toLocaleDateString('ru-RU', {
-                    weekday: 'short',
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </MiniCard>
-
-      <MiniCard className="p-4">
-        <div className="text-[15px] font-semibold tracking-[-0.045em]">
-          Воронка статусов
-        </div>
-        <div className="mt-4 space-y-3">
-          {statusStats.map((item) => {
-            const width = `${Math.max(4, (item.count / maxCount) * 100)}%`;
-            const meta = STATUS_META[item.status];
-
-            return (
-              <div key={item.status}>
-                <div className="mb-1 flex justify-between text-[11px] font-semibold text-white/45">
-                  <span>{meta.label}</span>
-                  <span>{item.count}</span>
-                </div>
-                <div className="h-2 rounded-full bg-white/[0.045]">
-                  <div
-                    className="h-2 rounded-full bg-[var(--mini-accent)]"
-                    style={{ width }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </MiniCard>
-
-      <MiniCard className="p-4">
-        <div className="text-[15px] font-semibold tracking-[-0.045em]">
-          Популярные услуги
-        </div>
-        <div className="mt-3 space-y-2">
-          {serviceStats.length > 0 ? (
-            serviceStats.map((item, index) => (
-              <div
-                key={item.name}
-                className="flex items-center gap-3 rounded-[16px] border border-white/[0.07] bg-white/[0.035] p-3"
-              >
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-white/[0.08] text-[10px] font-semibold text-white/42">
-                  {index + 1}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13px] font-semibold tracking-[-0.04em]">
-                    {item.name}
-                  </div>
-                  <div className="mt-1 text-[11px] text-white/38">
-                    {item.count} записей · {RUB.format(item.revenue)}
-                  </div>
-                </div>
-              </div>
-            ))
-          ) : (
-            <EmptyState
-              title="Нет данных"
-              text="Аналитика появится после первых записей."
-              icon={<BarChart3 className="size-5" />}
-            />
-          )}
-        </div>
-      </MiniCard>
     </div>
   );
 }
 
-function AppearanceScreen({
-  workspaceData,
-  updateWorkspaceSection,
-}: {
-  workspaceData: Record<string, unknown>;
-  updateWorkspaceSection: <T>(section: string, value: T) => Promise<boolean>;
-}) {
-  const appearance = safeRecord(workspaceData.appearance);
-  const currentAccent = getAccentFromWorkspace(workspaceData);
-
-  const [accentId, setAccentId] = useState(currentAccent.id);
-  const [density, setDensity] = useState(String(appearance.density || 'normal'));
-  const [cardStyle, setCardStyle] = useState(String(appearance.cardStyle || 'soft'));
-  const [message, setMessage] = useState('');
-
-  useEffect(() => {
-    setAccentId(currentAccent.id);
-    setDensity(String(appearance.density || 'normal'));
-    setCardStyle(String(appearance.cardStyle || 'soft'));
-  }, [currentAccent.id, appearance.density, appearance.cardStyle]);
-
-  async function save(next?: Partial<{ accentId: string; density: string; cardStyle: string }>) {
-    const selectedAccent = next?.accentId ?? accentId;
-    const selectedDensity = next?.density ?? density;
-    const selectedCardStyle = next?.cardStyle ?? cardStyle;
-
-    setMessage('');
-
-    const ok = await updateWorkspaceSection('appearance', {
-      ...appearance,
-      accent: selectedAccent,
-      accentTone: selectedAccent,
-      publicAccent: selectedAccent,
-      density: selectedDensity,
-      cardStyle: selectedCardStyle,
-    });
-
-    setMessage(ok ? 'Внешний вид сохранён.' : 'Не удалось сохранить.');
-  }
-
+function SettingRow({ title, text, enabled, loading, onClick }: { title: string; text: string; enabled: boolean; loading?: boolean; onClick: () => void }) {
   return (
-    <div className="space-y-3">
-      <section>
-        <MiniLabel>стиль</MiniLabel>
-        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
-          Внешний вид
-        </h1>
-        <p className="mt-2 text-[12px] leading-5 text-white/42">
-          Адаптация тех же настроек внешнего вида под Mini App.
-        </p>
-      </section>
-
-      <MiniCard className="space-y-4 p-4">
-        <div>
-          <div className="mb-2 text-[11px] font-semibold tracking-[-0.03em] text-white/58">
-            Акцент
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {ACCENT_OPTIONS.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => {
-                  setAccentId(item.id);
-                  void save({ accentId: item.id });
-                }}
-                className={cn(
-                  'flex h-12 items-center justify-between rounded-[16px] border px-3 text-[13px] font-semibold tracking-[-0.04em]',
-                  accentId === item.id
-                    ? 'border-white/20 bg-white text-black'
-                    : 'border-white/[0.08] bg-white/[0.045] text-white/55',
-                )}
-              >
-                <span className="flex items-center gap-2">
-                  <span
-                    className="size-3 rounded-full"
-                    style={{ backgroundColor: item.value }}
-                  />
-                  {item.label}
-                </span>
-                {accentId === item.id ? <CheckCircle2 className="size-4" /> : null}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <div className="mb-2 text-[11px] font-semibold tracking-[-0.03em] text-white/58">
-            Плотность
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { id: 'compact', label: 'Компактно' },
-              { id: 'normal', label: 'Обычно' },
-            ].map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => {
-                  setDensity(item.id);
-                  void save({ density: item.id });
-                }}
-                className={cn(
-                  'h-11 rounded-[15px] border text-[12px] font-semibold',
-                  density === item.id
-                    ? 'border-[var(--mini-accent)] bg-[var(--mini-accent-soft)] text-white'
-                    : 'border-white/[0.08] bg-white/[0.045] text-white/45',
-                )}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <div className="mb-2 text-[11px] font-semibold tracking-[-0.03em] text-white/58">
-            Карточки
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { id: 'soft', label: 'Мягкие' },
-              { id: 'glass', label: 'Glass' },
-            ].map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => {
-                  setCardStyle(item.id);
-                  void save({ cardStyle: item.id });
-                }}
-                className={cn(
-                  'h-11 rounded-[15px] border text-[12px] font-semibold',
-                  cardStyle === item.id
-                    ? 'border-[var(--mini-accent)] bg-[var(--mini-accent-soft)] text-white'
-                    : 'border-white/[0.08] bg-white/[0.045] text-white/45',
-                )}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <MiniCard className="border-white/[0.06] bg-white/[0.035] p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-[14px] font-semibold tracking-[-0.045em]">
-                Превью
-              </div>
-              <div className="mt-1 text-[11px] text-white/38">
-                Так будет выглядеть активный элемент.
-              </div>
-            </div>
-            <div className="flex size-10 items-center justify-center rounded-[14px] bg-[var(--mini-accent)] text-black">
-              <Sparkles className="size-4" />
-            </div>
-          </div>
-        </MiniCard>
-
-        {message ? (
-          <div className="rounded-[15px] border border-white/[0.08] bg-white/[0.035] p-3 text-[12px] text-white/58">
-            {message}
-          </div>
-        ) : null}
-      </MiniCard>
-    </div>
+    <button type="button" onClick={onClick} disabled={loading} className="flex w-full items-center justify-between gap-3 rounded-[20px] border border-white/[0.07] bg-white/[0.035] p-3 text-left active:scale-[0.99] disabled:opacity-60">
+      <div className="min-w-0">
+        <div className="text-[14px] font-semibold tracking-[-0.05em]">{title}</div>
+        <div className="mt-1 text-[11px] text-white/34">{text}</div>
+      </div>
+      <div className={cn('flex h-7 w-12 items-center rounded-full border p-1 transition', enabled ? 'border-white/[0.12] bg-white' : 'border-white/[0.08] bg-white/[0.045]')}>
+        <span className={cn('size-5 rounded-full transition', enabled ? 'translate-x-5 bg-black' : 'bg-white/30')} />
+      </div>
+    </button>
   );
 }
 
-function SettingsScreen({
-  workspaceData,
-  updateWorkspaceSection,
-}: {
-  workspaceData: Record<string, unknown>;
-  updateWorkspaceSection: <T>(section: string, value: T) => Promise<boolean>;
-}) {
-  const stored = safeRecord(workspaceData.miniSettings);
-  const [settings, setSettings] = useState({
-    reminders: stored.reminders !== false,
-    autoConfirm: Boolean(stored.autoConfirm),
-    noShowControl: stored.noShowControl !== false,
-    dailyDigest: stored.dailyDigest !== false,
-  });
-
-  async function update<K extends keyof typeof settings>(key: K, value: boolean) {
-    const next = { ...settings, [key]: value };
-    setSettings(next);
-    await updateWorkspaceSection('miniSettings', next);
-  }
-
-  return (
-    <div className="space-y-3">
-      <section>
-        <MiniLabel>управление</MiniLabel>
-        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
-          Настройки
-        </h1>
-        <p className="mt-2 text-[12px] leading-5 text-white/42">
-          Уведомления и рабочий день.
-        </p>
-      </section>
-
-      <MiniCard className="space-y-2 p-3">
-        {[
-          ['reminders', 'Напоминания клиентам', 'Отправлять клиенту напоминание перед записью.'],
-          ['autoConfirm', 'Автоподтверждение', 'Помечать запись подтверждённой после ответа клиента.'],
-          ['noShowControl', 'Контроль неявок', 'Подсвечивать клиентов с риском не прийти.'],
-          ['dailyDigest', 'Итоги дня', 'Показывать короткий итог по записям и деньгам.'],
-        ].map(([key, label, description]) => {
-          const typedKey = key as keyof typeof settings;
-          const checked = settings[typedKey];
-
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => void update(typedKey, !checked)}
-              className="flex w-full items-center justify-between gap-4 rounded-[18px] border border-white/[0.08] bg-white/[0.035] p-3 text-left"
-            >
-              <span>
-                <span className="block text-[13px] font-semibold tracking-[-0.04em] text-white">
-                  {label}
-                </span>
-                <span className="mt-1 block text-[11px] leading-4 text-white/42">
-                  {description}
-                </span>
-              </span>
-
-              <span
-                className={cn(
-                  'relative h-7 w-12 shrink-0 rounded-full border transition',
-                  checked
-                    ? 'border-[var(--mini-accent)] bg-[var(--mini-accent)] text-black'
-                    : 'border-white/[0.08] bg-white/[0.055]',
-                )}
-              >
-                <span
-                  className={cn(
-                    'absolute top-1 size-5 rounded-full transition',
-                    checked ? 'left-6 bg-black' : 'left-1 bg-white/35',
-                  )}
-                />
-              </span>
-            </button>
-          );
-        })}
-      </MiniCard>
-    </div>
-  );
-}
-
-function MoreScreen({ setScreen }: { setScreen: (screen: MiniScreen) => void }) {
-  const rows: Array<{
-    id: MiniScreen | 'desktop';
-    label: string;
-    description: string;
-    icon: ReactNode;
-  }> = [
-    { id: 'profile', label: 'Профиль', description: 'страница мастера', icon: <UserRound className="size-4" /> },
-    { id: 'services', label: 'Услуги', description: 'витрина и цены', icon: <Scissors className="size-4" /> },
-    { id: 'clients', label: 'Клиенты', description: 'база и история', icon: <Users2 className="size-4" /> },
-    { id: 'analytics', label: 'Аналитика', description: 'записи и доход', icon: <BarChart3 className="size-4" /> },
-    { id: 'appearance', label: 'Внешний вид', description: 'тема и акцент', icon: <Palette className="size-4" /> },
-    { id: 'settings', label: 'Настройки', description: 'уведомления', icon: <Settings className="size-4" /> },
-    { id: 'desktop', label: 'Веб-кабинет', description: 'полная версия', icon: <LayoutDashboard className="size-4" /> },
+function MoreScreen({ setScreen, dataset }: { setScreen: (screen: MiniScreen) => void; dataset: WorkspaceDataset }) {
+  const rows: Array<{ screen: MiniScreen; title: string; text: string; icon: ReactNode; value?: string | number }> = [
+    { screen: 'clients', title: 'Клиенты', text: 'База, VIP и заметки', icon: <Users2 className="size-4" />, value: dataset.clients.length },
+    { screen: 'analytics', title: 'Аналитика', text: 'Выручка, каналы, дни', icon: <BarChart3 className="size-4" />, value: dataset.totals.bookings },
+    { screen: 'profile', title: 'Профиль', text: 'Имя, контакты, ссылка', icon: <UserRound className="size-4" /> },
+    { screen: 'settings', title: 'Настройки', text: 'Уведомления и режимы', icon: <Settings className="size-4" /> },
   ];
 
   return (
-    <div className="space-y-3">
-      <section>
-        <MiniLabel>меню</MiniLabel>
-        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
-          Ещё
-        </h1>
-        <p className="mt-2 text-[12px] leading-5 text-white/42">
-          Дополнительные разделы.
-        </p>
-      </section>
-
-      <MiniCard className="p-2">
-        <div className="space-y-1">
-          {rows.map((row, index) => (
-            <button
-              key={row.id}
-              type="button"
-              onClick={() => {
-                if (row.id === 'desktop') {
-                  window.location.href = '/dashboard';
-                  return;
-                }
-
-                setScreen(row.id);
-              }}
-              className="group flex w-full items-center gap-3 rounded-[17px] px-2.5 py-3 text-left text-white/58 transition hover:bg-white/[0.045] hover:text-white active:scale-[0.99]"
-            >
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-white/[0.08] text-[10px] font-semibold text-white/36 group-hover:border-white/[0.14] group-hover:text-white/70">
-                {index + 1}
-              </span>
-
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-[13px] border border-white/[0.07] bg-white/[0.035] text-white/42 group-hover:text-white/78">
-                {row.icon}
-              </span>
-
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[14px] font-semibold tracking-[-0.045em]">
-                  {row.label}
-                </span>
-                <span className="mt-0.5 block truncate text-[11px] text-white/32">
-                  {row.description}
-                </span>
-              </span>
-
-              <ChevronRight className="size-4 shrink-0 text-white/24" />
-            </button>
-          ))}
-        </div>
+    <div className="space-y-3.5">
+      <MiniCard className="p-4">
+        <MiniLabel>ещё</MiniLabel>
+        <div className="mt-2 text-[27px] font-semibold leading-none tracking-[-0.085em]">Управление</div>
+        <div className="mt-2 text-[12px] leading-5 text-white/38">Всё второстепенное собрали сюда, чтобы главный экран не был перегружен.</div>
       </MiniCard>
+      <div className="space-y-2">
+        {rows.map((row) => (
+          <button key={row.screen} type="button" onClick={() => setScreen(row.screen)} className="flex w-full items-center gap-3 rounded-[20px] border border-white/[0.07] bg-white/[0.035] p-3 text-left active:scale-[0.99]">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-[16px] border border-white/[0.08] bg-white/[0.045] text-white/46">{row.icon}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[14px] font-semibold tracking-[-0.05em]">{row.title}</span>
+              <span className="mt-1 block truncate text-[11px] text-white/34">{row.text}</span>
+            </span>
+            {row.value !== undefined ? <span className="text-[12px] font-semibold text-white/40">{row.value}</span> : null}
+            <ChevronRight className="size-4 shrink-0 text-white/20" />
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
 
-function BookingSheet({
-  booking,
-  onClose,
-  onStatus,
-}: {
-  booking: Booking | null;
-  onClose: () => void;
-  onStatus: (bookingId: string, status: BookingStatus) => Promise<void>;
-}) {
-  const [updating, setUpdating] = useState<BookingStatus | null>(null);
+function MiniOnboarding({ onSave }: { onSave: (values: MiniProfileSaveValues) => Promise<{ success: boolean; error?: string }> }) {
+  const [form, setForm] = useState<MiniProfileSaveValues>({
+    name: '',
+    profession: '',
+    city: '',
+    bio: '',
+    servicesText: 'Консультация\nОсновная услуга',
+    phone: '',
+    telegram: '',
+    whatsapp: '',
+    locationMode: 'online',
+    address: '',
+    mapUrl: '',
+    hidePhone: false,
+    hideTelegram: false,
+    hideWhatsapp: false,
+    slug: '',
+    avatar: '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
+  function patch(value: Partial<MiniProfileSaveValues>) {
+    setForm((current) => ({ ...current, ...value }));
+    setError('');
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    const result = await onSave(form);
+    setSaving(false);
+    if (!result.success) setError(result.error || 'Не получилось создать профиль.');
+  }
+
+  return (
+    <main className="min-h-[100svh] bg-[#090909] px-3 py-[calc(var(--tg-safe-top,0px)+14px)] text-white">
+      <div className="mx-auto w-full max-w-[430px] space-y-3.5 pb-[calc(var(--tg-safe-bottom,0px)+20px)]">
+        <MiniCard className="p-5">
+          <BrandLogo />
+          <div className="mt-5 text-[31px] font-semibold leading-[0.93] tracking-[-0.095em]">Соберём профиль для mini app</div>
+          <div className="mt-3 text-[12px] leading-5 text-white/40">Минимум полей, чтобы запустить страницу клиента, услуги и запись.</div>
+        </MiniCard>
+        <form onSubmit={(event) => void submit(event)} className="space-y-3">
+          <MiniCard className="space-y-2 p-4">
+            <MiniInput value={form.name} onChange={(event) => patch({ name: event.target.value })} placeholder="Имя мастера / салона" />
+            <MiniInput value={form.profession} onChange={(event) => patch({ profession: event.target.value })} placeholder="Специализация" />
+            <MiniInput value={form.city} onChange={(event) => patch({ city: event.target.value })} placeholder="Город" />
+            <MiniTextarea value={form.bio} onChange={(event) => patch({ bio: event.target.value })} placeholder="Коротко о себе" />
+            <MiniTextarea value={form.servicesText} onChange={(event) => patch({ servicesText: event.target.value })} placeholder="Услуги, каждая с новой строки" />
+          </MiniCard>
+          {error ? <div className="rounded-[16px] border border-rose-300/15 bg-rose-400/10 px-3 py-2 text-[12px] text-rose-100">{error}</div> : null}
+          <MiniButton type="submit" variant="primary" className="w-full" disabled={saving}>
+            {saving ? 'Создаю...' : 'Создать mini app'}
+          </MiniButton>
+        </form>
+      </div>
+    </main>
+  );
+}
+
+function BookingSheet({ booking, onClose, onStatus, services }: { booking: Booking | null; onClose: () => void; onStatus: (id: string, status: BookingStatus) => Promise<void>; services: ServiceInsight[] }) {
+  const [updating, setUpdating] = useState<BookingStatus | null>(null);
   if (!booking) return null;
 
   async function update(status: BookingStatus) {
-    if (!booking) return;
-
     setUpdating(status);
     await onStatus(booking.id, status);
     setUpdating(null);
   }
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end bg-black/55 px-3 pb-[calc(var(--tg-safe-bottom,0px)+10px)] backdrop-blur-[8px]">
+    <div className="fixed inset-0 z-[90] flex items-end bg-black/55 px-3 pb-[calc(var(--tg-safe-bottom,0px)+10px)] backdrop-blur-[8px]">
       <div className="mx-auto w-full max-w-[430px] overflow-hidden rounded-[26px] border border-white/[0.10] bg-[#101010] shadow-[0_28px_90px_rgba(0,0,0,0.72)]">
-        <div className="flex items-start justify-between gap-4 border-b border-white/[0.08] p-4">
-          <div>
+        <div className="flex items-start justify-between gap-3 border-b border-white/[0.08] p-4">
+          <div className="min-w-0">
             <MiniLabel>запись</MiniLabel>
-            <div className="mt-2 text-[26px] font-semibold leading-none tracking-[-0.075em]">
-              {booking.clientName}
-            </div>
-            <div className="mt-2 text-[12px] text-white/42">
-              {formatDayLabel(booking.date)}, {formatTime(booking.time)}
-            </div>
+            <div className="mt-2 truncate text-[26px] font-semibold leading-none tracking-[-0.085em]">{booking.clientName}</div>
+            <div className="mt-2 text-[12px] text-white/40">{formatDay(booking.date)} · {formatTime(booking.time)}</div>
           </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex size-9 items-center justify-center rounded-[13px] border border-white/[0.08] bg-white/[0.045] text-white/55"
-          >
-            <X className="size-4" />
-          </button>
+          <button type="button" onClick={onClose} className="flex size-9 items-center justify-center rounded-[13px] border border-white/[0.08] bg-white/[0.045] text-white/52"><X className="size-4" /></button>
         </div>
-
         <div className="space-y-3 p-4">
-          <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.035] p-3">
-            <div className="text-[11px] text-white/35">Услуга</div>
-            <div className="mt-1 text-[15px] font-semibold tracking-[-0.045em]">
-              {booking.service}
-            </div>
-          </div>
-
+          <MiniPanel className="p-3">
+            <div className="text-[11px] text-white/32">Услуга</div>
+            <div className="mt-1 text-[15px] font-semibold tracking-[-0.045em]">{booking.service}</div>
+            <div className="mt-1 text-[11px] text-white/32">{getBookingAmount(booking, services) > 0 ? RUB.format(getBookingAmount(booking, services)) : 'без цены'} · {booking.clientPhone}</div>
+          </MiniPanel>
+          {booking.comment ? <MiniPanel className="p-3 text-[12px] leading-5 text-white/50">{booking.comment}</MiniPanel> : null}
           <div className="grid grid-cols-2 gap-2">
-            <MiniButton variant="accent" disabled={Boolean(updating)} onClick={() => void update('completed')}>
-              <CheckCircle2 className="size-4" />
-              Пришла
-            </MiniButton>
-            <MiniButton variant="secondary" disabled={Boolean(updating)} onClick={() => void update('confirmed')}>
-              <ShieldCheck className="size-4" />
-              Подтвердить
-            </MiniButton>
-            <MiniButton variant="secondary" disabled={Boolean(updating)} onClick={() => void update('new')}>
-              <Bell className="size-4" />
-              Новая
-            </MiniButton>
-            <MiniButton variant="danger" disabled={Boolean(updating)} onClick={() => void update('no_show')}>
-              <XCircle className="size-4" />
-              Не пришла
-            </MiniButton>
+            <MiniButton variant="primary" disabled={Boolean(updating)} onClick={() => void update('completed')}><CheckCircle2 className="size-4" />Пришла</MiniButton>
+            <MiniButton variant="secondary" disabled={Boolean(updating)} onClick={() => void update('confirmed')}><ShieldCheck className="size-4" />Подтвердить</MiniButton>
+            <MiniButton variant="secondary" disabled={Boolean(updating)} onClick={() => void update('new')}><Bell className="size-4" />Новая</MiniButton>
+            <MiniButton variant="danger" disabled={Boolean(updating)} onClick={() => void update('no_show')}><XCircle className="size-4" />Не пришла</MiniButton>
           </div>
         </div>
       </div>
     </div>
   );
+}
+
+function resolveAccent(workspaceData: Record<string, unknown>) {
+  const appearance = safeRecord(workspaceData.appearance);
+  const raw = String(appearance.accentTone || appearance.publicAccent || appearance.accent || '').toLowerCase();
+  if (raw.includes('blue')) return '#8bbcff';
+  if (raw.includes('rose') || raw.includes('pink')) return '#f5a3bd';
+  if (raw.includes('gold') || raw.includes('warm')) return '#e8c77a';
+  if (raw.includes('sage') || raw.includes('green')) return '#a8d5ba';
+  return '#ffffff';
 }
 
 export function MiniAppEntry() {
@@ -3400,42 +1516,40 @@ export function MiniAppEntry() {
     refreshWorkspace,
     getPublicPath,
   } = useApp();
-
+  const { locale } = useLocale();
   const [screen, setScreen] = useState<MiniScreen>('today');
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [bootState, setBootState] = useState<'loading' | 'ready'>('loading');
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const bootedRef = useRef(false);
 
   const workspaceRecord = safeRecord(workspaceData);
-  const accent = getAccentFromWorkspace(workspaceRecord);
+  const accent = resolveAccent(workspaceRecord);
+
+  const dataset = useMemo(() => {
+    if (!ownedProfile) return FALLBACK_DATASET;
+    try {
+      return buildWorkspaceDatasetFromStored(ownedProfile, bookings, locale, workspaceData);
+    } catch {
+      return FALLBACK_DATASET;
+    }
+  }, [bookings, locale, ownedProfile, workspaceData]);
+
+  const orderedBookings = useMemo(() => [...bookings].sort(descByCreated), [bookings]);
 
   useEffect(() => {
     if (bootedRef.current) return;
     bootedRef.current = true;
-
     let cancelled = false;
 
     async function boot() {
-      try {
-        if (hasTelegramMiniAppRuntime()) {
-          await authorizeTelegramMiniAppSession({
-            force: true,
-            waitMs: 2600,
-          });
-        }
-      } catch {
-        // Если Telegram initData недоступна, всё равно пробуем загрузить workspace по cookie/header.
+      if (hasTelegramMiniAppRuntime()) {
+        await authorizeTelegramMiniAppSession({ force: true, waitMs: 1800 }).catch(() => null);
       }
-
       await refreshWorkspace();
-
-      if (!cancelled) {
-        setBootState('ready');
-      }
+      if (!cancelled) setBootState('ready');
     }
 
     void boot();
-
     return () => {
       cancelled = true;
     };
@@ -3451,71 +1565,24 @@ export function MiniAppEntry() {
 
   return (
     <>
-      <MiniShell
-        screen={screen}
-        setScreen={setScreen}
-        profile={ownedProfile}
-        onRefresh={() => void refreshWorkspace()}
-        accent={accent}
-      >
+      <MiniShell screen={screen} setScreen={setScreen} profile={ownedProfile} accent={accent} onRefresh={() => void refreshWorkspace()}>
         {screen === 'today' ? (
-          <TodayScreen bookings={bookings} onOpenBooking={setSelectedBooking} />
+          <TodayScreen profile={ownedProfile} bookings={orderedBookings} dataset={dataset} onOpenBooking={setSelectedBooking} setScreen={setScreen} />
         ) : null}
-
-        {screen === 'availability' ? (
-          <AvailabilityScreen
-            workspaceData={workspaceRecord}
-            updateWorkspaceSection={updateWorkspaceSection}
-          />
+        {screen === 'schedule' ? (
+          <ScheduleScreen availability={dataset.availability} updateWorkspaceSection={updateWorkspaceSection} />
         ) : null}
-
-        {screen === 'chats' ? <ChatsScreen /> : null}
-
-        {screen === 'clients' ? (
-          <ClientsScreen bookings={bookings} onOpenBooking={setSelectedBooking} />
-        ) : null}
-
-        {screen === 'profile' ? (
-          <ProfileScreen
-            profile={ownedProfile}
-            onSave={saveProfile}
-            getPublicPath={getPublicPath}
-          />
-        ) : null}
-
         {screen === 'services' ? (
-          <ServicesScreen
-            profile={ownedProfile}
-            workspaceData={workspaceRecord}
-            onSave={saveProfile}
-            updateWorkspaceSection={updateWorkspaceSection}
-          />
+          <ServicesScreen profile={ownedProfile} services={dataset.services} onSaveProfile={saveProfile} updateWorkspaceSection={updateWorkspaceSection} />
         ) : null}
-
-        {screen === 'analytics' ? <AnalyticsScreen bookings={bookings} /> : null}
-
-        {screen === 'appearance' ? (
-          <AppearanceScreen
-            workspaceData={workspaceRecord}
-            updateWorkspaceSection={updateWorkspaceSection}
-          />
-        ) : null}
-
-        {screen === 'settings' ? (
-          <SettingsScreen
-            workspaceData={workspaceRecord}
-            updateWorkspaceSection={updateWorkspaceSection}
-          />
-        ) : null}
-
-        {screen === 'more' ? <MoreScreen setScreen={setScreen} /> : null}
+        {screen === 'chats' ? <ChatsScreen /> : null}
+        {screen === 'more' ? <MoreScreen setScreen={setScreen} dataset={dataset} /> : null}
+        {screen === 'clients' ? <ClientsScreen clients={dataset.clients} workspaceData={workspaceRecord} updateWorkspaceSection={updateWorkspaceSection} /> : null}
+        {screen === 'analytics' ? <AnalyticsScreen dataset={dataset} /> : null}
+        {screen === 'profile' ? <ProfileScreen profile={ownedProfile} onSave={saveProfile} getPublicPath={getPublicPath} /> : null}
+        {screen === 'settings' ? <SettingsScreen workspaceData={workspaceRecord} updateWorkspaceSection={updateWorkspaceSection} /> : null}
       </MiniShell>
-
-      <BookingSheet
-        booking={selectedBooking}
-        onClose={() => setSelectedBooking(null)}
-        onStatus={updateBookingStatus}
-      />
+      <BookingSheet booking={selectedBooking} onClose={() => setSelectedBooking(null)} onStatus={updateBookingStatus} services={dataset.services} />
     </>
   );
 }
