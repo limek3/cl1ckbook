@@ -2,96 +2,135 @@
 
 import { useEffect } from 'react';
 
-type TelegramWebAppLike = {
-  initData?: string;
-  initDataUnsafe?: {
-    user?: unknown;
-    auth_date?: number;
-    start_param?: string;
-  };
+type TelegramColorMap = Partial<
+  Record<
+    | 'bg_color'
+    | 'secondary_bg_color'
+    | 'text_color'
+    | 'hint_color'
+    | 'link_color'
+    | 'button_color'
+    | 'button_text_color',
+    string
+  >
+>;
+
+type TelegramInset = Partial<Record<'top' | 'bottom' | 'left' | 'right', number>>;
+
+type TelegramWebApp = {
   ready?: () => void;
   expand?: () => void;
-  onEvent?: (event: string, callback: () => void) => void;
-  offEvent?: (event: string, callback: () => void) => void;
-  contentSafeAreaInset?: {
-    top?: number;
-    bottom?: number;
-    left?: number;
-    right?: number;
-  };
-  safeAreaInset?: {
-    top?: number;
-    bottom?: number;
-    left?: number;
-    right?: number;
+  onEvent?: (event: string, handler: () => void) => void;
+  offEvent?: (event: string, handler: () => void) => void;
+  themeParams?: TelegramColorMap;
+  viewportHeight?: number;
+  viewportStableHeight?: number;
+  backgroundColor?: string;
+  headerColor?: string;
+  setBackgroundColor?: (color: string) => void;
+  setHeaderColor?: (color: string) => void;
+  safeAreaInset?: TelegramInset;
+  contentSafeAreaInset?: TelegramInset;
+};
+
+type TelegramWindow = Window & {
+  Telegram?: {
+    WebApp?: TelegramWebApp;
   };
 };
 
-declare global {
-  interface Window {
-    Telegram?: {
-      WebApp?: TelegramWebAppLike;
-    };
-  }
+function getTelegramWebApp() {
+  if (typeof window === 'undefined') return undefined;
+  return (window as TelegramWindow).Telegram?.WebApp;
 }
 
-function hasTelegramRuntime(webApp?: TelegramWebAppLike) {
-  if (!webApp) return false;
-  if (webApp.initData && webApp.initData.length > 10) return true;
-  if (webApp.initDataUnsafe?.user) return true;
+function setCssVar(name: string, value: string) {
+  document.documentElement.style.setProperty(name, value);
+}
 
-  try {
-    const params = new URLSearchParams(window.location.search);
-    return Boolean(params.get('tgWebAppData') || params.get('tgWebAppStartParam'));
-  } catch {
-    return false;
+function resolveInset(value: number | undefined, fallback: string) {
+  return typeof value === 'number' && Number.isFinite(value) ? `${value}px` : fallback;
+}
+
+function applyTheme(webApp?: TelegramWebApp) {
+  const root = document.documentElement;
+  const theme = webApp?.themeParams ?? {};
+
+  root.dataset.tgMiniapp = webApp ? 'true' : 'false';
+
+  setCssVar('--tg-safe-top', resolveInset(webApp?.contentSafeAreaInset?.top ?? webApp?.safeAreaInset?.top, 'env(safe-area-inset-top, 0px)'));
+  setCssVar('--tg-safe-bottom', resolveInset(webApp?.contentSafeAreaInset?.bottom ?? webApp?.safeAreaInset?.bottom, 'env(safe-area-inset-bottom, 0px)'));
+  setCssVar('--tg-safe-left', resolveInset(webApp?.contentSafeAreaInset?.left ?? webApp?.safeAreaInset?.left, 'env(safe-area-inset-left, 0px)'));
+  setCssVar('--tg-safe-right', resolveInset(webApp?.contentSafeAreaInset?.right ?? webApp?.safeAreaInset?.right, 'env(safe-area-inset-right, 0px)'));
+
+  const viewportHeight =
+    typeof webApp?.viewportStableHeight === 'number'
+      ? webApp.viewportStableHeight
+      : typeof webApp?.viewportHeight === 'number'
+        ? webApp.viewportHeight
+        : window.innerHeight;
+
+  setCssVar('--tg-viewport-height', `${Math.max(0, Math.round(viewportHeight))}px`);
+
+  if (theme.bg_color) {
+    setCssVar('--tg-bg-color', theme.bg_color);
+  }
+
+  if (theme.secondary_bg_color) {
+    setCssVar('--tg-secondary-bg-color', theme.secondary_bg_color);
+  }
+
+  if (theme.text_color) {
+    setCssVar('--tg-text-color', theme.text_color);
+  }
+
+  if (theme.hint_color) {
+    setCssVar('--tg-hint-color', theme.hint_color);
+  }
+
+  if (theme.button_color) {
+    setCssVar('--tg-button-color', theme.button_color);
+  }
+
+  if (theme.button_text_color) {
+    setCssVar('--tg-button-text-color', theme.button_text_color);
+  }
+
+  if (webApp?.setBackgroundColor && theme.bg_color) {
+    webApp.setBackgroundColor(theme.bg_color);
+  }
+
+  if (webApp?.setHeaderColor && (theme.secondary_bg_color || theme.bg_color)) {
+    webApp.setHeaderColor(theme.secondary_bg_color || theme.bg_color || '#090909');
   }
 }
 
 export function TelegramMiniAppViewport() {
   useEffect(() => {
-    const root = document.documentElement;
+    const webApp = getTelegramWebApp();
 
-    const applyInsets = () => {
-      const webApp = window.Telegram?.WebApp;
-      const active = hasTelegramRuntime(webApp);
-
-      if (!active) {
-        root.dataset.tgMiniapp = 'false';
-        root.style.setProperty('--tg-safe-top', '0px');
-        root.style.setProperty('--tg-safe-bottom', '0px');
-        return;
-      }
-
+    try {
       webApp?.ready?.();
       webApp?.expand?.();
+    } catch {}
 
-      root.dataset.tgMiniapp = 'true';
+    const syncViewport = () => applyTheme(getTelegramWebApp());
+    syncViewport();
 
-      const topInset = Number(
-        webApp?.contentSafeAreaInset?.top ?? webApp?.safeAreaInset?.top ?? 0,
-      );
-      const bottomInset = Number(
-        webApp?.contentSafeAreaInset?.bottom ?? webApp?.safeAreaInset?.bottom ?? 0,
-      );
+    window.addEventListener('resize', syncViewport);
 
-      root.style.setProperty('--tg-safe-top', `${Math.max(84, topInset + 28)}px`);
-      root.style.setProperty('--tg-safe-bottom', `${Math.max(16, bottomInset + 10)}px`);
-    };
-
-    applyInsets();
-
-    const webApp = window.Telegram?.WebApp;
-    webApp?.onEvent?.('viewportChanged', applyInsets);
-    webApp?.onEvent?.('themeChanged', applyInsets);
-    window.addEventListener('resize', applyInsets);
-    window.setTimeout(applyInsets, 350);
-    window.setTimeout(applyInsets, 1000);
+    if (webApp?.onEvent) {
+      webApp.onEvent('themeChanged', syncViewport);
+      webApp.onEvent('viewportChanged', syncViewport);
+    }
 
     return () => {
-      webApp?.offEvent?.('viewportChanged', applyInsets);
-      webApp?.offEvent?.('themeChanged', applyInsets);
-      window.removeEventListener('resize', applyInsets);
+      window.removeEventListener('resize', syncViewport);
+
+      if (webApp?.offEvent) {
+        webApp.offEvent('themeChanged', syncViewport);
+        webApp.offEvent('viewportChanged', syncViewport);
+      }
     };
   }, []);
 

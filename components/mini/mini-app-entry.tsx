@@ -48,6 +48,7 @@ import {
   authorizeTelegramMiniAppSession,
   getTelegramAppSessionHeaders,
 } from '@/lib/telegram-miniapp-auth-client';
+import { getPhoneHref } from '@/lib/contact-links';
 import { cn } from '@/lib/utils';
 import type {
   Booking,
@@ -284,6 +285,17 @@ const RUB = new Intl.NumberFormat('ru-RU', {
   currency: 'RUB',
   maximumFractionDigits: 0,
 });
+
+const MINI_SCREEN_STORAGE_KEY = 'clickbook-mini-screen';
+
+function formatMiniSyncTime(value: number | null) {
+  if (!value) return 'без синхронизации';
+
+  return new Date(value).toLocaleTimeString('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
 
 function todayKey() {
   const date = new Date();
@@ -773,13 +785,19 @@ function MiniShell({
   profile,
   onRefresh,
   accent,
+  online,
+  syncedAt,
+  refreshing,
 }: {
   screen: MiniScreen;
   setScreen: (screen: MiniScreen) => void;
   children: ReactNode;
   profile: MasterProfile | null;
-  onRefresh: () => void;
+  onRefresh: () => Promise<void> | void;
   accent: (typeof ACCENT_OPTIONS)[number];
+  online: boolean;
+  syncedAt: number | null;
+  refreshing: boolean;
 }) {
   const shellStyle = {
     paddingTop: 'calc(var(--tg-safe-top, 0px) + 10px)',
@@ -805,36 +823,45 @@ function MiniShell({
       className="cb-mini-app-root min-h-screen bg-[#090909] px-3 text-white"
     >
       <div className="mx-auto w-full max-w-[430px]">
-        <header className="mb-4 flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-[11px] border border-white/[0.08] bg-white/[0.055]">
-              {profile?.avatar ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={profile.avatar} alt="" className="size-full object-cover" />
-              ) : (
-                <span className="text-[10px] font-bold text-white">
-                  {getInitials(profile?.name)}
-                </span>
-              )}
+        <header className="sticky top-[calc(var(--tg-safe-top,0px)+6px)] z-40 mb-4">
+          <div className="flex items-center justify-between gap-3 rounded-[22px] border border-white/[0.08] bg-[#101010]/88 px-3 py-2.5 shadow-[0_12px_40px_rgba(0,0,0,0.28)] backdrop-blur-[22px]">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-[13px] border border-white/[0.08] bg-white/[0.055]">
+                {profile?.avatar ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={profile.avatar} alt="" className="size-full object-cover" />
+                ) : (
+                  <span className="text-[10px] font-bold text-white">
+                    {getInitials(profile?.name)}
+                  </span>
+                )}
+              </div>
+
+              <div className="min-w-0">
+                <div className="truncate text-[13px] font-semibold tracking-[-0.045em] text-white">
+                  {profile?.name || 'КликБук'}
+                </div>
+                <div className="flex items-center gap-1.5 truncate text-[10px] font-semibold tracking-[-0.03em] text-white/35">
+                  <span
+                    className={cn(
+                      'size-1.5 rounded-full transition-colors',
+                      online ? 'bg-emerald-400' : 'bg-rose-400',
+                    )}
+                  />
+                  {online ? 'онлайн' : 'офлайн'} · {refreshing ? 'обновляем…' : `синх. ${formatMiniSyncTime(syncedAt)}`}
+                </div>
+              </div>
             </div>
 
-            <div className="min-w-0">
-              <div className="truncate text-[13px] font-semibold tracking-[-0.045em] text-white">
-                {profile?.name || 'КликБук'}
-              </div>
-              <div className="truncate text-[10px] font-semibold tracking-[-0.03em] text-white/35">
-                кабинет мастера
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={() => void onRefresh()}
+              disabled={refreshing}
+              className="flex size-9 items-center justify-center rounded-[13px] border border-white/[0.08] bg-white/[0.045] text-white/55 transition active:scale-95 disabled:opacity-45"
+            >
+              <RefreshCcw className={cn('size-3.5', refreshing && 'animate-spin')} />
+            </button>
           </div>
-
-          <button
-            type="button"
-            onClick={onRefresh}
-            className="flex size-8 items-center justify-center rounded-[11px] border border-white/[0.08] bg-white/[0.045] text-white/55 active:scale-95"
-          >
-            <RefreshCcw className="size-3.5" />
-          </button>
         </header>
 
         {children}
@@ -1174,11 +1201,7 @@ function TodayScreen({
         </div>
 
         {nearest ? (
-          <button
-            type="button"
-            onClick={() => onOpenBooking(nearest)}
-            className="block w-full p-4 text-left active:scale-[0.995]"
-          >
+          <div className="p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-[34px] font-semibold leading-none tracking-[-0.08em]">
@@ -1194,15 +1217,23 @@ function TodayScreen({
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2">
-              <span className="flex h-10 items-center justify-center rounded-[14px] bg-white text-[12px] font-semibold text-black">
+              <MiniButton variant="primary" onClick={() => onOpenBooking(nearest)}>
                 Открыть
-              </span>
-              <span className="flex h-10 items-center justify-center gap-2 rounded-[14px] border border-white/[0.08] bg-white/[0.055] text-[12px] font-semibold text-white">
+              </MiniButton>
+              <MiniButton
+                disabled={!getPhoneHref(nearest.clientPhone)}
+                onClick={() => {
+                  const href = getPhoneHref(nearest.clientPhone);
+                  if (href) {
+                    window.location.href = href;
+                  }
+                }}
+              >
                 <Phone className="size-3.5" />
                 Позвонить
-              </span>
+              </MiniButton>
             </div>
-          </button>
+          </div>
         ) : (
           <div className="p-4">
             <EmptyState
@@ -1494,6 +1525,7 @@ function ChatsScreen() {
   const [newClientName, setNewClientName] = useState('');
   const [newClientPhone, setNewClientPhone] = useState('');
   const [error, setError] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const selectedThread = threads.find((thread) => thread.id === selectedId) ?? null;
 
@@ -1528,6 +1560,13 @@ function ChatsScreen() {
   useEffect(() => {
     void loadChats();
   }, [loadChats]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({
+      block: 'end',
+      behavior: 'smooth',
+    });
+  }, [selectedThread?.id, selectedThread?.messages.length]);
 
   async function sendMessage(text = messageText) {
     const clean = text.trim();
@@ -1580,6 +1619,9 @@ function ChatsScreen() {
         setThreads((current) =>
           current.map((thread) => (thread.id === selectedThread.id ? normalized : thread)),
         );
+        setSelectedId(normalized.id);
+      } else {
+        void loadChats();
       }
     } catch {
       setError('Сообщение добавлено локально, но API чата не ответил.');
@@ -1588,12 +1630,14 @@ function ChatsScreen() {
 
   async function createThread() {
     const name = newClientName.trim();
+    const phone = newClientPhone.trim();
     if (!name) return;
 
+    const localThreadId = `local-thread-${Date.now()}`;
     const localThread: MiniChatThread = {
-      id: `local-thread-${Date.now()}`,
+      id: localThreadId,
       clientName: name,
-      clientPhone: newClientPhone.trim(),
+      clientPhone: phone,
       priority: 'normal',
       botConnected: true,
       lastMessage: 'Новый диалог',
@@ -1614,17 +1658,34 @@ function ChatsScreen() {
     setNewClientPhone('');
 
     try {
-      await fetchMini('/api/chats', {
+      const response = await fetchMini('/api/chats', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           clientName: name,
-          clientPhone: newClientPhone.trim(),
+          clientPhone: phone,
           message: 'Диалог создан из Mini App.',
         }),
       });
+
+      if (!response.ok) {
+        throw new Error('create_thread_failed');
+      }
+
+      const payload = await parseJsonSafe<Record<string, unknown>>(response);
+      const maybeThread = payload?.thread || payload?.chat;
+
+      if (maybeThread) {
+        const normalized = normalizeChatThread(maybeThread, 0);
+        setThreads((current) =>
+          current.map((thread) => (thread.id === localThreadId ? normalized : thread)),
+        );
+        setSelectedId(normalized.id);
+      } else {
+        void loadChats();
+      }
     } catch {
       // Локальный поток уже создан.
     }
@@ -1704,6 +1765,7 @@ function ChatsScreen() {
                 icon={<MessageCircle className="size-5" />}
               />
             )}
+            <div ref={messagesEndRef} />
           </div>
 
           <div className="border-t border-white/[0.08] p-3">
@@ -1726,6 +1788,12 @@ function ChatsScreen() {
               <input
                 value={messageText}
                 onChange={(event) => setMessageText(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    void sendMessage();
+                  }
+                }}
                 placeholder="Сообщение клиенту..."
                 className="h-11 rounded-[15px] border border-white/[0.08] bg-[#141414] px-3 text-[14px] font-medium text-white outline-none placeholder:text-white/25"
               />
@@ -1896,6 +1964,7 @@ function ClientsScreen({
 
   if (selectedClient) {
     const favorite = favoriteKeys.includes(selectedClient.key);
+    const phoneHref = getPhoneHref(selectedClient.phone);
 
     return (
       <div className="space-y-3">
@@ -1933,7 +2002,14 @@ function ClientsScreen({
             <Star className="size-4" />
             {favorite ? 'VIP' : 'В VIP'}
           </MiniButton>
-          <MiniButton>
+          <MiniButton
+            disabled={!phoneHref}
+            onClick={() => {
+              if (phoneHref) {
+                window.location.href = phoneHref;
+              }
+            }}
+          >
             <Phone className="size-4" />
             Позвонить
           </MiniButton>
@@ -3030,6 +3106,17 @@ function BookingSheet({
 }) {
   const [updating, setUpdating] = useState<BookingStatus | null>(null);
 
+  useEffect(() => {
+    if (!booking || typeof document === 'undefined') return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [booking]);
+
   if (!booking) return null;
 
   async function update(status: BookingStatus) {
@@ -3041,8 +3128,14 @@ function BookingSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end bg-black/55 px-3 pb-[calc(var(--tg-safe-bottom,0px)+10px)] backdrop-blur-[8px]">
-      <div className="mx-auto w-full max-w-[430px] overflow-hidden rounded-[26px] border border-white/[0.10] bg-[#101010] shadow-[0_28px_90px_rgba(0,0,0,0.72)]">
+    <div
+      className="fixed inset-0 z-[80] flex items-end bg-black/55 px-3 pb-[calc(var(--tg-safe-bottom,0px)+10px)] backdrop-blur-[8px]"
+      onClick={onClose}
+    >
+      <div
+        className="mx-auto w-full max-w-[430px] overflow-hidden rounded-[26px] border border-white/[0.10] bg-[#101010] shadow-[0_28px_90px_rgba(0,0,0,0.72)]"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="flex items-start justify-between gap-4 border-b border-white/[0.08] p-4">
           <div>
             <MiniLabel>запись</MiniLabel>
@@ -3108,13 +3201,115 @@ export function MiniAppEntry() {
     getPublicPath,
   } = useApp();
 
-  const [screen, setScreen] = useState<MiniScreen>('today');
+  const [screen, setScreenState] = useState<MiniScreen>('today');
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [bootState, setBootState] = useState<'loading' | 'ready'>('loading');
+  const [refreshing, setRefreshing] = useState(false);
+  const [syncedAt, setSyncedAt] = useState<number | null>(null);
+  const [isOnline, setIsOnline] = useState(
+    typeof navigator === 'undefined' ? true : navigator.onLine,
+  );
   const bootedRef = useRef(false);
+  const refreshPromiseRef = useRef<Promise<void> | null>(null);
 
   const workspaceRecord = safeRecord(workspaceData);
   const accent = getAccentFromWorkspace(workspaceRecord);
+
+  const setScreen = useCallback((nextScreen: MiniScreen) => {
+    setScreenState(nextScreen);
+
+    if (typeof window === 'undefined') return;
+
+    try {
+      window.sessionStorage.setItem(MINI_SCREEN_STORAGE_KEY, nextScreen);
+    } catch {}
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  const refreshData = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (refreshPromiseRef.current) {
+        return refreshPromiseRef.current;
+      }
+
+      if (!options?.silent) {
+        setRefreshing(true);
+      }
+
+      const task = (async () => {
+        await refreshWorkspace();
+        setSyncedAt(Date.now());
+      })().finally(() => {
+        refreshPromiseRef.current = null;
+        setRefreshing(false);
+      });
+
+      refreshPromiseRef.current = task;
+      return task;
+    },
+    [refreshWorkspace],
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const storedScreen = window.sessionStorage.getItem(MINI_SCREEN_STORAGE_KEY);
+      if (
+        storedScreen === 'today' ||
+        storedScreen === 'availability' ||
+        storedScreen === 'chats' ||
+        storedScreen === 'clients' ||
+        storedScreen === 'more' ||
+        storedScreen === 'profile' ||
+        storedScreen === 'services' ||
+        storedScreen === 'analytics' ||
+        storedScreen === 'appearance' ||
+        storedScreen === 'settings'
+      ) {
+        setScreenState(storedScreen);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const syncOnlineState = () => setIsOnline(window.navigator.onLine);
+    syncOnlineState();
+
+    window.addEventListener('online', syncOnlineState);
+    window.addEventListener('offline', syncOnlineState);
+
+    return () => {
+      window.removeEventListener('online', syncOnlineState);
+      window.removeEventListener('offline', syncOnlineState);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && (typeof navigator === 'undefined' || navigator.onLine)) {
+        void refreshData({ silent: true });
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === 'visible' && (typeof navigator === 'undefined' || navigator.onLine)) {
+        void refreshData({ silent: true });
+      }
+    }, 60000);
+
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [refreshData]);
 
   useEffect(() => {
     if (bootedRef.current) return;
@@ -3132,7 +3327,7 @@ export function MiniAppEntry() {
         // Если Telegram initData недоступна, всё равно пробуем загрузить workspace по cookie/header.
       }
 
-      await refreshWorkspace();
+      await refreshData();
 
       if (!cancelled) {
         setBootState('ready');
@@ -3144,7 +3339,7 @@ export function MiniAppEntry() {
     return () => {
       cancelled = true;
     };
-  }, [refreshWorkspace]);
+  }, [refreshData]);
 
   if (!hasHydrated || bootState === 'loading') {
     return <MiniLoading />;
@@ -3160,8 +3355,11 @@ export function MiniAppEntry() {
         screen={screen}
         setScreen={setScreen}
         profile={ownedProfile}
-        onRefresh={() => void refreshWorkspace()}
+        onRefresh={refreshData}
         accent={accent}
+        online={isOnline}
+        syncedAt={syncedAt}
+        refreshing={refreshing}
       >
         {screen === 'today' ? (
           <TodayScreen bookings={bookings} onOpenBooking={setSelectedBooking} />

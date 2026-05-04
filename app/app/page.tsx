@@ -44,17 +44,16 @@ export default function AppPage() {
 
     async function boot() {
       const phone = isPhoneViewport();
+      const telegramRuntime = hasTelegramMiniAppRuntime();
 
-      if (!phone) {
+      if (!phone && !telegramRuntime) {
         try {
           if (hasTelegramMiniAppRuntime()) {
             await authorizeTelegramMiniAppSession({
               waitMs: 2200,
             });
           }
-        } catch {
-          // ПК всё равно должен открыть обычный кабинет.
-        }
+        } catch {}
 
         if (!cancelled) {
           window.location.replace(getDashboardTarget());

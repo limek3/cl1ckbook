@@ -11260,3 +11260,45 @@ html[data-tg-miniapp='true'] body {
   box-shadow: 0 0 0 999px #141414 inset !important;
   -webkit-text-fill-color: #ffffff !important;
 }
+
+
+html[data-tg-miniapp='true'] body {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.cb-mini-app-root {
+  min-height: 100svh;
+}
+
+.cb-mini-app-root input,
+.cb-mini-app-root textarea,
+.cb-mini-app-root select {
+  background-color: #141414 !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.cb-mini-app-root input::placeholder,
+.cb-mini-app-root textarea::placeholder {
+  color: rgba(255, 255, 255, 0.25) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+.cb-mini-app-root input:-webkit-autofill,
+.cb-mini-app-root textarea:-webkit-autofill {
+  box-shadow: 0 0 0 999px #141414 inset !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+html[data-tg-miniapp='true'] body {
+  min-height: var(--tg-viewport-height, 100svh);
+  overscroll-behavior-y: none;
+}
+
+.cb-mini-app-root {
+  min-height: var(--tg-viewport-height, 100svh);
+  padding-left: max(0.75rem, var(--tg-safe-left, 0px));
+  padding-right: max(0.75rem, var(--tg-safe-right, 0px));
+  overscroll-behavior-y: contain;
+}
