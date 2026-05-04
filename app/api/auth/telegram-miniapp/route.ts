@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/server/supabase-admin';
 import { createTelegramAppSessionToken, setTelegramAppSessionCookie } from '@/lib/server/app-session';
 import { verifyTelegramMiniAppInitData } from '@/lib/server/telegram-miniapp';
-import { ensureTelegramAuthUser, upsertTelegramAccount } from '@/lib/server/telegram-user';
+import { upsertTelegramAccount } from '@/lib/server/telegram-user';
+import { createTelegramVirtualUserId } from '@/lib/server/telegram-virtual-user';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -10,6 +11,12 @@ export const dynamic = 'force-dynamic';
 type TelegramMiniAppAuthBody = {
   initData?: string;
 };
+
+function stableTelegramUserId(telegramId: number, accountUserId?: unknown) {
+  return typeof accountUserId === 'string' && accountUserId.trim()
+    ? accountUserId.trim()
+    : createTelegramVirtualUserId(telegramId);
+}
 
 export async function POST(request: Request) {
   try {
@@ -25,19 +32,17 @@ export async function POST(request: Request) {
 
     if (accountError) throw accountError;
 
-    const user = await ensureTelegramAuthUser({
-      admin,
-      telegramId: verified.user.id,
-      accountUserId: existingAccount?.user_id as string | undefined,
-      username: verified.user.username ?? null,
-      firstName: verified.user.first_name ?? null,
-      lastName: verified.user.last_name ?? null,
-      photoUrl: verified.user.photo_url ?? null,
-      chatId: typeof existingAccount?.chat_id === 'number' ? existingAccount.chat_id : null,
-    });
+    // ВАЖНО:
+    // Mini App не обязан создавать Supabase Auth user. Раньше именно вызов
+    // admin.auth.admin.createUser() часто отдавал GoTrue "Internal Server Error",
+    // из-за чего кабинет начинал тупить и повторно пытался чинить пользователя
+    // на /api/workspace и /api/chats. Для Mini App держим собственную подписанную
+    // app-session: если аккаунт уже был связан — сохраняем его user_id, если нет —
+    // используем стабильный детерминированный UUID по telegram_id.
+    const userId = stableTelegramUserId(verified.user.id, existingAccount?.user_id);
 
     await upsertTelegramAccount(admin, {
-      userId: user.id,
+      userId,
       telegramId: verified.user.id,
       username: verified.user.username ?? null,
       firstName: verified.user.first_name ?? null,
@@ -48,7 +53,7 @@ export async function POST(request: Request) {
     });
 
     const appSessionToken = createTelegramAppSessionToken({
-      userId: user.id,
+      userId,
       telegramId: verified.user.id,
       username: verified.user.username ?? null,
       firstName: verified.user.first_name ?? null,
@@ -60,7 +65,7 @@ export async function POST(request: Request) {
       app_session: true,
       appSessionToken,
       user: {
-        id: user.id,
+        id: userId,
         telegramId: verified.user.id,
         username: verified.user.username ?? null,
         firstName: verified.user.first_name ?? null,
@@ -69,7 +74,7 @@ export async function POST(request: Request) {
     });
 
     return setTelegramAppSessionCookie(response, {
-      userId: user.id,
+      userId,
       telegramId: verified.user.id,
       username: verified.user.username ?? null,
       firstName: verified.user.first_name ?? null,

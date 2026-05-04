@@ -4,10 +4,7 @@ import { headers } from 'next/headers';
 import { createClient as createSupabaseClient, type User } from '@supabase/supabase-js';
 import { createClient as createServerSupabaseClient } from '@/lib/supabase/server';
 import { getSupabasePublishableKey, getSupabaseUrl } from '@/lib/supabase/env';
-import { createSupabaseAdminClient } from '@/lib/server/supabase-admin';
 import { getAppSessionUser, getAppSessionUserFromToken } from '@/lib/server/app-session';
-import { ensureTelegramAuthUser, upsertTelegramAccount } from '@/lib/server/telegram-user';
-import { createTelegramVirtualUser } from '@/lib/server/telegram-virtual-user';
 
 function parseBearerToken(value: string | null) {
   if (!value) return null;
@@ -31,94 +28,21 @@ async function getRequestAuthHeaders() {
   }
 }
 
-function getTelegramIdFromUser(user: User | null) {
-  const raw = user?.user_metadata?.telegram_id;
-  const value = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : NaN;
-  return Number.isFinite(value) && value > 0 ? Math.trunc(value) : null;
-}
+async function getUserFromBearerToken(token: string): Promise<User | null> {
+  const tokenSupabase = createSupabaseClient(
+    getSupabaseUrl(),
+    getSupabasePublishableKey(),
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    },
+  );
 
-function getStringMetadata(user: User | null, key: string) {
-  const value = user?.user_metadata?.[key];
-  return typeof value === 'string' && value.trim() ? value.trim() : null;
-}
-
-async function getExistingAuthUser(userId?: string | null) {
-  if (!userId) return null;
-
-  try {
-    const admin = createSupabaseAdminClient();
-    const { data, error } = await admin.auth.admin.getUserById(userId);
-    if (error || !data.user) return null;
-    return data.user;
-  } catch {
-    return null;
-  }
-}
-
-async function repairTelegramAppSessionUser(sessionUser: User | null) {
-  if (!sessionUser) return null;
-
-  // The Telegram mini-app stores its own signed session token. If the matching
-  // Supabase Auth user was deleted manually, the UI can still look logged in,
-  // but profile creation fails on owner_id -> auth.users foreign keys. Always
-  // validate the user id and recreate/relink it by telegram_id when needed.
-  const existing = await getExistingAuthUser(sessionUser.id);
-  if (existing) return existing;
-
-  const telegramId = getTelegramIdFromUser(sessionUser);
-  if (!telegramId) return null;
-
-  const admin = createSupabaseAdminClient();
-
-  const { data: account } = await admin
-    .from('sloty_telegram_accounts')
-    .select('user_id,chat_id,username,first_name,last_name,photo_url')
-    .eq('telegram_id', telegramId)
-    .maybeSingle();
-
-  const telegramProfile = {
-    username: getStringMetadata(sessionUser, 'telegram_username') ?? (typeof account?.username === 'string' ? account.username : null),
-    firstName: getStringMetadata(sessionUser, 'telegram_first_name') ?? (typeof account?.first_name === 'string' ? account.first_name : null),
-    lastName: getStringMetadata(sessionUser, 'telegram_last_name') ?? (typeof account?.last_name === 'string' ? account.last_name : null),
-    photoUrl: getStringMetadata(sessionUser, 'telegram_photo_url') ?? (typeof account?.photo_url === 'string' ? account.photo_url : null),
-    chatId: typeof account?.chat_id === 'number' ? account.chat_id : null,
-  };
-
-  let user: User;
-
-  try {
-    user = await ensureTelegramAuthUser({
-      admin,
-      telegramId,
-      accountUserId: typeof account?.user_id === 'string' ? account.user_id : null,
-      ...telegramProfile,
-    });
-  } catch (error) {
-    console.warn(
-      '[require-auth-user] Telegram Auth repair failed, using virtual user',
-      error instanceof Error ? error.message : 'unknown_error',
-    );
-    user = createTelegramVirtualUser({ telegramId, ...telegramProfile });
-  }
-
-  try {
-    await upsertTelegramAccount(admin, {
-      userId: user.id,
-      telegramId,
-      username: getStringMetadata(user, 'telegram_username') ?? telegramProfile.username ?? null,
-      firstName: getStringMetadata(user, 'telegram_first_name') ?? telegramProfile.firstName ?? null,
-      lastName: getStringMetadata(user, 'telegram_last_name') ?? telegramProfile.lastName ?? null,
-      photoUrl: getStringMetadata(user, 'telegram_photo_url') ?? telegramProfile.photoUrl ?? null,
-      chatId: telegramProfile.chatId,
-    });
-  } catch (error) {
-    console.warn(
-      '[require-auth-user] Telegram account upsert skipped',
-      error instanceof Error ? error.message : 'unknown_error',
-    );
-  }
-
-  return user;
+  const { data, error } = await tokenSupabase.auth.getUser(token);
+  return !error && data.user ? data.user : null;
 }
 
 export async function requireAuthUser(): Promise<User> {
@@ -129,48 +53,23 @@ export async function requireAuthUser(): Promise<User> {
     return data.user;
   }
 
-  // Fallback: sometimes the browser has a valid Supabase session, but the
-  // API route does not receive/refresh the auth cookie yet on Vercel.
-  // Client requests send Authorization: Bearer <access_token>, and we validate
-  // that token directly through Supabase Auth.
-  const { bearerToken: token, appSessionToken } = await getRequestAuthHeaders();
+  const { bearerToken, appSessionToken } = await getRequestAuthHeaders();
 
-  // Prefer a real Supabase bearer token over the Telegram app-session fallback.
-  // This prevents an old Telegram token in localStorage from overriding a new
-  // Google/VK/Supabase session after the previous account was deleted.
-  if (token) {
-    const tokenSupabase = createSupabaseClient(
-      getSupabaseUrl(),
-      getSupabasePublishableKey(),
-      {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-          detectSessionInUrl: false,
-        },
-      },
-    );
-
-    const { data: tokenData, error: tokenError } = await tokenSupabase.auth.getUser(token);
-
-    if (!tokenError && tokenData.user) {
-      return tokenData.user;
-    }
+  // Реальная Supabase-сессия всегда главнее, чтобы VK/Google/пароль не
+  // перебивались старым Telegram-токеном из localStorage.
+  if (bearerToken) {
+    const bearerUser = await getUserFromBearerToken(bearerToken);
+    if (bearerUser) return bearerUser;
   }
 
+  // Telegram/VK Mini App живут на собственной подписанной app-session.
+  // Не пытаемся на каждом API-запросе пересоздавать auth.users: именно это
+  // давало повторяющиеся "Supabase Auth user create failed" и тормозило кабинет.
   const headerAppSessionUser = getAppSessionUserFromToken(appSessionToken);
+  if (headerAppSessionUser) return headerAppSessionUser;
 
-  if (headerAppSessionUser) {
-    const repaired = await repairTelegramAppSessionUser(headerAppSessionUser);
-    return repaired ?? headerAppSessionUser;
-  }
-
-  const appSessionUser = await getAppSessionUser();
-
-  if (appSessionUser) {
-    const repaired = await repairTelegramAppSessionUser(appSessionUser);
-    return repaired ?? appSessionUser;
-  }
+  const cookieAppSessionUser = await getAppSessionUser();
+  if (cookieAppSessionUser) return cookieAppSessionUser;
 
   throw new Error('unauthorized');
 }
