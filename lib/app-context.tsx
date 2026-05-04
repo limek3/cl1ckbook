@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { usePathname } from 'next/navigation';
 import { useLocale } from '@/lib/locale-context';
 import { createClient as createSupabaseBrowserClient } from '@/lib/supabase/client';
 import {
@@ -417,6 +418,7 @@ async function fetchWithTelegramMiniAppRetry(input: RequestInfo | URL, init?: Re
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const { copy, locale } = useLocale();
+  const pathname = usePathname();
   const [hasHydrated, setHasHydrated] = useState(false);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [ownedProfile, setOwnedProfile] = useState<MasterProfile | null>(null);
@@ -471,6 +473,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
 
+    if (pathname === '/app') {
+      setHasHydrated(true);
+      return () => {
+        active = false;
+      };
+    }
+
     (async () => {
       await refreshWorkspace();
       if (active) {
@@ -481,7 +490,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [refreshWorkspace]);
+  }, [pathname, refreshWorkspace]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

@@ -12,6 +12,17 @@ function getBotUsername() {
   return process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME?.replace(/^@/, '').trim() || '';
 }
 
+function normalizeRedirect(value?: string | null) {
+  if (!value) return '/dashboard';
+
+  try {
+    const decoded = decodeURIComponent(value);
+    return decoded.startsWith('/') && !decoded.startsWith('//') ? decoded : '/dashboard';
+  } catch {
+    return value.startsWith('/') && !value.startsWith('//') ? value : '/dashboard';
+  }
+}
+
 function normalizeTelegramMiniAppError(error?: string) {
   if (!error) return 'Не удалось войти через Telegram Mini App.';
 
@@ -27,7 +38,44 @@ function normalizeTelegramMiniAppError(error?: string) {
     return 'Не найдена таблица Telegram-аккаунтов. Выполните свежий SQL из архива в Supabase.';
   }
 
+  if (error.includes('telegram_init_data_empty')) {
+    return 'Telegram не передал данные входа. Откройте Mini App кнопкой из бота, а не прямой ссылкой в браузере.';
+  }
+
   return error;
+}
+
+async function sleep(ms: number) {
+  await new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function fetchWorkspaceWithSession() {
+  return fetch('/api/workspace', {
+    credentials: 'include',
+    cache: 'no-store',
+    headers: getTelegramAppSessionHeaders(),
+  });
+}
+
+async function resolveTargetAfterAuth(redirectTo: string) {
+  const safeRedirect = normalizeRedirect(redirectTo);
+
+  // Give the browser a tiny moment to persist HttpOnly cookie after /api/auth/telegram-miniapp.
+  await sleep(180);
+
+  let response = await fetchWorkspaceWithSession();
+
+  // Telegram WebView can be slow to attach cookies on the first request.
+  if (response.status === 401) {
+    await sleep(450);
+    response = await fetchWorkspaceWithSession();
+  }
+
+  if (response.status === 404) return '/create-profile';
+  if (response.ok) return safeRedirect;
+
+  // Do not keep the loading card forever. Let the workspace handle its own state.
+  return safeRedirect;
 }
 
 export function TelegramMiniAppGate({
@@ -39,6 +87,7 @@ export function TelegramMiniAppGate({
 }) {
   const [state, setState] = useState<MiniAppAuthState>('checking');
   const [message, setMessage] = useState('Проверяем Telegram-сессию...');
+  const [fallbackTarget, setFallbackTarget] = useState(normalizeRedirect(redirectTo));
 
   const botUrl = useMemo(() => {
     const botUsername = getBotUsername();
@@ -47,72 +96,48 @@ export function TelegramMiniAppGate({
 
   useEffect(() => {
     let cancelled = false;
+    let hardTimeout: number | undefined;
 
-    async function openFromStoredSession() {
-      const fallbackHeaders = getTelegramAppSessionHeaders();
-
-      if (Object.keys(fallbackHeaders).length === 0) return false;
-
+    async function run() {
       try {
-        const response = await fetch('/api/workspace', {
-          credentials: 'include',
-          cache: 'no-store',
-          headers: fallbackHeaders,
-        });
+        hardTimeout = window.setTimeout(() => {
+          if (cancelled) return;
+          setState('error');
+          setMessage('Вход занял слишком много времени. Нажмите «Открыть кабинет» или перезапустите Mini App из бота.');
+        }, 11500);
 
-        if (!response.ok) return false;
-        if (cancelled) return true;
+        const payload = await authorizeTelegramMiniAppSession({ force: true, waitMs: 3200 });
 
-        setState('success');
-        setMessage('Сессия найдена. Открываем кабинет...');
-        window.setTimeout(() => window.location.replace(redirectTo), 180);
-        return true;
-      } catch {
-        return false;
-      }
-    }
+        if (cancelled) return;
 
-    async function authorizeMiniApp() {
-      const payload = await authorizeTelegramMiniAppSession({ force: true, waitMs: 2400 });
-
-      if (cancelled) return;
-
-      if (!payload.ok) {
-        const restored = await openFromStoredSession();
-        if (restored) return;
-
-        if (payload.error === 'telegram_init_data_empty') {
-          setState('outside');
-          setMessage('Откройте кабинет через Telegram-бота. В браузере можно пользоваться веб-входом через кнопку ниже.');
+        if (!payload.ok) {
+          setState(payload.error === 'telegram_init_data_empty' ? 'outside' : 'error');
+          setMessage(normalizeTelegramMiniAppError(payload.error));
           return;
         }
 
+        setState('success');
+        setMessage('Сессия создана. Открываем кабинет...');
+
+        const target = await resolveTargetAfterAuth(redirectTo);
+        if (cancelled) return;
+
+        setFallbackTarget(target);
+        window.location.replace(target);
+      } catch (error) {
+        if (cancelled) return;
         setState('error');
-        setMessage(normalizeTelegramMiniAppError(payload.error));
-        return;
+        setMessage(normalizeTelegramMiniAppError(error instanceof Error ? error.message : 'telegram_miniapp_auth_failed'));
+      } finally {
+        if (hardTimeout) window.clearTimeout(hardTimeout);
       }
-
-      setState('success');
-      setMessage('Готово. Открываем кабинет...');
-
-      window.setTimeout(() => {
-        window.location.replace(redirectTo);
-      }, 280);
     }
 
-    const watchdog = window.setTimeout(async () => {
-      if (cancelled) return;
-      const restored = await openFromStoredSession();
-      if (restored || cancelled) return;
-      setState('outside');
-      setMessage('Telegram долго не отдаёт сессию. Нажмите «Открыть кабинет», если вы уже входили, или откройте Mini App из бота ещё раз.');
-    }, 6200);
-
-    void authorizeMiniApp().finally(() => window.clearTimeout(watchdog));
+    void run();
 
     return () => {
       cancelled = true;
-      window.clearTimeout(watchdog);
+      if (hardTimeout) window.clearTimeout(hardTimeout);
     };
   }, [redirectTo]);
 
@@ -162,17 +187,17 @@ export function TelegramMiniAppGate({
         {message}
       </p>
 
-      {state === 'outside' || state === 'error' ? (
+      {state === 'outside' || state === 'error' || state === 'success' ? (
         <div className="mt-4 grid gap-2">
           <button
             type="button"
-            onClick={() => window.location.replace(redirectTo)}
+            onClick={() => window.location.replace(fallbackTarget)}
             className="inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border border-black/[0.08] bg-black px-4 text-[12px] font-semibold text-white transition hover:bg-black/88 active:scale-[0.99] dark:border-white/[0.10] dark:bg-white dark:text-black"
           >
             Открыть кабинет
           </button>
 
-          {botUrl ? (
+          {botUrl && state !== 'success' ? (
             <a
               href={botUrl}
               target="_blank"
@@ -184,13 +209,15 @@ export function TelegramMiniAppGate({
             </a>
           ) : null}
 
-          <Link
-            href="/login"
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-[10px] border border-black/[0.08] bg-white px-3 text-[11px] font-semibold text-black/54 transition hover:bg-black/[0.035] hover:text-black dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/54 dark:hover:bg-white/[0.07] dark:hover:text-white"
-          >
-            <ExternalLink className="size-3.5" />
-            Войти на сайте
-          </Link>
+          {state !== 'success' ? (
+            <Link
+              href="/login"
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-[10px] border border-black/[0.08] bg-white px-3 text-[11px] font-semibold text-black/54 transition hover:bg-black/[0.035] hover:text-black dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/54 dark:hover:bg-white/[0.07] dark:hover:text-white"
+            >
+              <ExternalLink className="size-3.5" />
+              Войти на сайте
+            </Link>
+          ) : null}
         </div>
       ) : null}
     </div>

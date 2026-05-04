@@ -34,6 +34,8 @@ export function TelegramMiniAppAutoAuth() {
   useEffect(() => {
     let cancelled = false;
 
+    if (pathname === '/app') return;
+
     (async () => {
       const result = await authorizeTelegramMiniAppSession({
         force: shouldForceTelegramSession(pathname),
