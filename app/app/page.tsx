@@ -82,17 +82,15 @@ export default function AppPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#090909] px-6 text-white">
       <div className="flex w-full max-w-[320px] flex-col items-center rounded-[22px] border border-white/[0.08] bg-[#101010]/92 px-5 py-6 text-center backdrop-blur-[22px]">
-        <div className="flex items-center justify-center">
-          <BrandLogo />
-        </div>
+        <BrandLogo />
 
-        <div className="mt-5 size-9 rounded-full border border-white/[0.08] border-t-white/55 animate-spin" />
+        <div className="mt-5 size-9 animate-spin rounded-full border border-white/[0.08] border-t-white/60" />
 
         <div className="mt-5 text-[15px] font-semibold tracking-[-0.045em]">
           Открываем кабинет
         </div>
-        <div className="mt-1 max-w-[220px] text-[12px] leading-5 text-white/45">
-          Проверяем устройство, сессию и открываем нужную версию.
+        <div className="mt-1 max-w-[230px] text-[12px] leading-5 text-white/42">
+          Проверяем устройство и открываем нужную версию.
         </div>
       </div>
     </main>
