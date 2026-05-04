@@ -11219,3 +11219,14 @@ html[data-tg-miniapp='false'] body {
     padding-bottom: 0;
   }
 }
+
+
+
+html[data-tg-miniapp='true'] body {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.cb-mini-app-root {
+  min-height: 100svh;
+}

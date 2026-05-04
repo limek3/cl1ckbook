@@ -1,263 +1,194 @@
 'use client';
 
+import Link from 'next/link';
 import {
-  useCallback,
   useEffect,
   useMemo,
   useState,
-  type ChangeEvent,
+  type CSSProperties,
   type ReactNode,
 } from 'react';
-import Link from 'next/link';
 import {
-  ArrowRight,
-  BadgeCheck,
   BarChart3,
+  Bell,
   CalendarClock,
-  Check,
+  CalendarDays,
+  CheckCircle2,
   ChevronRight,
-  CircleUserRound,
-  ClipboardList,
   Copy,
   ExternalLink,
-  Home,
-  Loader2,
-  MessageCircleMore,
+  LayoutDashboard,
+  MessageCircle,
   MoreHorizontal,
+  Palette,
   Phone,
   Plus,
-  RefreshCw,
+  RefreshCcw,
+  Scissors,
   Send,
-  Settings2,
-  Sparkles,
+  Settings,
+  ShieldCheck,
   UserRound,
-  Users2,
   X,
-  type LucideIcon,
+  XCircle,
 } from 'lucide-react';
 
 import { BrandLogo } from '@/components/brand/brand-logo';
-import {
-  authorizeTelegramMiniAppSession,
-  getTelegramAppSessionHeaders,
-  hasTelegramMiniAppRuntime,
-} from '@/lib/telegram-miniapp-auth-client';
-import { cn, parseServices, slugify } from '@/lib/utils';
-import type { Booking, BookingStatus, MasterProfile } from '@/lib/types';
-import type { WorkspaceSections, WorkspaceSnapshot } from '@/lib/workspace-store';
+import { useApp } from '@/lib/app-context';
+import { cn } from '@/lib/utils';
+import type {
+  Booking,
+  BookingStatus,
+  MasterProfile,
+  MasterProfileFormValues,
+} from '@/lib/types';
 
-type MiniMode = 'checking' | 'desktop' | 'mobile';
-type MiniTab = 'today' | 'bookings' | 'chats' | 'clients' | 'more';
-type LoadState = 'loading' | 'ready' | 'profile_required' | 'auth_required' | 'error';
-type ProfileStep = 0 | 1 | 2 | 3;
+type MiniScreen =
+  | 'today'
+  | 'schedule'
+  | 'chats'
+  | 'clients'
+  | 'more'
+  | 'profile'
+  | 'services'
+  | 'analytics'
+  | 'appearance'
+  | 'settings';
 
-type ServiceLike = {
-  id?: string;
-  name?: string;
-  price?: number;
-  duration?: number;
-  visible?: boolean;
-  status?: string;
-  bookings?: number;
-  revenue?: number;
-  popularity?: number;
-};
-
-type MiniProfileDraft = {
-  name: string;
-  profession: string;
-  city: string;
-  slug: string;
-  bio: string;
-  servicesText: string;
-  phone: string;
-  telegram: string;
-  whatsapp: string;
-  avatar: string;
-  address: string;
-};
-
-const emptyDraft: MiniProfileDraft = {
-  name: '',
-  profession: '',
-  city: '',
-  slug: '',
-  bio: '',
-  servicesText: '',
-  phone: '',
-  telegram: '',
-  whatsapp: '',
-  avatar: '',
-  address: '',
-};
-
-const statusCopy: Record<BookingStatus, { label: string; dot: string; tone: string }> = {
+const STATUS_META: Record<
+  BookingStatus,
+  {
+    label: string;
+    dot: string;
+    pill: string;
+  }
+> = {
   new: {
     label: 'Новая',
     dot: 'bg-sky-400',
-    tone: 'border-sky-400/20 bg-sky-400/10 text-sky-100',
+    pill: 'bg-sky-400/12 text-sky-100 border-sky-300/20',
   },
   confirmed: {
     label: 'Запланирована',
-    dot: 'bg-[#2f81ff]',
-    tone: 'border-[#2f81ff]/25 bg-[#2f81ff]/10 text-blue-100',
+    dot: 'bg-blue-400',
+    pill: 'bg-blue-400/12 text-blue-100 border-blue-300/20',
   },
   completed: {
     label: 'Пришла',
     dot: 'bg-emerald-400',
-    tone: 'border-emerald-400/22 bg-emerald-400/10 text-emerald-100',
+    pill: 'bg-emerald-400/12 text-emerald-100 border-emerald-300/20',
   },
   no_show: {
     label: 'Не пришла',
-    dot: 'bg-amber-400',
-    tone: 'border-amber-400/22 bg-amber-400/10 text-amber-100',
+    dot: 'bg-orange-400',
+    pill: 'bg-orange-400/12 text-orange-100 border-orange-300/20',
   },
   cancelled: {
     label: 'Отмена',
     dot: 'bg-rose-400',
-    tone: 'border-rose-400/22 bg-rose-400/10 text-rose-100',
+    pill: 'bg-rose-400/12 text-rose-100 border-rose-300/20',
   },
 };
 
-const tabs: Array<{ id: MiniTab; label: string; icon: LucideIcon }> = [
-  { id: 'today', label: 'Сегодня', icon: Home },
-  { id: 'bookings', label: 'Записи', icon: CalendarClock },
-  { id: 'chats', label: 'Чаты', icon: MessageCircleMore },
-  { id: 'clients', label: 'Клиенты', icon: Users2 },
-  { id: 'more', label: 'Ещё', icon: MoreHorizontal },
-];
+const RUB = new Intl.NumberFormat('ru-RU', {
+  style: 'currency',
+  currency: 'RUB',
+  maximumFractionDigits: 0,
+});
 
-function todayIso() {
-  const now = new Date();
-  const offset = now.getTimezoneOffset() * 60_000;
-  return new Date(now.getTime() - offset).toISOString().slice(0, 10);
+function todayKey() {
+  const date = new Date();
+
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-');
 }
 
-function formatMoney(value: number) {
-  return new Intl.NumberFormat('ru-RU').format(Math.round(value || 0)) + ' ₽';
+function addDaysKey(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-');
 }
 
-function parseDateTime(booking: Booking) {
-  const value = new Date(`${booking.date}T${booking.time || '00:00'}:00`);
-  return Number.isNaN(value.getTime()) ? new Date(booking.createdAt) : value;
+function formatDayLabel(dateKey: string) {
+  const date = new Date(`${dateKey}T12:00:00`);
+
+  if (Number.isNaN(date.getTime())) return dateKey;
+
+  return date.toLocaleDateString('ru-RU', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
 }
 
-function sortBookings(bookings: Booking[]) {
-  return [...bookings].sort((a, b) => parseDateTime(a).getTime() - parseDateTime(b).getTime());
+function formatTime(value: string) {
+  return value?.slice(0, 5) || '—';
 }
 
-function bookingRevenue(booking: Booking, services: ServiceLike[]) {
-  if (typeof booking.priceAmount === 'number') return booking.priceAmount;
-  const service = services.find((item) => item.name === booking.service);
-  return Number(service?.price ?? 0);
+function getBookingAmount(booking: Booking) {
+  return typeof booking.priceAmount === 'number' && Number.isFinite(booking.priceAmount)
+    ? booking.priceAmount
+    : 0;
 }
 
-function getServices(sections?: WorkspaceSections | null, profile?: MasterProfile | null): ServiceLike[] {
-  const dataServices = Array.isArray(sections?.services) ? (sections?.services as ServiceLike[]) : [];
+function getInitials(name?: string | null) {
+  const safe = (name || 'КБ').trim();
 
-  if (dataServices.length > 0) {
-    return dataServices.filter((item) => item.visible !== false && item.status !== 'draft');
-  }
-
-  return (profile?.services ?? []).map((name, index) => ({
-    id: `profile-service-${index}`,
-    name,
-    price: 0,
-    duration: 60,
-  }));
+  return safe
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase();
 }
 
-function initials(name?: string | null) {
-  const parts = String(name || 'КБ').trim().split(/\s+/).filter(Boolean);
-  return parts.slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'КБ';
+function sortBookings(a: Booking, b: Booking) {
+  return `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`);
 }
 
-function normalizeError(error: unknown) {
-  if (error instanceof Error) return error.message;
-  return 'Не удалось загрузить данные.';
-}
-
-function buildProfile(draft: MiniProfileDraft, previous?: MasterProfile | null): MasterProfile {
-  const name = draft.name.trim() || 'Мастер';
-  const slug = slugify(draft.slug || name) || `master-${Date.now().toString(36)}`;
-  const services = parseServices(draft.servicesText);
-
+function profileToForm(profile: MasterProfile | null): MasterProfileFormValues {
   return {
-    id: previous?.id ?? crypto.randomUUID(),
-    slug,
-    name,
-    profession: draft.profession.trim() || 'Специалист',
-    city: draft.city.trim() || 'Город',
-    bio: draft.bio.trim() || 'Запишитесь онлайн на удобное время.',
-    services: services.length > 0 ? services : ['Консультация'],
-    phone: draft.phone.trim() || undefined,
-    telegram: draft.telegram.trim() || undefined,
-    whatsapp: draft.whatsapp.trim() || undefined,
-    locationMode: draft.address.trim() ? 'address' : 'online',
-    address: draft.address.trim() || undefined,
-    avatar: draft.avatar.trim() || undefined,
-    hidePhone: false,
-    hideTelegram: false,
-    hideWhatsapp: false,
-    createdAt: previous?.createdAt ?? new Date().toISOString(),
+    name: profile?.name ?? '',
+    profession: profile?.profession ?? '',
+    city: profile?.city ?? '',
+    bio: profile?.bio ?? '',
+    servicesText: profile?.services?.join('\n') ?? '',
+    slug: profile?.slug ?? '',
+    phone: profile?.phone ?? '',
+    telegram: profile?.telegram ?? '',
+    whatsapp: profile?.whatsapp ?? '',
+    avatar: profile?.avatar ?? '',
+    hidePhone: Boolean(profile?.hidePhone),
+    hideTelegram: Boolean(profile?.hideTelegram),
+    hideWhatsapp: Boolean(profile?.hideWhatsapp),
   };
 }
 
-async function readJsonSafe<T>(response: Response) {
-  const text = await response.text();
-  if (!text) return null as T | null;
-
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    return null as T | null;
-  }
+function safeWorkspaceRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
-function MiniButton({
+function MiniCard({
   children,
-  onClick,
-  href,
-  primary = false,
-  disabled = false,
   className,
 }: {
   children: ReactNode;
-  onClick?: () => void;
-  href?: string;
-  primary?: boolean;
-  disabled?: boolean;
   className?: string;
 }) {
-  const classes = cn(
-    'inline-flex h-10 items-center justify-center gap-2 rounded-[13px] border px-3 text-[12px] font-semibold tracking-[-0.02em] transition active:scale-[0.985]',
-    primary
-      ? 'border-white/[0.12] bg-white text-black hover:bg-white/90'
-      : 'border-white/[0.085] bg-white/[0.055] text-white/78 hover:border-white/[0.14] hover:bg-white/[0.085] hover:text-white',
-    disabled && 'pointer-events-none opacity-45',
-    className,
-  );
-
-  if (href) {
-    return (
-      <Link href={href} className={classes}>
-        {children}
-      </Link>
-    );
-  }
-
-  return (
-    <button type="button" onClick={onClick} disabled={disabled} className={classes}>
-      {children}
-    </button>
-  );
-}
-
-function MiniCard({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <section
       className={cn(
-        'rounded-[20px] border border-white/[0.08] bg-[#101010]/86 shadow-none backdrop-blur-[18px]',
+        'rounded-[22px] border border-white/[0.08] bg-[#101010]/92 shadow-none backdrop-blur-[18px]',
         className,
       )}
     >
@@ -266,730 +197,60 @@ function MiniCard({ children, className }: { children: ReactNode; className?: st
   );
 }
 
-function MiniHeader({
-  title,
-  subtitle,
-  profile,
-  right,
-}: {
-  title: string;
-  subtitle?: string;
-  profile?: MasterProfile | null;
-  right?: ReactNode;
-}) {
+function MiniLabel({ children }: { children: ReactNode }) {
   return (
-    <header className="mb-4 flex items-start justify-between gap-3 px-1">
-      <div className="min-w-0">
-        <div className="mb-3 flex items-center gap-2 text-white/48">
-          <div className="flex size-7 items-center justify-center overflow-hidden rounded-[9px] border border-white/[0.09] bg-white/[0.045]">
-            {profile?.avatar ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={profile.avatar} alt="" className="size-full object-cover" />
-            ) : (
-              <span className="text-[10px] font-bold text-white/78">{initials(profile?.name)}</span>
-            )}
-          </div>
-          <span className="truncate text-[12px] font-semibold tracking-[-0.03em] text-white/72">
-            {profile?.name || 'КликБук'}
-          </span>
-        </div>
-
-        <h1 className="text-[28px] font-semibold leading-[0.95] tracking-[-0.075em] text-white">
-          {title}
-        </h1>
-        {subtitle ? (
-          <p className="mt-2 max-w-[320px] text-[12.5px] leading-5 text-white/42">
-            {subtitle}
-          </p>
-        ) : null}
-      </div>
-
-      {right ? <div className="shrink-0">{right}</div> : null}
-    </header>
+    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">
+      {children}
+    </div>
   );
 }
 
-function StatusPill({ status }: { status: BookingStatus }) {
-  const item = statusCopy[status] ?? statusCopy.new;
-  return (
-    <span className={cn('inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[10.5px] font-semibold', item.tone)}>
-      <span className={cn('size-1.5 rounded-full', item.dot)} />
-      {item.label}
-    </span>
-  );
-}
-
-function BookingCard({
-  booking,
-  services,
-  onOpen,
+function MiniButton({
+  children,
+  onClick,
+  variant = 'secondary',
+  disabled,
 }: {
-  booking: Booking;
-  services: ServiceLike[];
-  onOpen: (booking: Booking) => void;
+  children: ReactNode;
+  onClick?: () => void;
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
+  disabled?: boolean;
 }) {
-  const revenue = bookingRevenue(booking, services);
-
   return (
     <button
       type="button"
-      onClick={() => onOpen(booking)}
-      className="w-full rounded-[17px] border border-white/[0.07] bg-white/[0.035] p-3 text-left transition hover:bg-white/[0.055] active:scale-[0.992]"
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        'flex h-10 items-center justify-center gap-2 rounded-[14px] px-3 text-[12px] font-semibold tracking-[-0.035em] transition active:scale-[0.985] disabled:pointer-events-none disabled:opacity-45',
+        variant === 'primary' &&
+          'bg-white text-black hover:bg-white/90',
+        variant === 'secondary' &&
+          'border border-white/[0.08] bg-white/[0.055] text-white hover:bg-white/[0.08]',
+        variant === 'danger' &&
+          'border border-rose-300/15 bg-rose-400/10 text-rose-100 hover:bg-rose-400/14',
+        variant === 'ghost' &&
+          'bg-transparent text-white/55 hover:bg-white/[0.05] hover:text-white',
+      )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-[18px] font-semibold tracking-[-0.06em] text-white">
-              {booking.time}
-            </span>
-            <StatusPill status={booking.status} />
-          </div>
-          <div className="mt-2 truncate text-[15px] font-semibold tracking-[-0.04em] text-white/92">
-            {booking.clientName}
-          </div>
-          <div className="mt-1 truncate text-[12px] text-white/42">
-            {booking.service}{revenue ? ` · ${formatMoney(revenue)}` : ''}
-          </div>
-        </div>
-
-        <ChevronRight className="mt-1 size-4 shrink-0 text-white/26" />
-      </div>
+      {children}
     </button>
   );
 }
 
-function MetricTile({ label, value, caption }: { label: string; value: string; caption?: string }) {
-  return (
-    <div className="rounded-[16px] border border-white/[0.07] bg-white/[0.035] p-3">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/28">{label}</div>
-      <div className="mt-2 text-[19px] font-semibold tracking-[-0.06em] text-white">{value}</div>
-      {caption ? <div className="mt-0.5 truncate text-[10.5px] text-white/32">{caption}</div> : null}
-    </div>
-  );
-}
-
-function MiniBottomNav({ tab, setTab }: { tab: MiniTab; setTab: (tab: MiniTab) => void }) {
-  return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-[520px] px-3 pb-[calc(var(--tg-safe-bottom)+10px)]">
-      <div className="grid grid-cols-5 rounded-[22px] border border-white/[0.09] bg-[#101010]/88 p-1 shadow-[0_20px_70px_rgba(0,0,0,0.45)] backdrop-blur-[24px]">
-        {tabs.map((item) => {
-          const active = tab === item.id;
-          const Icon = item.icon;
-
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setTab(item.id)}
-              className={cn(
-                'relative flex h-[58px] min-w-0 flex-col items-center justify-center gap-1 rounded-[17px] text-[10.5px] font-semibold transition',
-                active
-                  ? 'bg-white/[0.075] text-white'
-                  : 'text-white/42 hover:bg-white/[0.04] hover:text-white/72',
-              )}
-            >
-              <Icon className="size-[18px]" />
-              <span className="truncate leading-none">{item.label}</span>
-              {active ? <span className="absolute bottom-1.5 size-1 rounded-full bg-white/78" /> : null}
-            </button>
-          );
-        })}
-      </div>
-    </nav>
-  );
-}
-
-function TodayScreen({
-  profile,
-  bookings,
-  services,
-  onOpenBooking,
-  onRefresh,
-}: {
-  profile: MasterProfile;
-  bookings: Booking[];
-  services: ServiceLike[];
-  onOpenBooking: (booking: Booking) => void;
-  onRefresh: () => void;
-}) {
-  const today = todayIso();
-  const todaysBookings = useMemo(
-    () => sortBookings(bookings.filter((booking) => booking.date === today && booking.status !== 'cancelled')),
-    [bookings, today],
-  );
-  const nearest = todaysBookings.find((booking) => booking.status !== 'completed' && booking.status !== 'no_show') ?? todaysBookings[0];
-  const revenue = todaysBookings.reduce((sum, booking) => sum + bookingRevenue(booking, services), 0);
-  const riskCount = todaysBookings.filter((booking) => booking.status === 'new' || booking.status === 'no_show').length;
+function StatusPill({ status }: { status: BookingStatus }) {
+  const meta = STATUS_META[status] ?? STATUS_META.new;
 
   return (
-    <>
-      <MiniHeader
-        title="Сегодня"
-        subtitle="Быстрый пульт мастера: ближайшая запись, статусы, клиенты и действия на день."
-        profile={profile}
-        right={
-          <button
-            type="button"
-            onClick={onRefresh}
-            className="grid size-10 place-items-center rounded-[13px] border border-white/[0.08] bg-white/[0.045] text-white/62 transition hover:bg-white/[0.075] hover:text-white"
-          >
-            <RefreshCw className="size-4" />
-          </button>
-        }
-      />
-
-      <div className="grid grid-cols-3 gap-2">
-        <MetricTile label="Записи" value={String(todaysBookings.length)} caption="на сегодня" />
-        <MetricTile label="Доход" value={formatMoney(revenue)} caption="по услугам" />
-        <MetricTile label="Риск" value={String(riskCount)} caption="проверить" />
-      </div>
-
-      <MiniCard className="mt-3 overflow-hidden p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/30">
-              Ближайшая
-            </div>
-            <div className="mt-1 text-[13px] text-white/42">что нужно сделать сейчас</div>
-          </div>
-          <MiniButton href="/dashboard/today" className="h-8 px-2.5 text-[10.5px]">
-            ПК
-            <ExternalLink className="size-3" />
-          </MiniButton>
-        </div>
-
-        {nearest ? (
-          <div className="mt-4 rounded-[18px] border border-white/[0.08] bg-white/[0.04] p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-[34px] font-semibold leading-none tracking-[-0.08em] text-white">
-                  {nearest.time}
-                </div>
-                <div className="mt-3 truncate text-[20px] font-semibold tracking-[-0.06em] text-white">
-                  {nearest.clientName}
-                </div>
-                <div className="mt-1 text-[12.5px] text-white/44">
-                  {nearest.service}
-                </div>
-              </div>
-              <StatusPill status={nearest.status} />
-            </div>
-
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <MiniButton onClick={() => onOpenBooking(nearest)} primary>
-                Открыть
-              </MiniButton>
-              <MiniButton href={`tel:${nearest.clientPhone}`}>
-                <Phone className="size-3.5" />
-                Позвонить
-              </MiniButton>
-            </div>
-          </div>
-        ) : (
-          <div className="mt-4 rounded-[18px] border border-dashed border-white/[0.09] bg-white/[0.025] p-5 text-center">
-            <div className="mx-auto grid size-11 place-items-center rounded-[14px] bg-white/[0.045] text-white/42">
-              <CalendarClock className="size-5" />
-            </div>
-            <div className="mt-3 text-[16px] font-semibold tracking-[-0.045em] text-white">На сегодня пусто</div>
-            <p className="mx-auto mt-1 max-w-[240px] text-[12px] leading-5 text-white/38">
-              Когда клиент запишется, ближайшая заявка появится здесь.
-            </p>
-          </div>
-        )}
-      </MiniCard>
-
-      <MiniCard className="mt-3 p-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <div className="text-[15px] font-semibold tracking-[-0.045em] text-white">День</div>
-            <div className="mt-0.5 text-[11.5px] text-white/36">все записи компактным списком</div>
-          </div>
-        </div>
-
-        <div className="grid gap-2">
-          {todaysBookings.slice(0, 8).map((booking) => (
-            <BookingCard key={booking.id} booking={booking} services={services} onOpen={onOpenBooking} />
-          ))}
-        </div>
-      </MiniCard>
-    </>
-  );
-}
-
-function BookingsScreen({
-  profile,
-  bookings,
-  services,
-  onOpenBooking,
-}: {
-  profile: MasterProfile;
-  bookings: Booking[];
-  services: ServiceLike[];
-  onOpenBooking: (booking: Booking) => void;
-}) {
-  const upcoming = useMemo(
-    () => sortBookings(bookings.filter((booking) => booking.status !== 'cancelled')).slice(0, 30),
-    [bookings],
-  );
-
-  return (
-    <>
-      <MiniHeader
-        title="Записи"
-        subtitle="Короткий список клиентов. Нажмите на запись, чтобы сменить статус или связаться."
-        profile={profile}
-        right={
-          <MiniButton href="/dashboard/today" className="h-10 px-3">
-            <Plus className="size-4" />
-          </MiniButton>
-        }
-      />
-
-      <div className="grid gap-2">
-        {upcoming.map((booking) => (
-          <BookingCard key={booking.id} booking={booking} services={services} onOpen={onOpenBooking} />
-        ))}
-      </div>
-
-      {upcoming.length === 0 ? <EmptyState title="Записей пока нет" text="Новые заявки будут появляться здесь." /> : null}
-    </>
-  );
-}
-
-function ChatsScreen({
-  profile,
-  bookings,
-  onOpenBooking,
-}: {
-  profile: MasterProfile;
-  bookings: Booking[];
-  onOpenBooking: (booking: Booking) => void;
-}) {
-  const threads = useMemo(() => {
-    const map = new Map<string, Booking>();
-
-    for (const booking of sortBookings(bookings).reverse()) {
-      const key = booking.clientPhone || booking.clientName;
-      if (!map.has(key)) map.set(key, booking);
-    }
-
-    return Array.from(map.values()).slice(0, 20);
-  }, [bookings]);
-
-  return (
-    <>
-      <MiniHeader
-        title="Чаты"
-        subtitle="Быстрые карточки коммуникаций. Полный чат можно открыть в веб-кабинете."
-        profile={profile}
-        right={<MiniButton href="/dashboard/chats" className="h-10 px-3"><ExternalLink className="size-4" /></MiniButton>}
-      />
-
-      <div className="grid gap-2">
-        {threads.map((booking) => (
-          <button
-            key={`${booking.id}-chat`}
-            type="button"
-            onClick={() => onOpenBooking(booking)}
-            className="flex items-center gap-3 rounded-[18px] border border-white/[0.07] bg-white/[0.035] p-3 text-left transition hover:bg-white/[0.055]"
-          >
-            <div className="grid size-11 shrink-0 place-items-center rounded-[15px] border border-white/[0.08] bg-white/[0.045] text-[13px] font-semibold text-white/80">
-              {initials(booking.clientName)}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[14px] font-semibold tracking-[-0.035em] text-white">{booking.clientName}</div>
-              <div className="mt-1 truncate text-[11.5px] text-white/38">
-                {booking.service} · {booking.date} {booking.time}
-              </div>
-            </div>
-            <ChevronRight className="size-4 text-white/26" />
-          </button>
-        ))}
-      </div>
-
-      {threads.length === 0 ? <EmptyState title="Чатов пока нет" text="Когда появятся записи, здесь будут быстрые карточки клиентов." /> : null}
-    </>
-  );
-}
-
-function ClientsScreen({
-  profile,
-  bookings,
-  onOpenBooking,
-}: {
-  profile: MasterProfile;
-  bookings: Booking[];
-  onOpenBooking: (booking: Booking) => void;
-}) {
-  const clients = useMemo(() => {
-    const map = new Map<string, { name: string; phone: string; count: number; last: Booking }>();
-
-    for (const booking of sortBookings(bookings)) {
-      const key = booking.clientPhone || booking.clientName;
-      const current = map.get(key);
-      map.set(key, {
-        name: booking.clientName,
-        phone: booking.clientPhone,
-        count: (current?.count ?? 0) + 1,
-        last: booking,
-      });
-    }
-
-    return Array.from(map.values()).reverse().slice(0, 30);
-  }, [bookings]);
-
-  return (
-    <>
-      <MiniHeader
-        title="Клиенты"
-        subtitle="Клиентская база без таблиц: история, контакт и последняя запись."
-        profile={profile}
-        right={<MiniButton href="/dashboard/clients" className="h-10 px-3"><ExternalLink className="size-4" /></MiniButton>}
-      />
-
-      <div className="grid gap-2">
-        {clients.map((client) => (
-          <button
-            key={client.phone || client.name}
-            type="button"
-            onClick={() => onOpenBooking(client.last)}
-            className="rounded-[18px] border border-white/[0.07] bg-white/[0.035] p-3 text-left transition hover:bg-white/[0.055]"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="truncate text-[15px] font-semibold tracking-[-0.04em] text-white">{client.name}</div>
-                <div className="mt-1 truncate text-[11.5px] text-white/38">{client.count} визит(а) · {client.last.service}</div>
-              </div>
-              <div className="text-right text-[11px] text-white/34">
-                <div>{client.last.date}</div>
-                <div>{client.last.time}</div>
-              </div>
-            </div>
-          </button>
-        ))}
-      </div>
-
-      {clients.length === 0 ? <EmptyState title="Клиентов пока нет" text="После первой записи клиент появится здесь." /> : null}
-    </>
-  );
-}
-
-function MoreScreen({ profile, services, bookings }: { profile: MasterProfile; services: ServiceLike[]; bookings: Booking[] }) {
-  const revenue = bookings.reduce((sum, booking) => sum + bookingRevenue(booking, services), 0);
-  const menu = [
-    { label: 'Профиль', caption: 'публичная страница', href: '/dashboard/profile', icon: CircleUserRound },
-    { label: 'Услуги', caption: `${services.length} активных`, href: '/dashboard/services', icon: ClipboardList },
-    { label: 'Аналитика', caption: formatMoney(revenue), href: '/dashboard/stats', icon: BarChart3 },
-    { label: 'Внешний вид', caption: 'цвета и тема', href: '/dashboard/appearance', icon: Sparkles },
-    { label: 'Настройки', caption: 'уведомления и доступ', href: '/dashboard/notifications', icon: Settings2 },
-    { label: 'Веб-кабинет', caption: 'полная версия', href: '/dashboard', icon: ExternalLink },
-  ];
-
-  return (
-    <>
-      <MiniHeader title="Ещё" subtitle="Разделы кабинета в спокойном индексном меню." profile={profile} />
-
-      <MiniCard className="overflow-hidden p-2">
-        {menu.map((item, index) => {
-          const Icon = item.icon;
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="group flex items-center gap-3 rounded-[17px] px-3 py-3 transition hover:bg-white/[0.055]"
-            >
-              <span className="grid size-6 shrink-0 place-items-center rounded-full border border-white/[0.09] text-[10px] font-semibold text-white/42 group-hover:text-white/78">
-                {index + 1}
-              </span>
-              <Icon className="size-4 shrink-0 text-white/32 group-hover:text-white/62" />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[14px] font-semibold tracking-[-0.04em] text-white/82 group-hover:text-white">
-                  {item.label}
-                </span>
-                <span className="mt-0.5 block truncate text-[11px] text-white/32">{item.caption}</span>
-              </span>
-              <ChevronRight className="size-4 text-white/22 group-hover:text-white/50" />
-            </Link>
-          );
-        })}
-      </MiniCard>
-
-      <MiniCard className="mt-3 p-4">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/30">Публичная ссылка</div>
-        <div className="mt-2 flex items-center gap-2">
-          <div className="min-w-0 flex-1 truncate text-[18px] font-semibold tracking-[-0.06em] text-white">/m/{profile.slug}</div>
-          <button
-            type="button"
-            onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/m/${profile.slug}`).catch(() => {})}
-            className="grid size-9 place-items-center rounded-[12px] border border-white/[0.08] bg-white/[0.045] text-white/58"
-          >
-            <Copy className="size-4" />
-          </button>
-        </div>
-      </MiniCard>
-    </>
-  );
-}
-
-function EmptyState({ title, text }: { title: string; text: string }) {
-  return (
-    <div className="rounded-[20px] border border-dashed border-white/[0.09] bg-white/[0.025] p-6 text-center">
-      <div className="mx-auto grid size-12 place-items-center rounded-[16px] bg-white/[0.045] text-white/40">
-        <Sparkles className="size-5" />
-      </div>
-      <div className="mt-3 text-[16px] font-semibold tracking-[-0.045em] text-white">{title}</div>
-      <p className="mx-auto mt-1 max-w-[260px] text-[12px] leading-5 text-white/38">{text}</p>
-    </div>
-  );
-}
-
-function BookingSheet({
-  booking,
-  services,
-  updatingStatus,
-  onClose,
-  onStatus,
-}: {
-  booking: Booking | null;
-  services: ServiceLike[];
-  updatingStatus: boolean;
-  onClose: () => void;
-  onStatus: (bookingId: string, status: BookingStatus) => void;
-}) {
-  if (!booking) return null;
-
-  const revenue = bookingRevenue(booking, services);
-
-  return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/55 px-3 pb-[calc(var(--tg-safe-bottom)+10px)] backdrop-blur-[10px]">
-      <div className="w-full max-w-[520px] overflow-hidden rounded-t-[28px] border border-white/[0.10] bg-[#101010] shadow-[0_-30px_80px_rgba(0,0,0,0.55)]">
-        <div className="flex items-start justify-between gap-3 border-b border-white/[0.08] p-4">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <StatusPill status={booking.status} />
-              <span className="text-[11px] text-white/34">{booking.date} · {booking.time}</span>
-            </div>
-            <div className="mt-3 truncate text-[25px] font-semibold leading-none tracking-[-0.075em] text-white">
-              {booking.clientName}
-            </div>
-            <div className="mt-2 text-[12.5px] text-white/42">
-              {booking.service}{revenue ? ` · ${formatMoney(revenue)}` : ''}
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="grid size-10 shrink-0 place-items-center rounded-[14px] border border-white/[0.08] bg-white/[0.045] text-white/58"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-
-        <div className="p-4">
-          <div className="grid grid-cols-2 gap-2">
-            <MiniButton href={`tel:${booking.clientPhone}`}>
-              <Phone className="size-4" />
-              Позвонить
-            </MiniButton>
-            <MiniButton href="/dashboard/chats">
-              <MessageCircleMore className="size-4" />
-              Чат
-            </MiniButton>
-          </div>
-
-          {booking.comment ? (
-            <div className="mt-3 rounded-[16px] border border-white/[0.07] bg-white/[0.035] p-3">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/28">Комментарий</div>
-              <div className="mt-2 text-[12.5px] leading-5 text-white/56">{booking.comment}</div>
-            </div>
-          ) : null}
-
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <MiniButton disabled={updatingStatus} primary onClick={() => onStatus(booking.id, 'completed')}>
-              {updatingStatus ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
-              Пришла
-            </MiniButton>
-            <MiniButton disabled={updatingStatus} onClick={() => onStatus(booking.id, 'confirmed')}>
-              Подтвердить
-            </MiniButton>
-            <MiniButton disabled={updatingStatus} onClick={() => onStatus(booking.id, 'no_show')}>
-              Не пришла
-            </MiniButton>
-            <MiniButton disabled={updatingStatus} onClick={() => onStatus(booking.id, 'cancelled')}>
-              Отмена
-            </MiniButton>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MobileLoginRequired({ error }: { error?: string }) {
-  const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME?.replace(/^@/, '').trim();
-  const botUrl = botUsername ? `https://t.me/${botUsername}?startapp=dashboard` : null;
-
-  return (
-    <main className="cb-mini-app-root min-h-screen bg-[#090909] px-4 text-white">
-      <div className="mx-auto flex min-h-[72vh] w-full max-w-[520px] flex-col justify-center">
-        <MiniCard className="overflow-hidden p-5">
-          <BrandLogo className="w-[104px]" />
-          <div className="mt-6 text-[28px] font-semibold leading-[0.95] tracking-[-0.075em] text-white">
-            Откройте кабинет
-          </div>
-          <p className="mt-3 text-[12.5px] leading-5 text-white/42">
-            На телефоне кабинет работает как быстрый пульт мастера. Для входа используйте Telegram Mini App или сайт.
-          </p>
-          {error ? <p className="mt-3 rounded-[14px] border border-amber-400/20 bg-amber-400/10 p-3 text-[12px] leading-5 text-amber-100/80">{error}</p> : null}
-          <div className="mt-5 grid gap-2">
-            {botUrl ? (
-              <a
-                href={botUrl}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-[14px] bg-white px-4 text-[12px] font-semibold text-black"
-              >
-                <Send className="size-4" />
-                Открыть в Telegram
-              </a>
-            ) : null}
-            <Link
-              href="/login"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-white/[0.09] bg-white/[0.055] px-4 text-[12px] font-semibold text-white/76"
-            >
-              Войти на сайте
-            </Link>
-          </div>
-        </MiniCard>
-      </div>
-    </main>
-  );
-}
-
-function ProfileWizard({
-  saving,
-  error,
-  onSave,
-}: {
-  saving: boolean;
-  error: string | null;
-  onSave: (profile: MasterProfile) => void;
-}) {
-  const [step, setStep] = useState<ProfileStep>(0);
-  const [draft, setDraft] = useState<MiniProfileDraft>(emptyDraft);
-
-  const update = (key: keyof MiniProfileDraft) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const value = event.target.value;
-    setDraft((current) => ({
-      ...current,
-      [key]: value,
-      ...(key === 'name' && !current.slug ? { slug: slugify(value) } : {}),
-    }));
-  };
-
-  const steps = [
-    { title: 'Основное', caption: 'имя, профессия и город' },
-    { title: 'Услуги', caption: 'что смогут выбрать клиенты' },
-    { title: 'Контакты', caption: 'куда писать и звонить' },
-    { title: 'Готово', caption: 'проверка и сохранение' },
-  ] as const;
-
-  const canGoNext =
-    step === 0 ? Boolean(draft.name.trim() && draft.profession.trim() && draft.city.trim()) :
-    step === 1 ? parseServices(draft.servicesText).length > 0 :
-    step === 2 ? Boolean(draft.phone.trim() || draft.telegram.trim() || draft.whatsapp.trim()) :
-    true;
-
-  const submit = () => {
-    if (step < 3) {
-      setStep((current) => Math.min(3, current + 1) as ProfileStep);
-      return;
-    }
-
-    onSave(buildProfile(draft));
-  };
-
-  return (
-    <main className="cb-mini-app-root min-h-screen bg-[#090909] px-4 text-white">
-      <div className="mx-auto w-full max-w-[520px]">
-        <MiniHeader title="Создание профиля" subtitle="Заполните минимум. Остальное можно спокойно настроить позже." />
-
-        <MiniCard className="overflow-hidden">
-          <div className="border-b border-white/[0.08] p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/30">Шаг {step + 1} из 4</div>
-                <div className="mt-2 text-[20px] font-semibold tracking-[-0.06em] text-white">{steps[step].title}</div>
-                <div className="mt-1 text-[12px] text-white/38">{steps[step].caption}</div>
-              </div>
-              <div className="flex gap-1.5">
-                {steps.map((item, index) => (
-                  <span
-                    key={item.title}
-                    className={cn('size-2 rounded-full', index === step ? 'bg-white' : 'bg-white/[0.16]')}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-3 p-4">
-            {step === 0 ? (
-              <>
-                <MiniInput label="Имя мастера" value={draft.name} onChange={update('name')} placeholder="Например, Борис" />
-                <MiniInput label="Специализация" value={draft.profession} onChange={update('profession')} placeholder="Барбер, мастер маникюра, тренер" />
-                <MiniInput label="Город" value={draft.city} onChange={update('city')} placeholder="Москва" />
-                <MiniInput label="Ссылка" value={draft.slug} onChange={update('slug')} placeholder="admin" prefix="/m/" />
-              </>
-            ) : null}
-
-            {step === 1 ? (
-              <>
-                <MiniTextarea label="Услуги" value={draft.servicesText} onChange={update('servicesText')} placeholder={'Маникюр — 2500 ₽\nПедикюр — 3000 ₽\nКонсультация — 1500 ₽'} rows={6} />
-                <div className="rounded-[16px] border border-white/[0.07] bg-white/[0.035] p-3 text-[12px] leading-5 text-white/42">
-                  Пишите каждую услугу с новой строки. Потом в веб-кабинете можно настроить длительность, цену и расписание точнее.
-                </div>
-              </>
-            ) : null}
-
-            {step === 2 ? (
-              <>
-                <MiniInput label="Телефон" value={draft.phone} onChange={update('phone')} placeholder="+7 999 000-00-00" />
-                <MiniInput label="Telegram" value={draft.telegram} onChange={update('telegram')} placeholder="@username" />
-                <MiniInput label="WhatsApp / VK" value={draft.whatsapp} onChange={update('whatsapp')} placeholder="ссылка или номер" />
-                <MiniInput label="Адрес" value={draft.address} onChange={update('address')} placeholder="можно оставить пустым" />
-              </>
-            ) : null}
-
-            {step === 3 ? (
-              <>
-                <MiniTextarea label="Короткое описание" value={draft.bio} onChange={update('bio')} placeholder="Расскажите клиентам, чем вы занимаетесь и как проходит запись." rows={5} />
-                <MiniInput label="Фото / аватар" value={draft.avatar} onChange={update('avatar')} placeholder="ссылка на изображение, можно позже" />
-                <div className="rounded-[16px] border border-white/[0.07] bg-white/[0.035] p-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/28">Проверка</div>
-                  <div className="mt-2 text-[15px] font-semibold tracking-[-0.04em] text-white">{draft.name || 'Имя мастера'}</div>
-                  <div className="mt-1 text-[12px] text-white/42">{draft.profession || 'Специализация'} · {draft.city || 'Город'}</div>
-                  <div className="mt-2 text-[12px] text-white/38">/m/{draft.slug || slugify(draft.name) || 'profile'}</div>
-                </div>
-              </>
-            ) : null}
-
-            {error ? <div className="rounded-[14px] border border-rose-400/20 bg-rose-400/10 p-3 text-[12px] leading-5 text-rose-100/80">{error}</div> : null}
-          </div>
-        </MiniCard>
-
-        <div className="sticky bottom-[calc(var(--tg-safe-bottom)+12px)] mt-4 grid grid-cols-[92px_1fr] gap-2">
-          <MiniButton disabled={saving || step === 0} onClick={() => setStep((current) => Math.max(0, current - 1) as ProfileStep)}>
-            Назад
-          </MiniButton>
-          <MiniButton primary disabled={saving || !canGoNext} onClick={submit}>
-            {saving ? <Loader2 className="size-4 animate-spin" /> : null}
-            {step === 3 ? 'Сохранить профиль' : 'Далее'}
-            {!saving ? <ArrowRight className="size-4" /> : null}
-          </MiniButton>
-        </div>
-      </div>
-    </main>
+    <span
+      className={cn(
+        'inline-flex h-6 items-center gap-1.5 rounded-full border px-2 text-[10px] font-semibold tracking-[-0.03em]',
+        meta.pill,
+      )}
+    >
+      <span className={cn('size-1.5 rounded-full', meta.dot)} />
+      {meta.label}
+    </span>
   );
 }
 
@@ -998,355 +259,1725 @@ function MiniInput({
   value,
   onChange,
   placeholder,
-  prefix,
+  textarea,
 }: {
   label: string;
   value: string;
-  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  onChange: (value: string) => void;
   placeholder?: string;
-  prefix?: string;
+  textarea?: boolean;
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.14em] text-white/30">{label}</span>
-      <span className="flex h-11 items-center rounded-[14px] border border-white/[0.08] bg-white/[0.045] px-3 transition focus-within:border-white/[0.16]">
-        {prefix ? <span className="mr-1.5 text-[13px] font-semibold text-white/34">{prefix}</span> : null}
+      <div className="mb-2 text-[11px] font-semibold tracking-[-0.03em] text-white/58">
+        {label}
+      </div>
+
+      {textarea ? (
+        <textarea
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+          rows={5}
+          className="w-full resize-none rounded-[16px] border border-white/[0.08] bg-white/[0.045] px-3 py-3 text-[14px] font-medium tracking-[-0.035em] text-white outline-none placeholder:text-white/25 focus:border-white/[0.16] focus:bg-white/[0.065]"
+        />
+      ) : (
         <input
           value={value}
-          onChange={onChange}
+          onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
-          className="h-full min-w-0 flex-1 bg-transparent text-[14px] font-semibold tracking-[-0.025em] text-white outline-none placeholder:text-white/22"
+          className="h-11 w-full rounded-[16px] border border-white/[0.08] bg-white/[0.045] px-3 text-[14px] font-medium tracking-[-0.035em] text-white outline-none placeholder:text-white/25 focus:border-white/[0.16] focus:bg-white/[0.065]"
+        />
+      )}
+    </label>
+  );
+}
+
+function MiniToggle({
+  checked,
+  label,
+  description,
+  onChange,
+}: {
+  checked: boolean;
+  label: string;
+  description: string;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className="flex w-full items-center justify-between gap-4 rounded-[18px] border border-white/[0.08] bg-white/[0.035] p-3 text-left"
+    >
+      <span>
+        <span className="block text-[13px] font-semibold tracking-[-0.04em] text-white">
+          {label}
+        </span>
+        <span className="mt-1 block text-[11px] leading-4 text-white/42">
+          {description}
+        </span>
+      </span>
+
+      <span
+        className={cn(
+          'relative h-7 w-12 shrink-0 rounded-full border transition',
+          checked
+            ? 'border-white/20 bg-white text-black'
+            : 'border-white/[0.08] bg-white/[0.055]',
+        )}
+      >
+        <span
+          className={cn(
+            'absolute top-1 size-5 rounded-full transition',
+            checked ? 'left-6 bg-black' : 'left-1 bg-white/35',
+          )}
         />
       </span>
-    </label>
+    </button>
   );
 }
 
-function MiniTextarea({
-  label,
-  value,
-  onChange,
-  placeholder,
-  rows = 4,
+function EmptyState({
+  title,
+  text,
+  icon,
 }: {
-  label: string;
-  value: string;
-  onChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
-  placeholder?: string;
-  rows?: number;
+  title: string;
+  text: string;
+  icon?: ReactNode;
 }) {
   return (
-    <label className="block">
-      <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.14em] text-white/30">{label}</span>
-      <textarea
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        rows={rows}
-        className="w-full resize-none rounded-[14px] border border-white/[0.08] bg-white/[0.045] px-3 py-3 text-[14px] font-semibold leading-5 tracking-[-0.025em] text-white outline-none transition placeholder:text-white/22 focus:border-white/[0.16]"
-      />
-    </label>
+    <div className="flex flex-col items-center justify-center rounded-[20px] border border-dashed border-white/[0.08] bg-white/[0.025] px-5 py-8 text-center">
+      <div className="mb-3 flex size-11 items-center justify-center rounded-[16px] border border-white/[0.08] bg-white/[0.045] text-white/55">
+        {icon ?? <CalendarClock className="size-5" />}
+      </div>
+      <div className="text-[15px] font-semibold tracking-[-0.045em] text-white">
+        {title}
+      </div>
+      <div className="mt-1 max-w-[230px] text-[12px] leading-5 text-white/42">
+        {text}
+      </div>
+    </div>
   );
 }
 
-function MobileDashboard({
-  snapshot,
-  setSnapshot,
+function MiniLogoHeader({
+  profile,
   onRefresh,
 }: {
-  snapshot: WorkspaceSnapshot;
-  setSnapshot: (snapshot: WorkspaceSnapshot) => void;
+  profile: MasterProfile | null;
   onRefresh: () => void;
 }) {
-  const [tab, setTab] = useState<MiniTab>('today');
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
-  const [updatingStatus, setUpdatingStatus] = useState(false);
-
-  const profile = snapshot.profile;
-  const sections = snapshot.data ?? {};
-  const bookings = useMemo(() => Array.isArray(sections.bookings) ? sections.bookings : [], [sections.bookings]);
-  const services = useMemo(() => getServices(sections, profile), [sections, profile]);
-
-  const updateBookingStatus = useCallback(async (bookingId: string, status: BookingStatus) => {
-    setUpdatingStatus(true);
-
-    const optimisticBookings = bookings.map((booking) => booking.id === bookingId ? { ...booking, status } : booking);
-    setSnapshot({
-      ...snapshot,
-      data: {
-        ...(snapshot.data ?? {}),
-        bookings: optimisticBookings,
-      },
-    });
-    setSelectedBooking((current) => current?.id === bookingId ? { ...current, status } : current);
-
-    try {
-      const response = await fetch('/api/bookings', {
-        method: 'PATCH',
-        credentials: 'include',
-        cache: 'no-store',
-        headers: {
-          'Content-Type': 'application/json',
-          ...getTelegramAppSessionHeaders(),
-        },
-        body: JSON.stringify({ bookingId, status }),
-      });
-
-      if (!response.ok) throw new Error('booking_status_update_failed');
-      const payload = await readJsonSafe<{ booking?: Booking }>(response);
-      const updated = payload?.booking;
-
-      if (updated) {
-        const confirmedBookings = optimisticBookings.map((booking) => booking.id === bookingId ? updated : booking);
-        setSnapshot({
-          ...snapshot,
-          data: {
-            ...(snapshot.data ?? {}),
-            bookings: confirmedBookings,
-          },
-        });
-        setSelectedBooking(updated);
-      }
-    } catch {
-      onRefresh();
-    } finally {
-      setUpdatingStatus(false);
-    }
-  }, [bookings, onRefresh, setSnapshot, snapshot]);
-
   return (
-    <main className="cb-mini-app-root min-h-screen bg-[#090909] px-3 text-white">
-      <div className="mx-auto w-full max-w-[520px] pb-24">
-        {tab === 'today' ? (
-          <TodayScreen profile={profile} bookings={bookings} services={services} onOpenBooking={setSelectedBooking} onRefresh={onRefresh} />
-        ) : null}
-        {tab === 'bookings' ? (
-          <BookingsScreen profile={profile} bookings={bookings} services={services} onOpenBooking={setSelectedBooking} />
-        ) : null}
-        {tab === 'chats' ? (
-          <ChatsScreen profile={profile} bookings={bookings} onOpenBooking={setSelectedBooking} />
-        ) : null}
-        {tab === 'clients' ? (
-          <ClientsScreen profile={profile} bookings={bookings} onOpenBooking={setSelectedBooking} />
-        ) : null}
-        {tab === 'more' ? (
-          <MoreScreen profile={profile} services={services} bookings={bookings} />
-        ) : null}
+    <header className="mb-4 flex items-center justify-between gap-3">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-[11px] border border-white/[0.08] bg-white/[0.055]">
+          {profile?.avatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={profile.avatar} alt="" className="size-full object-cover" />
+          ) : (
+            <span className="text-[10px] font-bold text-white">
+              {getInitials(profile?.name)}
+            </span>
+          )}
+        </div>
+
+        <div className="min-w-0">
+          <div className="truncate text-[13px] font-semibold tracking-[-0.045em] text-white">
+            {profile?.name || 'КликБук'}
+          </div>
+          <div className="truncate text-[10px] font-semibold tracking-[-0.03em] text-white/35">
+            кабинет мастера
+          </div>
+        </div>
       </div>
 
-      <MiniBottomNav tab={tab} setTab={setTab} />
-      <BookingSheet
-        booking={selectedBooking}
-        services={services}
-        updatingStatus={updatingStatus}
-        onClose={() => setSelectedBooking(null)}
-        onStatus={updateBookingStatus}
-      />
+      <button
+        type="button"
+        onClick={onRefresh}
+        className="flex size-8 items-center justify-center rounded-[11px] border border-white/[0.08] bg-white/[0.045] text-white/55 active:scale-95"
+      >
+        <RefreshCcw className="size-3.5" />
+      </button>
+    </header>
+  );
+}
+
+function MiniShell({
+  screen,
+  setScreen,
+  children,
+  profile,
+  onRefresh,
+}: {
+  screen: MiniScreen;
+  setScreen: (screen: MiniScreen) => void;
+  children: ReactNode;
+  profile: MasterProfile | null;
+  onRefresh: () => void;
+}) {
+  const shellStyle: CSSProperties = {
+    paddingTop: 'calc(var(--tg-safe-top, 0px) + 10px)',
+    paddingBottom: 'calc(var(--tg-safe-bottom, 0px) + 96px)',
+  };
+
+  const navItems: Array<{
+    id: MiniScreen;
+    label: string;
+    icon: ReactNode;
+  }> = [
+    { id: 'today', label: 'Сегодня', icon: <CalendarClock className="size-4" /> },
+    { id: 'schedule', label: 'График', icon: <CalendarDays className="size-4" /> },
+    { id: 'chats', label: 'Чаты', icon: <MessageCircle className="size-4" /> },
+    { id: 'more', label: 'Ещё', icon: <MoreHorizontal className="size-4" /> },
+  ];
+
+  return (
+    <main
+      style={shellStyle}
+      className="cb-mini-app-root min-h-screen bg-[#090909] px-3 text-white"
+    >
+      <div className="mx-auto w-full max-w-[430px]">
+        <MiniLogoHeader profile={profile} onRefresh={onRefresh} />
+        {children}
+      </div>
+
+      <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-[430px] px-3 pb-[calc(var(--tg-safe-bottom,0px)+10px)]">
+        <div className="grid grid-cols-4 gap-1 rounded-[22px] border border-white/[0.08] bg-[#101010]/90 p-1.5 shadow-[0_18px_60px_rgba(0,0,0,0.45)] backdrop-blur-[24px]">
+          {navItems.map((item) => {
+            const active =
+              screen === item.id ||
+              (item.id === 'more' &&
+                ['more', 'profile', 'services', 'analytics', 'appearance', 'settings', 'clients'].includes(screen));
+
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setScreen(item.id)}
+                className={cn(
+                  'flex h-12 flex-col items-center justify-center gap-1 rounded-[16px] text-[10px] font-semibold tracking-[-0.04em] transition active:scale-[0.98]',
+                  active
+                    ? 'bg-white/[0.08] text-white'
+                    : 'text-white/42 hover:bg-white/[0.04] hover:text-white/72',
+                )}
+              >
+                {item.icon}
+                {item.label}
+                {active ? <span className="size-1 rounded-full bg-white" /> : null}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
     </main>
   );
 }
 
-function LoadingScreen({ text = 'Загружаем кабинет...' }: { text?: string }) {
+function MiniLoading() {
   return (
-    <main className="cb-mini-app-root min-h-screen bg-[#090909] px-4 text-white">
-      <div className="mx-auto grid min-h-[74vh] w-full max-w-[520px] place-items-center">
-        <div className="text-center">
-          <div className="mx-auto grid size-13 place-items-center rounded-[18px] border border-white/[0.08] bg-white/[0.045] text-white/58">
-            <Loader2 className="size-5 animate-spin" />
-          </div>
-          <div className="mt-4 text-[17px] font-semibold tracking-[-0.045em] text-white">{text}</div>
-          <div className="mt-1 text-[12px] text-white/34">КликБук Mini App</div>
+    <main className="flex min-h-screen items-center justify-center bg-[#090909] px-6 text-white">
+      <div className="flex w-full max-w-[310px] flex-col items-center rounded-[22px] border border-white/[0.08] bg-[#101010]/92 px-5 py-6 text-center">
+        <BrandLogo />
+
+        <div className="mt-5 size-9 animate-spin rounded-full border border-white/[0.08] border-t-white/60" />
+
+        <div className="mt-5 text-[15px] font-semibold tracking-[-0.045em]">
+          Загружаем кабинет
+        </div>
+        <div className="mt-1 max-w-[230px] text-[12px] leading-5 text-white/42">
+          Поднимаем сессию, записи, чаты и настройки мастера.
         </div>
       </div>
     </main>
   );
 }
 
-export function MiniAppEntry({ desktopRedirectTo = '/dashboard' }: { desktopRedirectTo?: string }) {
-  const [mode, setMode] = useState<MiniMode>('checking');
-  const [state, setState] = useState<LoadState>('loading');
-  const [snapshot, setSnapshot] = useState<WorkspaceSnapshot | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [savingProfile, setSavingProfile] = useState(false);
+function MiniOnboarding({
+  onSave,
+}: {
+  onSave: (values: MasterProfileFormValues) => Promise<{ success: boolean; error?: string }>;
+}) {
+  const [step, setStep] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  const fetchWorkspace = useCallback(async () => {
-    const response = await fetch('/api/workspace', {
-      credentials: 'include',
-      cache: 'no-store',
-      headers: getTelegramAppSessionHeaders(),
+  const [form, setForm] = useState<MasterProfileFormValues>({
+    name: '',
+    profession: '',
+    city: '',
+    bio: '',
+    servicesText: '',
+    slug: '',
+    phone: '',
+    telegram: '',
+    whatsapp: '',
+    avatar: '',
+    hidePhone: false,
+    hideTelegram: false,
+    hideWhatsapp: false,
+  });
+
+  const steps = [
+    {
+      title: 'Основное',
+      text: 'Имя, город и короткое описание.',
+    },
+    {
+      title: 'Услуги',
+      text: 'Что клиент сможет выбрать при записи.',
+    },
+    {
+      title: 'Контакты',
+      text: 'Куда писать клиенту и как показать страницу.',
+    },
+  ];
+
+  const update = <K extends keyof MasterProfileFormValues>(
+    key: K,
+    value: MasterProfileFormValues[K],
+  ) => {
+    setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  async function handleNext() {
+    setError('');
+
+    if (step < steps.length - 1) {
+      setStep((current) => current + 1);
+      return;
+    }
+
+    setSaving(true);
+
+    const result = await onSave({
+      ...form,
+      slug: form.slug || form.name,
+      bio: form.bio || 'Онлайн-запись к мастеру через КликБук.',
     });
 
-    if (response.status === 401) {
-      setState('auth_required');
-      return;
+    setSaving(false);
+
+    if (!result.success) {
+      setError(result.error || 'Не удалось сохранить профиль.');
     }
+  }
 
-    if (response.status === 404) {
-      setState('profile_required');
-      setSnapshot(null);
-      return;
-    }
+  return (
+    <main
+      className="min-h-screen bg-[#090909] px-3 text-white"
+      style={{
+        paddingTop: 'calc(var(--tg-safe-top, 0px) + 10px)',
+        paddingBottom: 'calc(var(--tg-safe-bottom, 0px) + 24px)',
+      }}
+    >
+      <div className="mx-auto w-full max-w-[430px]">
+        <header className="mb-5 flex items-center justify-between">
+          <BrandLogo />
+          <div className="rounded-full border border-white/[0.08] bg-white/[0.045] px-3 py-1 text-[10px] font-semibold text-white/52">
+            шаг {step + 1}/{steps.length}
+          </div>
+        </header>
 
-    if (!response.ok) {
-      const payload = await readJsonSafe<{ error?: string }>(response);
-      throw new Error(payload?.error || 'workspace_fetch_failed');
-    }
+        <div className="mb-5">
+          <MiniLabel>быстрый старт</MiniLabel>
+          <h1 className="mt-2 text-[30px] font-semibold leading-none tracking-[-0.075em]">
+            Создадим страницу
+          </h1>
+          <p className="mt-2 max-w-[310px] text-[13px] leading-5 text-white/45">
+            Минимум данных сейчас. Остальное можно донастроить позже в кабинете.
+          </p>
+        </div>
 
-    const nextSnapshot = await readJsonSafe<WorkspaceSnapshot>(response);
+        <MiniCard className="overflow-hidden">
+          <div className="border-b border-white/[0.08] p-4">
+            <div className="text-[20px] font-semibold tracking-[-0.06em]">
+              {steps[step].title}
+            </div>
+            <div className="mt-1 text-[12px] leading-5 text-white/42">
+              {steps[step].text}
+            </div>
+          </div>
 
-    if (!nextSnapshot?.profile) {
-      setState('profile_required');
-      setSnapshot(null);
-      return;
-    }
+          <div className="space-y-4 p-4">
+            {step === 0 ? (
+              <>
+                <MiniInput
+                  label="Имя или название"
+                  value={form.name}
+                  onChange={(value) => update('name', value)}
+                  placeholder="Например, Анна Nails"
+                />
+                <MiniInput
+                  label="Специализация"
+                  value={form.profession}
+                  onChange={(value) => update('profession', value)}
+                  placeholder="Маникюр, тату, массаж..."
+                />
+                <MiniInput
+                  label="Город"
+                  value={form.city}
+                  onChange={(value) => update('city', value)}
+                  placeholder="Москва"
+                />
+                <MiniInput
+                  label="Описание"
+                  value={form.bio}
+                  onChange={(value) => update('bio', value)}
+                  placeholder="Коротко о себе"
+                  textarea
+                />
+              </>
+            ) : null}
 
-    setSnapshot(nextSnapshot);
-    setState('ready');
-  }, []);
+            {step === 1 ? (
+              <>
+                <MiniInput
+                  label="Услуги"
+                  value={form.servicesText}
+                  onChange={(value) => update('servicesText', value)}
+                  placeholder={'Маникюр — 2500 ₽\nПедикюр — 3000 ₽\nКоррекция — 2000 ₽'}
+                  textarea
+                />
+                <div className="rounded-[16px] border border-white/[0.08] bg-white/[0.035] p-3 text-[12px] leading-5 text-white/42">
+                  Каждую услугу лучше писать с новой строки. Потом можно добавить длительность,
+                  цену и описание.
+                </div>
+              </>
+            ) : null}
 
-  const refresh = useCallback(async () => {
-    try {
-      await fetchWorkspace();
-    } catch (nextError) {
-      setError(normalizeError(nextError));
-      setState('error');
-    }
-  }, [fetchWorkspace]);
+            {step === 2 ? (
+              <>
+                <MiniInput
+                  label="Телефон"
+                  value={form.phone}
+                  onChange={(value) => update('phone', value)}
+                  placeholder="+7..."
+                />
+                <MiniInput
+                  label="Telegram"
+                  value={form.telegram}
+                  onChange={(value) => update('telegram', value)}
+                  placeholder="@username"
+                />
+                <MiniInput
+                  label="Ссылка"
+                  value={form.slug}
+                  onChange={(value) => update('slug', value)}
+                  placeholder="anna-nails"
+                />
+              </>
+            ) : null}
+
+            {error ? (
+              <div className="rounded-[16px] border border-rose-300/15 bg-rose-400/10 p-3 text-[12px] leading-5 text-rose-100">
+                {error}
+              </div>
+            ) : null}
+          </div>
+        </MiniCard>
+
+        <div className="mt-4 grid grid-cols-[96px_1fr] gap-2">
+          <MiniButton
+            variant="secondary"
+            disabled={step === 0 || saving}
+            onClick={() => setStep((current) => Math.max(0, current - 1))}
+          >
+            Назад
+          </MiniButton>
+          <MiniButton variant="primary" disabled={saving} onClick={handleNext}>
+            {saving ? 'Сохраняем...' : step === steps.length - 1 ? 'Сохранить профиль' : 'Далее'}
+          </MiniButton>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function TodayScreen({
+  bookings,
+  onOpenBooking,
+}: {
+  bookings: Booking[];
+  onOpenBooking: (booking: Booking) => void;
+}) {
+  const today = todayKey();
+
+  const todayBookings = useMemo(
+    () => bookings.filter((booking) => booking.date === today).sort(sortBookings),
+    [bookings, today],
+  );
+
+  const upcomingBookings = useMemo(
+    () =>
+      bookings
+        .filter((booking) => `${booking.date} ${booking.time}` >= `${today} 00:00`)
+        .sort(sortBookings),
+    [bookings, today],
+  );
+
+  const list = todayBookings.length > 0 ? todayBookings : upcomingBookings.slice(0, 5);
+  const nearest = list[0] ?? null;
+  const revenue = todayBookings.reduce((sum, booking) => sum + getBookingAmount(booking), 0);
+  const riskCount = todayBookings.filter(
+    (booking) => booking.status === 'new' || booking.status === 'no_show',
+  ).length;
+
+  return (
+    <div className="space-y-3">
+      <section>
+        <MiniLabel>рабочий день</MiniLabel>
+        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
+          Сегодня
+        </h1>
+        <p className="mt-2 max-w-[320px] text-[12px] leading-5 text-white/42">
+          Быстрый пульт мастера: ближайшая запись, статусы, клиенты и действия на день.
+        </p>
+      </section>
+
+      <div className="grid grid-cols-3 gap-2">
+        <MiniCard className="p-3">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
+            записи
+          </div>
+          <div className="mt-2 text-[22px] font-semibold tracking-[-0.07em]">
+            {todayBookings.length}
+          </div>
+          <div className="text-[10px] text-white/35">на сегодня</div>
+        </MiniCard>
+
+        <MiniCard className="p-3">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
+            доход
+          </div>
+          <div className="mt-2 text-[22px] font-semibold tracking-[-0.07em]">
+            {RUB.format(revenue)}
+          </div>
+          <div className="text-[10px] text-white/35">по услугам</div>
+        </MiniCard>
+
+        <MiniCard className="p-3">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
+            риск
+          </div>
+          <div className="mt-2 text-[22px] font-semibold tracking-[-0.07em]">
+            {riskCount}
+          </div>
+          <div className="text-[10px] text-white/35">проверить</div>
+        </MiniCard>
+      </div>
+
+      <MiniCard className="overflow-hidden">
+        <div className="flex items-center justify-between border-b border-white/[0.08] p-4">
+          <div>
+            <MiniLabel>ближайшая</MiniLabel>
+            <div className="mt-1 text-[12px] text-white/42">что нужно сделать сейчас</div>
+          </div>
+
+          <Link
+            href="/dashboard"
+            className="flex h-8 items-center gap-1.5 rounded-[11px] border border-white/[0.08] bg-white/[0.045] px-2.5 text-[11px] font-semibold text-white/58"
+          >
+            ПК <ExternalLink className="size-3" />
+          </Link>
+        </div>
+
+        {nearest ? (
+          <button
+            type="button"
+            onClick={() => onOpenBooking(nearest)}
+            className="block w-full p-4 text-left active:scale-[0.995]"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[34px] font-semibold leading-none tracking-[-0.08em]">
+                  {formatTime(nearest.time)}
+                </div>
+                <div className="mt-3 text-[19px] font-semibold tracking-[-0.06em]">
+                  {nearest.clientName}
+                </div>
+                <div className="mt-1 text-[12px] text-white/42">{nearest.service}</div>
+              </div>
+
+              <StatusPill status={nearest.status} />
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <span className="flex h-10 items-center justify-center rounded-[14px] bg-white text-[12px] font-semibold text-black">
+                Открыть
+              </span>
+              <span className="flex h-10 items-center justify-center gap-2 rounded-[14px] border border-white/[0.08] bg-white/[0.055] text-[12px] font-semibold text-white">
+                <Phone className="size-3.5" />
+                Позвонить
+              </span>
+            </div>
+          </button>
+        ) : (
+          <div className="p-4">
+            <EmptyState
+              title="Сегодня свободно"
+              text="На сегодня нет записей. Можно добавить запись или проверить график."
+            />
+          </div>
+        )}
+      </MiniCard>
+
+      <MiniCard className="overflow-hidden">
+        <div className="border-b border-white/[0.08] p-4">
+          <div className="text-[15px] font-semibold tracking-[-0.045em]">День</div>
+          <div className="mt-1 text-[11px] text-white/38">
+            все записи компактным списком
+          </div>
+        </div>
+
+        <div className="space-y-2 p-3">
+          {list.length > 0 ? (
+            list.map((booking) => (
+              <button
+                key={booking.id}
+                type="button"
+                onClick={() => onOpenBooking(booking)}
+                className="flex w-full items-center gap-3 rounded-[17px] border border-white/[0.07] bg-white/[0.035] p-3 text-left active:scale-[0.99]"
+              >
+                <div className="w-12 shrink-0 text-[17px] font-semibold tracking-[-0.06em]">
+                  {formatTime(booking.time)}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px] font-semibold tracking-[-0.04em]">
+                    {booking.clientName}
+                  </div>
+                  <div className="mt-1 truncate text-[11px] text-white/38">
+                    {booking.service} · {RUB.format(getBookingAmount(booking))}
+                  </div>
+                </div>
+
+                <StatusPill status={booking.status} />
+                <ChevronRight className="size-4 shrink-0 text-white/26" />
+              </button>
+            ))
+          ) : (
+            <EmptyState
+              title="Записей пока нет"
+              text="Когда клиенты начнут записываться, они появятся здесь."
+            />
+          )}
+        </div>
+      </MiniCard>
+    </div>
+  );
+}
+
+function ScheduleScreen({
+  bookings,
+  onOpenBooking,
+}: {
+  bookings: Booking[];
+  onOpenBooking: (booking: Booking) => void;
+}) {
+  const [selectedDate, setSelectedDate] = useState(todayKey());
+
+  const days = useMemo(() => Array.from({ length: 7 }, (_, index) => addDaysKey(index)), []);
+
+  const selectedBookings = useMemo(
+    () => bookings.filter((booking) => booking.date === selectedDate).sort(sortBookings),
+    [bookings, selectedDate],
+  );
+
+  return (
+    <div className="space-y-3">
+      <section>
+        <MiniLabel>расписание</MiniLabel>
+        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
+          График
+        </h1>
+        <p className="mt-2 text-[12px] leading-5 text-white/42">
+          Быстрый просмотр ближайших дней без тяжёлых таблиц.
+        </p>
+      </section>
+
+      <div className="-mx-3 overflow-x-auto px-3">
+        <div className="flex gap-2 pb-1">
+          {days.map((day) => {
+            const active = day === selectedDate;
+            const count = bookings.filter((booking) => booking.date === day).length;
+
+            return (
+              <button
+                key={day}
+                type="button"
+                onClick={() => setSelectedDate(day)}
+                className={cn(
+                  'min-w-[82px] rounded-[18px] border p-3 text-left transition active:scale-[0.98]',
+                  active
+                    ? 'border-white/[0.16] bg-white text-black'
+                    : 'border-white/[0.08] bg-white/[0.045] text-white',
+                )}
+              >
+                <div className="text-[11px] font-semibold capitalize tracking-[-0.035em]">
+                  {formatDayLabel(day)}
+                </div>
+                <div className={cn('mt-2 text-[20px] font-semibold tracking-[-0.07em]', active ? 'text-black' : 'text-white')}>
+                  {count}
+                </div>
+                <div className={cn('text-[10px]', active ? 'text-black/45' : 'text-white/35')}>
+                  записей
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <MiniCard className="overflow-hidden">
+        <div className="border-b border-white/[0.08] p-4">
+          <div className="text-[15px] font-semibold tracking-[-0.045em]">
+            {formatDayLabel(selectedDate)}
+          </div>
+          <div className="mt-1 text-[11px] text-white/38">
+            {selectedBookings.length > 0
+              ? `${selectedBookings.length} записей в этот день`
+              : 'свободный день'}
+          </div>
+        </div>
+
+        <div className="space-y-2 p-3">
+          {selectedBookings.length > 0 ? (
+            selectedBookings.map((booking) => (
+              <button
+                key={booking.id}
+                type="button"
+                onClick={() => onOpenBooking(booking)}
+                className="grid w-full grid-cols-[52px_1fr_auto] items-center gap-3 rounded-[17px] border border-white/[0.07] bg-white/[0.035] p-3 text-left"
+              >
+                <div className="text-[16px] font-semibold tracking-[-0.06em]">
+                  {formatTime(booking.time)}
+                </div>
+                <div className="min-w-0">
+                  <div className="truncate text-[13px] font-semibold tracking-[-0.04em]">
+                    {booking.clientName}
+                  </div>
+                  <div className="mt-1 truncate text-[11px] text-white/38">
+                    {booking.service}
+                  </div>
+                </div>
+                <ChevronRight className="size-4 text-white/25" />
+              </button>
+            ))
+          ) : (
+            <EmptyState
+              title="Нет записей"
+              text="Можно оставить день свободным или добавить клиента из веб-кабинета."
+              icon={<CalendarDays className="size-5" />}
+            />
+          )}
+        </div>
+      </MiniCard>
+    </div>
+  );
+}
+
+function ChatsScreen({ bookings }: { bookings: Booking[] }) {
+  const chatRows = useMemo(() => {
+    const map = new Map<string, Booking>();
+
+    bookings
+      .slice()
+      .sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`))
+      .forEach((booking) => {
+        if (!map.has(booking.clientPhone || booking.clientName)) {
+          map.set(booking.clientPhone || booking.clientName, booking);
+        }
+      });
+
+    return Array.from(map.values()).slice(0, 12);
+  }, [bookings]);
+
+  return (
+    <div className="space-y-3">
+      <section>
+        <MiniLabel>коммуникации</MiniLabel>
+        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
+          Чаты
+        </h1>
+        <p className="mt-2 text-[12px] leading-5 text-white/42">
+          Быстрый список клиентов и шаблоны сообщений.
+        </p>
+      </section>
+
+      <div className="grid grid-cols-2 gap-2">
+        <MiniButton variant="primary">
+          <Send className="size-4" />
+          Напомнить
+        </MiniButton>
+        <MiniButton>
+          <MessageCircle className="size-4" />
+          Шаблоны
+        </MiniButton>
+      </div>
+
+      <MiniCard className="overflow-hidden">
+        <div className="border-b border-white/[0.08] p-4">
+          <div className="text-[15px] font-semibold tracking-[-0.045em]">Диалоги</div>
+          <div className="mt-1 text-[11px] text-white/38">
+            последние клиенты и записи
+          </div>
+        </div>
+
+        <div className="space-y-2 p-3">
+          {chatRows.length > 0 ? (
+            chatRows.map((booking) => (
+              <div
+                key={booking.id}
+                className="flex items-center gap-3 rounded-[17px] border border-white/[0.07] bg-white/[0.035] p-3"
+              >
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-[14px] border border-white/[0.08] bg-white/[0.055] text-[11px] font-bold">
+                  {getInitials(booking.clientName)}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px] font-semibold tracking-[-0.04em]">
+                    {booking.clientName}
+                  </div>
+                  <div className="mt-1 truncate text-[11px] text-white/38">
+                    {booking.service} · {formatDayLabel(booking.date)}, {formatTime(booking.time)}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="flex size-9 items-center justify-center rounded-[13px] bg-white text-black"
+                >
+                  <Send className="size-4" />
+                </button>
+              </div>
+            ))
+          ) : (
+            <EmptyState
+              title="Чатов пока нет"
+              text="Когда появятся записи и клиенты, быстрые диалоги будут здесь."
+              icon={<MessageCircle className="size-5" />}
+            />
+          )}
+        </div>
+      </MiniCard>
+    </div>
+  );
+}
+
+function ClientsScreen({ bookings }: { bookings: Booking[] }) {
+  const clients = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        name: string;
+        phone: string;
+        visits: number;
+        last: string;
+        service: string;
+      }
+    >();
+
+    bookings.forEach((booking) => {
+      const key = booking.clientPhone || booking.clientName;
+      const current = map.get(key);
+
+      if (!current) {
+        map.set(key, {
+          name: booking.clientName,
+          phone: booking.clientPhone,
+          visits: 1,
+          last: booking.date,
+          service: booking.service,
+        });
+        return;
+      }
+
+      current.visits += 1;
+
+      if (booking.date > current.last) {
+        current.last = booking.date;
+        current.service = booking.service;
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => b.last.localeCompare(a.last));
+  }, [bookings]);
+
+  return (
+    <div className="space-y-3">
+      <section>
+        <MiniLabel>база</MiniLabel>
+        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
+          Клиенты
+        </h1>
+        <p className="mt-2 text-[12px] leading-5 text-white/42">
+          Компактная клиентская база для телефона.
+        </p>
+      </section>
+
+      <MiniCard className="overflow-hidden">
+        <div className="space-y-2 p-3">
+          {clients.length > 0 ? (
+            clients.map((client) => (
+              <div
+                key={client.phone || client.name}
+                className="flex items-center gap-3 rounded-[17px] border border-white/[0.07] bg-white/[0.035] p-3"
+              >
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-[14px] border border-white/[0.08] bg-white/[0.055] text-[11px] font-bold">
+                  {getInitials(client.name)}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px] font-semibold tracking-[-0.04em]">
+                    {client.name}
+                  </div>
+                  <div className="mt-1 truncate text-[11px] text-white/38">
+                    {client.visits} визита · последний: {formatDayLabel(client.last)}
+                  </div>
+                </div>
+
+                <ChevronRight className="size-4 text-white/25" />
+              </div>
+            ))
+          ) : (
+            <EmptyState
+              title="Клиентов пока нет"
+              text="Клиенты появятся после первых записей."
+              icon={<UserRound className="size-5" />}
+            />
+          )}
+        </div>
+      </MiniCard>
+    </div>
+  );
+}
+
+function ProfileScreen({
+  profile,
+  onSave,
+  getPublicPath,
+}: {
+  profile: MasterProfile | null;
+  onSave: (values: MasterProfileFormValues) => Promise<{ success: boolean; error?: string }>;
+  getPublicPath: (slug: string) => string;
+}) {
+  const [form, setForm] = useState(() => profileToForm(profile));
+  const [saving, setSaving] = useState(false);
+  const [resultText, setResultText] = useState('');
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
+    setForm(profileToForm(profile));
+  }, [profile]);
 
-    const detectAndLoad = async () => {
-      const telegram = hasTelegramMiniAppRuntime();
-      const phone = window.matchMedia('(max-width: 820px)').matches;
+  const publicUrl =
+    typeof window !== 'undefined' && profile?.slug
+      ? `${window.location.origin}${getPublicPath(profile.slug)}`
+      : '';
 
-      if (!telegram && !phone) {
-        setMode('desktop');
-        window.location.replace(desktopRedirectTo || '/dashboard');
-        return;
-      }
+  const update = <K extends keyof MasterProfileFormValues>(
+    key: K,
+    value: MasterProfileFormValues[K],
+  ) => {
+    setForm((current) => ({ ...current, [key]: value }));
+  };
 
-      setMode('mobile');
-      setState('loading');
+  async function handleSave() {
+    setSaving(true);
+    setResultText('');
 
-      try {
-        if (telegram) {
-          const auth = await authorizeTelegramMiniAppSession({ waitMs: 3200 });
+    const result = await onSave(form);
 
-          if (cancelled) return;
-
-          if (!auth.ok) {
-            setError(auth.error || 'telegram_miniapp_auth_failed');
-            setState('auth_required');
-            return;
-          }
-        }
-
-        await fetchWorkspace();
-      } catch (nextError) {
-        if (cancelled) return;
-        setError(normalizeError(nextError));
-        setState('error');
-      }
-    };
-
-    void detectAndLoad();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [desktopRedirectTo, fetchWorkspace]);
-
-  const saveProfile = useCallback(async (profile: MasterProfile) => {
-    setSavingProfile(true);
-    setError(null);
-
-    try {
-      const response = await fetch('/api/profile', {
-        method: 'POST',
-        credentials: 'include',
-        cache: 'no-store',
-        headers: {
-          'Content-Type': 'application/json',
-          ...getTelegramAppSessionHeaders(),
-        },
-        body: JSON.stringify({
-          profile,
-          locale: 'ru',
-        }),
-      });
-
-      if (response.status === 409) {
-        setError('Эта ссылка уже занята. Измените поле «Ссылка».');
-        return;
-      }
-
-      if (response.status === 401) {
-        setState('auth_required');
-        setError('Сессия истекла. Откройте Mini App заново из Telegram.');
-        return;
-      }
-
-      if (!response.ok) {
-        const payload = await readJsonSafe<{ error?: string }>(response);
-        throw new Error(payload?.error || 'profile_save_failed');
-      }
-
-      const nextSnapshot = await readJsonSafe<WorkspaceSnapshot>(response);
-
-      if (nextSnapshot?.profile) {
-        setSnapshot(nextSnapshot);
-        setState('ready');
-        return;
-      }
-
-      await fetchWorkspace();
-    } catch (nextError) {
-      setError(normalizeError(nextError));
-    } finally {
-      setSavingProfile(false);
-    }
-  }, [fetchWorkspace]);
-
-  if (mode === 'checking' || mode === 'desktop') {
-    return <LoadingScreen text="Открываем кабинет..." />;
-  }
-
-  if (state === 'loading') {
-    return <LoadingScreen />;
-  }
-
-  if (state === 'auth_required') {
-    return <MobileLoginRequired error={error ?? undefined} />;
-  }
-
-  if (state === 'profile_required') {
-    return <ProfileWizard saving={savingProfile} error={error} onSave={saveProfile} />;
-  }
-
-  if (state === 'error') {
-    return (
-      <main className="cb-mini-app-root min-h-screen bg-[#090909] px-4 text-white">
-        <div className="mx-auto flex min-h-[72vh] w-full max-w-[520px] flex-col justify-center">
-          <MiniCard className="p-5 text-center">
-            <div className="mx-auto grid size-12 place-items-center rounded-[16px] border border-rose-400/20 bg-rose-400/10 text-rose-100">
-              <BadgeCheck className="size-5" />
-            </div>
-            <div className="mt-4 text-[22px] font-semibold tracking-[-0.065em] text-white">Не загрузилось</div>
-            <p className="mt-2 text-[12.5px] leading-5 text-white/42">{error || 'Попробуйте обновить кабинет.'}</p>
-            <div className="mt-5 grid gap-2">
-              <MiniButton primary onClick={refresh}>Обновить</MiniButton>
-              <MiniButton href="/dashboard">Открыть веб-кабинет</MiniButton>
-            </div>
-          </MiniCard>
-        </div>
-      </main>
+    setSaving(false);
+    setResultText(
+      result.success ? 'Профиль сохранён.' : result.error || 'Не удалось сохранить профиль.',
     );
   }
 
-  if (!snapshot) {
-    return <ProfileWizard saving={savingProfile} error={error} onSave={saveProfile} />;
+  async function copyLink() {
+    if (!publicUrl) return;
+
+    try {
+      await navigator.clipboard.writeText(publicUrl);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {}
   }
 
-  return <MobileDashboard snapshot={snapshot} setSnapshot={setSnapshot} onRefresh={refresh} />;
+  return (
+    <div className="space-y-3">
+      <section>
+        <MiniLabel>публичная страница</MiniLabel>
+        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
+          Профиль
+        </h1>
+        <p className="mt-2 text-[12px] leading-5 text-white/42">
+          Быстрая правка основной информации с телефона.
+        </p>
+      </section>
+
+      {publicUrl ? (
+        <MiniCard className="p-4">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/32">
+            ссылка
+          </div>
+          <div className="mt-2 truncate text-[18px] font-semibold tracking-[-0.06em]">
+            {getPublicPath(profile?.slug || '')}
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <MiniButton onClick={copyLink}>
+              <Copy className="size-4" />
+              {copied ? 'Скопировано' : 'Копировать'}
+            </MiniButton>
+            <Link
+              href={publicUrl}
+              className="flex h-10 items-center justify-center gap-2 rounded-[14px] border border-white/[0.08] bg-white/[0.055] text-[12px] font-semibold tracking-[-0.035em] text-white"
+            >
+              <ExternalLink className="size-4" />
+              Открыть
+            </Link>
+          </div>
+        </MiniCard>
+      ) : null}
+
+      <MiniCard className="space-y-4 p-4">
+        <MiniInput
+          label="Имя"
+          value={form.name}
+          onChange={(value) => update('name', value)}
+        />
+        <MiniInput
+          label="Специализация"
+          value={form.profession}
+          onChange={(value) => update('profession', value)}
+        />
+        <MiniInput
+          label="Город"
+          value={form.city}
+          onChange={(value) => update('city', value)}
+        />
+        <MiniInput
+          label="Описание"
+          value={form.bio}
+          onChange={(value) => update('bio', value)}
+          textarea
+        />
+        <MiniInput
+          label="Телефон"
+          value={form.phone}
+          onChange={(value) => update('phone', value)}
+        />
+        <MiniInput
+          label="Telegram"
+          value={form.telegram}
+          onChange={(value) => update('telegram', value)}
+        />
+
+        {resultText ? (
+          <div className="rounded-[15px] border border-white/[0.08] bg-white/[0.035] p-3 text-[12px] text-white/58">
+            {resultText}
+          </div>
+        ) : null}
+
+        <MiniButton variant="primary" onClick={handleSave} disabled={saving}>
+          {saving ? 'Сохраняем...' : 'Сохранить профиль'}
+        </MiniButton>
+      </MiniCard>
+    </div>
+  );
+}
+
+function ServicesScreen({
+  profile,
+  onSave,
+}: {
+  profile: MasterProfile | null;
+  onSave: (values: MasterProfileFormValues) => Promise<{ success: boolean; error?: string }>;
+}) {
+  const [servicesText, setServicesText] = useState(profile?.services?.join('\n') ?? '');
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    setServicesText(profile?.services?.join('\n') ?? '');
+  }, [profile?.services]);
+
+  async function handleSave() {
+    const base = profileToForm(profile);
+    setSaving(true);
+    setMessage('');
+
+    const result = await onSave({
+      ...base,
+      servicesText,
+    });
+
+    setSaving(false);
+    setMessage(result.success ? 'Услуги сохранены.' : result.error || 'Не удалось сохранить.');
+  }
+
+  const services = servicesText
+    .split('\n')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return (
+    <div className="space-y-3">
+      <section>
+        <MiniLabel>витрина</MiniLabel>
+        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
+          Услуги
+        </h1>
+        <p className="mt-2 text-[12px] leading-5 text-white/42">
+          Быстро обновите список услуг, который видят клиенты.
+        </p>
+      </section>
+
+      <MiniCard className="space-y-4 p-4">
+        <MiniInput
+          label="Список услуг"
+          value={servicesText}
+          onChange={setServicesText}
+          placeholder={'Маникюр — 2500 ₽\nПедикюр — 3000 ₽'}
+          textarea
+        />
+
+        <div className="space-y-2">
+          {services.length > 0 ? (
+            services.map((service, index) => (
+              <div
+                key={`${service}-${index}`}
+                className="flex items-center gap-3 rounded-[16px] border border-white/[0.07] bg-white/[0.035] p-3"
+              >
+                <div className="flex size-7 shrink-0 items-center justify-center rounded-full border border-white/[0.08] text-[10px] font-semibold text-white/42">
+                  {index + 1}
+                </div>
+                <div className="min-w-0 flex-1 truncate text-[13px] font-semibold tracking-[-0.04em]">
+                  {service}
+                </div>
+              </div>
+            ))
+          ) : (
+            <EmptyState
+              title="Услуги не заполнены"
+              text="Добавьте услуги по одной строке, чтобы клиент мог выбрать нужную."
+              icon={<Scissors className="size-5" />}
+            />
+          )}
+        </div>
+
+        {message ? (
+          <div className="rounded-[15px] border border-white/[0.08] bg-white/[0.035] p-3 text-[12px] text-white/58">
+            {message}
+          </div>
+        ) : null}
+
+        <MiniButton variant="primary" onClick={handleSave} disabled={saving}>
+          {saving ? 'Сохраняем...' : 'Сохранить услуги'}
+        </MiniButton>
+      </MiniCard>
+    </div>
+  );
+}
+
+function AnalyticsScreen({ bookings }: { bookings: Booking[] }) {
+  const days = useMemo(() => Array.from({ length: 7 }, (_, index) => addDaysKey(index - 6)), []);
+
+  const dayStats = useMemo(
+    () =>
+      days.map((day) => {
+        const dayBookings = bookings.filter((booking) => booking.date === day);
+        const revenue = dayBookings.reduce((sum, booking) => sum + getBookingAmount(booking), 0);
+
+        return {
+          day,
+          count: dayBookings.length,
+          revenue,
+        };
+      }),
+    [bookings, days],
+  );
+
+  const totalBookings = bookings.length;
+  const totalRevenue = bookings.reduce((sum, booking) => sum + getBookingAmount(booking), 0);
+  const completed = bookings.filter((booking) => booking.status === 'completed').length;
+  const noShow = bookings.filter((booking) => booking.status === 'no_show').length;
+  const maxCount = Math.max(1, ...dayStats.map((item) => item.count));
+
+  return (
+    <div className="space-y-3">
+      <section>
+        <MiniLabel>короткая аналитика</MiniLabel>
+        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
+          Аналитика
+        </h1>
+        <p className="mt-2 text-[12px] leading-5 text-white/42">
+          Только самое важное для телефона: записи, деньги, явка и динамика недели.
+        </p>
+      </section>
+
+      <div className="grid grid-cols-2 gap-2">
+        <MiniCard className="p-3">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
+            записи
+          </div>
+          <div className="mt-2 text-[26px] font-semibold tracking-[-0.08em]">
+            {totalBookings}
+          </div>
+          <div className="text-[10px] text-white/35">всего</div>
+        </MiniCard>
+
+        <MiniCard className="p-3">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
+            доход
+          </div>
+          <div className="mt-2 text-[26px] font-semibold tracking-[-0.08em]">
+            {RUB.format(totalRevenue)}
+          </div>
+          <div className="text-[10px] text-white/35">по записям</div>
+        </MiniCard>
+
+        <MiniCard className="p-3">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
+            пришли
+          </div>
+          <div className="mt-2 text-[26px] font-semibold tracking-[-0.08em]">
+            {completed}
+          </div>
+          <div className="text-[10px] text-white/35">завершено</div>
+        </MiniCard>
+
+        <MiniCard className="p-3">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
+            неявки
+          </div>
+          <div className="mt-2 text-[26px] font-semibold tracking-[-0.08em]">
+            {noShow}
+          </div>
+          <div className="text-[10px] text-white/35">контроль</div>
+        </MiniCard>
+      </div>
+
+      <MiniCard className="p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-[15px] font-semibold tracking-[-0.045em]">
+              График недели
+            </div>
+            <div className="mt-1 text-[11px] text-white/38">
+              записи по дням
+            </div>
+          </div>
+          <BarChart3 className="size-5 text-white/35" />
+        </div>
+
+        <div className="mt-5 flex h-[150px] items-end gap-2">
+          {dayStats.map((item) => {
+            const height = Math.max(8, (item.count / maxCount) * 120);
+
+            return (
+              <div key={item.day} className="flex flex-1 flex-col items-center gap-2">
+                <div className="flex h-[120px] w-full items-end rounded-full bg-white/[0.035] p-1">
+                  <div
+                    className="w-full rounded-full bg-white"
+                    style={{ height }}
+                  />
+                </div>
+                <div className="text-[9px] font-semibold uppercase text-white/35">
+                  {new Date(`${item.day}T12:00:00`).toLocaleDateString('ru-RU', {
+                    weekday: 'short',
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </MiniCard>
+    </div>
+  );
+}
+
+function AppearanceScreen({
+  workspaceData,
+  updateWorkspaceSection,
+}: {
+  workspaceData: Record<string, unknown>;
+  updateWorkspaceSection: <T>(section: string, value: T) => Promise<boolean>;
+}) {
+  const appearance = safeWorkspaceRecord(workspaceData.appearance);
+  const [mode, setMode] = useState(String(appearance.mode ?? 'dark'));
+  const [accent, setAccent] = useState(String(appearance.accent ?? 'mono'));
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const accents = [
+    { id: 'mono', label: 'Моно' },
+    { id: 'blue', label: 'Синий' },
+    { id: 'rose', label: 'Розовый' },
+    { id: 'gold', label: 'Золото' },
+  ];
+
+  async function save(next?: { mode?: string; accent?: string }) {
+    const payload = {
+      mode: next?.mode ?? mode,
+      accent: next?.accent ?? accent,
+    };
+
+    setSaving(true);
+    setMessage('');
+
+    const ok = await updateWorkspaceSection('appearance', payload);
+
+    setSaving(false);
+    setMessage(ok ? 'Внешний вид сохранён.' : 'Не удалось сохранить.');
+  }
+
+  return (
+    <div className="space-y-3">
+      <section>
+        <MiniLabel>стиль</MiniLabel>
+        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
+          Внешний вид
+        </h1>
+        <p className="mt-2 text-[12px] leading-5 text-white/42">
+          Быстрые настройки оформления для страницы и кабинета.
+        </p>
+      </section>
+
+      <MiniCard className="space-y-4 p-4">
+        <div>
+          <div className="mb-2 text-[11px] font-semibold tracking-[-0.03em] text-white/58">
+            Тема
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { id: 'dark', label: 'Тёмная' },
+              { id: 'light', label: 'Светлая' },
+            ].map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  setMode(item.id);
+                  void save({ mode: item.id });
+                }}
+                className={cn(
+                  'h-12 rounded-[16px] border text-[13px] font-semibold tracking-[-0.04em]',
+                  mode === item.id
+                    ? 'border-white/20 bg-white text-black'
+                    : 'border-white/[0.08] bg-white/[0.045] text-white/55',
+                )}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-2 text-[11px] font-semibold tracking-[-0.03em] text-white/58">
+            Акцент
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {accents.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  setAccent(item.id);
+                  void save({ accent: item.id });
+                }}
+                className={cn(
+                  'flex h-12 items-center justify-between rounded-[16px] border px-3 text-[13px] font-semibold tracking-[-0.04em]',
+                  accent === item.id
+                    ? 'border-white/20 bg-white text-black'
+                    : 'border-white/[0.08] bg-white/[0.045] text-white/55',
+                )}
+              >
+                {item.label}
+                {accent === item.id ? <CheckCircle2 className="size-4" /> : null}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {message ? (
+          <div className="rounded-[15px] border border-white/[0.08] bg-white/[0.035] p-3 text-[12px] text-white/58">
+            {saving ? 'Сохраняем...' : message}
+          </div>
+        ) : null}
+      </MiniCard>
+    </div>
+  );
+}
+
+function SettingsScreen({
+  workspaceData,
+  updateWorkspaceSection,
+}: {
+  workspaceData: Record<string, unknown>;
+  updateWorkspaceSection: <T>(section: string, value: T) => Promise<boolean>;
+}) {
+  const stored = safeWorkspaceRecord(workspaceData.miniSettings);
+  const [settings, setSettings] = useState({
+    reminders: stored.reminders !== false,
+    autoConfirm: Boolean(stored.autoConfirm),
+    noShowControl: stored.noShowControl !== false,
+    dailyDigest: stored.dailyDigest !== false,
+  });
+
+  async function update<K extends keyof typeof settings>(key: K, value: boolean) {
+    const next = { ...settings, [key]: value };
+    setSettings(next);
+    await updateWorkspaceSection('miniSettings', next);
+  }
+
+  return (
+    <div className="space-y-3">
+      <section>
+        <MiniLabel>управление</MiniLabel>
+        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
+          Настройки
+        </h1>
+        <p className="mt-2 text-[12px] leading-5 text-white/42">
+          Мобильные настройки уведомлений и рабочего дня.
+        </p>
+      </section>
+
+      <MiniCard className="space-y-2 p-3">
+        <MiniToggle
+          checked={settings.reminders}
+          label="Напоминания клиентам"
+          description="Отправлять клиенту напоминание перед записью."
+          onChange={(value) => void update('reminders', value)}
+        />
+        <MiniToggle
+          checked={settings.autoConfirm}
+          label="Автоподтверждение"
+          description="Помечать запись подтверждённой после ответа клиента."
+          onChange={(value) => void update('autoConfirm', value)}
+        />
+        <MiniToggle
+          checked={settings.noShowControl}
+          label="Контроль неявок"
+          description="Подсвечивать клиентов с риском не прийти."
+          onChange={(value) => void update('noShowControl', value)}
+        />
+        <MiniToggle
+          checked={settings.dailyDigest}
+          label="Итоги дня"
+          description="Показывать короткий итог по записям и деньгам."
+          onChange={(value) => void update('dailyDigest', value)}
+        />
+      </MiniCard>
+    </div>
+  );
+}
+
+function MoreScreen({ setScreen }: { setScreen: (screen: MiniScreen) => void }) {
+  const rows: Array<{
+    id: MiniScreen | 'desktop';
+    label: string;
+    description: string;
+    icon: ReactNode;
+  }> = [
+    {
+      id: 'profile',
+      label: 'Профиль',
+      description: 'страница мастера',
+      icon: <UserRound className="size-4" />,
+    },
+    {
+      id: 'services',
+      label: 'Услуги',
+      description: 'витрина и цены',
+      icon: <Scissors className="size-4" />,
+    },
+    {
+      id: 'clients',
+      label: 'Клиенты',
+      description: 'база и история',
+      icon: <UserRound className="size-4" />,
+    },
+    {
+      id: 'analytics',
+      label: 'Аналитика',
+      description: 'записи и доход',
+      icon: <BarChart3 className="size-4" />,
+    },
+    {
+      id: 'appearance',
+      label: 'Внешний вид',
+      description: 'тема и акцент',
+      icon: <Palette className="size-4" />,
+    },
+    {
+      id: 'settings',
+      label: 'Настройки',
+      description: 'уведомления и день',
+      icon: <Settings className="size-4" />,
+    },
+    {
+      id: 'desktop',
+      label: 'Веб-кабинет',
+      description: 'полная версия',
+      icon: <LayoutDashboard className="size-4" />,
+    },
+  ];
+
+  return (
+    <div className="space-y-3">
+      <section>
+        <MiniLabel>меню</MiniLabel>
+        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
+          Ещё
+        </h1>
+        <p className="mt-2 text-[12px] leading-5 text-white/42">
+          Дополнительные разделы в компактном стиле.
+        </p>
+      </section>
+
+      <MiniCard className="p-2">
+        <div className="space-y-1">
+          {rows.map((row, index) => (
+            <button
+              key={row.id}
+              type="button"
+              onClick={() => {
+                if (row.id === 'desktop') {
+                  window.location.href = '/dashboard';
+                  return;
+                }
+
+                setScreen(row.id);
+              }}
+              className="group flex w-full items-center gap-3 rounded-[17px] px-2.5 py-3 text-left text-white/58 transition hover:bg-white/[0.045] hover:text-white active:scale-[0.99]"
+            >
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-white/[0.08] text-[10px] font-semibold text-white/36 group-hover:border-white/[0.14] group-hover:text-white/70">
+                {index + 1}
+              </span>
+
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-[13px] border border-white/[0.07] bg-white/[0.035] text-white/42 group-hover:text-white/78">
+                {row.icon}
+              </span>
+
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[14px] font-semibold tracking-[-0.045em]">
+                  {row.label}
+                </span>
+                <span className="mt-0.5 block truncate text-[11px] text-white/32">
+                  {row.description}
+                </span>
+              </span>
+
+              <ChevronRight className="size-4 shrink-0 text-white/24" />
+            </button>
+          ))}
+        </div>
+      </MiniCard>
+    </div>
+  );
+}
+
+function BookingSheet({
+  booking,
+  onClose,
+  onStatus,
+}: {
+  booking: Booking | null;
+  onClose: () => void;
+  onStatus: (bookingId: string, status: BookingStatus) => Promise<void>;
+}) {
+  if (!booking) return null;
+
+  const [updating, setUpdating] = useState<BookingStatus | null>(null);
+
+  async function update(status: BookingStatus) {
+    setUpdating(status);
+    await onStatus(booking.id, status);
+    setUpdating(null);
+  }
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end bg-black/55 px-3 pb-[calc(var(--tg-safe-bottom,0px)+10px)] backdrop-blur-[8px]">
+      <div className="mx-auto w-full max-w-[430px] overflow-hidden rounded-[26px] border border-white/[0.10] bg-[#101010] shadow-[0_28px_90px_rgba(0,0,0,0.72)]">
+        <div className="flex items-start justify-between gap-4 border-b border-white/[0.08] p-4">
+          <div>
+            <MiniLabel>запись</MiniLabel>
+            <div className="mt-2 text-[26px] font-semibold leading-none tracking-[-0.075em]">
+              {booking.clientName}
+            </div>
+            <div className="mt-2 text-[12px] text-white/42">
+              {formatDayLabel(booking.date)}, {formatTime(booking.time)}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex size-9 items-center justify-center rounded-[13px] border border-white/[0.08] bg-white/[0.045] text-white/55"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="space-y-3 p-4">
+          <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.035] p-3">
+            <div className="text-[11px] text-white/35">Услуга</div>
+            <div className="mt-1 text-[15px] font-semibold tracking-[-0.045em]">
+              {booking.service}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.035] p-3">
+              <div className="text-[11px] text-white/35">Телефон</div>
+              <div className="mt-1 truncate text-[13px] font-semibold tracking-[-0.04em]">
+                {booking.clientPhone || '—'}
+              </div>
+            </div>
+
+            <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.035] p-3">
+              <div className="text-[11px] text-white/35">Сумма</div>
+              <div className="mt-1 text-[13px] font-semibold tracking-[-0.04em]">
+                {RUB.format(getBookingAmount(booking))}
+              </div>
+            </div>
+          </div>
+
+          {booking.comment ? (
+            <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.035] p-3">
+              <div className="text-[11px] text-white/35">Комментарий</div>
+              <div className="mt-1 text-[13px] leading-5 text-white/68">
+                {booking.comment}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="grid grid-cols-2 gap-2">
+            <MiniButton
+              variant="primary"
+              disabled={Boolean(updating)}
+              onClick={() => void update('completed')}
+            >
+              <CheckCircle2 className="size-4" />
+              Пришла
+            </MiniButton>
+            <MiniButton
+              variant="secondary"
+              disabled={Boolean(updating)}
+              onClick={() => void update('confirmed')}
+            >
+              <ShieldCheck className="size-4" />
+              Подтвердить
+            </MiniButton>
+            <MiniButton
+              variant="secondary"
+              disabled={Boolean(updating)}
+              onClick={() => void update('new')}
+            >
+              <Bell className="size-4" />
+              Новая
+            </MiniButton>
+            <MiniButton
+              variant="danger"
+              disabled={Boolean(updating)}
+              onClick={() => void update('no_show')}
+            >
+              <XCircle className="size-4" />
+              Не пришла
+            </MiniButton>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function MiniAppEntry() {
+  const {
+    hasHydrated,
+    ownedProfile,
+    bookings,
+    workspaceData,
+    saveProfile,
+    updateBookingStatus,
+    updateWorkspaceSection,
+    refreshWorkspace,
+    getPublicPath,
+  } = useApp();
+
+  const [screen, setScreen] = useState<MiniScreen>('today');
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+
+  const workspaceRecord = safeWorkspaceRecord(workspaceData);
+
+  if (!hasHydrated) {
+    return <MiniLoading />;
+  }
+
+  if (!ownedProfile) {
+    return <MiniOnboarding onSave={saveProfile} />;
+  }
+
+  return (
+    <>
+      <MiniShell
+        screen={screen}
+        setScreen={setScreen}
+        profile={ownedProfile}
+        onRefresh={() => void refreshWorkspace()}
+      >
+        {screen === 'today' ? (
+          <TodayScreen bookings={bookings} onOpenBooking={setSelectedBooking} />
+        ) : null}
+
+        {screen === 'schedule' ? (
+          <ScheduleScreen bookings={bookings} onOpenBooking={setSelectedBooking} />
+        ) : null}
+
+        {screen === 'chats' ? <ChatsScreen bookings={bookings} /> : null}
+
+        {screen === 'clients' ? <ClientsScreen bookings={bookings} /> : null}
+
+        {screen === 'profile' ? (
+          <ProfileScreen
+            profile={ownedProfile}
+            onSave={saveProfile}
+            getPublicPath={getPublicPath}
+          />
+        ) : null}
+
+        {screen === 'services' ? (
+          <ServicesScreen profile={ownedProfile} onSave={saveProfile} />
+        ) : null}
+
+        {screen === 'analytics' ? <AnalyticsScreen bookings={bookings} /> : null}
+
+        {screen === 'appearance' ? (
+          <AppearanceScreen
+            workspaceData={workspaceRecord}
+            updateWorkspaceSection={updateWorkspaceSection}
+          />
+        ) : null}
+
+        {screen === 'settings' ? (
+          <SettingsScreen
+            workspaceData={workspaceRecord}
+            updateWorkspaceSection={updateWorkspaceSection}
+          />
+        ) : null}
+
+        {screen === 'more' ? <MoreScreen setScreen={setScreen} /> : null}
+      </MiniShell>
+
+      <BookingSheet
+        booking={selectedBooking}
+        onClose={() => setSelectedBooking(null)}
+        onStatus={updateBookingStatus}
+      />
+    </>
+  );
 }
