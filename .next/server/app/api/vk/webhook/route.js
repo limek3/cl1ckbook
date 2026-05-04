@@ -1,6 +1,6 @@
 var R=require("../../../../chunks/[turbopack]_runtime.js")("server/app/api/vk/webhook/route.js")
 R.c("server/chunks/lib_server_554e06b1._.js")
-R.c("server/chunks/lib_server_3b9ea308._.js")
+R.c("server/chunks/lib_server_cd7381f6._.js")
 R.c("server/chunks/[root-of-the-server]__cdfbc0d5._.js")
 R.c("server/chunks/4d4ea_@supabase_supabase-js_dist_index_mjs_80222416._.js")
 R.c("server/chunks/979b6_next_dist_esm_build_templates_app-route_f916a0f5.js")

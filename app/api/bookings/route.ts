@@ -8,8 +8,9 @@ import { requireAuthUser } from '@/lib/server/require-auth-user';
 import { createClientTelegramBookingLink, notifyWorkspaceOwnerAboutBooking } from '@/lib/server/booking-telegram';
 import { createClientVkBookingLink, notifyWorkspaceOwnerAboutBookingVk } from '@/lib/server/booking-vk';
 import { sendClientTelegramMessage } from '@/lib/server/client-telegram';
+import { sendClientVkMessage } from '@/lib/server/client-vk';
 import { isNotificationEnabled } from '@/lib/server/notification-settings';
-import { createBookingRecord, listBookingsByWorkspace, updateBookingStatusRecord } from '@/lib/server/supabase-bookings';
+import { createBookingRecord, listBookingsByWorkspace, updateBookingRecord } from '@/lib/server/supabase-bookings';
 import {
   createChatMessage,
   createChatThread,
@@ -24,6 +25,11 @@ import {
   updateWorkspace,
 } from '@/lib/server/supabase-workspaces';
 import { bookingMessageText, bookingShortContext, bookingThreadMetadata } from '@/lib/server/booking-context';
+import {
+  buildTelegramRescheduleProposalReplyMarkup,
+  buildVkRescheduleProposalKeyboard,
+  createRescheduleProposal,
+} from '@/lib/server/booking-reschedule-proposals';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -438,7 +444,6 @@ export async function POST(request: Request) {
           botConnected: sourceInfo.botConnected || sentToClientTelegram || thread.botConnected,
           metadata: {
             ...(thread.metadata ?? {}),
-            bookingId: persistedBooking.id,
             ...bookingThreadMetadata(persistedBooking, workspace.profile),
             bookingIds: [persistedBooking.id],
             lastClientTelegramDelivery: sentToClientTelegram ? 'delivered' : sourceInfo.channel === 'telegram' ? 'pending_link' : 'phone_fallback',
@@ -463,20 +468,214 @@ export async function POST(request: Request) {
   }
 }
 
+type BookingAction =
+  | 'confirm'
+  | 'complete'
+  | 'no_show'
+  | 'cancel'
+  | 'request_reschedule'
+  | 'decline_reschedule'
+  | 'offer_reschedule'
+  | 'accept_reschedule';
+
+type RescheduleStatus = 'none' | 'requested' | 'offered' | 'accepted' | 'declined' | 'done';
+
+type BookingPatchBody = {
+  bookingId?: string;
+  status?: Booking['status'];
+  action?: BookingAction;
+  transferStatus?: RescheduleStatus;
+  transferRequested?: boolean;
+  rescheduleReason?: string;
+  transferReason?: string;
+  proposedDate?: string;
+  proposedTime?: string;
+  date?: string;
+  time?: string;
+  message?: string;
+};
+
+function isBookingStatus(value: unknown): value is Booking['status'] {
+  return value === 'new' || value === 'confirmed' || value === 'completed' || value === 'no_show' || value === 'cancelled';
+}
+
+function cleanText(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function cleanIsoDate(value: unknown) {
+  const text = cleanText(value);
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : '';
+}
+
+function cleanTime(value: unknown) {
+  const text = cleanText(value);
+  return /^\d{2}:\d{2}/.test(text) ? text.slice(0, 5) : '';
+}
+
+function statusSystemText(status: Booking['status'], booking: Booking) {
+  if (status === 'confirmed') return `Запись подтверждена: ${bookingShortContext(booking)}`;
+  if (status === 'completed') return `Запись завершена: ${bookingShortContext(booking)}`;
+  if (status === 'no_show') return `Клиент не пришёл: ${bookingShortContext(booking)}`;
+  if (status === 'cancelled') return `Запись отменена: ${bookingShortContext(booking)}`;
+  return `Статус записи обновлён: ${bookingShortContext(booking)}`;
+}
+
+function clientStatusTitle(status: Booking['status']) {
+  if (status === 'confirmed') return 'Запись подтверждена ✅';
+  if (status === 'completed') return 'Визит завершён ✅';
+  if (status === 'no_show') return 'Отметка по записи';
+  if (status === 'cancelled') return 'Запись отменена';
+  return 'Статус записи обновлён';
+}
+
+function mergeBookingMetadata(booking: Booking, patch: Record<string, unknown>) {
+  return {
+    ...(booking.metadata ?? {}),
+    ...patch,
+  };
+}
+
+function applyBookingPatch(booking: Booking, patch: Partial<Booking> & { metadata?: Record<string, unknown> }) {
+  return {
+    ...booking,
+    ...patch,
+    metadata: patch.metadata ? { ...(booking.metadata ?? {}), ...patch.metadata } : booking.metadata,
+  } satisfies Booking;
+}
+
+function buildRescheduleAlert(params: {
+  type: 'request' | 'offered' | 'declined' | 'done';
+  bookingId: string;
+  now: string;
+  reason?: string;
+  date?: string;
+  time?: string;
+}) {
+  if (params.type === 'request') {
+    return {
+      type: 'reschedule_request',
+      status: 'open',
+      bookingId: params.bookingId,
+      createdAt: params.now,
+      message: params.reason || 'Клиент запросил перенос. Нужно подобрать новое время.',
+    };
+  }
+
+  if (params.type === 'offered') {
+    return {
+      type: 'reschedule_request',
+      status: 'proposal_sent',
+      bookingId: params.bookingId,
+      createdAt: params.now,
+      message: `Клиенту предложен перенос на ${params.date} ${params.time}. Ждём подтверждение.`,
+    };
+  }
+
+  if (params.type === 'declined') {
+    return {
+      type: 'reschedule_request',
+      status: 'declined_by_master',
+      bookingId: params.bookingId,
+      createdAt: params.now,
+      message: 'Запрос на перенос закрыт мастером.',
+    };
+  }
+
+  return null;
+}
+
+async function touchBookingThread(params: {
+  workspaceId: string;
+  booking: Booking;
+  systemMessage?: string;
+  metadataPatch?: Record<string, unknown>;
+  priority?: boolean;
+}) {
+  const thread = await fetchChatThreadByBookingId(params.workspaceId, params.booking.id).catch(() => null);
+  if (!thread) return null;
+
+  const now = new Date().toISOString();
+
+  if (params.systemMessage) {
+    await createChatMessage(params.workspaceId, {
+      threadId: thread.id,
+      author: 'system',
+      body: params.systemMessage,
+      deliveryState: 'sent',
+      viaBot: true,
+      metadata: {
+        kind: 'booking_action',
+        bookingId: params.booking.id,
+      },
+    }).catch(() => null);
+  }
+
+  await updateChatThread(params.workspaceId, thread.id, {
+    nextVisit: params.booking.status === 'cancelled' ? null : params.booking.date,
+    isPriority: typeof params.priority === 'boolean' ? params.priority : thread.isPriority,
+    lastMessagePreview: params.systemMessage ?? thread.lastMessagePreview,
+    lastMessageAt: params.systemMessage ? now : thread.lastMessageAt,
+    metadata: {
+      ...(thread.metadata ?? {}),
+      ...bookingThreadMetadata(params.booking),
+      bookingId: params.booking.id,
+      ...(params.metadataPatch ?? {}),
+    },
+  }).catch(() => null);
+
+  return thread;
+}
+
+async function notifyClientAboutStatus(params: {
+  workspace: NonNullable<Awaited<ReturnType<typeof fetchWorkspaceForUser>>>;
+  booking: Booking;
+  threadChannel?: ChatChannel | null;
+}) {
+  if (params.booking.status !== 'confirmed' && params.booking.status !== 'cancelled') return;
+  if (!isNotificationEnabled(params.workspace, { id: 'chat-message', titleIncludes: 'чат', audience: 'client', fallback: true })) return;
+
+  const title = clientStatusTitle(params.booking.status);
+  const text = bookingMessageText({
+    title,
+    booking: params.booking,
+    profile: params.workspace.profile,
+    footer: params.booking.status === 'confirmed'
+      ? 'Если потребуется перенос — ответьте в этот чат.'
+      : 'Если нужно подобрать другое время — напишите мастеру.',
+  });
+
+  const channel = params.threadChannel ?? (String(params.booking.channel ?? '').toLowerCase().includes('vk') ? 'VK' : String(params.booking.channel ?? '').toLowerCase().includes('telegram') ? 'Telegram' : null);
+
+  if (channel === 'Telegram') {
+    await sendClientTelegramMessage({
+      workspaceId: params.workspace.id,
+      bookingId: params.booking.id,
+      clientPhone: params.booking.clientPhone,
+      clientName: params.booking.clientName,
+      text,
+    }).catch(() => false);
+  }
+
+  if (channel === 'VK') {
+    await sendClientVkMessage({
+      workspaceId: params.workspace.id,
+      bookingId: params.booking.id,
+      clientPhone: params.booking.clientPhone,
+      clientName: params.booking.clientName,
+      text,
+    }).catch(() => false);
+  }
+}
+
 export async function PATCH(request: Request) {
   try {
     const user = await requireAuthUser();
-    const body = (await request.json()) as {
-      bookingId?: string;
-      status?: Booking['status'];
-    };
+    const body = (await request.json()) as BookingPatchBody;
 
-    if (!body.bookingId || !body.status) {
-      return NextResponse.json({ error: 'booking_id_and_status_required' }, { status: 400 });
+    if (!body.bookingId) {
+      return NextResponse.json({ error: 'booking_id_required' }, { status: 400 });
     }
-
-    const nextStatus = body.status;
-    const bookingId = body.bookingId;
 
     const workspace = await fetchWorkspaceForUser(user);
 
@@ -484,20 +683,174 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'not_found' }, { status: 404 });
     }
 
+    const bookingId = body.bookingId;
     const jsonBookings = Array.isArray(workspace.data?.bookings) ? (workspace.data.bookings as Booking[]) : [];
     const tableBookings = await listBookingsByWorkspace(workspace.id).catch(() => [] as Booking[]);
     const currentBookings = mergeBookings(tableBookings, jsonBookings);
-    let updatedBooking: Booking | null = null;
-    let nextBookings = currentBookings.map((bookingItem) =>
-      bookingItem.id === bookingId ? { ...bookingItem, status: nextStatus } : bookingItem,
-    );
+    const currentBooking = currentBookings.find((booking) => booking.id === bookingId);
+
+    if (!currentBooking) {
+      return NextResponse.json({ error: 'booking_not_found' }, { status: 404 });
+    }
+
+    const now = new Date().toISOString();
+    const action = body.action;
+    const transferStatus = body.transferStatus;
+    const reason = cleanText(body.rescheduleReason ?? body.transferReason);
+    const proposedDate = cleanIsoDate(body.proposedDate ?? body.date);
+    const proposedTime = cleanTime(body.proposedTime ?? body.time);
+
+    let bookingPatch: Partial<Booking> & { metadata?: Record<string, unknown> } = {};
+    let systemMessage = '';
+    let threadPriority: boolean | undefined;
+    let threadMetadataPatch: Record<string, unknown> = {};
+    let shouldNotifyClient = false;
+    let shouldOfferReschedule = false;
+
+    if (body.status !== undefined) {
+      if (!isBookingStatus(body.status)) {
+        return NextResponse.json({ error: 'invalid_booking_status' }, { status: 400 });
+      }
+      bookingPatch.status = body.status;
+    }
+
+    if (action === 'confirm') bookingPatch.status = 'confirmed';
+    if (action === 'complete') bookingPatch.status = 'completed';
+    if (action === 'no_show') bookingPatch.status = 'no_show';
+    if (action === 'cancel') bookingPatch.status = 'cancelled';
+
+    if (bookingPatch.status) {
+      if (bookingPatch.status === 'confirmed') bookingPatch.confirmedAt = now;
+      if (bookingPatch.status === 'completed') bookingPatch.completedAt = now;
+      if (bookingPatch.status === 'no_show') bookingPatch.noShowAt = now;
+      if (bookingPatch.status === 'cancelled') bookingPatch.cancelledAt = now;
+      systemMessage = statusSystemText(bookingPatch.status, applyBookingPatch(currentBooking, bookingPatch));
+      shouldNotifyClient = bookingPatch.status === 'confirmed' || bookingPatch.status === 'cancelled';
+    }
+
+    if (action === 'request_reschedule' || body.transferRequested === true || transferStatus === 'requested') {
+      const activeAlert = buildRescheduleAlert({ type: 'request', bookingId, now, reason });
+      bookingPatch.metadata = mergeBookingMetadata(currentBooking, {
+        rescheduleRequested: true,
+        transferRequested: true,
+        rescheduleStatus: 'requested',
+        transferStatus: 'requested',
+        rescheduleReason: reason || undefined,
+        transferReason: reason || undefined,
+        rescheduleRequestedAt: now,
+        transferRequestedAt: now,
+        activeAlert,
+      });
+      systemMessage = `Клиент запросил перенос: ${bookingShortContext(currentBooking)}${reason ? `\nПричина: ${reason}` : ''}`;
+      threadPriority = true;
+      threadMetadataPatch = {
+        rescheduleRequested: true,
+        rescheduleStatus: 'requested',
+        activeAlert,
+      };
+    }
+
+    if (action === 'decline_reschedule' || transferStatus === 'declined') {
+      const activeAlert = buildRescheduleAlert({ type: 'declined', bookingId, now });
+      bookingPatch.metadata = mergeBookingMetadata(currentBooking, {
+        rescheduleRequested: false,
+        transferRequested: false,
+        rescheduleStatus: 'declined',
+        transferStatus: 'declined',
+        rescheduleClosedAt: now,
+        activeAlert,
+      });
+      systemMessage = `Запрос на перенос закрыт мастером: ${bookingShortContext(currentBooking)}`;
+      threadPriority = false;
+      threadMetadataPatch = {
+        rescheduleRequested: false,
+        rescheduleStatus: 'declined',
+        activeAlert,
+      };
+    }
+
+    if (action === 'offer_reschedule') {
+      if (!proposedDate || !proposedTime) {
+        return NextResponse.json({ error: 'proposed_date_and_time_required' }, { status: 400 });
+      }
+      const activeAlert = buildRescheduleAlert({ type: 'offered', bookingId, now, date: proposedDate, time: proposedTime });
+      bookingPatch.metadata = mergeBookingMetadata(currentBooking, {
+        rescheduleRequested: true,
+        transferRequested: true,
+        rescheduleStatus: 'offered',
+        transferStatus: 'requested',
+        rescheduleProposedDate: proposedDate,
+        rescheduleProposedTime: proposedTime,
+        rescheduleOfferedAt: now,
+        activeAlert,
+      });
+      systemMessage = `Мастер предложил перенос на ${proposedDate} ${proposedTime}: ${bookingShortContext(currentBooking)}`;
+      threadPriority = true;
+      threadMetadataPatch = {
+        rescheduleRequested: true,
+        rescheduleStatus: 'offered',
+        rescheduleProposalDate: proposedDate,
+        rescheduleProposalTime: proposedTime,
+        activeAlert,
+      };
+      shouldOfferReschedule = true;
+    }
+
+    if (action === 'accept_reschedule' || transferStatus === 'accepted' || transferStatus === 'done') {
+      if (!proposedDate || !proposedTime) {
+        return NextResponse.json({ error: 'date_and_time_required' }, { status: 400 });
+      }
+      bookingPatch = {
+        ...bookingPatch,
+        status: 'confirmed',
+        date: proposedDate,
+        time: proposedTime,
+        confirmedAt: now,
+        metadata: mergeBookingMetadata(currentBooking, {
+          rescheduleRequested: false,
+          transferRequested: false,
+          rescheduleStatus: 'done',
+          transferStatus: 'done',
+          rescheduledFromDate: currentBooking.date,
+          rescheduledFromTime: currentBooking.time,
+          rescheduledAt: now,
+          activeAlert: null,
+        }),
+      };
+      systemMessage = `Запись перенесена на ${proposedDate} ${proposedTime}: ${currentBooking.clientName}`;
+      threadPriority = false;
+      threadMetadataPatch = {
+        rescheduleRequested: false,
+        rescheduleStatus: 'done',
+        activeAlert: null,
+      };
+      shouldNotifyClient = true;
+    }
+
+    if (!bookingPatch.status && !bookingPatch.date && !bookingPatch.time && !bookingPatch.metadata) {
+      return NextResponse.json({ error: 'booking_action_required' }, { status: 400 });
+    }
+
+    const optimisticBooking = applyBookingPatch(currentBooking, bookingPatch);
+    let nextBookings = currentBookings.map((booking) => (booking.id === bookingId ? optimisticBooking : booking));
+    let updatedBooking: Booking | null = optimisticBooking;
 
     try {
-      updatedBooking = await updateBookingStatusRecord(workspace.id, bookingId, nextStatus);
+      updatedBooking = await updateBookingRecord(workspace.id, bookingId, {
+        status: bookingPatch.status,
+        date: bookingPatch.date,
+        time: bookingPatch.time,
+        confirmedAt: bookingPatch.confirmedAt ?? undefined,
+        completedAt: bookingPatch.completedAt ?? undefined,
+        noShowAt: bookingPatch.noShowAt ?? undefined,
+        cancelledAt: bookingPatch.cancelledAt ?? undefined,
+        metadata: bookingPatch.metadata,
+      });
+
       const refreshedTableBookings = await listBookingsByWorkspace(workspace.id).catch(() => [] as Booking[]);
-      nextBookings = mergeBookings(refreshedTableBookings, nextBookings);
+      nextBookings = mergeBookings(refreshedTableBookings, nextBookings.map((booking) => (booking.id === bookingId && updatedBooking ? updatedBooking : booking)));
     } catch {
-      updatedBooking = nextBookings.find((bookingItem) => bookingItem.id === bookingId) ?? null;
+      updatedBooking = optimisticBooking;
     }
 
     if (!updatedBooking) {
@@ -511,7 +864,70 @@ export async function PATCH(request: Request) {
       },
     });
 
-    return NextResponse.json({ booking: updatedBooking });
+    const thread = await touchBookingThread({
+      workspaceId: workspace.id,
+      booking: updatedBooking,
+      systemMessage,
+      metadataPatch: threadMetadataPatch,
+      priority: threadPriority,
+    });
+
+    let rescheduleProposalId: string | null = null;
+    let telegramDelivered = false;
+    let vkDelivered = false;
+
+    if (shouldOfferReschedule && thread && proposedDate && proposedTime) {
+      const proposal = await createRescheduleProposal({
+        workspaceId: workspace.id,
+        threadId: thread.id,
+        bookingId: updatedBooking.id,
+        proposedDate,
+        proposedTime,
+        message: body.message || `Предлагаю перенести запись на ${proposedDate} ${proposedTime}.`,
+      }).catch(() => null);
+
+      if (proposal) {
+        rescheduleProposalId = proposal.proposal.id;
+
+        if (thread.channel === 'Telegram') {
+          telegramDelivered = await sendClientTelegramMessage({
+            workspaceId: workspace.id,
+            bookingId: updatedBooking.id,
+            clientPhone: updatedBooking.clientPhone,
+            clientName: updatedBooking.clientName,
+            directChatId: typeof thread.metadata?.clientTelegramChatId === 'number' || typeof thread.metadata?.clientTelegramChatId === 'string'
+              ? thread.metadata.clientTelegramChatId
+              : null,
+            text: proposal.text,
+            replyMarkup: buildTelegramRescheduleProposalReplyMarkup(proposal.proposal.id),
+          }).catch(() => false);
+        }
+
+        if (thread.channel === 'VK') {
+          vkDelivered = await sendClientVkMessage({
+            workspaceId: workspace.id,
+            bookingId: updatedBooking.id,
+            clientPhone: updatedBooking.clientPhone,
+            clientName: updatedBooking.clientName,
+            directPeerId: typeof thread.metadata?.clientVkPeerId === 'number' || typeof thread.metadata?.clientVkPeerId === 'string'
+              ? thread.metadata.clientVkPeerId
+              : null,
+            text: proposal.text,
+            keyboard: buildVkRescheduleProposalKeyboard(proposal.proposal.id),
+          }).catch(() => false);
+        }
+      }
+    } else if (shouldNotifyClient) {
+      await notifyClientAboutStatus({ workspace, booking: updatedBooking, threadChannel: thread?.channel ?? null }).catch(() => null);
+    }
+
+    return NextResponse.json({
+      booking: updatedBooking,
+      workspaceId: workspace.id,
+      rescheduleProposalId,
+      telegramDelivered,
+      vkDelivered,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'unknown_error';
     if (message === 'unauthorized') {

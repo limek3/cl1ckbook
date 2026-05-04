@@ -1,5 +1,6 @@
 'use client';
 
+import type * as React from 'react';
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   ArrowLeft,
@@ -435,7 +436,8 @@ function normalizeBooking(value: unknown, index: number): Booking | null {
       row.rescheduleStatus ??
       row.reschedule_status ??
       transfer.status ??
-      metadata.transferStatus,
+      metadata.transferStatus ??
+      metadata.rescheduleStatus,
     transferRequested ? 'requested' : 'none',
   );
 
@@ -476,7 +478,9 @@ function normalizeBooking(value: unknown, index: number): Booking | null {
       rawTransferStatus === 'done' ||
       rawTransferStatus === 'requested'
         ? rawTransferStatus
-        : 'none',
+        : rawTransferStatus === 'offered'
+          ? 'requested'
+          : 'none',
     clientNote: text(row.clientNote ?? row.client_note ?? metadata.clientNote),
   };
 }
@@ -534,16 +538,26 @@ function normalizeWeek(data: Json): WorkDay[] {
     const row = obj(found);
     const rawStatus = text(row.status, base.status);
 
+    const slots = list<string>(row.slots);
+    const firstSlot = slots[0] ?? '';
+    const lastSlot = slots[slots.length - 1] ?? '';
+    const firstStart = firstSlot.includes('–') ? firstSlot.split('–')[0] : '';
+    const lastEnd = lastSlot.includes('–') ? lastSlot.split('–')[1] : '';
+    const breaks = list<string>(row.breaks);
+    const firstBreak = breaks[0] ?? '';
+    const breakStart = firstBreak.includes('–') ? firstBreak.split('–')[0] : '';
+    const breakEnd = firstBreak.includes('–') ? firstBreak.split('–')[1] : '';
+
     return {
       ...base,
       status: (rawStatus === 'day-off' || rawStatus === 'short' ? rawStatus : 'workday') as DayStatus,
-      start: timeLabel(row.start ?? row.startTime ?? row.start_time ?? base.start),
-      end: timeLabel(row.end ?? row.endTime ?? row.end_time ?? base.end),
-      breakStart: text(row.breakStart ?? row.break_start)
-        ? timeLabel(row.breakStart ?? row.break_start)
+      start: timeLabel((row.start ?? row.startTime ?? row.start_time ?? firstStart) || base.start),
+      end: timeLabel((row.end ?? row.endTime ?? row.end_time ?? lastEnd) || base.end),
+      breakStart: text(row.breakStart ?? row.break_start ?? breakStart)
+        ? timeLabel(row.breakStart ?? row.break_start ?? breakStart)
         : '',
-      breakEnd: text(row.breakEnd ?? row.break_end)
-        ? timeLabel(row.breakEnd ?? row.break_end)
+      breakEnd: text(row.breakEnd ?? row.break_end ?? breakEnd)
+        ? timeLabel(row.breakEnd ?? row.break_end ?? breakEnd)
         : '',
     };
   });
@@ -970,8 +984,8 @@ function Shell({
   const tabs: Array<{ id: Screen; label: string; icon: ReactNode }> = [
     { id: 'today', label: 'Сегодня', icon: <CalendarClock className="size-4" /> },
     { id: 'schedule', label: 'График', icon: <Clock3 className="size-4" /> },
-    { id: 'services', label: 'Услуги', icon: <Scissors className="size-4" /> },
     { id: 'chats', label: 'Чаты', icon: <MessageCircle className="size-4" /> },
+    { id: 'clients', label: 'Клиенты', icon: <Users2 className="size-4" /> },
     { id: 'more', label: 'Ещё', icon: <Settings className="size-4" /> },
   ];
 
@@ -1017,10 +1031,13 @@ function Shell({
         >
           <div className="mx-auto grid max-w-[460px] grid-cols-5 gap-1">
             {tabs.map((tab) => {
-              const active =
-                screen === tab.id ||
-                (tab.id === 'chats' && screen === 'chat') ||
-                (tab.id === 'more' && ['clients', 'analytics', 'profile', 'settings'].includes(screen));
+              const currentScreen = screen as string;
+              const currentTab = tab.id as string;
+              const active = currentTab === 'chats'
+                ? currentScreen === 'chats' || currentScreen === 'chat'
+                : currentTab === 'more'
+                  ? ['services', 'analytics', 'profile', 'settings', 'more'].includes(currentScreen)
+                  : currentScreen === currentTab;
 
               return (
                 <button
@@ -1241,8 +1258,8 @@ function TodayScreen({
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <Button light={light} onClick={() => openChatForBooking(booking)}>Открыть чат</Button>
-                  <Button light={light} primary onClick={() => openQuick({ clientName: booking.clientName, clientPhone: booking.clientPhone, service: booking.service, comment: `Перенос записи ${booking.date} ${booking.time}` })}>
-                    Создать перенос
+                  <Button light={light} primary onClick={() => openBooking(booking)}>
+                    Разобрать перенос
                   </Button>
                 </div>
               </div>
@@ -1382,7 +1399,15 @@ function ScheduleScreen({
       body: JSON.stringify({
         workspaceId,
         section: 'availability',
-        value: days,
+        value: days.map((day) => ({
+          id: day.id,
+          label: day.label,
+          weekdayIndex: day.weekdayIndex,
+          status: day.status,
+          slots: day.status === 'day-off' ? [] : [`${day.start}–${day.end}`],
+          breaks: day.breakStart && day.breakEnd ? [`${day.breakStart}–${day.breakEnd}`] : [],
+          custom: false,
+        })),
       }),
     }).catch(() => null);
 
@@ -2012,7 +2037,7 @@ function MoreScreen({
   const t = ui(light);
 
   const items: Array<{ screen: Screen; title: string; info: string; icon: ReactNode }> = [
-    { screen: 'clients', title: 'Клиенты', info: `${len(clients)} карточек`, icon: <Users2 className="size-4" /> },
+    { screen: 'services', title: 'Услуги', info: `${len(services)} позиций`, icon: <Scissors className="size-4" /> },
     { screen: 'analytics', title: 'Аналитика', info: `${len(bookings)} заявок`, icon: <BarChart3 className="size-4" /> },
     { screen: 'profile', title: 'Профиль', info: `/${profile.slug}`, icon: <UserRound className="size-4" /> },
     { screen: 'settings', title: 'Настройки записи', info: 'Переносы, напоминания, правила', icon: <ShieldCheck className="size-4" /> },
@@ -2583,6 +2608,7 @@ function BookingSheet({
   onClose,
   updateStatus,
   updateTransfer,
+  offerTransfer,
   openChat,
   openQuick,
 }: {
@@ -2592,10 +2618,14 @@ function BookingSheet({
   onClose: () => void;
   updateStatus: (id: string, status: BookingStatus) => Promise<void>;
   updateTransfer: (id: string, transferStatus: Booking['transferStatus']) => Promise<void>;
+  offerTransfer: (id: string, date: string, time: string) => Promise<void>;
   openChat: (booking: Booking) => void;
   openQuick: (preset?: QuickBookingPreset) => void;
 }) {
   const t = ui(light);
+  const [proposedDate, setProposedDate] = useState(today());
+  const [proposedTime, setProposedTime] = useState('12:00');
+  const [offering, setOffering] = useState(false);
 
   if (!booking) return null;
 
@@ -2628,9 +2658,24 @@ function BookingSheet({
               <div className="font-bold">Клиент просит перенос</div>
               <div className="mt-1 opacity-80">{booking.transferReason || 'Причина не указана.'}</div>
               <div className="mt-3 grid grid-cols-2 gap-2">
+                <Field light={light} type="date" value={proposedDate} onChange={(event) => setProposedDate(event.target.value)} />
+                <Field light={light} type="time" value={proposedTime} onChange={(event) => setProposedTime(event.target.value)} />
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
                 <Button light={light} onClick={() => void updateTransfer(booking.id, 'declined').then(onClose)}>Отклонить</Button>
-                <Button light={light} primary onClick={() => openQuick({ clientName: booking.clientName, clientPhone: booking.clientPhone, service: booking.service, comment: `Перенос записи ${booking.date} ${booking.time}` })}>
-                  Новый слот
+                <Button
+                  light={light}
+                  primary
+                  disabled={offering}
+                  onClick={() => {
+                    setOffering(true);
+                    void offerTransfer(booking.id, proposedDate, proposedTime).then(() => {
+                      setOffering(false);
+                      onClose();
+                    });
+                  }}
+                >
+                  {offering ? 'Отправляю' : 'Предложить время'}
                 </Button>
               </div>
             </div>
@@ -2719,7 +2764,7 @@ function QuickBookingSheet({
     }).catch(() => null);
 
     if (!response?.ok) {
-      const payload = response ? await parseJson(response).catch(() => ({})) : {};
+      const payload = (response ? await parseJson(response).catch(() => ({})) : {}) as Json;
       setError(text(payload.error, 'Не удалось создать запись. Проверь услугу, график и телефон.'));
       setSaving(false);
       return;
@@ -2937,7 +2982,7 @@ export function MiniAppEntry() {
       }
 
       if (!response.ok) {
-        const payload = await parseJson(response).catch(() => ({}));
+        const payload = (await parseJson(response).catch(() => ({}))) as Json;
         throw new Error(text(payload.error, 'workspace_load_failed'));
       }
 
@@ -3010,12 +3055,43 @@ export function MiniAppEntry() {
       headers: apiHeaders(true),
       body: JSON.stringify({
         bookingId,
+        action: transferStatus === 'declined' ? 'decline_reschedule' : transferStatus === 'requested' ? 'request_reschedule' : undefined,
         transferStatus,
         transferRequested: transferStatus === 'requested',
       }),
     }).catch(() => null);
 
     await load();
+  };
+
+  const offerTransfer = async (bookingId: string, date: string, time: string) => {
+    setBookings((current) =>
+      current.map((booking) =>
+        booking.id === bookingId
+          ? {
+              ...booking,
+              transferRequested: true,
+              transferStatus: 'requested',
+            }
+          : booking,
+      ),
+    );
+
+    await fetch('/api/bookings', {
+      method: 'PATCH',
+      credentials: 'include',
+      cache: 'no-store',
+      headers: apiHeaders(true),
+      body: JSON.stringify({
+        bookingId,
+        action: 'offer_reschedule',
+        proposedDate: date,
+        proposedTime: time,
+      }),
+    }).catch(() => null);
+
+    await load();
+    await loadChats();
   };
 
   const sendChatMessage = async (threadId: string, body: string) => {
@@ -3259,6 +3335,7 @@ export function MiniAppEntry() {
         onClose={() => setSelectedBooking(null)}
         updateStatus={updateBookingStatus}
         updateTransfer={updateTransfer}
+        offerTransfer={offerTransfer}
         openChat={openChatForBooking}
         openQuick={openQuick}
       />

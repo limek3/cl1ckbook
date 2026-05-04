@@ -68,7 +68,13 @@ export interface Booking {
   cancelReason?: string;
   statusCheckSentAt?: string;
   metadata?: Record<string, unknown>;
+  rescheduleRequestedAt?: string;
+  rescheduleReason?: string;
+  rescheduleOfferedAt?: string;
+  rescheduleProposedDate?: string;
+  rescheduleProposedTime?: string;
 }
+
 
 export interface BookingReviewLink {
   token: string;

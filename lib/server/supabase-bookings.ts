@@ -99,7 +99,50 @@ export async function createBookingRecord(workspaceId: string, booking: Booking)
   return rows[0] ? mapRow(rows[0]) : null;
 }
 
-export async function updateBookingStatusRecord(workspaceId: string, bookingId: string, status: BookingStatus) {
+
+export type BookingRecordPatch = Partial<{
+  status: BookingStatus;
+  date: string;
+  time: string;
+  comment: string | null;
+  source: string | null;
+  channel: string | null;
+  durationMinutes: number | null;
+  priceAmount: number | null;
+  confirmedAt: string | null;
+  completedAt: string | null;
+  noShowAt: string | null;
+  cancelledAt: string | null;
+  cancelReason: string | null;
+  statusCheckSentAt: string | null;
+  metadata: Record<string, unknown>;
+}>;
+
+function buildPatchPayload(patch: BookingRecordPatch) {
+  const payload: Record<string, unknown> = {};
+
+  if (patch.status !== undefined) payload.status = patch.status;
+  if (patch.date !== undefined) payload.booking_date = patch.date;
+  if (patch.time !== undefined) payload.booking_time = patch.time;
+  if (patch.comment !== undefined) payload.comment = patch.comment;
+  if (patch.source !== undefined) payload.source = patch.source;
+  if (patch.channel !== undefined) payload.channel = patch.channel;
+  if (patch.durationMinutes !== undefined) payload.duration_minutes = patch.durationMinutes;
+  if (patch.priceAmount !== undefined) payload.price_amount = patch.priceAmount;
+  if (patch.confirmedAt !== undefined) payload.confirmed_at = patch.confirmedAt;
+  if (patch.completedAt !== undefined) payload.completed_at = patch.completedAt;
+  if (patch.noShowAt !== undefined) payload.no_show_at = patch.noShowAt;
+  if (patch.cancelledAt !== undefined) payload.cancelled_at = patch.cancelledAt;
+  if (patch.cancelReason !== undefined) payload.cancel_reason = patch.cancelReason;
+  if (patch.statusCheckSentAt !== undefined) payload.status_check_sent_at = patch.statusCheckSentAt;
+  if (patch.metadata !== undefined) payload.metadata = patch.metadata;
+
+  return payload;
+}
+
+export async function updateBookingRecord(workspaceId: string, bookingId: string, patch: BookingRecordPatch) {
+  const payload = buildPatchPayload(patch);
+
   const response = await supabaseRestRequest(
     `/rest/v1/sloty_bookings?id=eq.${encodeURIComponent(bookingId)}&workspace_id=eq.${encodeURIComponent(workspaceId)}&select=*`,
     {
@@ -107,16 +150,22 @@ export async function updateBookingStatusRecord(workspaceId: string, bookingId: 
       headers: {
         Prefer: 'return=representation',
       },
-      body: JSON.stringify({
-        status,
-        ...(status === 'confirmed' ? { confirmed_at: new Date().toISOString() } : {}),
-        ...(status === 'completed' ? { completed_at: new Date().toISOString() } : {}),
-        ...(status === 'no_show' ? { no_show_at: new Date().toISOString() } : {}),
-        ...(status === 'cancelled' ? { cancelled_at: new Date().toISOString() } : {}),
-      }),
+      body: JSON.stringify(payload),
     },
   );
 
   const rows = (await response.json()) as BookingRow[];
   return rows[0] ? mapRow(rows[0]) : null;
+}
+
+export async function updateBookingStatusRecord(workspaceId: string, bookingId: string, status: BookingStatus) {
+  const now = new Date().toISOString();
+
+  return updateBookingRecord(workspaceId, bookingId, {
+    status,
+    ...(status === 'confirmed' ? { confirmedAt: now } : {}),
+    ...(status === 'completed' ? { completedAt: now } : {}),
+    ...(status === 'no_show' ? { noShowAt: now } : {}),
+    ...(status === 'cancelled' ? { cancelledAt: now } : {}),
+  });
 }
