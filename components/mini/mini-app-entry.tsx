@@ -59,12 +59,19 @@ import type {
   WorkspaceDataset,
 } from '@/lib/master-workspace';
 import type { ChatThreadListResponse, ChatThreadRecord } from '@/lib/chat-types';
-import type { Booking, BookingStatus, MasterProfile, MasterProfileFormValues } from '@/lib/types';
+import type { Booking, BookingFormValues, BookingStatus, MasterProfile, MasterProfileFormValues } from '@/lib/types';
 
 type MiniScreen = 'workday' | 'calendar' | 'catalog' | 'dialogs' | 'hub' | 'clients' | 'analytics' | 'profile';
 type ThemeTone = { light: boolean; accent: string };
 type UpdateWorkspaceSection = <T>(section: string, value: T) => Promise<boolean>;
 type SaveProfile = (values: MiniProfileSaveValues) => Promise<{ success: boolean; error?: string; profile?: MasterProfile }>;
+type CreateBooking = (masterSlug: string, values: BookingFormValues) => Promise<{
+  success: boolean;
+  error?: string;
+  booking?: Booking;
+  telegramConfirmationUrl?: string | null;
+  vkConfirmationUrl?: string | null;
+}>;
 
 type MiniProfileSaveValues = MasterProfileFormValues &
   Partial<
@@ -236,6 +243,45 @@ function getBookingAmount(booking: Booking, services: ServiceInsight[]) {
   if (typeof booking.priceAmount === 'number' && Number.isFinite(booking.priceAmount)) return booking.priceAmount;
   return services.find((service) => service.name === booking.service)?.price ?? 0;
 }
+
+function getServiceOptions(profile: MasterProfile, services: ServiceInsight[]) {
+  const source = services.length > 0
+    ? services.filter((service) => service.visible !== false).map((service) => service.name)
+    : profile.services;
+  return Array.from(new Set(source.map((item) => item.trim()).filter(Boolean)));
+}
+
+function countWorkingDays(availability: AvailabilityDayInsight[]) {
+  const normalized = normalizeWeekAvailability(availability);
+  return normalized.filter((day) => day.status !== 'day-off' && day.slots.length > 0).length;
+}
+
+function getSetupItems(profile: MasterProfile, dataset: WorkspaceDataset) {
+  return [
+    {
+      id: 'services',
+      label: 'Услуги',
+      text: dataset.services.some((service) => service.visible !== false) || profile.services.length > 0 ? 'каталог готов' : 'добавь хотя бы одну услугу',
+      ready: dataset.services.some((service) => service.visible !== false) || profile.services.length > 0,
+      screen: 'catalog' as MiniScreen,
+    },
+    {
+      id: 'schedule',
+      label: 'График',
+      text: countWorkingDays(dataset.availability) > 0 ? `${countWorkingDays(dataset.availability)} раб. дней` : 'укажи рабочие окна',
+      ready: countWorkingDays(dataset.availability) > 0,
+      screen: 'calendar' as MiniScreen,
+    },
+    {
+      id: 'contacts',
+      label: 'Контакты',
+      text: profile.phone || profile.telegram || profile.whatsapp ? 'клиенту есть куда писать' : 'добавь телефон или Telegram',
+      ready: Boolean(profile.phone || profile.telegram || profile.whatsapp),
+      screen: 'profile' as MiniScreen,
+    },
+  ];
+}
+
 
 function getInitials(name?: string | null) {
   const source = (name || 'КБ').trim();
@@ -672,6 +718,7 @@ function WorkdayScreen({
   bookings,
   dataset,
   onOpenBooking,
+  onQuickBooking,
   setScreen,
   getPublicPath,
   theme,
@@ -680,6 +727,7 @@ function WorkdayScreen({
   bookings: Booking[];
   dataset: WorkspaceDataset;
   onOpenBooking: (booking: Booking) => void;
+  onQuickBooking: () => void;
   setScreen: (screen: MiniScreen) => void;
   getPublicPath: (slug: string) => string;
   theme: ThemeTone;
@@ -690,11 +738,16 @@ function WorkdayScreen({
   const selectedBookings = bookings.filter((booking) => booking.date === selectedDate).sort(sortByDateTime);
   const activeSelected = selectedBookings.filter((booking) => activeStatus(booking.status));
   const completedSelected = selectedBookings.filter((booking) => booking.status === 'completed');
+  const noShowSelected = selectedBookings.filter((booking) => booking.status === 'no_show');
   const revenueSelected = completedSelected.reduce((sum, booking) => sum + getBookingAmount(booking, dataset.services), 0);
   const upcoming = bookings
     .filter((booking) => `${booking.date} ${booking.time}` >= `${today} 00:00` && booking.status !== 'cancelled')
     .sort(sortByDateTime);
   const nextBooking = upcoming[0];
+  const setupItems = getSetupItems(profile, dataset);
+  const readyCount = setupItems.filter((item) => item.ready).length;
+  const health = Math.round((readyCount / setupItems.length) * 100);
+  const todayConfirmed = selectedBookings.filter((booking) => booking.status === 'confirmed' || booking.status === 'new').length;
 
   async function copyPublicLink() {
     const origin = typeof window === 'undefined' ? '' : window.location.origin;
@@ -706,19 +759,49 @@ function WorkdayScreen({
       <MiniCard light={theme.light} className="overflow-hidden">
         <div className={cn('border-b px-4 py-3', tone.line)}>
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <MiniLabel light={theme.light}>рабочий экран</MiniLabel>
-              <div className={cn('mt-2 text-[30px] font-semibold leading-[0.95] tracking-[-0.095em]', tone.text)}>Сегодня</div>
-              <div className={cn('mt-2 text-[12px] leading-5', tone.muted)}>Записи, ближайший клиент и быстрые действия без лишних страниц.</div>
+            <div className="min-w-0">
+              <MiniLabel light={theme.light}>мобильный пульт</MiniLabel>
+              <div className={cn('mt-2 text-[31px] font-semibold leading-[0.94] tracking-[-0.1em]', tone.text)}>Сегодня</div>
+              <div className={cn('mt-2 max-w-[250px] text-[12px] leading-5', tone.muted)}>Самое важное на одном экране: запись, клиент, статус, деньги и быстрые действия.</div>
             </div>
-            <button type="button" onClick={copyPublicLink} className={cn('flex h-8 shrink-0 items-center gap-1.5 rounded-[9px] border px-2.5 text-[10px] font-bold', tone.ghost)}>
-              <Copy className="size-3.5" /> ссылка
-            </button>
+            <div className="flex shrink-0 flex-col gap-1.5">
+              <button type="button" onClick={copyPublicLink} className={cn('flex h-8 items-center justify-center gap-1.5 rounded-[9px] border px-2.5 text-[10px] font-bold', tone.ghost)}>
+                <Copy className="size-3.5" /> ссылка
+              </button>
+              <button type="button" onClick={onQuickBooking} className={cn('flex h-8 items-center justify-center gap-1.5 rounded-[9px] border px-2.5 text-[10px] font-bold')} style={accentStyle(theme.accent, theme.light, 22)}>
+                <Plus className="size-3.5" /> запись
+              </button>
+            </div>
           </div>
         </div>
 
         <div className="p-3">
           <DayStrip selectedDate={selectedDate} onSelect={setSelectedDate} theme={theme} />
+        </div>
+      </MiniCard>
+
+      <MiniCard light={theme.light} className="p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <MiniLabel light={theme.light}>готовность к записи</MiniLabel>
+            <div className={cn('mt-2 text-[22px] font-semibold leading-none tracking-[-0.085em]', tone.text)}>{health}%</div>
+          </div>
+          <div className="flex gap-1.5">
+            {setupItems.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setScreen(item.screen)}
+                className={cn('rounded-[9px] border px-2.5 py-2 text-left transition active:scale-[0.98]', item.ready ? tone.panel : tone.ghost)}
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="size-1.5 rounded-full" style={{ backgroundColor: item.ready ? theme.accent : (theme.light ? 'rgba(0,0,0,.22)' : 'rgba(255,255,255,.22)') }} />
+                  <span className={cn('text-[10px] font-bold tracking-[-0.02em]', tone.text)}>{item.label}</span>
+                </div>
+                <div className={cn('mt-1 max-w-[72px] truncate text-[9px]', tone.faint)}>{item.text}</div>
+              </button>
+            ))}
+          </div>
         </div>
       </MiniCard>
 
@@ -728,7 +811,7 @@ function WorkdayScreen({
             <div className="min-w-0">
               <MiniLabel light={theme.light}>следующая запись</MiniLabel>
               <div className={cn('mt-2 flex items-baseline gap-2', tone.text)}>
-                <span className="text-[28px] font-semibold leading-none tracking-[-0.09em]">{formatTime(nextBooking.time)}</span>
+                <span className="text-[30px] font-semibold leading-none tracking-[-0.095em]">{formatTime(nextBooking.time)}</span>
                 <span className={cn('truncate text-[12px] font-medium', tone.muted)}>{formatDateHuman(nextBooking.date)}</span>
               </div>
               <div className={cn('mt-2 truncate text-[15px] font-semibold tracking-[-0.055em]', tone.text)}>{nextBooking.clientName}</div>
@@ -740,32 +823,35 @@ function WorkdayScreen({
           </div>
         </MiniCard>
       ) : (
-        <EmptyBlock theme={theme} title="Ближайших записей нет" text="Открой график и услуги — клиент сможет выбрать свободное окно на публичной странице." icon={<CalendarClock className="size-5" />} />
+        <EmptyBlock theme={theme} title="Ближайших записей нет" text="Добавь запись вручную или проверь график — клиент сможет выбрать свободное окно на публичной странице." icon={<CalendarClock className="size-5" />} />
       )}
 
-      <div className="grid grid-cols-3 gap-2">
-        <StatBox theme={theme} label="Записей" value={activeSelected.length} hint={formatDateHuman(selectedDate)} />
+      <div className="grid grid-cols-4 gap-2">
+        <StatBox theme={theme} label="Активные" value={activeSelected.length} hint={formatDateHuman(selectedDate)} />
+        <StatBox theme={theme} label="Ждут" value={todayConfirmed} />
         <StatBox theme={theme} label="Пришли" value={completedSelected.length} />
-        <StatBox theme={theme} label="Выручка" value={RUB.format(revenueSelected)} />
+        <StatBox theme={theme} label="No-show" value={noShowSelected.length} />
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
-        <button type="button" onClick={() => setScreen('calendar')} className={cn('rounded-[10px] border p-3 text-left transition active:scale-[0.98]', tone.panel)}>
-          <Clock3 className={cn('size-4', tone.muted)} />
-          <div className={cn('mt-3 text-[12px] font-semibold tracking-[-0.045em]', tone.text)}>График</div>
-          <div className={cn('mt-1 text-[10px]', tone.faint)}>слоты</div>
-        </button>
-        <button type="button" onClick={() => setScreen('catalog')} className={cn('rounded-[10px] border p-3 text-left transition active:scale-[0.98]', tone.panel)}>
-          <Scissors className={cn('size-4', tone.muted)} />
-          <div className={cn('mt-3 text-[12px] font-semibold tracking-[-0.045em]', tone.text)}>Услуги</div>
-          <div className={cn('mt-1 text-[10px]', tone.faint)}>цены</div>
-        </button>
-        <button type="button" onClick={() => setScreen('dialogs')} className={cn('rounded-[10px] border p-3 text-left transition active:scale-[0.98]', tone.panel)}>
-          <MessageCircle className={cn('size-4', tone.muted)} />
-          <div className={cn('mt-3 text-[12px] font-semibold tracking-[-0.045em]', tone.text)}>Чаты</div>
-          <div className={cn('mt-1 text-[10px]', tone.faint)}>ответы</div>
-        </button>
-      </div>
+      <MiniCard light={theme.light} className="p-3">
+        <div className="grid grid-cols-[1.15fr_0.85fr] gap-2">
+          <MiniPanel light={theme.light} className="p-3">
+            <MiniLabel light={theme.light}>касса дня</MiniLabel>
+            <div className={cn('mt-2 text-[24px] font-semibold leading-none tracking-[-0.085em]', tone.text)}>{RUB.format(revenueSelected)}</div>
+            <div className={cn('mt-2 text-[11px] leading-4', tone.muted)}>Считается по завершённым записям выбранного дня.</div>
+          </MiniPanel>
+          <div className="grid gap-2">
+            <button type="button" onClick={() => setScreen('calendar')} className={cn('rounded-[10px] border p-3 text-left transition active:scale-[0.98]', tone.panel)}>
+              <Clock3 className={cn('size-4', tone.muted)} />
+              <div className={cn('mt-2 text-[12px] font-semibold tracking-[-0.045em]', tone.text)}>Слоты</div>
+            </button>
+            <button type="button" onClick={() => setScreen('dialogs')} className={cn('rounded-[10px] border p-3 text-left transition active:scale-[0.98]', tone.panel)}>
+              <MessageCircle className={cn('size-4', tone.muted)} />
+              <div className={cn('mt-2 text-[12px] font-semibold tracking-[-0.045em]', tone.text)}>Ответы</div>
+            </button>
+          </div>
+        </div>
+      </MiniCard>
 
       <section className="space-y-2">
         <div className="flex items-center justify-between px-1">
@@ -784,7 +870,7 @@ function WorkdayScreen({
               <div className={cn('flex size-10 items-center justify-center rounded-[10px] border', tone.panel, tone.muted)}><Bell className="size-4" /></div>
               <div>
                 <div className={cn('text-[14px] font-semibold tracking-[-0.05em]', tone.text)}>На этот день пусто</div>
-                <div className={cn('mt-1 text-[11px] leading-4', tone.muted)}>Новые записи появятся здесь автоматически.</div>
+                <div className={cn('mt-1 text-[11px] leading-4', tone.muted)}>Новые записи появятся здесь автоматически, ручную можно добавить кнопкой сверху.</div>
               </div>
             </div>
           </MiniCard>
@@ -833,7 +919,10 @@ function CalendarScreen({ availability, updateWorkspaceSection, theme }: { avail
             <div className={cn('mt-2 text-[28px] font-semibold leading-none tracking-[-0.085em]', tone.text)}>Рабочая неделя</div>
             <div className={cn('mt-2 text-[12px] leading-5', tone.muted)}>Один день — одно рабочее окно. Перерыв не отдаётся клиентам как свободный слот.</div>
           </div>
-          <MiniButton theme={theme} variant="secondary" onClick={applyWeekPreset} className="h-8 px-2.5 text-[10px]">шаблон</MiniButton>
+          <div className="flex shrink-0 flex-col gap-1.5">
+            <MiniButton theme={theme} variant="secondary" onClick={applyWeekPreset} className="h-8 px-2.5 text-[10px]">5/2</MiniButton>
+            <MiniButton theme={theme} variant="secondary" onClick={() => { setDays((current) => current.map((day) => ({ ...day, status: day.weekdayIndex === 6 ? 'short' : 'workday', start: day.weekdayIndex === 6 ? '11:00' : '10:00', end: day.weekdayIndex === 6 ? '16:00' : '20:00', breakStart: day.weekdayIndex === 6 ? '' : '14:00', breakEnd: day.weekdayIndex === 6 ? '' : '15:00' }))); setSaved(false); }} className="h-8 px-2.5 text-[10px]">7 дней</MiniButton>
+          </div>
         </div>
       </MiniCard>
 
@@ -1014,6 +1103,12 @@ function CatalogScreen({
         <div className={cn('mt-2 text-[12px] leading-5', tone.muted)}>Эти услуги сохраняются в общий профиль и подтягиваются на публичную страницу клиента.</div>
       </MiniCard>
 
+      <div className="grid grid-cols-3 gap-2">
+        <StatBox theme={theme} label="Видно" value={items.filter((item) => item.visible).length} />
+        <StatBox theme={theme} label="Средний чек" value={items.length ? RUB.format(Math.round(items.reduce((sum, item) => sum + item.price, 0) / items.length)) : '—'} />
+        <StatBox theme={theme} label="Категорий" value={new Set(items.map((item) => item.category.trim()).filter(Boolean)).size} />
+      </div>
+
       <MiniCard light={theme.light} className="p-3">
         <div className="grid grid-cols-[1fr_92px] gap-2">
           <MiniInput light={theme.light} value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} placeholder="Название услуги" />
@@ -1073,6 +1168,11 @@ function DialogsScreen({ theme }: { theme: ThemeTone }) {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [query, setQuery] = useState('');
+  const quickReplies = [
+    'Здравствуйте! Подтверждаю вашу запись.',
+    'Напомню: если нужно перенести время, напишите заранее.',
+    'Спасибо, сейчас посмотрю свободные окна и вернусь с вариантами.',
+  ];
 
   const load = useCallback(async (showLoader = true) => {
     if (showLoader) setLoading(true);
@@ -1211,6 +1311,18 @@ function DialogsScreen({ theme }: { theme: ThemeTone }) {
               )}
             </div>
             <div className={cn('border-t p-3', tone.line)}>
+              <div className="-mx-1 mb-2 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {quickReplies.map((reply) => (
+                  <button
+                    key={reply}
+                    type="button"
+                    onClick={() => setDraft(reply)}
+                    className={cn('min-w-max rounded-[9px] border px-2.5 py-1.5 text-[10px] font-semibold', tone.ghost)}
+                  >
+                    {reply.slice(0, 28)}...
+                  </button>
+                ))}
+              </div>
               <div className="flex gap-2">
                 <MiniInput light={theme.light} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Ответ клиенту" onKeyDown={(event) => { if (event.key === 'Enter') void send(); }} />
                 <MiniButton theme={theme} variant="primary" disabled={sending || !draft.trim()} onClick={() => void send()} className="h-10 w-11 shrink-0 px-0">
@@ -1508,6 +1620,79 @@ function BookingSheet({ booking, onClose, onStatus, services, theme }: { booking
         {booking.clientPhone ? (
           <a href={`tel:${booking.clientPhone}`} className={cn('flex h-10 items-center justify-center gap-2 rounded-[9px] border text-[12px] font-semibold', tone.ghost)}><Phone className="size-4" />Позвонить клиенту</a>
         ) : null}
+        <button
+          type="button"
+          onClick={() => void copyText(`Здравствуйте, ${booking.clientName}! Напоминаю про запись ${formatDateHuman(booking.date)} в ${formatTime(booking.time)}: ${booking.service}.`)}
+          className={cn('flex h-10 w-full items-center justify-center gap-2 rounded-[9px] border text-[12px] font-semibold', tone.ghost)}
+        >
+          <Copy className="size-4" /> Скопировать напоминание
+        </button>
+      </div>
+    </BottomSheet>
+  );
+}
+
+function QuickBookingSheet({ profile, services, theme, onClose, onCreate }: { profile: MasterProfile; services: ServiceInsight[]; theme: ThemeTone; onClose: () => void; onCreate: CreateBooking }) {
+  const tone = toneClasses(theme.light);
+  const serviceOptions = getServiceOptions(profile, services);
+  const [form, setForm] = useState<BookingFormValues>({
+    clientName: '',
+    clientPhone: '',
+    service: serviceOptions[0] ?? '',
+    date: todayIso(),
+    time: '10:00',
+    comment: '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [done, setDone] = useState(false);
+
+  async function create() {
+    setError('');
+    setSaving(true);
+    const result = await onCreate(profile.slug, form);
+    setSaving(false);
+    if (!result.success) {
+      setError(result.error ?? 'Не удалось создать запись');
+      return;
+    }
+    setDone(true);
+    window.setTimeout(onClose, 650);
+  }
+
+  return (
+    <BottomSheet theme={theme} onClose={onClose} title="Новая запись" subtitle="Быстро добавить клиента вручную">
+      <div className="space-y-3 p-4">
+        <MiniPanel light={theme.light} className="p-3">
+          <div className={cn('text-[11px] leading-5', tone.muted)}>
+            Запись создаётся через общий API и сразу попадает в сегодняшнюю ленту, аналитику и карточку клиента.
+          </div>
+        </MiniPanel>
+
+        <div className="space-y-2">
+          <MiniInput light={theme.light} value={form.clientName} onChange={(event) => setForm((current) => ({ ...current, clientName: event.target.value }))} placeholder="Имя клиента" />
+          <MiniInput light={theme.light} value={form.clientPhone} onChange={(event) => setForm((current) => ({ ...current, clientPhone: event.target.value }))} placeholder="Телефон" inputMode="tel" />
+          <select
+            value={form.service}
+            onChange={(event) => setForm((current) => ({ ...current, service: event.target.value }))}
+            className={cn('h-10 w-full rounded-[9px] border px-3 text-[13px] font-medium tracking-[-0.03em] outline-none transition', tone.input)}
+          >
+            {serviceOptions.length === 0 ? <option value="">Сначала добавь услугу</option> : null}
+            {serviceOptions.map((service) => <option key={service} value={service}>{service}</option>)}
+          </select>
+          <div className="grid grid-cols-2 gap-2">
+            <MiniInput light={theme.light} type="date" value={form.date} onChange={(event) => setForm((current) => ({ ...current, date: event.target.value }))} />
+            <MiniInput light={theme.light} type="time" value={form.time} onChange={(event) => setForm((current) => ({ ...current, time: event.target.value }))} />
+          </div>
+          <MiniTextarea light={theme.light} value={form.comment} onChange={(event) => setForm((current) => ({ ...current, comment: event.target.value }))} placeholder="Комментарий: пожелание, перенос, источник" />
+        </div>
+
+        {error ? <div className={cn('rounded-[9px] border px-3 py-2 text-[11px] leading-4', theme.light ? 'border-rose-300/35 bg-rose-50 text-rose-700' : 'border-rose-300/15 bg-rose-400/10 text-rose-100')}>{error}</div> : null}
+        {done ? <div className={cn('rounded-[9px] border px-3 py-2 text-[11px] leading-4', tone.panel, tone.text)}>Запись создана</div> : null}
+
+        <MiniButton theme={theme} variant="primary" onClick={() => void create()} disabled={saving || !form.clientName.trim() || !form.clientPhone.trim() || !form.service} className="w-full">
+          <Plus className="size-4" /> {saving ? 'Создаю' : 'Создать запись'}
+        </MiniButton>
       </div>
     </BottomSheet>
   );
@@ -1576,6 +1761,7 @@ export function MiniAppEntry() {
     bookings,
     workspaceData,
     saveProfile,
+    createBooking,
     updateBookingStatus,
     updateWorkspaceSection,
     refreshWorkspace,
@@ -1587,6 +1773,7 @@ export function MiniAppEntry() {
   const [screen, setScreen] = useState<MiniScreen>('workday');
   const [bootState, setBootState] = useState<'loading' | 'ready'>('loading');
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [quickBookingOpen, setQuickBookingOpen] = useState(false);
   const bootedRef = useRef(false);
 
   const workspaceRecord = safeRecord(workspaceData);
@@ -1634,7 +1821,7 @@ export function MiniAppEntry() {
     <>
       <MiniShell screen={screen} setScreen={setScreen} profile={ownedProfile} theme={theme} onRefresh={() => void refreshWorkspace()}>
         {screen === 'workday' ? (
-          <WorkdayScreen profile={ownedProfile} bookings={orderedBookings} dataset={dataset} onOpenBooking={setSelectedBooking} setScreen={setScreen} getPublicPath={getPublicPath} theme={theme} />
+          <WorkdayScreen profile={ownedProfile} bookings={orderedBookings} dataset={dataset} onOpenBooking={setSelectedBooking} onQuickBooking={() => setQuickBookingOpen(true)} setScreen={setScreen} getPublicPath={getPublicPath} theme={theme} />
         ) : null}
         {screen === 'calendar' ? (
           <CalendarScreen availability={dataset.availability} updateWorkspaceSection={updateWorkspaceSection} theme={theme} />
@@ -1649,6 +1836,9 @@ export function MiniAppEntry() {
         {screen === 'profile' ? <ProfileScreen profile={ownedProfile} onSave={saveProfile} getPublicPath={getPublicPath} theme={theme} /> : null}
       </MiniShell>
       <BookingSheet booking={selectedBooking} onClose={() => setSelectedBooking(null)} onStatus={updateBookingStatus} services={dataset.services} theme={theme} />
+      {quickBookingOpen ? (
+        <QuickBookingSheet profile={ownedProfile} services={dataset.services} theme={theme} onClose={() => setQuickBookingOpen(false)} onCreate={createBooking} />
+      ) : null}
     </>
   );
 }
