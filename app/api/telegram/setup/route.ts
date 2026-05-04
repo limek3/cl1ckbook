@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { setTelegramMenuButton, setTelegramWebhook } from '@/lib/server/telegram-bot';
+import { getAppUrl, setTelegramMenuButton, setTelegramWebhook } from '@/lib/server/telegram-bot';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,14 +17,21 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   }
 
+  const appUrl = getAppUrl();
+  const webhookUrl = `${appUrl}/api/telegram/webhook`;
+
   try {
     const webhook = await setTelegramWebhook();
     const menu = await setTelegramMenuButton();
 
-    return NextResponse.json({ ok: true, webhook, menu });
+    return NextResponse.json({ ok: true, appUrl, webhookUrl, webhook, menu });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'telegram_setup_failed' },
+      {
+        error: error instanceof Error ? error.message : 'telegram_setup_failed',
+        appUrl,
+        webhookUrl,
+      },
       { status: 500 },
     );
   }

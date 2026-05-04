@@ -304,24 +304,24 @@ function buildPreview(
           '{имя}': 'Анна',
           '{дата}': '15 ноября',
           '{время}': '14:30',
-          '{ссылка}': 'https://www.кликбук.рф/m/demo',
+          '{ссылка}': 'https://кликбук.рф/m/demo',
           '{услуга}': 'маникюр',
           '{name}': 'Анна',
           '{date}': '15 ноября',
           '{time}': '14:30',
-          '{link}': 'https://www.кликбук.рф/m/demo',
+          '{link}': 'https://кликбук.рф/m/demo',
           '{service}': 'маникюр',
         }
       : {
           '{name}': 'Anna',
           '{date}': '15 November',
           '{time}': '2:30 PM',
-          '{link}': 'https://www.кликбук.рф/m/demo',
+          '{link}': 'https://кликбук.рф/m/demo',
           '{service}': 'manicure',
           '{имя}': 'Anna',
           '{дата}': '15 November',
           '{время}': '2:30 PM',
-          '{ссылка}': 'https://www.кликбук.рф/m/demo',
+          '{ссылка}': 'https://кликбук.рф/m/demo',
           '{услуга}': 'manicure',
         };
 

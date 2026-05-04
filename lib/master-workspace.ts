@@ -616,7 +616,7 @@ function buildTemplates(locale: Locale): MessageTemplateInsight[] {
           channel: locale === 'ru' ? 'ВК / Телеграм' : 'VK / Telegram',
           conversion: '74%',
           variables: ['{{имя}}', '{{дата}}', '{{время}}', '{{услуга}}'],
-          content: 'Здравствуйте, {{имя}}! Ваша запись на {{услуга}} создана: {{дата}} в {{время}}. Быстрая ссылка: https://www.кликбук.рф/m/{{slug}}',
+          content: 'Здравствуйте, {{имя}}! Ваша запись на {{услуга}} создана: {{дата}} в {{время}}. Быстрая ссылка: https://кликбук.рф/m/{{slug}}',
         },
         {
           id: 'reminder',
@@ -631,16 +631,16 @@ function buildTemplates(locale: Locale): MessageTemplateInsight[] {
           title: 'Спасибо после визита',
           channel: locale === 'ru' ? 'Телеграм' : 'Telegram',
           conversion: '42%',
-          variables: ['{{имя}}', 'https://www.кликбук.рф/m/{{slug}}'],
-          content: 'Спасибо за визит, {{имя}}! Буду рада видеть вас снова. Сохраните ссылку https://www.кликбук.рф/m/{{slug}}, чтобы в следующий раз записаться быстрее.',
+          variables: ['{{имя}}', 'https://кликбук.рф/m/{{slug}}'],
+          content: 'Спасибо за визит, {{имя}}! Буду рада видеть вас снова. Сохраните ссылку https://кликбук.рф/m/{{slug}}, чтобы в следующий раз записаться быстрее.',
         },
         {
           id: 'return',
           title: 'Возврат клиента',
           channel: 'VK',
           conversion: '31%',
-          variables: ['{{имя}}', 'https://www.кликбук.рф/m/{{slug}}'],
-          content: 'Здравствуйте, {{имя}}! У меня появились новые удобные слоты на ближайшие недели. Вот быстрая ссылка для записи: https://www.кликбук.рф/m/{{slug}}',
+          variables: ['{{имя}}', 'https://кликбук.рф/m/{{slug}}'],
+          content: 'Здравствуйте, {{имя}}! У меня появились новые удобные слоты на ближайшие недели. Вот быстрая ссылка для записи: https://кликбук.рф/m/{{slug}}',
         },
       ]
     : [
@@ -650,7 +650,7 @@ function buildTemplates(locale: Locale): MessageTemplateInsight[] {
           channel: locale === 'ru' ? 'ВК / Телеграм' : 'VK / Telegram',
           conversion: '74%',
           variables: ['{{name}}', '{{date}}', '{{time}}', '{{service}}'],
-          content: 'Hi {{name}}! Your {{service}} booking is created for {{date}} at {{time}}. Quick link: https://www.кликбук.рф/m/{{slug}}',
+          content: 'Hi {{name}}! Your {{service}} booking is created for {{date}} at {{time}}. Quick link: https://кликбук.рф/m/{{slug}}',
         },
         {
           id: 'reminder',
@@ -665,16 +665,16 @@ function buildTemplates(locale: Locale): MessageTemplateInsight[] {
           title: 'Post-visit thank you',
           channel: locale === 'ru' ? 'Телеграм' : 'Telegram',
           conversion: '42%',
-          variables: ['{{name}}', 'https://www.кликбук.рф/m/{{slug}}'],
-          content: 'Thanks for coming, {{name}}. I would love to see you again. Save this link https://www.кликбук.рф/m/{{slug}} to book faster next time.',
+          variables: ['{{name}}', 'https://кликбук.рф/m/{{slug}}'],
+          content: 'Thanks for coming, {{name}}. I would love to see you again. Save this link https://кликбук.рф/m/{{slug}} to book faster next time.',
         },
         {
           id: 'return',
           title: 'Return invitation',
           channel: 'VK',
           conversion: '31%',
-          variables: ['{{name}}', 'https://www.кликбук.рф/m/{{slug}}'],
-          content: 'Hi {{name}}! New time slots are open for the coming weeks. Here is the quick booking link: https://www.кликбук.рф/m/{{slug}}',
+          variables: ['{{name}}', 'https://кликбук.рф/m/{{slug}}'],
+          content: 'Hi {{name}}! New time slots are open for the coming weeks. Here is the quick booking link: https://кликбук.рф/m/{{slug}}',
         },
       ];
 }

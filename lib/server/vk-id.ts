@@ -1,6 +1,7 @@
 import 'server-only';
 
 import crypto from 'node:crypto';
+import { domainToASCII } from 'node:url';
 
 export type VkIdTokenResponse = {
   access_token?: string;
@@ -45,14 +46,36 @@ function requiredEnv(name: string) {
   return value;
 }
 
+const CLICKBOOK_APP_URL = 'https://xn--90anfbbc3d.xn--p1ai';
+
+function normalizeAppUrl(value?: string | null) {
+  const raw = value?.trim() || CLICKBOOK_APP_URL;
+  const candidate = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+
+  try {
+    const url = new URL(candidate);
+    const asciiHost = domainToASCII(url.hostname) || url.hostname;
+
+    url.protocol = 'https:';
+    url.hostname = asciiHost === 'www.xn--90anfbbc3d.xn--p1ai'
+      ? 'xn--90anfbbc3d.xn--p1ai'
+      : asciiHost;
+    url.pathname = '';
+    url.search = '';
+    url.hash = '';
+
+    return url.toString().replace(/\/$/, '');
+  } catch {
+    return CLICKBOOK_APP_URL;
+  }
+}
+
 export function getAppUrl() {
-  return (
-    process.env.NEXT_PUBLIC_APP_URL ||
+  return normalizeAppUrl(
     process.env.APP_URL ||
-    process.env.VERCEL_PROJECT_PRODUCTION_URL && `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` ||
-    process.env.VERCEL_URL && `https://${process.env.VERCEL_URL}` ||
-    'http://localhost:3000'
-  ).replace(/\/$/, '');
+      process.env.NEXT_PUBLIC_APP_URL ||
+      CLICKBOOK_APP_URL,
+  );
 }
 
 function normalizeClassicVkScope(value?: string | null) {
