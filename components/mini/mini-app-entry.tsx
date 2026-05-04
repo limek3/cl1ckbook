@@ -1,21 +1,8 @@
 'use client';
 
-import Link from 'next/link';
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-  type InputHTMLAttributes,
-  type ReactNode,
-  type TextareaHTMLAttributes,
-} from 'react';
-import { useTheme } from 'next-themes';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   BarChart3,
-  Bell,
   CalendarClock,
   Check,
   CheckCircle2,
@@ -25,7 +12,6 @@ import {
   ExternalLink,
   LayoutDashboard,
   MessageCircle,
-  MoreHorizontal,
   Phone,
   Plus,
   RefreshCcw,
@@ -33,7 +19,6 @@ import {
   Scissors,
   Send,
   Settings,
-  Sparkles,
   Star,
   Trash2,
   UserRound,
@@ -42,99 +27,89 @@ import {
   XCircle,
 } from 'lucide-react';
 
-import { BrandLogo } from '@/components/brand/brand-logo';
-import { useApp } from '@/lib/app-context';
-import { useLocale } from '@/lib/locale-context';
-import { buildWorkspaceDatasetFromStored } from '@/lib/workspace-store';
-import {
-  authorizeTelegramMiniAppSession,
-  getTelegramAppSessionHeaders,
-  hasTelegramMiniAppRuntime,
-} from '@/lib/telegram-miniapp-auth-client';
-import { cn } from '@/lib/utils';
-import type {
-  AvailabilityDayInsight,
-  ClientInsight,
-  ServiceInsight,
-  WorkspaceDataset,
-} from '@/lib/master-workspace';
-import type { ChatThreadListResponse, ChatThreadRecord } from '@/lib/chat-types';
-import type { Booking, BookingFormValues, BookingStatus, MasterProfile, MasterProfileFormValues } from '@/lib/types';
+type Json = Record<string, unknown>;
+type Screen = 'today' | 'schedule' | 'services' | 'chats' | 'more' | 'clients' | 'analytics' | 'profile';
+type BookingStatus = 'new' | 'confirmed' | 'completed' | 'no_show' | 'cancelled';
+type DayStatus = 'workday' | 'short' | 'day-off';
+type ServiceStatus = 'active' | 'seasonal' | 'draft';
 
-type MiniScreen = 'workday' | 'calendar' | 'catalog' | 'dialogs' | 'hub' | 'clients' | 'analytics' | 'profile';
-type ThemeTone = { light: boolean; accent: string };
-type UpdateWorkspaceSection = <T>(section: string, value: T) => Promise<boolean>;
-type SaveProfile = (values: MiniProfileSaveValues) => Promise<{ success: boolean; error?: string; profile?: MasterProfile }>;
-type CreateBooking = (masterSlug: string, values: BookingFormValues) => Promise<{
-  success: boolean;
-  error?: string;
-  booking?: Booking;
-  telegramConfirmationUrl?: string | null;
-  vkConfirmationUrl?: string | null;
-}>;
+type Profile = {
+  id: string;
+  slug: string;
+  name: string;
+  profession: string;
+  city: string;
+  bio: string;
+  phone: string;
+  telegram: string;
+  whatsapp: string;
+  services: string[];
+};
 
-type MiniProfileSaveValues = MasterProfileFormValues &
-  Partial<
-    Pick<
-      MasterProfile,
-      | 'priceHint'
-      | 'experienceLabel'
-      | 'responseTime'
-      | 'workGallery'
-      | 'reviews'
-      | 'rating'
-      | 'reviewCount'
-      | 'locationMode'
-      | 'address'
-      | 'mapUrl'
-    >
-  >;
+type Booking = {
+  id: string;
+  clientName: string;
+  clientPhone: string;
+  service: string;
+  date: string;
+  time: string;
+  status: BookingStatus;
+  comment: string;
+  createdAt: string;
+  priceAmount: number;
+};
 
-type EditableService = {
+type Service = {
   id: string;
   name: string;
+  category: string;
   duration: number;
   price: number;
-  category: string;
-  status: 'active' | 'seasonal' | 'draft';
+  status: ServiceStatus;
   visible: boolean;
 };
 
-type WeekdayEditor = {
+type WorkDay = {
   id: string;
   label: string;
   short: string;
   weekdayIndex: number;
-  status: 'workday' | 'short' | 'day-off';
+  status: DayStatus;
   start: string;
   end: string;
   breakStart: string;
   breakEnd: string;
 };
 
-const RUB = new Intl.NumberFormat('ru-RU', {
-  style: 'currency',
-  currency: 'RUB',
-  maximumFractionDigits: 0,
-});
+type ChatMessage = { id: string; author: string; body: string; createdAt?: string };
+type ChatThread = { id: string; clientName: string; clientPhone: string; channel: string; unreadCount: number; messages: ChatMessage[] };
+type Client = { id: string; name: string; phone: string; visits: number; revenue: number; lastVisit: string; note: string; favorite: boolean };
 
-const STATUS_LABELS: Record<BookingStatus, string> = {
-  new: 'Новая',
-  confirmed: 'В плане',
-  completed: 'Пришла',
-  no_show: 'Не пришла',
-  cancelled: 'Отмена',
+type TgWindow = Window & {
+  Telegram?: {
+    WebApp?: {
+      initData?: string;
+      initDataUnsafe?: unknown;
+      ready?: () => void;
+      expand?: () => void;
+    };
+  };
 };
 
-const STATUS_DOT: Record<BookingStatus, string> = {
-  new: '#8bbcff',
-  confirmed: '#b8c7ff',
-  completed: '#9ed7b7',
-  no_show: '#e9c077',
-  cancelled: '#eba3a3',
+const DEFAULT_PROFILE: Profile = {
+  id: 'profile',
+  slug: 'master',
+  name: '',
+  profession: '',
+  city: '',
+  bio: '',
+  phone: '',
+  telegram: '',
+  whatsapp: '',
+  services: [],
 };
 
-const WEEKDAYS: WeekdayEditor[] = [
+const DEFAULT_WEEK: WorkDay[] = [
   { id: 'mon', label: 'Понедельник', short: 'Пн', weekdayIndex: 0, status: 'workday', start: '10:00', end: '20:00', breakStart: '14:00', breakEnd: '15:00' },
   { id: 'tue', label: 'Вторник', short: 'Вт', weekdayIndex: 1, status: 'workday', start: '10:00', end: '20:00', breakStart: '14:00', breakEnd: '15:00' },
   { id: 'wed', label: 'Среда', short: 'Ср', weekdayIndex: 2, status: 'workday', start: '10:00', end: '20:00', breakStart: '14:00', breakEnd: '15:00' },
@@ -144,356 +119,330 @@ const WEEKDAYS: WeekdayEditor[] = [
   { id: 'sun', label: 'Воскресенье', short: 'Вс', weekdayIndex: 6, status: 'day-off', start: '11:00', end: '16:00', breakStart: '', breakEnd: '' },
 ];
 
-const FALLBACK_DATASET: WorkspaceDataset = {
-  services: [],
-  clients: [],
-  daily: [],
-  channels: [],
-  weeklyLoad: [],
-  peakHours: [],
-  templates: [],
-  availability: [],
-  integrations: [],
-  notifications: [],
-  payments: [],
-  plans: [],
-  subscription: {
-    id: null,
-    planId: 'start',
-    planName: 'Start',
-    status: 'active',
-    billingCycle: 'monthly',
-    currentPeriodStart: null,
-    currentPeriodEnd: null,
-    nextChargeLabel: '—',
-    paymentMethodLabel: '—',
-    cancelAtPeriodEnd: false,
-    provider: 'manual',
-  },
-  limits: [],
-  totals: {
-    bookings: 0,
-    confirmed: 0,
-    completed: 0,
-    cancelled: 0,
-    revenue: 0,
-    visitors: 0,
-    conversion: 0,
-    averageCheck: 0,
-    newClients: 0,
-    returnRate: 0,
-  },
+const STATUS_LABEL: Record<BookingStatus, string> = {
+  new: 'Новая',
+  confirmed: 'В плане',
+  completed: 'Пришла',
+  no_show: 'Не пришла',
+  cancelled: 'Отмена',
 };
 
-function safeRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+const STATUS_DOT: Record<BookingStatus, string> = {
+  new: '#9fbdf6',
+  confirmed: '#c8b98f',
+  completed: '#96d2aa',
+  no_show: '#e2b169',
+  cancelled: '#e59b9b',
+};
+
+function cx(...items: Array<string | false | null | undefined>) {
+  return items.filter(Boolean).join(' ');
 }
 
-function asNumber(value: unknown, fallback = 0) {
-  const number = typeof value === 'number' ? value : Number(String(value ?? '').replace(/[^\d.]/g, ''));
-  return Number.isFinite(number) ? number : fallback;
+function obj(value: unknown): Json {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Json) : {};
 }
 
-function makeId(prefix = 'item') {
-  return `${prefix}-${Date.now()}-${Math.round(Math.random() * 100000)}`;
+function list<T = unknown>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
 }
 
-function todayIso() {
-  const date = new Date();
-  return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+function len(value: unknown) {
+  return Array.isArray(value) || typeof value === 'string' ? value.length : 0;
 }
 
-function addDaysIso(base: string, days: number) {
-  const date = new Date(`${base}T12:00:00`);
-  date.setDate(date.getDate() + days);
-  return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+function text(value: unknown, fallback = '') {
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  return fallback;
 }
 
-function formatDateHuman(dateIso: string, long = false) {
-  const date = new Date(`${dateIso}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return dateIso;
-  return date.toLocaleDateString('ru-RU', {
-    weekday: long ? 'long' : 'short',
-    day: 'numeric',
-    month: 'short',
-  });
+function moneyNumber(value: unknown, fallback = 0) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const parsed = Number(String(value ?? '').replace(/[^\d.,-]/g, '').replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function formatTime(value?: string | null) {
-  return (value || '').slice(0, 5) || '—';
+function id(prefix: string) {
+  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
 }
 
-function sortByDateTime(a: Booking, b: Booking) {
-  return `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`);
+function today() {
+  const d = new Date();
+  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
 }
 
-function descByCreated(a: Booking, b: Booking) {
-  return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+function addDays(date: string, days: number) {
+  const d = new Date(`${date}T12:00:00`);
+  d.setDate(d.getDate() + days);
+  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
 }
 
-function activeStatus(status: BookingStatus) {
-  return status === 'new' || status === 'confirmed' || status === 'completed';
+function dateLabel(value: string, long = false) {
+  const safe = text(value, today()).slice(0, 10);
+  const d = new Date(`${safe}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return safe;
+  return d.toLocaleDateString('ru-RU', { weekday: long ? 'long' : 'short', day: 'numeric', month: 'short' });
 }
 
-function revenueStatus(status: BookingStatus) {
-  return status === 'completed';
+function timeLabel(value: unknown) {
+  const raw = text(value, '10:00');
+  return /^\d{2}:\d{2}/.test(raw) ? raw.slice(0, 5) : '10:00';
 }
 
-function getBookingAmount(booking: Booking, services: ServiceInsight[]) {
-  if (typeof booking.priceAmount === 'number' && Number.isFinite(booking.priceAmount)) return booking.priceAmount;
-  return services.find((service) => service.name === booking.service)?.price ?? 0;
+function rub(value: unknown) {
+  return `${Math.round(moneyNumber(value)).toLocaleString('ru-RU')} ₽`;
 }
 
-function getServiceOptions(profile: MasterProfile, services: ServiceInsight[]) {
-  const source = services.length > 0
-    ? services.filter((service) => service.visible !== false).map((service) => service.name)
-    : profile.services;
-  return Array.from(new Set(source.map((item) => item.trim()).filter(Boolean)));
+function slugify(value: unknown) {
+  const raw = text(value, 'master').toLowerCase();
+  const latin = raw
+    .replace(/[а]/g, 'a').replace(/[б]/g, 'b').replace(/[в]/g, 'v').replace(/[г]/g, 'g')
+    .replace(/[д]/g, 'd').replace(/[её]/g, 'e').replace(/[ж]/g, 'zh').replace(/[з]/g, 'z')
+    .replace(/[и]/g, 'i').replace(/[й]/g, 'y').replace(/[к]/g, 'k').replace(/[л]/g, 'l')
+    .replace(/[м]/g, 'm').replace(/[н]/g, 'n').replace(/[о]/g, 'o').replace(/[п]/g, 'p')
+    .replace(/[р]/g, 'r').replace(/[с]/g, 's').replace(/[т]/g, 't').replace(/[у]/g, 'u')
+    .replace(/[ф]/g, 'f').replace(/[х]/g, 'h').replace(/[ц]/g, 'c').replace(/[ч]/g, 'ch')
+    .replace(/[ш]/g, 'sh').replace(/[щ]/g, 'sch').replace(/[ы]/g, 'y').replace(/[э]/g, 'e')
+    .replace(/[ю]/g, 'yu').replace(/[я]/g, 'ya').replace(/[ьъ]/g, '');
+  return latin.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50) || 'master';
 }
 
-function countWorkingDays(availability: AvailabilityDayInsight[]) {
-  const normalized = normalizeWeekAvailability(availability);
-  return normalized.filter((day) => day.status !== 'day-off' && day.slots.length > 0).length;
+function normalizeStatus(value: unknown): BookingStatus {
+  return value === 'confirmed' || value === 'completed' || value === 'no_show' || value === 'cancelled' || value === 'new' ? value : 'new';
 }
 
-function getSetupItems(profile: MasterProfile, dataset: WorkspaceDataset) {
-  return [
-    {
-      id: 'services',
-      label: 'Услуги',
-      text: dataset.services.some((service) => service.visible !== false) || profile.services.length > 0 ? 'каталог готов' : 'добавь хотя бы одну услугу',
-      ready: dataset.services.some((service) => service.visible !== false) || profile.services.length > 0,
-      screen: 'catalog' as MiniScreen,
-    },
-    {
-      id: 'schedule',
-      label: 'График',
-      text: countWorkingDays(dataset.availability) > 0 ? `${countWorkingDays(dataset.availability)} раб. дней` : 'укажи рабочие окна',
-      ready: countWorkingDays(dataset.availability) > 0,
-      screen: 'calendar' as MiniScreen,
-    },
-    {
-      id: 'contacts',
-      label: 'Контакты',
-      text: profile.phone || profile.telegram || profile.whatsapp ? 'клиенту есть куда писать' : 'добавь телефон или Telegram',
-      ready: Boolean(profile.phone || profile.telegram || profile.whatsapp),
-      screen: 'profile' as MiniScreen,
-    },
-  ];
+function normalizeProfile(value: unknown): Profile | null {
+  const row = obj(value);
+  const name = text(row.name ?? row.title ?? row.masterName);
+  if (!name && Object.keys(row).length === 0) return null;
+
+  const serviceNames = list(row.services)
+    .map((item) => (typeof item === 'string' ? item : text(obj(item).name ?? obj(item).title)))
+    .filter(Boolean);
+
+  return {
+    id: text(row.id, 'profile'),
+    slug: slugify(row.slug || name || 'master'),
+    name: name || 'Мастер',
+    profession: text(row.profession ?? row.specialization, 'Специалист'),
+    city: text(row.city, ''),
+    bio: text(row.bio ?? row.description, 'Онлайн-запись через КликБук'),
+    phone: text(row.phone),
+    telegram: text(row.telegram),
+    whatsapp: text(row.whatsapp),
+    services: serviceNames,
+  };
 }
 
+function normalizeBooking(value: unknown, index: number): Booking | null {
+  const row = obj(value);
+  if (Object.keys(row).length === 0) return null;
+  const name = text(row.clientName ?? row.client_name ?? row.name, 'Клиент');
+  const service = text(row.service ?? row.serviceName ?? row.service_name, 'Услуга');
+  const date = text(row.date, today()).slice(0, 10);
+  const time = timeLabel(row.time);
 
-function getInitials(name?: string | null) {
-  const source = (name || 'КБ').trim();
-  return source
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase();
+  return {
+    id: text(row.id, `booking-${index}-${date}-${time}`),
+    clientName: name,
+    clientPhone: text(row.clientPhone ?? row.client_phone ?? row.phone),
+    service,
+    date,
+    time,
+    status: normalizeStatus(row.status),
+    comment: text(row.comment),
+    createdAt: text(row.createdAt ?? row.created_at, new Date().toISOString()),
+    priceAmount: moneyNumber(row.priceAmount ?? row.price_amount, 0),
+  };
 }
 
-function splitInterval(value?: string | null) {
-  const normalized = String(value ?? '').replace(/—/g, '–').replace(/-/g, '–');
-  const [start, end] = normalized.split('–').map((item) => item.trim());
-  return { start: (start || '10:00').slice(0, 5), end: (end || '20:00').slice(0, 5) };
-}
+function normalizeServices(profile: Profile | null, data: Json): Service[] {
+  const stored = list(data.services)
+    .map((item, index) => {
+      const row = obj(item);
+      const name = text(row.name ?? row.title ?? row.service);
+      if (!name) return null;
+      const rawStatus = text(row.status, 'active');
+      return {
+        id: text(row.id, `service-${index}-${slugify(name)}`),
+        name,
+        category: text(row.category, 'Основное'),
+        duration: Math.max(15, moneyNumber(row.duration ?? row.durationMinutes ?? row.duration_minutes, 60)),
+        price: Math.max(0, moneyNumber(row.price ?? row.priceAmount ?? row.price_amount, 0)),
+        status: (rawStatus === 'draft' || rawStatus === 'seasonal' ? rawStatus : 'active') as ServiceStatus,
+        visible: row.visible === false ? false : true,
+      } satisfies Service;
+    })
+    .filter((item): item is Service => Boolean(item));
 
-function timeToMinutes(value: string) {
-  const [hour, minute] = value.split(':').map(Number);
-  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
-  return hour * 60 + minute;
-}
+  if (len(stored) > 0) return stored;
 
-function validTimeRange(start: string, end: string) {
-  const left = timeToMinutes(start);
-  const right = timeToMinutes(end);
-  return left !== null && right !== null && right > left;
-}
-
-function normalizeWeekAvailability(items: AvailabilityDayInsight[]) {
-  const byIndex = new Map<number, AvailabilityDayInsight>();
-  items.forEach((item) => {
-    const record = safeRecord(item);
-    const index = typeof record.weekdayIndex === 'number'
-      ? record.weekdayIndex
-      : WEEKDAYS.find((day) => day.id === item.id || day.label === item.label || day.short === item.label)?.weekdayIndex;
-    if (typeof index === 'number' && index >= 0 && index <= 6 && !record.date) byIndex.set(index, item);
-  });
-
-  return WEEKDAYS.map((fallback) => {
-    const stored = byIndex.get(fallback.weekdayIndex);
-    if (!stored) return fallback;
-    const work = splitInterval(stored.slots?.[0]);
-    const pause = splitInterval(stored.breaks?.[0]);
-    return {
-      ...fallback,
-      status: stored.status ?? fallback.status,
-      start: work.start || fallback.start,
-      end: work.end || fallback.end,
-      breakStart: stored.breaks?.[0] ? pause.start : '',
-      breakEnd: stored.breaks?.[0] ? pause.end : '',
-    } satisfies WeekdayEditor;
-  });
-}
-
-function serializeWeekAvailability(days: WeekdayEditor[]) {
-  return days.map((day) => ({
-    id: day.id,
-    label: day.label,
-    weekdayIndex: day.weekdayIndex,
-    status: day.status,
-    slots: day.status === 'day-off' || !validTimeRange(day.start, day.end) ? [] : [`${day.start}–${day.end}`],
-    breaks: day.status === 'day-off' || !validTimeRange(day.breakStart, day.breakEnd) ? [] : [`${day.breakStart}–${day.breakEnd}`],
+  return list<string>(profile?.services).map((name, index) => ({
+    id: `profile-service-${index}-${slugify(name)}`,
+    name,
+    category: 'Основное',
+    duration: 60,
+    price: 0,
+    status: 'active',
+    visible: true,
   }));
 }
 
-function profileSavePayload(profile: MasterProfile, patch: Partial<MiniProfileSaveValues>): MiniProfileSaveValues {
-  return {
-    name: profile.name,
-    profession: profile.profession,
-    city: profile.city,
-    bio: profile.bio,
-    servicesText: profile.services.join('\n'),
-    phone: profile.phone ?? '',
-    telegram: profile.telegram ?? '',
-    whatsapp: profile.whatsapp ?? '',
-    locationMode: profile.locationMode ?? 'online',
-    address: profile.address ?? '',
-    mapUrl: profile.mapUrl ?? '',
-    hidePhone: Boolean(profile.hidePhone),
-    hideTelegram: Boolean(profile.hideTelegram),
-    hideWhatsapp: Boolean(profile.hideWhatsapp),
-    slug: profile.slug,
-    avatar: profile.avatar ?? '',
-    priceHint: profile.priceHint,
-    experienceLabel: profile.experienceLabel,
-    responseTime: profile.responseTime,
-    workGallery: profile.workGallery,
-    reviews: profile.reviews,
-    rating: profile.rating,
-    reviewCount: profile.reviewCount,
-    ...patch,
-  };
+function normalizeWeek(data: Json): WorkDay[] {
+  const stored = list(data.availability);
+  if (len(stored) === 0) return DEFAULT_WEEK;
+
+  return DEFAULT_WEEK.map((base) => {
+    const found = stored.find((item) => {
+      const row = obj(item);
+      return text(row.id) === base.id || moneyNumber(row.weekdayIndex ?? row.weekday_index, -1) === base.weekdayIndex;
+    });
+
+    if (!found) return base;
+    const row = obj(found);
+    const rawStatus = text(row.status, base.status);
+    return {
+      ...base,
+      status: (rawStatus === 'day-off' || rawStatus === 'short' ? rawStatus : 'workday') as DayStatus,
+      start: timeLabel(row.start ?? row.startTime ?? row.start_time ?? base.start),
+      end: timeLabel(row.end ?? row.endTime ?? row.end_time ?? base.end),
+      breakStart: text(row.breakStart ?? row.break_start) ? timeLabel(row.breakStart ?? row.break_start) : '',
+      breakEnd: text(row.breakEnd ?? row.break_end) ? timeLabel(row.breakEnd ?? row.break_end) : '',
+    };
+  });
 }
 
-async function copyText(value: string) {
+function buildClients(bookings: Booking[], services: Service[]): Client[] {
+  const prices = new Map(services.map((service) => [service.name, service.price]));
+  const map = new Map<string, Client>();
+
+  for (const booking of bookings) {
+    const key = booking.clientPhone || booking.clientName;
+    if (!key) continue;
+    const prev = map.get(key);
+    const revenue = booking.status === 'completed' ? booking.priceAmount || prices.get(booking.service) || 0 : 0;
+    map.set(key, {
+      id: key,
+      name: booking.clientName,
+      phone: booking.clientPhone,
+      visits: (prev?.visits ?? 0) + (booking.status === 'completed' ? 1 : 0),
+      revenue: (prev?.revenue ?? 0) + revenue,
+      lastVisit: !prev || `${booking.date} ${booking.time}` > prev.lastVisit ? `${booking.date} ${booking.time}` : prev.lastVisit,
+      note: prev?.note || booking.comment,
+      favorite: prev?.favorite || revenue > 0,
+    });
+  }
+
+  return Array.from(map.values()).sort((a, b) => b.lastVisit.localeCompare(a.lastVisit));
+}
+
+async function parseJson(response: Response): Promise<Json> {
+  const body = await response.text().catch(() => '');
+  if (!body) return {};
   try {
-    await navigator.clipboard.writeText(value);
-    return true;
+    return obj(JSON.parse(body));
   } catch {
-    try {
-      const input = document.createElement('textarea');
-      input.value = value;
-      input.style.position = 'fixed';
-      input.style.opacity = '0';
-      document.body.appendChild(input);
-      input.select();
-      const ok = document.execCommand('copy');
-      document.body.removeChild(input);
-      return ok;
-    } catch {
-      return false;
-    }
+    return { error: body };
   }
 }
 
-function resolveAccent(workspaceData: Record<string, unknown>) {
-  const appearance = safeRecord(workspaceData.appearance);
-  const raw = String(appearance.accentTone || appearance.publicAccent || appearance.accent || '').toLowerCase();
-  if (raw.includes('blue')) return '#8bbcff';
-  if (raw.includes('rose') || raw.includes('pink')) return '#f0a7bd';
-  if (raw.includes('gold') || raw.includes('warm')) return '#e8c77a';
-  if (raw.includes('sage') || raw.includes('green')) return '#a8d5ba';
-  if (raw.includes('violet') || raw.includes('purple')) return '#c1adff';
-  return '#d8d8d1';
+function storedToken() {
+  if (typeof window === 'undefined') return '';
+  try {
+    return window.localStorage.getItem('clickbook_app_session_token') || '';
+  } catch {
+    return '';
+  }
 }
 
-function toneClasses(light: boolean) {
+function apiHeaders(json = false) {
+  const token = storedToken();
   return {
-    page: light ? 'bg-[#f4f4f2] text-[#0e0e0e]' : 'bg-[#090909] text-white',
-    card: light ? 'border-black/[0.08] bg-[#fbfbfa]' : 'border-white/[0.08] bg-[#101010]',
-    panel: light ? 'border-black/[0.07] bg-black/[0.025]' : 'border-white/[0.07] bg-white/[0.035]',
-    line: light ? 'border-black/[0.08]' : 'border-white/[0.08]',
-    text: light ? 'text-[#0e0e0e]' : 'text-white',
-    muted: light ? 'text-black/48' : 'text-white/42',
-    faint: light ? 'text-black/32' : 'text-white/26',
-    input: light
-      ? 'border-black/[0.08] bg-white/70 text-black placeholder:text-black/28 focus:border-black/[0.18] focus:bg-white'
-      : 'border-white/[0.08] bg-white/[0.045] text-white placeholder:text-white/24 focus:border-white/[0.18] focus:bg-white/[0.065]',
-    ghost: light
-      ? 'border-black/[0.08] bg-white/70 text-black/58 hover:border-black/[0.14] hover:bg-white hover:text-black'
-      : 'border-white/[0.08] bg-white/[0.04] text-white/55 hover:border-white/[0.14] hover:bg-white/[0.07] hover:text-white',
+    ...(json ? { 'Content-Type': 'application/json' } : {}),
+    ...(token ? { 'X-ClickBook-App-Session': token } : {}),
   };
 }
 
-function accentStyle(color: string, light: boolean, amount = 20): CSSProperties {
+async function authorizeTelegram() {
+  if (typeof window === 'undefined') return;
+  const webApp = (window as TgWindow).Telegram?.WebApp;
+  const initData = text(webApp?.initData);
+
+  try { webApp?.ready?.(); } catch {}
+  try { webApp?.expand?.(); } catch {}
+
+  if (!initData) return;
+
+  const response = await fetch('/api/auth/telegram-miniapp', {
+    method: 'POST',
+    credentials: 'include',
+    cache: 'no-store',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData }),
+  }).catch(() => null);
+
+  if (!response?.ok) return;
+  const payload = await parseJson(response);
+  const token = text(payload.appSessionToken ?? payload.app_session_token ?? payload.token);
+  if (!token) return;
+
+  try {
+    window.localStorage.setItem('clickbook_app_session_token', token);
+  } catch {}
+}
+
+function isLightTheme() {
+  if (typeof document === 'undefined') return false;
+  return !document.documentElement.classList.contains('dark') && !document.body.classList.contains('dark');
+}
+
+function getAccent(data: Json) {
+  const appearance = obj(data.appearance);
+  return text(appearance.accentColor ?? appearance.accent ?? data.accentColor, '#d7c7aa');
+}
+
+function theme(light: boolean) {
   return {
-    background: light
-      ? `color-mix(in srgb, ${color} ${amount}%, #ffffff)`
-      : `color-mix(in srgb, ${color} ${Math.min(42, amount + 14)}%, #101010)`,
-    borderColor: light
-      ? `color-mix(in srgb, ${color} 34%, rgba(0,0,0,0.08))`
-      : `color-mix(in srgb, ${color} 42%, rgba(255,255,255,0.08))`,
-    color: light
-      ? `color-mix(in srgb, ${color} 66%, #101010)`
-      : `color-mix(in srgb, ${color} 14%, #ffffff)`,
+    page: light ? 'bg-[#f4f4f2] text-[#090909]' : 'bg-[#090909] text-white',
+    card: light ? 'border-black/[0.08] bg-[#fbfbfa] text-[#090909]' : 'border-white/[0.08] bg-[#101010] text-white',
+    panel: light ? 'border-black/[0.07] bg-black/[0.025]' : 'border-white/[0.08] bg-white/[0.035]',
+    input: light ? 'border-black/[0.08] bg-white/75 text-black placeholder:text-black/35' : 'border-white/[0.09] bg-white/[0.055] text-white placeholder:text-white/35',
+    ghost: light ? 'border-black/[0.08] bg-white/60 text-black' : 'border-white/[0.09] bg-white/[0.055] text-white',
+    muted: light ? 'text-black/48' : 'text-white/45',
+    soft: light ? 'text-black/62' : 'text-white/62',
+    divider: light ? 'border-black/[0.07]' : 'border-white/[0.08]',
   };
 }
 
-function MiniLabel({ children, light }: { children: ReactNode; light: boolean }) {
-  const tone = toneClasses(light);
-  return <div className={cn('text-[9px] font-bold uppercase tracking-[0.22em]', tone.faint)}>{children}</div>;
-}
-
-function MiniCard({ children, className, light, onClick }: { children: ReactNode; className?: string; light: boolean; onClick?: () => void }) {
-  const tone = toneClasses(light);
+function Logo({ light }: { light: boolean }) {
   return (
-    <section
-      role={onClick ? 'button' : undefined}
-      tabIndex={onClick ? 0 : undefined}
-      onClick={onClick}
-      className={cn('rounded-[11px] border shadow-none', tone.card, onClick && 'active:scale-[0.99]', className)}
-    >
-      {children}
-    </section>
+    <div className="flex items-center gap-2">
+      <div className={cx('grid size-8 place-items-center rounded-[10px] border', light ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.04]')}>
+        <div className={cx('size-3.5 rounded-[4px] border', light ? 'border-black' : 'border-white')} />
+      </div>
+      <div className="text-[15px] font-semibold tracking-[-0.06em]">КликБук</div>
+    </div>
   );
 }
 
-function MiniPanel({ children, className, light }: { children: ReactNode; className?: string; light: boolean }) {
-  const tone = toneClasses(light);
-  return <div className={cn('rounded-[10px] border', tone.panel, className)}>{children}</div>;
+function Card({ light, className, children }: { light: boolean; className?: string; children: ReactNode }) {
+  return <div className={cx('rounded-[14px] border shadow-none', theme(light).card, className)}>{children}</div>;
 }
 
-function MiniButton({
-  children,
-  onClick,
-  disabled,
-  variant = 'secondary',
-  className,
-  type = 'button',
-  theme,
-}: {
-  children: ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
-  className?: string;
-  type?: 'button' | 'submit';
-  theme: ThemeTone;
-}) {
-  const tone = toneClasses(theme.light);
+function Micro({ children }: { children: ReactNode }) {
+  return <div className="text-[10px] font-bold uppercase tracking-[0.18em] opacity-50">{children}</div>;
+}
+
+function Button({ light, primary, danger, className, children, disabled, onClick }: { light: boolean; primary?: boolean; danger?: boolean; className?: string; children: ReactNode; disabled?: boolean; onClick?: () => void }) {
   return (
     <button
-      type={type}
-      onClick={onClick}
+      type="button"
       disabled={disabled}
-      style={variant === 'primary' ? accentStyle(theme.accent, theme.light, 22) : undefined}
-      className={cn(
-        'inline-flex h-9 items-center justify-center gap-2 rounded-[9px] border px-3 text-[12px] font-semibold tracking-[-0.035em] transition active:scale-[0.985] disabled:pointer-events-none disabled:opacity-45',
-        variant === 'secondary' && tone.ghost,
-        variant === 'ghost' && cn('border-transparent bg-transparent', tone.muted),
-        variant === 'danger' && (theme.light ? 'border-rose-300/35 bg-rose-50 text-rose-700' : 'border-rose-300/15 bg-rose-400/10 text-rose-100'),
+      onClick={onClick}
+      className={cx(
+        'inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border px-3 text-[12px] font-bold transition active:scale-[0.985] disabled:pointer-events-none disabled:opacity-45',
+        primary ? (light ? 'border-black bg-black text-white' : 'border-white bg-white text-black') : danger ? (light ? 'border-rose-300/40 bg-rose-50 text-rose-700' : 'border-rose-300/15 bg-rose-400/10 text-rose-100') : theme(light).ghost,
         className,
       )}
     >
@@ -502,158 +451,53 @@ function MiniButton({
   );
 }
 
-function MiniInput({ className, light, ...props }: InputHTMLAttributes<HTMLInputElement> & { light: boolean }) {
-  const tone = toneClasses(light);
-  return (
-    <input
-      {...props}
-      className={cn(
-        'h-10 w-full rounded-[9px] border px-3 text-[13px] font-medium tracking-[-0.03em] outline-none transition',
-        tone.input,
-        className,
-      )}
-    />
-  );
+function Field(props: React.InputHTMLAttributes<HTMLInputElement> & { light: boolean }) {
+  const { light, className, ...rest } = props;
+  return <input {...rest} className={cx('h-10 w-full rounded-[10px] border px-3 text-[13px] font-medium outline-none', theme(light).input, className)} />;
 }
 
-function MiniTextarea({ className, light, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement> & { light: boolean }) {
-  const tone = toneClasses(light);
-  return (
-    <textarea
-      {...props}
-      className={cn(
-        'min-h-[86px] w-full resize-none rounded-[9px] border px-3 py-2.5 text-[13px] font-medium leading-5 tracking-[-0.03em] outline-none transition',
-        tone.input,
-        className,
-      )}
-    />
-  );
+function Area(props: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { light: boolean }) {
+  const { light, className, ...rest } = props;
+  return <textarea {...rest} className={cx('min-h-[84px] w-full resize-none rounded-[10px] border px-3 py-2 text-[13px] font-medium leading-5 outline-none', theme(light).input, className)} />;
 }
 
-function AvatarMark({ profile, light, className }: { profile?: MasterProfile | null; light: boolean; className?: string }) {
-  const tone = toneClasses(light);
-  return (
-    <div className={cn('flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-[10px] border', tone.panel, className)}>
-      {profile?.avatar ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={profile.avatar} alt="" className="size-full object-cover" />
-      ) : (
-        <span className="text-[11px] font-black tracking-[-0.05em]">{getInitials(profile?.name)}</span>
-      )}
-    </div>
-  );
+function Empty({ light, title, text: body }: { light: boolean; title: string; text: string }) {
+  return <div className={cx('rounded-[12px] border p-4 text-center', theme(light).panel)}><div className="text-[13px] font-bold tracking-[-0.03em]">{title}</div><div className={cx('mt-1 text-[11px] leading-4', theme(light).muted)}>{body}</div></div>;
 }
 
-function StatusPill({ status, theme }: { status: BookingStatus; theme: ThemeTone }) {
-  const tone = toneClasses(theme.light);
-  return (
-    <span className={cn('inline-flex h-7 items-center gap-1.5 rounded-[9px] border px-2.5 text-[10px] font-bold tracking-[-0.02em]', tone.panel)}>
-      <span className="size-1.5 rounded-full" style={{ backgroundColor: STATUS_DOT[status] ?? theme.accent }} />
-      {STATUS_LABELS[status] ?? 'Статус'}
-    </span>
-  );
+function Stat({ light, label, value }: { light: boolean; label: string; value: string }) {
+  return <div className={cx('rounded-[11px] border p-3', theme(light).panel)}><div className={cx('text-[10px] font-bold uppercase tracking-[0.14em]', theme(light).muted)}>{label}</div><div className="mt-1 truncate text-[17px] font-semibold tracking-[-0.06em]">{value}</div></div>;
 }
 
-function StatBox({ label, value, theme, hint }: { label: string; value: ReactNode; theme: ThemeTone; hint?: string }) {
-  const tone = toneClasses(theme.light);
-  return (
-    <MiniPanel light={theme.light} className="p-3">
-      <div className={cn('text-[10px] font-semibold tracking-[-0.02em]', tone.faint)}>{label}</div>
-      <div className={cn('mt-1 text-[19px] font-semibold leading-none tracking-[-0.075em]', tone.text)}>{value}</div>
-      {hint ? <div className={cn('mt-1 truncate text-[10px]', tone.faint)}>{hint}</div> : null}
-    </MiniPanel>
-  );
-}
-
-function EmptyBlock({ title, text, icon, theme }: { title: string; text: string; icon: ReactNode; theme: ThemeTone }) {
-  const tone = toneClasses(theme.light);
-  return (
-    <MiniCard light={theme.light} className="flex flex-col items-center px-5 py-8 text-center">
-      <div className={cn('flex size-12 items-center justify-center rounded-[10px] border', tone.panel, tone.muted)}>{icon}</div>
-      <div className={cn('mt-4 text-[17px] font-semibold tracking-[-0.06em]', tone.text)}>{title}</div>
-      <div className={cn('mt-2 max-w-[270px] text-[12px] leading-5', tone.muted)}>{text}</div>
-    </MiniCard>
-  );
-}
-
-function MiniLoading() {
-  return (
-    <main className="flex min-h-[100svh] items-center justify-center bg-[#090909] px-5 text-white">
-      <div className="w-full max-w-[330px] rounded-[14px] border border-white/[0.08] bg-[#101010] px-5 py-6 text-center">
-        <BrandLogo />
-        <div className="mx-auto mt-5 size-8 animate-spin rounded-full border border-white/[0.12] border-t-white/70" />
-        <div className="mt-5 text-[16px] font-semibold tracking-[-0.06em]">Открываем mini app</div>
-        <div className="mt-2 text-[12px] leading-5 text-white/42">Подтягиваем профиль, записи, услуги, график и чаты.</div>
-      </div>
-    </main>
-  );
-}
-
-function MiniShell({
-  screen,
-  setScreen,
-  profile,
-  theme,
-  onRefresh,
-  children,
-}: {
-  screen: MiniScreen;
-  setScreen: (screen: MiniScreen) => void;
-  profile: MasterProfile;
-  theme: ThemeTone;
-  onRefresh: () => void;
-  children: ReactNode;
-}) {
-  const tone = toneClasses(theme.light);
-  const moreActive = screen === 'hub' || screen === 'clients' || screen === 'analytics' || screen === 'profile';
-  const nav = [
-    { id: 'workday' as const, label: 'Сегодня', icon: <LayoutDashboard className="size-4" /> },
-    { id: 'calendar' as const, label: 'График', icon: <Clock3 className="size-4" /> },
-    { id: 'catalog' as const, label: 'Услуги', icon: <Scissors className="size-4" /> },
-    { id: 'dialogs' as const, label: 'Чаты', icon: <MessageCircle className="size-4" /> },
-    { id: 'hub' as const, label: 'Ещё', icon: <MoreHorizontal className="size-4" /> },
+function Shell({ light, accent, profile, screen, setScreen, refresh, children }: { light: boolean; accent: string; profile: Profile; screen: Screen; setScreen: (value: Screen) => void; refresh: () => void; children: ReactNode }) {
+  const t = theme(light);
+  const tabs: Array<{ id: Screen; label: string; icon: ReactNode }> = [
+    { id: 'today', label: 'Сегодня', icon: <CalendarClock className="size-4" /> },
+    { id: 'schedule', label: 'График', icon: <Clock3 className="size-4" /> },
+    { id: 'services', label: 'Услуги', icon: <Scissors className="size-4" /> },
+    { id: 'chats', label: 'Чаты', icon: <MessageCircle className="size-4" /> },
+    { id: 'more', label: 'Ещё', icon: <Settings className="size-4" /> },
   ];
 
   return (
-    <main className={cn('min-h-[100svh]', tone.page)} style={{ '--mini-accent': theme.accent } as CSSProperties}>
-      <div className="mx-auto flex min-h-[100svh] w-full max-w-[440px] flex-col px-3 pb-[calc(var(--tg-safe-bottom,0px)+92px)] pt-[calc(var(--tg-safe-top,0px)+10px)]">
-        <header className={cn('sticky top-0 z-30 -mx-3 border-b px-3 pb-2 pt-[calc(var(--tg-safe-top,0px)+8px)] backdrop-blur-[18px]', tone.page, tone.line)}>
-          <div className="flex items-center gap-3">
-            <AvatarMark profile={profile} light={theme.light} />
-            <div className="min-w-0 flex-1">
-              <div className={cn('truncate text-[14px] font-semibold tracking-[-0.055em]', tone.text)}>{profile.name}</div>
-              <div className={cn('mt-0.5 flex items-center gap-1.5 text-[10px] font-medium', tone.muted)}>
-                <span className="size-1.5 rounded-full" style={{ backgroundColor: theme.accent }} />
-                <span className="truncate">@{profile.slug} · mini app</span>
-              </div>
+    <main className={cx('min-h-screen overflow-x-hidden pb-[calc(84px+var(--tg-safe-bottom,0px))] pt-[calc(var(--tg-safe-top,0px)+8px)]', t.page)} style={{ '--mini-accent': accent } as CSSProperties}>
+      <div className="mx-auto flex w-full max-w-[460px] flex-col gap-3 px-3">
+        <header className="sticky top-0 z-20 -mx-3 bg-inherit px-3 pb-2 pt-[calc(var(--tg-safe-top,0px)+8px)]">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <Logo light={light} />
+              <div className={cx('mt-1 truncate text-[10px] font-semibold', t.muted)}>{profile.name || 'Мастер'} · {profile.profession || 'Mini app'}</div>
             </div>
-            <button type="button" onClick={onRefresh} className={cn('flex size-9 items-center justify-center rounded-[9px] border transition active:scale-[0.985]', tone.ghost)}>
-              <RefreshCcw className="size-4" />
-            </button>
+            <button type="button" onClick={refresh} className={cx('grid size-9 place-items-center rounded-[10px] border', t.ghost)}><RefreshCcw className="size-4" /></button>
           </div>
         </header>
-
-        <div className="flex-1 py-3">{children}</div>
+        {children}
       </div>
-
-      <nav className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(var(--tg-safe-bottom,0px)+10px)]">
-        <div className={cn('mx-auto grid h-[64px] max-w-[440px] grid-cols-5 gap-1 rounded-[16px] border p-1 shadow-[0_18px_70px_rgba(0,0,0,0.18)] backdrop-blur-[22px]', theme.light ? 'border-black/[0.08] bg-[#fbfbfa]/88' : 'border-white/[0.10] bg-[#101010]/88')}>
-          {nav.map((item) => {
-            const active = item.id === 'hub' ? moreActive : screen === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setScreen(item.id)}
-                className={cn(
-                  'flex min-h-0 flex-col items-center justify-center gap-1 rounded-[12px] text-[9.5px] font-bold tracking-[-0.04em] transition active:scale-[0.97]',
-                  active ? (theme.light ? 'bg-black/[0.045] text-black' : 'bg-white/[0.075] text-white') : tone.faint,
-                )}
-              >
-                <span style={active ? { color: theme.accent } : undefined}>{item.icon}</span>
-                <span>{item.label}</span>
-              </button>
-            );
+      <nav className={cx('fixed inset-x-0 bottom-0 z-40 border-t px-3 pb-[calc(var(--tg-safe-bottom,0px)+8px)] pt-2 backdrop-blur-[20px]', light ? 'border-black/[0.08] bg-[#f4f4f2]/92' : 'border-white/[0.08] bg-[#090909]/92')}>
+        <div className="mx-auto grid max-w-[460px] grid-cols-5 gap-1">
+          {tabs.map((tab) => {
+            const active = screen === tab.id || (tab.id === 'more' && ['clients', 'analytics', 'profile'].includes(screen));
+            return <button key={tab.id} type="button" onClick={() => setScreen(tab.id)} className={cx('flex h-12 flex-col items-center justify-center gap-1 rounded-[11px] text-[10px] font-bold transition active:scale-[0.98]', active ? (light ? 'bg-black text-white' : 'bg-white text-black') : t.muted)}>{tab.icon}{tab.label}</button>;
           })}
         </div>
       </nav>
@@ -661,1184 +505,334 @@ function MiniShell({
   );
 }
 
-function BookingRow({ booking, onOpen, services, theme }: { booking: Booking; onOpen: (booking: Booking) => void; services: ServiceInsight[]; theme: ThemeTone }) {
-  const tone = toneClasses(theme.light);
-  return (
-    <button type="button" onClick={() => onOpen(booking)} className={cn('flex w-full items-center gap-3 rounded-[10px] border p-2.5 text-left transition active:scale-[0.99]', tone.panel)}>
-      <div className={cn('flex w-[58px] shrink-0 flex-col items-center rounded-[9px] border py-2', tone.panel)}>
-        <div className={cn('text-[15px] font-semibold leading-none tracking-[-0.06em]', tone.text)}>{formatTime(booking.time)}</div>
-        <div className={cn('mt-1 text-[9px] font-bold uppercase tracking-[0.12em]', tone.faint)}>{formatDateHuman(booking.date).split(',')[0]}</div>
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className={cn('truncate text-[14px] font-semibold tracking-[-0.045em]', tone.text)}>{booking.clientName}</div>
-            <div className={cn('mt-1 truncate text-[11px]', tone.muted)}>{booking.service}</div>
-          </div>
-          <StatusPill status={booking.status} theme={theme} />
-        </div>
-        <div className={cn('mt-2 flex items-center justify-between gap-2 text-[10px] font-semibold tracking-[-0.02em]', tone.faint)}>
-          <span className="truncate">{booking.source || booking.channel || 'Клиент'}</span>
-          <span>{getBookingAmount(booking, services) > 0 ? RUB.format(getBookingAmount(booking, services)) : '—'}</span>
-        </div>
-      </div>
-      <ChevronRight className={cn('size-4 shrink-0', tone.faint)} />
-    </button>
-  );
+function LoadingScreen() {
+  return <main className="flex min-h-screen items-center justify-center bg-[#090909] px-6 text-white"><div className="w-full max-w-[340px] rounded-[18px] border border-white/[0.10] bg-[#101010] p-5 text-center"><Logo light={false} /><div className="mt-5 text-[24px] font-semibold tracking-[-0.08em]">Загружаю mini app</div><div className="mt-2 text-[12px] leading-5 text-white/45">Профиль, записи, услуги, график и чаты.</div><div className="mt-5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]"><div className="h-full w-1/2 animate-pulse rounded-full bg-white/70" /></div></div></main>;
 }
 
-function DayStrip({ selectedDate, onSelect, theme }: { selectedDate: string; onSelect: (date: string) => void; theme: ThemeTone }) {
-  const today = todayIso();
-  const tone = toneClasses(theme.light);
-  const days = Array.from({ length: 7 }, (_, index) => addDaysIso(today, index));
-  return (
-    <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      {days.map((date) => {
-        const active = date === selectedDate;
-        const parsed = new Date(`${date}T12:00:00`);
-        return (
-          <button
-            key={date}
-            type="button"
-            onClick={() => onSelect(date)}
-            style={active ? accentStyle(theme.accent, theme.light, 20) : undefined}
-            className={cn('min-w-[58px] rounded-[10px] border px-2 py-2 text-center transition active:scale-[0.98]', active ? '' : tone.panel)}
-          >
-            <div className="text-[10px] font-bold uppercase tracking-[0.08em] opacity-60">{parsed.toLocaleDateString('ru-RU', { weekday: 'short' }).replace('.', '')}</div>
-            <div className="mt-1 text-[17px] font-semibold leading-none tracking-[-0.07em]">{parsed.getDate()}</div>
-          </button>
-        );
+function TodayScreen({ light, profile, bookings, services, week, setScreen, openBooking, openQuick, publicUrl }: { light: boolean; profile: Profile; bookings: Booking[]; services: Service[]; week: WorkDay[]; setScreen: (value: Screen) => void; openBooking: (booking: Booking) => void; openQuick: () => void; publicUrl: string }) {
+  const t = theme(light);
+  const [date, setDate] = useState(today());
+  const days = useMemo(() => Array.from({ length: 7 }, (_, index) => addDays(today(), index)), []);
+  const dayBookings = bookings.filter((booking) => booking.date === date).sort((a, b) => a.time.localeCompare(b.time));
+  const active = dayBookings.filter((booking) => booking.status !== 'cancelled' && booking.status !== 'no_show');
+  const completed = dayBookings.filter((booking) => booking.status === 'completed');
+  const revenue = completed.reduce((sum, booking) => sum + (booking.priceAmount || services.find((service) => service.name === booking.service)?.price || 0), 0);
+  const ready = [len(services) > 0, week.some((day) => day.status !== 'day-off'), Boolean(profile.phone || profile.telegram || profile.whatsapp)];
+
+  return <>
+    <Card light={light} className="overflow-hidden p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div><Micro>Рабочий пульт</Micro><div className="mt-2 text-[32px] font-semibold leading-[0.9] tracking-[-0.095em]">Сегодня</div><div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Записи, касса, быстрые действия и готовность профиля.</div></div>
+        <div className={cx('rounded-full border px-2.5 py-1 text-[10px] font-bold', t.ghost)}>{ready.filter(Boolean).length}/3</div>
+      </div>
+      <div className="mt-4 grid grid-cols-3 gap-2"><Stat light={light} label="Записей" value={String(len(active))} /><Stat light={light} label="Пришли" value={String(len(completed))} /><Stat light={light} label="Касса" value={rub(revenue)} /></div>
+      <div className="mt-3 grid grid-cols-2 gap-2"><Button light={light} primary onClick={openQuick}><Plus className="size-4" />Запись</Button><Button light={light} onClick={() => navigator.clipboard?.writeText(publicUrl).catch(() => null)}><Copy className="size-4" />Ссылка</Button></div>
+    </Card>
+
+    <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {days.map((day) => {
+        const isActive = day === date;
+        const count = bookings.filter((booking) => booking.date === day).length;
+        return <button key={day} type="button" onClick={() => setDate(day)} className={cx('min-w-[78px] rounded-[12px] border p-2 text-left transition', isActive ? (light ? 'border-black bg-black text-white' : 'border-white bg-white text-black') : t.ghost)}><div className="text-[11px] font-bold capitalize">{dateLabel(day)}</div><div className="mt-1 text-[10px] opacity-55">{count} записей</div></button>;
       })}
     </div>
-  );
-}
 
-function WorkdayScreen({
-  profile,
-  bookings,
-  dataset,
-  onOpenBooking,
-  onQuickBooking,
-  setScreen,
-  getPublicPath,
-  theme,
-}: {
-  profile: MasterProfile;
-  bookings: Booking[];
-  dataset: WorkspaceDataset;
-  onOpenBooking: (booking: Booking) => void;
-  onQuickBooking: () => void;
-  setScreen: (screen: MiniScreen) => void;
-  getPublicPath: (slug: string) => string;
-  theme: ThemeTone;
-}) {
-  const tone = toneClasses(theme.light);
-  const [selectedDate, setSelectedDate] = useState(todayIso());
-  const today = todayIso();
-  const selectedBookings = bookings.filter((booking) => booking.date === selectedDate).sort(sortByDateTime);
-  const activeSelected = selectedBookings.filter((booking) => activeStatus(booking.status));
-  const completedSelected = selectedBookings.filter((booking) => booking.status === 'completed');
-  const noShowSelected = selectedBookings.filter((booking) => booking.status === 'no_show');
-  const revenueSelected = completedSelected.reduce((sum, booking) => sum + getBookingAmount(booking, dataset.services), 0);
-  const upcoming = bookings
-    .filter((booking) => `${booking.date} ${booking.time}` >= `${today} 00:00` && booking.status !== 'cancelled')
-    .sort(sortByDateTime);
-  const nextBooking = upcoming[0];
-  const setupItems = getSetupItems(profile, dataset);
-  const readyCount = setupItems.filter((item) => item.ready).length;
-  const health = Math.round((readyCount / setupItems.length) * 100);
-  const todayConfirmed = selectedBookings.filter((booking) => booking.status === 'confirmed' || booking.status === 'new').length;
+    <Card light={light} className="p-3">
+      <div className="mb-3 flex items-center justify-between"><div><Micro>Лента дня</Micro><div className="mt-1 text-[15px] font-bold tracking-[-0.04em]">{dateLabel(date, true)}</div></div><Button light={light} className="h-8 px-2" onClick={openQuick}><Plus className="size-3.5" /></Button></div>
+      <div className="space-y-2">{len(dayBookings) === 0 ? <Empty light={light} title="Записей нет" text="Добавь запись вручную или отправь клиенту ссылку." /> : dayBookings.map((booking) => <BookingRow key={booking.id} light={light} booking={booking} onClick={() => openBooking(booking)} />)}</div>
+    </Card>
 
-  async function copyPublicLink() {
-    const origin = typeof window === 'undefined' ? '' : window.location.origin;
-    await copyText(`${origin}${getPublicPath(profile.slug)}`);
-  }
-
-  return (
-    <div className="space-y-3">
-      <MiniCard light={theme.light} className="overflow-hidden">
-        <div className={cn('border-b px-4 py-3', tone.line)}>
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <MiniLabel light={theme.light}>мобильный пульт</MiniLabel>
-              <div className={cn('mt-2 text-[31px] font-semibold leading-[0.94] tracking-[-0.1em]', tone.text)}>Сегодня</div>
-              <div className={cn('mt-2 max-w-[250px] text-[12px] leading-5', tone.muted)}>Самое важное на одном экране: запись, клиент, статус, деньги и быстрые действия.</div>
-            </div>
-            <div className="flex shrink-0 flex-col gap-1.5">
-              <button type="button" onClick={copyPublicLink} className={cn('flex h-8 items-center justify-center gap-1.5 rounded-[9px] border px-2.5 text-[10px] font-bold', tone.ghost)}>
-                <Copy className="size-3.5" /> ссылка
-              </button>
-              <button type="button" onClick={onQuickBooking} className={cn('flex h-8 items-center justify-center gap-1.5 rounded-[9px] border px-2.5 text-[10px] font-bold')} style={accentStyle(theme.accent, theme.light, 22)}>
-                <Plus className="size-3.5" /> запись
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-3">
-          <DayStrip selectedDate={selectedDate} onSelect={setSelectedDate} theme={theme} />
-        </div>
-      </MiniCard>
-
-      <MiniCard light={theme.light} className="p-3">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <MiniLabel light={theme.light}>готовность к записи</MiniLabel>
-            <div className={cn('mt-2 text-[22px] font-semibold leading-none tracking-[-0.085em]', tone.text)}>{health}%</div>
-          </div>
-          <div className="flex gap-1.5">
-            {setupItems.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setScreen(item.screen)}
-                className={cn('rounded-[9px] border px-2.5 py-2 text-left transition active:scale-[0.98]', item.ready ? tone.panel : tone.ghost)}
-              >
-                <div className="flex items-center gap-1.5">
-                  <span className="size-1.5 rounded-full" style={{ backgroundColor: item.ready ? theme.accent : (theme.light ? 'rgba(0,0,0,.22)' : 'rgba(255,255,255,.22)') }} />
-                  <span className={cn('text-[10px] font-bold tracking-[-0.02em]', tone.text)}>{item.label}</span>
-                </div>
-                <div className={cn('mt-1 max-w-[72px] truncate text-[9px]', tone.faint)}>{item.text}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-      </MiniCard>
-
-      {nextBooking ? (
-        <MiniCard light={theme.light} className="p-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <MiniLabel light={theme.light}>следующая запись</MiniLabel>
-              <div className={cn('mt-2 flex items-baseline gap-2', tone.text)}>
-                <span className="text-[30px] font-semibold leading-none tracking-[-0.095em]">{formatTime(nextBooking.time)}</span>
-                <span className={cn('truncate text-[12px] font-medium', tone.muted)}>{formatDateHuman(nextBooking.date)}</span>
-              </div>
-              <div className={cn('mt-2 truncate text-[15px] font-semibold tracking-[-0.055em]', tone.text)}>{nextBooking.clientName}</div>
-              <div className={cn('mt-1 truncate text-[12px]', tone.muted)}>{nextBooking.service}</div>
-            </div>
-            <MiniButton theme={theme} variant="primary" onClick={() => onOpenBooking(nextBooking)} className="shrink-0">
-              Открыть
-            </MiniButton>
-          </div>
-        </MiniCard>
-      ) : (
-        <EmptyBlock theme={theme} title="Ближайших записей нет" text="Добавь запись вручную или проверь график — клиент сможет выбрать свободное окно на публичной странице." icon={<CalendarClock className="size-5" />} />
-      )}
-
-      <div className="grid grid-cols-4 gap-2">
-        <StatBox theme={theme} label="Активные" value={activeSelected.length} hint={formatDateHuman(selectedDate)} />
-        <StatBox theme={theme} label="Ждут" value={todayConfirmed} />
-        <StatBox theme={theme} label="Пришли" value={completedSelected.length} />
-        <StatBox theme={theme} label="No-show" value={noShowSelected.length} />
+    <Card light={light} className="p-3">
+      <Micro>Готовность</Micro>
+      <div className="mt-3 space-y-2">
+        <ReadyRow light={light} done={ready[0]} title="Услуги" text={len(services) > 0 ? `${len(services)} услуг в каталоге` : 'Добавь услуги и цены'} onClick={() => setScreen('services')} />
+        <ReadyRow light={light} done={ready[1]} title="График" text="Рабочие дни и перерывы" onClick={() => setScreen('schedule')} />
+        <ReadyRow light={light} done={ready[2]} title="Контакты" text="Телефон, Telegram или WhatsApp" onClick={() => setScreen('profile')} />
       </div>
-
-      <MiniCard light={theme.light} className="p-3">
-        <div className="grid grid-cols-[1.15fr_0.85fr] gap-2">
-          <MiniPanel light={theme.light} className="p-3">
-            <MiniLabel light={theme.light}>касса дня</MiniLabel>
-            <div className={cn('mt-2 text-[24px] font-semibold leading-none tracking-[-0.085em]', tone.text)}>{RUB.format(revenueSelected)}</div>
-            <div className={cn('mt-2 text-[11px] leading-4', tone.muted)}>Считается по завершённым записям выбранного дня.</div>
-          </MiniPanel>
-          <div className="grid gap-2">
-            <button type="button" onClick={() => setScreen('calendar')} className={cn('rounded-[10px] border p-3 text-left transition active:scale-[0.98]', tone.panel)}>
-              <Clock3 className={cn('size-4', tone.muted)} />
-              <div className={cn('mt-2 text-[12px] font-semibold tracking-[-0.045em]', tone.text)}>Слоты</div>
-            </button>
-            <button type="button" onClick={() => setScreen('dialogs')} className={cn('rounded-[10px] border p-3 text-left transition active:scale-[0.98]', tone.panel)}>
-              <MessageCircle className={cn('size-4', tone.muted)} />
-              <div className={cn('mt-2 text-[12px] font-semibold tracking-[-0.045em]', tone.text)}>Ответы</div>
-            </button>
-          </div>
-        </div>
-      </MiniCard>
-
-      <section className="space-y-2">
-        <div className="flex items-center justify-between px-1">
-          <MiniLabel light={theme.light}>{selectedDate === today ? 'лента сегодня' : formatDateHuman(selectedDate)}</MiniLabel>
-          <div className={cn('text-[10px] font-semibold', tone.faint)}>{selectedBookings.length} записей</div>
-        </div>
-        {selectedBookings.length > 0 ? (
-          <div className="space-y-2">
-            {selectedBookings.map((booking) => (
-              <BookingRow key={booking.id} booking={booking} services={dataset.services} onOpen={onOpenBooking} theme={theme} />
-            ))}
-          </div>
-        ) : (
-          <MiniCard light={theme.light} className="p-4">
-            <div className="flex items-center gap-3">
-              <div className={cn('flex size-10 items-center justify-center rounded-[10px] border', tone.panel, tone.muted)}><Bell className="size-4" /></div>
-              <div>
-                <div className={cn('text-[14px] font-semibold tracking-[-0.05em]', tone.text)}>На этот день пусто</div>
-                <div className={cn('mt-1 text-[11px] leading-4', tone.muted)}>Новые записи появятся здесь автоматически, ручную можно добавить кнопкой сверху.</div>
-              </div>
-            </div>
-          </MiniCard>
-        )}
-      </section>
-    </div>
-  );
+    </Card>
+  </>;
 }
 
-function CalendarScreen({ availability, updateWorkspaceSection, theme }: { availability: AvailabilityDayInsight[]; updateWorkspaceSection: UpdateWorkspaceSection; theme: ThemeTone }) {
-  const tone = toneClasses(theme.light);
-  const [days, setDays] = useState(() => normalizeWeekAvailability(availability));
-  const [activeId, setActiveId] = useState('mon');
+function BookingRow({ light, booking, onClick }: { light: boolean; booking: Booking; onClick: () => void }) {
+  const t = theme(light);
+  return <button type="button" onClick={onClick} className={cx('flex w-full items-center gap-3 rounded-[12px] border p-3 text-left', t.panel)}><div className="w-[56px] shrink-0"><div className="text-[18px] font-semibold tracking-[-0.07em]">{timeLabel(booking.time)}</div><div className={cx('mt-1 flex items-center gap-1 text-[10px] font-bold', t.muted)}><span className="size-1.5 rounded-full" style={{ backgroundColor: STATUS_DOT[booking.status] }} />{STATUS_LABEL[booking.status]}</div></div><div className="min-w-0 flex-1"><div className="truncate text-[13px] font-bold tracking-[-0.03em]">{booking.clientName}</div><div className={cx('mt-1 truncate text-[11px]', t.muted)}>{booking.service}</div></div><ChevronRight className={cx('size-4 shrink-0', t.muted)} /></button>;
+}
+
+function ReadyRow({ light, done, title, text: body, onClick }: { light: boolean; done: boolean; title: string; text: string; onClick: () => void }) {
+  const t = theme(light);
+  return <button type="button" onClick={onClick} className={cx('flex w-full items-center gap-3 rounded-[11px] border p-3 text-left', t.panel)}><span className={cx('grid size-8 shrink-0 place-items-center rounded-[9px]', done ? (light ? 'bg-emerald-50 text-emerald-700' : 'bg-emerald-400/10 text-emerald-200') : t.ghost)}>{done ? <Check className="size-4" /> : <ChevronRight className="size-4" />}</span><span className="min-w-0"><span className="block text-[13px] font-bold tracking-[-0.03em]">{title}</span><span className={cx('mt-0.5 block text-[11px]', t.muted)}>{body}</span></span></button>;
+}
+
+function ScheduleScreen({ light, workspaceId, days, setDays, reload }: { light: boolean; workspaceId: string; days: WorkDay[]; setDays: (days: WorkDay[]) => void; reload: () => Promise<void> }) {
+  const t = theme(light);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    setDays(normalizeWeekAvailability(availability));
-  }, [availability]);
-
-  const activeDay = days.find((day) => day.id === activeId) ?? days[0];
-
-  function patchDay(id: string, patch: Partial<WeekdayEditor>) {
-    setDays((current) => current.map((day) => (day.id === id ? { ...day, ...patch } : day)));
-    setSaved(false);
-  }
-
-  async function save() {
+  const update = (dayId: string, patch: Partial<WorkDay>) => setDays(days.map((day) => day.id === dayId ? { ...day, ...patch } : day));
+  const preset = (mode: '5/2' | '7/0') => setDays(DEFAULT_WEEK.map((day) => ({ ...day, status: mode === '7/0' || day.weekdayIndex < 5 ? 'workday' : 'day-off' })));
+  const save = async () => {
     setSaving(true);
-    const ok = await updateWorkspaceSection('availability', serializeWeekAvailability(days));
+    await fetch('/api/workspace/section', { method: 'PATCH', credentials: 'include', cache: 'no-store', headers: apiHeaders(true), body: JSON.stringify({ workspaceId, section: 'availability', value: days }) }).catch(() => null);
+    await reload();
     setSaving(false);
-    setSaved(ok);
-  }
+  };
 
-  function applyWeekPreset() {
-    setDays((current) => current.map((day) => (day.weekdayIndex <= 4 ? { ...day, status: 'workday', start: '10:00', end: '20:00', breakStart: '14:00', breakEnd: '15:00' } : { ...day, status: 'day-off' })));
-    setSaved(false);
-  }
-
-  return (
-    <div className="space-y-3">
-      <MiniCard light={theme.light} className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <MiniLabel light={theme.light}>график</MiniLabel>
-            <div className={cn('mt-2 text-[28px] font-semibold leading-none tracking-[-0.085em]', tone.text)}>Рабочая неделя</div>
-            <div className={cn('mt-2 text-[12px] leading-5', tone.muted)}>Один день — одно рабочее окно. Перерыв не отдаётся клиентам как свободный слот.</div>
-          </div>
-          <div className="flex shrink-0 flex-col gap-1.5">
-            <MiniButton theme={theme} variant="secondary" onClick={applyWeekPreset} className="h-8 px-2.5 text-[10px]">5/2</MiniButton>
-            <MiniButton theme={theme} variant="secondary" onClick={() => { setDays((current) => current.map((day) => ({ ...day, status: day.weekdayIndex === 6 ? 'short' : 'workday', start: day.weekdayIndex === 6 ? '11:00' : '10:00', end: day.weekdayIndex === 6 ? '16:00' : '20:00', breakStart: day.weekdayIndex === 6 ? '' : '14:00', breakEnd: day.weekdayIndex === 6 ? '' : '15:00' }))); setSaved(false); }} className="h-8 px-2.5 text-[10px]">7 дней</MiniButton>
-          </div>
-        </div>
-      </MiniCard>
-
-      <MiniCard light={theme.light} className="p-3">
-        <div className="grid grid-cols-7 gap-1.5">
-          {days.map((day) => {
-            const active = day.id === activeId;
-            return (
-              <button
-                key={day.id}
-                type="button"
-                onClick={() => setActiveId(day.id)}
-                style={active ? accentStyle(theme.accent, theme.light, 18) : undefined}
-                className={cn('rounded-[9px] border px-1 py-2 text-center transition active:scale-[0.98]', active ? '' : tone.panel)}
-              >
-                <div className="text-[10px] font-bold">{day.short}</div>
-                <div className="mt-1 flex justify-center"><span className="size-1.5 rounded-full" style={{ backgroundColor: day.status === 'day-off' ? (theme.light ? 'rgba(0,0,0,.22)' : 'rgba(255,255,255,.22)') : theme.accent }} /></div>
-              </button>
-            );
-          })}
-        </div>
-      </MiniCard>
-
-      <MiniCard light={theme.light} className="overflow-hidden">
-        <div className={cn('border-b px-4 py-3', tone.line)}>
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className={cn('text-[18px] font-semibold tracking-[-0.07em]', tone.text)}>{activeDay.label}</div>
-              <div className={cn('mt-1 text-[11px]', tone.muted)}>{activeDay.status === 'day-off' ? 'выходной' : `${activeDay.start}–${activeDay.end}`}</div>
-            </div>
-            <div className="flex gap-1.5">
-              {(['workday', 'short', 'day-off'] as const).map((status) => (
-                <button
-                  key={status}
-                  type="button"
-                  onClick={() => patchDay(activeDay.id, { status })}
-                  style={activeDay.status === status ? accentStyle(theme.accent, theme.light, 18) : undefined}
-                  className={cn('h-8 rounded-[9px] border px-2 text-[10px] font-bold', activeDay.status === status ? '' : tone.ghost)}
-                >
-                  {status === 'workday' ? 'день' : status === 'short' ? 'коротко' : 'выход'}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-3 p-4">
-          <div className="grid grid-cols-2 gap-2">
-            <label className="space-y-1.5">
-              <span className={cn('text-[10px] font-bold uppercase tracking-[0.14em]', tone.faint)}>начало</span>
-              <MiniInput light={theme.light} type="time" value={activeDay.start} onChange={(event) => patchDay(activeDay.id, { start: event.target.value })} disabled={activeDay.status === 'day-off'} />
-            </label>
-            <label className="space-y-1.5">
-              <span className={cn('text-[10px] font-bold uppercase tracking-[0.14em]', tone.faint)}>конец</span>
-              <MiniInput light={theme.light} type="time" value={activeDay.end} onChange={(event) => patchDay(activeDay.id, { end: event.target.value })} disabled={activeDay.status === 'day-off'} />
-            </label>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="space-y-1.5">
-              <span className={cn('text-[10px] font-bold uppercase tracking-[0.14em]', tone.faint)}>перерыв с</span>
-              <MiniInput light={theme.light} type="time" value={activeDay.breakStart} onChange={(event) => patchDay(activeDay.id, { breakStart: event.target.value })} disabled={activeDay.status === 'day-off'} />
-            </label>
-            <label className="space-y-1.5">
-              <span className={cn('text-[10px] font-bold uppercase tracking-[0.14em]', tone.faint)}>до</span>
-              <MiniInput light={theme.light} type="time" value={activeDay.breakEnd} onChange={(event) => patchDay(activeDay.id, { breakEnd: event.target.value })} disabled={activeDay.status === 'day-off'} />
-            </label>
-          </div>
-
-          <MiniPanel light={theme.light} className="p-3">
-            <div className={cn('text-[11px] leading-5', tone.muted)}>
-              Клиент увидит рабочее окно <b className={tone.text}>{activeDay.status === 'day-off' ? 'закрыто' : `${activeDay.start}–${activeDay.end}`}</b>{activeDay.breakStart && activeDay.breakEnd ? <> без перерыва <b className={tone.text}>{activeDay.breakStart}–{activeDay.breakEnd}</b></> : null}.
-            </div>
-          </MiniPanel>
-
-          <MiniButton theme={theme} variant="primary" onClick={() => void save()} disabled={saving} className="w-full">
-            <Save className="size-4" /> {saved ? 'Сохранено' : saving ? 'Сохраняю' : 'Сохранить график'}
-          </MiniButton>
-        </div>
-      </MiniCard>
-    </div>
-  );
+  return <><Card light={light} className="p-4"><Micro>График</Micro><div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.09em]">Рабочие окна</div><div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Дни, время и перерывы для записи клиентов.</div><div className="mt-4 grid grid-cols-3 gap-2"><Button light={light} onClick={() => preset('5/2')}>5/2</Button><Button light={light} onClick={() => preset('7/0')}>7 дней</Button><Button light={light} primary disabled={saving} onClick={() => void save()}><Save className="size-4" />{saving ? '...' : 'Сохранить'}</Button></div></Card><div className="space-y-2">{days.map((day) => <Card light={light} key={day.id} className="p-3"><div className="flex items-center justify-between gap-3"><div><div className="text-[15px] font-bold tracking-[-0.04em]">{day.label}</div><div className={cx('mt-1 text-[11px]', t.muted)}>{day.status === 'day-off' ? 'Выходной' : `${day.start}–${day.end}${day.breakStart ? ` · перерыв ${day.breakStart}–${day.breakEnd}` : ''}`}</div></div><select value={day.status} onChange={(event) => update(day.id, { status: event.target.value as DayStatus })} className={cx('h-9 rounded-[10px] border px-2 text-[11px] font-bold outline-none', t.input)}><option value="workday">Рабочий</option><option value="short">Короткий</option><option value="day-off">Выходной</option></select></div>{day.status !== 'day-off' ? <div className="mt-3 grid grid-cols-4 gap-2"><Field light={light} type="time" value={day.start} onChange={(event) => update(day.id, { start: event.target.value })} /><Field light={light} type="time" value={day.end} onChange={(event) => update(day.id, { end: event.target.value })} /><Field light={light} type="time" value={day.breakStart} onChange={(event) => update(day.id, { breakStart: event.target.value })} /><Field light={light} type="time" value={day.breakEnd} onChange={(event) => update(day.id, { breakEnd: event.target.value })} /></div> : null}</Card>)}</div></>;
 }
 
-function normalizeEditableServices(profile: MasterProfile, services: ServiceInsight[]): EditableService[] {
-  if (services.length > 0) {
-    return services.map((service, index) => ({
-      id: service.id || `service-${index}`,
-      name: service.name,
-      duration: service.duration || 60,
-      price: service.price || 0,
-      category: service.category || 'Основное',
-      status: service.status || 'active',
-      visible: service.visible !== false,
-    }));
-  }
-
-  return profile.services.map((name, index) => ({
-    id: `profile-service-${index}`,
-    name,
-    duration: 60,
-    price: 0,
-    category: 'Основное',
-    status: 'active',
-    visible: true,
-  }));
-}
-
-function CatalogScreen({
-  profile,
-  services,
-  onSaveProfile,
-  updateWorkspaceSection,
-  theme,
-}: {
-  profile: MasterProfile;
-  services: ServiceInsight[];
-  onSaveProfile: SaveProfile;
-  updateWorkspaceSection: UpdateWorkspaceSection;
-  theme: ThemeTone;
-}) {
-  const tone = toneClasses(theme.light);
-  const [items, setItems] = useState(() => normalizeEditableServices(profile, services));
-  const [draft, setDraft] = useState({ name: '', price: '', duration: '60', category: 'Основное' });
+function ServicesScreen({ light, profile, workspaceId, services, setServices, reload }: { light: boolean; profile: Profile; workspaceId: string; services: Service[]; setServices: (services: Service[]) => void; reload: () => Promise<void> }) {
+  const t = theme(light);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    setItems(normalizeEditableServices(profile, services));
-  }, [profile, services]);
-
-  function updateItem(id: string, patch: Partial<EditableService>) {
-    setItems((current) => current.map((item) => (item.id === id ? { ...item, ...patch } : item)));
-    setSaved(false);
-  }
-
-  function addService() {
-    const name = draft.name.trim();
-    if (!name) return;
-    setItems((current) => [
-      {
-        id: makeId('service'),
-        name,
-        duration: Math.max(15, asNumber(draft.duration, 60)),
-        price: Math.max(0, asNumber(draft.price, 0)),
-        category: draft.category.trim() || 'Основное',
-        status: 'active',
-        visible: true,
-      },
-      ...current,
-    ]);
-    setDraft({ name: '', price: '', duration: '60', category: 'Основное' });
-    setSaved(false);
-  }
-
-  async function save() {
-    const clean = items
-      .map((item) => ({
-        ...item,
-        name: item.name.trim(),
-        duration: Math.max(15, asNumber(item.duration, 60)),
-        price: Math.max(0, asNumber(item.price, 0)),
-        category: item.category.trim() || 'Основное',
-      }))
-      .filter((item) => item.name);
-
+  const update = (serviceId: string, patch: Partial<Service>) => setServices(services.map((service) => service.id === serviceId ? { ...service, ...patch } : service));
+  const remove = (serviceId: string) => setServices(services.filter((service) => service.id !== serviceId));
+  const add = () => setServices([{ id: id('service'), name: 'Новая услуга', category: 'Основное', duration: 60, price: 0, status: 'active', visible: true }, ...services]);
+  const save = async () => {
     setSaving(true);
-    const ok = await updateWorkspaceSection('services', clean);
-    await onSaveProfile(profileSavePayload(profile, { servicesText: clean.filter((item) => item.visible).map((item) => item.name).join('\n') }));
+    const value = services.filter((service) => text(service.name)).map((service) => ({ ...service, name: text(service.name) }));
+    await fetch('/api/workspace/section', { method: 'PATCH', credentials: 'include', cache: 'no-store', headers: apiHeaders(true), body: JSON.stringify({ workspaceId, section: 'services', value }) }).catch(() => null);
+    await fetch('/api/profile', { method: 'POST', credentials: 'include', cache: 'no-store', headers: apiHeaders(true), body: JSON.stringify({ workspaceId, locale: 'ru', profile: { ...profile, services: value.filter((service) => service.visible && service.status !== 'draft').map((service) => service.name) } }) }).catch(() => null);
+    await reload();
     setSaving(false);
-    setSaved(ok);
-  }
+  };
 
-  return (
-    <div className="space-y-3">
-      <MiniCard light={theme.light} className="p-4">
-        <MiniLabel light={theme.light}>услуги</MiniLabel>
-        <div className={cn('mt-2 text-[28px] font-semibold leading-none tracking-[-0.085em]', tone.text)}>Каталог</div>
-        <div className={cn('mt-2 text-[12px] leading-5', tone.muted)}>Эти услуги сохраняются в общий профиль и подтягиваются на публичную страницу клиента.</div>
-      </MiniCard>
-
-      <div className="grid grid-cols-3 gap-2">
-        <StatBox theme={theme} label="Видно" value={items.filter((item) => item.visible).length} />
-        <StatBox theme={theme} label="Средний чек" value={items.length ? RUB.format(Math.round(items.reduce((sum, item) => sum + item.price, 0) / items.length)) : '—'} />
-        <StatBox theme={theme} label="Категорий" value={new Set(items.map((item) => item.category.trim()).filter(Boolean)).size} />
-      </div>
-
-      <MiniCard light={theme.light} className="p-3">
-        <div className="grid grid-cols-[1fr_92px] gap-2">
-          <MiniInput light={theme.light} value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} placeholder="Название услуги" />
-          <MiniInput light={theme.light} value={draft.price} onChange={(event) => setDraft((current) => ({ ...current, price: event.target.value }))} placeholder="Цена" inputMode="numeric" />
-        </div>
-        <div className="mt-2 grid grid-cols-[1fr_92px] gap-2">
-          <MiniInput light={theme.light} value={draft.category} onChange={(event) => setDraft((current) => ({ ...current, category: event.target.value }))} placeholder="Категория" />
-          <MiniInput light={theme.light} value={draft.duration} onChange={(event) => setDraft((current) => ({ ...current, duration: event.target.value }))} placeholder="Мин" inputMode="numeric" />
-        </div>
-        <MiniButton theme={theme} variant="primary" onClick={addService} disabled={!draft.name.trim()} className="mt-2 w-full">
-          <Plus className="size-4" /> Добавить услугу
-        </MiniButton>
-      </MiniCard>
-
-      <div className="space-y-2">
-        {items.length === 0 ? (
-          <EmptyBlock theme={theme} title="Каталог пустой" text="Добавь первую услугу, чтобы клиент понимал цену, длительность и мог записаться." icon={<Scissors className="size-5" />} />
-        ) : (
-          items.map((item) => (
-            <MiniCard key={item.id} light={theme.light} className="p-3">
-              <div className="flex items-start gap-2">
-                <div className="min-w-0 flex-1 space-y-2">
-                  <MiniInput light={theme.light} value={item.name} onChange={(event) => updateItem(item.id, { name: event.target.value })} />
-                  <div className="grid grid-cols-[1fr_82px_82px] gap-2">
-                    <MiniInput light={theme.light} value={item.category} onChange={(event) => updateItem(item.id, { category: event.target.value })} />
-                    <MiniInput light={theme.light} value={String(item.duration)} onChange={(event) => updateItem(item.id, { duration: asNumber(event.target.value, 60) })} inputMode="numeric" />
-                    <MiniInput light={theme.light} value={String(item.price)} onChange={(event) => updateItem(item.id, { price: asNumber(event.target.value, 0) })} inputMode="numeric" />
-                  </div>
-                </div>
-                <button type="button" onClick={() => setItems((current) => current.filter((service) => service.id !== item.id))} className={cn('flex size-10 shrink-0 items-center justify-center rounded-[9px] border', tone.ghost)}>
-                  <Trash2 className="size-4" />
-                </button>
-              </div>
-              <div className="mt-2 flex items-center justify-between gap-2">
-                <button type="button" onClick={() => updateItem(item.id, { visible: !item.visible })} className={cn('h-8 rounded-[9px] border px-2.5 text-[10px] font-bold', tone.ghost)}>
-                  {item.visible ? 'видно клиенту' : 'скрыто'}
-                </button>
-                <div className={cn('text-[11px] font-semibold', tone.muted)}>{item.duration} мин · {item.price ? RUB.format(item.price) : 'цена не указана'}</div>
-              </div>
-            </MiniCard>
-          ))
-        )}
-      </div>
-
-      <MiniButton theme={theme} variant="primary" onClick={() => void save()} disabled={saving} className="w-full">
-        <Save className="size-4" /> {saved ? 'Сохранено' : saving ? 'Сохраняю' : 'Сохранить каталог'}
-      </MiniButton>
-    </div>
-  );
+  return <><Card light={light} className="p-4"><Micro>Услуги</Micro><div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.09em]">Каталог</div><div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Цены, длительность и видимость для клиентов.</div><div className="mt-4 grid grid-cols-2 gap-2"><Button light={light} onClick={add}><Plus className="size-4" />Добавить</Button><Button light={light} primary disabled={saving} onClick={() => void save()}><Save className="size-4" />{saving ? '...' : 'Сохранить'}</Button></div></Card><div className="space-y-2">{len(services) === 0 ? <Empty light={light} title="Услуг нет" text="Добавь первую услугу, чтобы клиенты могли записываться." /> : services.map((service) => <Card light={light} key={service.id} className="p-3"><div className="flex items-start gap-2"><div className="min-w-0 flex-1 space-y-2"><Field light={light} value={service.name} onChange={(event) => update(service.id, { name: event.target.value })} placeholder="Название" /><div className="grid grid-cols-2 gap-2"><Field light={light} value={service.category} onChange={(event) => update(service.id, { category: event.target.value })} placeholder="Категория" /><Field light={light} type="number" value={service.price} onChange={(event) => update(service.id, { price: Number(event.target.value) })} placeholder="Цена" /></div><div className="grid grid-cols-2 gap-2"><Field light={light} type="number" value={service.duration} onChange={(event) => update(service.id, { duration: Number(event.target.value) })} placeholder="Минут" /><select value={service.status} onChange={(event) => update(service.id, { status: event.target.value as ServiceStatus })} className={cx('h-10 rounded-[10px] border px-3 text-[12px] font-bold outline-none', t.input)}><option value="active">Активна</option><option value="seasonal">Сезонная</option><option value="draft">Черновик</option></select></div><label className={cx('flex items-center gap-2 text-[11px] font-bold', t.muted)}><input type="checkbox" checked={service.visible} onChange={(event) => update(service.id, { visible: event.target.checked })} />Показывать клиентам</label></div><button type="button" onClick={() => remove(service.id)} className={cx('grid size-10 shrink-0 place-items-center rounded-[10px] border', t.ghost)}><Trash2 className="size-4" /></button></div></Card>)}</div></>;
 }
 
-function DialogsScreen({ theme }: { theme: ThemeTone }) {
-  const tone = toneClasses(theme.light);
-  const [threads, setThreads] = useState<ChatThreadRecord[]>([]);
+function ChatsScreen({ light }: { light: boolean }) {
+  const t = theme(light);
+  const [threads, setThreads] = useState<ChatThread[]>([]);
+  const [activeId, setActiveId] = useState('');
   const [loading, setLoading] = useState(true);
-  const [active, setActive] = useState<ChatThreadRecord | null>(null);
-  const [draft, setDraft] = useState('');
-  const [sending, setSending] = useState(false);
-  const [query, setQuery] = useState('');
-  const quickReplies = [
-    'Здравствуйте! Подтверждаю вашу запись.',
-    'Напомню: если нужно перенести время, напишите заранее.',
-    'Спасибо, сейчас посмотрю свободные окна и вернусь с вариантами.',
+  const [reply, setReply] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const response = await fetch('/api/chats', { credentials: 'include', cache: 'no-store', headers: apiHeaders(false) }).catch(() => null);
+    if (response?.ok) {
+      const payload = await parseJson(response);
+      const nextThreads = list(payload.threads).map((item, index) => {
+        const row = obj(item);
+        const messages = list(row.messages).map((message, messageIndex) => {
+          const msg = obj(message);
+          return { id: text(msg.id, `msg-${index}-${messageIndex}`), author: text(msg.author, 'client'), body: text(msg.body ?? msg.text ?? msg.message), createdAt: text(msg.createdAt ?? msg.created_at) };
+        }).filter((message) => Boolean(message.body));
+        return { id: text(row.id, `thread-${index}`), clientName: text(row.clientName ?? row.client_name ?? row.name, 'Клиент'), clientPhone: text(row.clientPhone ?? row.client_phone ?? row.phone), channel: text(row.channel, 'Web'), unreadCount: moneyNumber(row.unreadCount ?? row.unread_count, 0), messages };
+      });
+      setThreads(nextThreads);
+      if (!activeId && nextThreads[0]) setActiveId(nextThreads[0].id);
+    }
+    setLoading(false);
+  }, [activeId]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const active = threads.find((thread) => thread.id === activeId) ?? threads[0] ?? null;
+  const messages = list<ChatMessage>(active?.messages);
+  const quick = ['Здравствуйте! Подтверждаю запись.', 'Напишите удобное время для переноса.', 'Спасибо, буду ждать вас.'];
+
+  const send = async (body = reply) => {
+    if (!active || !text(body)) return;
+    setReply('');
+    await fetch('/api/chats', { method: 'POST', credentials: 'include', cache: 'no-store', headers: apiHeaders(true), body: JSON.stringify({ threadId: active.id, body: text(body), author: 'master', viaBot: true, clientMessageKey: `${active.id}-${Date.now()}` }) }).catch(() => null);
+    await load();
+  };
+
+  return <><Card light={light} className="p-4"><Micro>Чаты</Micro><div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.09em]">Диалоги</div><div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Сообщения и заявки клиентов.</div></Card>{loading ? <Empty light={light} title="Загружаю чаты" text="Собираю диалоги." /> : len(threads) === 0 ? <Empty light={light} title="Чатов нет" text="Когда клиент напишет или запишется, диалог появится здесь." /> : <><div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{threads.map((thread) => <button key={thread.id} type="button" onClick={() => setActiveId(thread.id)} className={cx('min-w-[150px] rounded-[12px] border p-3 text-left', active?.id === thread.id ? (light ? 'border-black bg-black text-white' : 'border-white bg-white text-black') : t.ghost)}><div className="truncate text-[12px] font-bold">{thread.clientName}</div><div className="mt-1 truncate text-[10px] opacity-55">{thread.channel} · {thread.unreadCount} новых</div></button>)}</div><Card light={light} className="overflow-hidden"><div className={cx('border-b p-3', t.divider)}><div className="text-[15px] font-bold tracking-[-0.04em]">{active?.clientName || 'Клиент'}</div><div className={cx('mt-1 text-[11px]', t.muted)}>{active?.clientPhone || active?.channel || 'Диалог'}</div></div><div className="max-h-[360px] space-y-2 overflow-y-auto p-3">{len(messages) === 0 ? <Empty light={light} title="Сообщений нет" text="Напиши клиенту первым сообщением." /> : messages.map((message) => <div key={message.id} className={cx('max-w-[84%] rounded-[13px] border px-3 py-2 text-[12px] leading-5', message.author === 'master' ? 'ml-auto' : '', message.author === 'master' ? (light ? 'border-black bg-black text-white' : 'border-white bg-white text-black') : t.panel)}>{message.body}</div>)}</div><div className={cx('border-t p-3', t.divider)}><div className="mb-2 flex gap-2 overflow-x-auto">{quick.map((item) => <button key={item} type="button" onClick={() => void send(item)} className={cx('shrink-0 rounded-full border px-3 py-1.5 text-[10px] font-bold', t.ghost)}>{item}</button>)}</div><div className="flex gap-2"><Field light={light} value={reply} onChange={(event) => setReply(event.target.value)} placeholder="Ответ клиенту" onKeyDown={(event) => { if (event.key === 'Enter') void send(); }} /><Button light={light} primary disabled={!text(reply)} onClick={() => void send()}><Send className="size-4" /></Button></div></div></Card></>}</>;
+}
+
+function MoreScreen({ light, profile, clients, bookings, services, publicUrl, setScreen }: { light: boolean; profile: Profile; clients: Client[]; bookings: Booking[]; services: Service[]; publicUrl: string; setScreen: (value: Screen) => void }) {
+  const t = theme(light);
+  const items: Array<{ screen: Screen; title: string; info: string; icon: ReactNode }> = [
+    { screen: 'clients', title: 'Клиенты', info: `${len(clients)} карточек`, icon: <Users2 className="size-4" /> },
+    { screen: 'analytics', title: 'Аналитика', info: `${len(bookings)} заявок`, icon: <BarChart3 className="size-4" /> },
+    { screen: 'profile', title: 'Профиль', info: `/${profile.slug}`, icon: <UserRound className="size-4" /> },
   ];
 
-  const load = useCallback(async (showLoader = true) => {
-    if (showLoader) setLoading(true);
-    try {
-      const response = await fetch('/api/chats', {
-        credentials: 'include',
-        cache: 'no-store',
-        headers: getTelegramAppSessionHeaders(),
-      });
-      if (!response.ok) throw new Error('failed');
-      const payload = (await response.json()) as ChatThreadListResponse;
-      const next = Array.isArray(payload.threads) ? payload.threads : [];
-      setThreads(next);
-      return next;
-    } catch {
-      setThreads([]);
-      return [];
-    } finally {
-      if (showLoader) setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  async function send() {
-    const text = draft.trim();
-    if (!active || !text) return;
-    setSending(true);
-    try {
-      const response = await fetch('/api/chats', {
-        method: 'POST',
-        credentials: 'include',
-        cache: 'no-store',
-        headers: {
-          'Content-Type': 'application/json',
-          ...getTelegramAppSessionHeaders(),
-        },
-        body: JSON.stringify({
-          threadId: active.id,
-          body: text,
-          author: 'master',
-          viaBot: true,
-          clientMessageKey: `${active.id}-${Date.now()}`,
-        }),
-      });
-      if (!response.ok) throw new Error('send_failed');
-      setDraft('');
-      const next = await load(false);
-      setActive((current) => next.find((thread) => thread.id === current?.id) ?? current);
-    } catch {
-      // draft stays in input
-    } finally {
-      setSending(false);
-    }
-  }
-
-  const ordered = useMemo(() => {
-    const search = query.trim().toLowerCase();
-    return [...threads]
-      .filter((thread) => `${thread.clientName} ${thread.clientPhone} ${thread.lastMessagePreview ?? ''}`.toLowerCase().includes(search))
-      .sort((a, b) => new Date(b.lastMessageAt || b.updatedAt).getTime() - new Date(a.lastMessageAt || a.updatedAt).getTime());
-  }, [query, threads]);
-
-  if (loading) {
-    return <EmptyBlock theme={theme} title="Загружаю чаты" text="Проверяю сообщения и заявки из Telegram, VK и публичной страницы." icon={<MessageCircle className="size-5" />} />;
-  }
-
-  return (
-    <div className="space-y-3">
-      <MiniCard light={theme.light} className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <MiniLabel light={theme.light}>чаты</MiniLabel>
-            <div className={cn('mt-2 text-[28px] font-semibold leading-none tracking-[-0.085em]', tone.text)}>Диалоги</div>
-            <div className={cn('mt-2 text-[12px] leading-5', tone.muted)}>Короткая мобильная лента всех клиентов.</div>
-          </div>
-          <MiniButton theme={theme} variant="secondary" className="h-8 px-2.5" onClick={() => void load()}>
-            <RefreshCcw className="size-4" />
-          </MiniButton>
-        </div>
-        <div className="mt-3">
-          <MiniInput light={theme.light} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск по клиенту или сообщению" />
-        </div>
-      </MiniCard>
-
-      {ordered.length === 0 ? (
-        <EmptyBlock theme={theme} title="Чатов пока нет" text="Когда клиент напишет или появится запись, диалог подтянется сюда." icon={<MessageCircle className="size-5" />} />
-      ) : (
-        <div className="space-y-2">
-          {ordered.map((thread) => {
-            const lastMessage = thread.lastMessagePreview || thread.messages?.[thread.messages.length - 1]?.body || 'Диалог открыт';
-            return (
-              <button key={thread.id} type="button" onClick={() => setActive(thread)} className={cn('flex w-full items-center gap-3 rounded-[10px] border p-3 text-left transition active:scale-[0.99]', tone.panel)}>
-                <div className={cn('flex size-10 shrink-0 items-center justify-center rounded-[10px] border text-[11px] font-black tracking-[-0.05em]', tone.panel)}>{getInitials(thread.clientName)}</div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className={cn('truncate text-[14px] font-semibold tracking-[-0.05em]', tone.text)}>{thread.clientName}</div>
-                    <span className={cn('rounded-[8px] border px-2 py-1 text-[9px] font-bold', tone.panel, tone.faint)}>{thread.channel}</span>
-                  </div>
-                  <div className={cn('mt-1 truncate text-[11px]', tone.muted)}>{lastMessage}</div>
-                </div>
-                {thread.unreadCount > 0 ? <span className="flex size-5 items-center justify-center rounded-full text-[10px] font-bold" style={accentStyle(theme.accent, theme.light, 24)}>{thread.unreadCount}</span> : null}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {active ? (
-        <BottomSheet theme={theme} onClose={() => setActive(null)} title={active.clientName} subtitle={active.clientPhone || active.channel}>
-          <div className="flex max-h-[58svh] flex-col">
-            <div className="flex-1 space-y-2 overflow-y-auto p-4">
-              {(active.messages ?? []).length === 0 ? (
-                <div className={cn('py-8 text-center text-[12px]', tone.faint)}>Сообщений пока нет</div>
-              ) : (
-                active.messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={cn(
-                      'max-w-[86%] rounded-[10px] px-3 py-2 text-[12px] leading-5',
-                      message.author === 'master'
-                        ? 'ml-auto'
-                        : message.author === 'system'
-                          ? 'mx-auto'
-                          : '',
-                      message.author === 'master'
-                        ? (theme.light ? 'bg-black text-white' : 'bg-white text-black')
-                        : cn(tone.panel, 'border'),
-                    )}
-                  >
-                    {message.body}
-                  </div>
-                ))
-              )}
-            </div>
-            <div className={cn('border-t p-3', tone.line)}>
-              <div className="-mx-1 mb-2 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {quickReplies.map((reply) => (
-                  <button
-                    key={reply}
-                    type="button"
-                    onClick={() => setDraft(reply)}
-                    className={cn('min-w-max rounded-[9px] border px-2.5 py-1.5 text-[10px] font-semibold', tone.ghost)}
-                  >
-                    {reply.slice(0, 28)}...
-                  </button>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <MiniInput light={theme.light} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Ответ клиенту" onKeyDown={(event) => { if (event.key === 'Enter') void send(); }} />
-                <MiniButton theme={theme} variant="primary" disabled={sending || !draft.trim()} onClick={() => void send()} className="h-10 w-11 shrink-0 px-0">
-                  <Send className="size-4" />
-                </MiniButton>
-              </div>
-            </div>
-          </div>
-        </BottomSheet>
-      ) : null}
-    </div>
-  );
+  return <><Card light={light} className="p-4"><Micro>Ещё</Micro><div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.09em]">Управление</div><div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Клиенты, аналитика, профиль и полный кабинет.</div><div className="mt-4 grid grid-cols-2 gap-2"><Button light={light} onClick={() => navigator.clipboard?.writeText(publicUrl).catch(() => null)}><Copy className="size-4" />Ссылка</Button><a href="/dashboard" className={cx('inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border px-3 text-[12px] font-bold', t.ghost)}><LayoutDashboard className="size-4" />Кабинет</a></div></Card><div className="space-y-2">{items.map((item) => <button key={item.screen} type="button" onClick={() => setScreen(item.screen)} className={cx('flex w-full items-center gap-3 rounded-[13px] border p-3 text-left', t.card)}><span className={cx('grid size-10 place-items-center rounded-[10px] border', t.panel)}>{item.icon}</span><span className="min-w-0 flex-1"><span className="block text-[14px] font-bold tracking-[-0.04em]">{item.title}</span><span className={cx('mt-1 block text-[11px]', t.muted)}>{item.info}</span></span><ChevronRight className={cx('size-4', t.muted)} /></button>)}</div><Card light={light} className="p-3"><Micro>Состояние</Micro><div className="mt-3 grid grid-cols-3 gap-2"><Stat light={light} label="Услуги" value={String(len(services))} /><Stat light={light} label="Клиенты" value={String(len(clients))} /><Stat light={light} label="Заявки" value={String(len(bookings))} /></div></Card></>;
 }
 
-function HubScreen({ profile, dataset, setScreen, getPublicPath, theme }: { profile: MasterProfile; dataset: WorkspaceDataset; setScreen: (screen: MiniScreen) => void; getPublicPath: (slug: string) => string; theme: ThemeTone }) {
-  const tone = toneClasses(theme.light);
-  async function copyPublicLink() {
-    const origin = typeof window === 'undefined' ? '' : window.location.origin;
-    await copyText(`${origin}${getPublicPath(profile.slug)}`);
-  }
-
-  const tiles = [
-    { id: 'clients' as const, title: 'Клиенты', text: `${dataset.clients.length} в базе`, icon: <Users2 className="size-4" /> },
-    { id: 'analytics' as const, title: 'Аналитика', text: RUB.format(dataset.totals.revenue || 0), icon: <BarChart3 className="size-4" /> },
-    { id: 'profile' as const, title: 'Профиль', text: `@${profile.slug}`, icon: <UserRound className="size-4" /> },
-  ];
-
-  return (
-    <div className="space-y-3">
-      <MiniCard light={theme.light} className="p-4">
-        <MiniLabel light={theme.light}>ещё</MiniLabel>
-        <div className={cn('mt-2 text-[28px] font-semibold leading-none tracking-[-0.085em]', tone.text)}>Центр управления</div>
-        <div className={cn('mt-2 text-[12px] leading-5', tone.muted)}>Всё второстепенное убрано сюда, чтобы основные экраны не были перегружены.</div>
-      </MiniCard>
-
-      <div className="grid grid-cols-1 gap-2">
-        {tiles.map((tile) => (
-          <button key={tile.id} type="button" onClick={() => setScreen(tile.id)} className={cn('flex items-center gap-3 rounded-[10px] border p-3 text-left transition active:scale-[0.99]', tone.panel)}>
-            <div className={cn('flex size-10 items-center justify-center rounded-[9px] border', tone.panel)} style={{ color: theme.accent }}>{tile.icon}</div>
-            <div className="min-w-0 flex-1">
-              <div className={cn('text-[14px] font-semibold tracking-[-0.05em]', tone.text)}>{tile.title}</div>
-              <div className={cn('mt-1 text-[11px]', tone.muted)}>{tile.text}</div>
-            </div>
-            <ChevronRight className={cn('size-4', tone.faint)} />
-          </button>
-        ))}
-      </div>
-
-      <MiniCard light={theme.light} className="p-3">
-        <div className="grid grid-cols-2 gap-2">
-          <MiniButton theme={theme} variant="secondary" onClick={copyPublicLink} className="w-full">
-            <Copy className="size-4" /> Ссылка
-          </MiniButton>
-          <MiniButton theme={theme} variant="secondary" className="w-full" onClick={() => setScreen('profile')}>
-            <Settings className="size-4" /> Настроить
-          </MiniButton>
-        </div>
-        <MiniButton theme={theme} variant="primary" className="mt-2 w-full" onClick={() => { if (typeof window !== 'undefined') window.location.href = '/dashboard'; }}>
-          <ExternalLink className="size-4" /> Открыть полный кабинет
-        </MiniButton>
-      </MiniCard>
-    </div>
-  );
+function ClientsScreen({ light, clients }: { light: boolean; clients: Client[] }) {
+  const t = theme(light);
+  return <><Card light={light} className="p-4"><Micro>Клиенты</Micro><div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.09em]">База</div><div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Карточки собираются из записей.</div></Card><div className="space-y-2">{len(clients) === 0 ? <Empty light={light} title="Клиентов пока нет" text="Новые клиенты появятся после записей." /> : clients.map((client) => <Card light={light} key={client.id} className="p-3"><div className="flex items-center gap-3"><div className={cx('grid size-10 place-items-center rounded-[10px] border', t.panel)}>{client.favorite ? <Star className="size-4" /> : <UserRound className="size-4" />}</div><div className="min-w-0 flex-1"><div className="truncate text-[14px] font-bold tracking-[-0.04em]">{client.name}</div><div className={cx('mt-1 truncate text-[11px]', t.muted)}>{client.phone || 'без телефона'} · {client.visits} визитов · {rub(client.revenue)}</div></div>{client.phone ? <a href={`tel:${client.phone}`} className={cx('grid size-9 place-items-center rounded-[10px] border', t.ghost)}><Phone className="size-4" /></a> : null}</div>{client.note ? <div className={cx('mt-3 rounded-[10px] border p-2 text-[11px] leading-4', t.panel)}>{client.note}</div> : null}</Card>)}</div></>;
 }
 
-function ClientsScreen({ clients, workspaceData, updateWorkspaceSection, theme }: { clients: ClientInsight[]; workspaceData: Record<string, unknown>; updateWorkspaceSection: UpdateWorkspaceSection; theme: ThemeTone }) {
-  const tone = toneClasses(theme.light);
-  const [query, setQuery] = useState('');
-  const [selected, setSelected] = useState<ClientInsight | null>(null);
-  const notes = safeRecord(workspaceData.clientNotes) as Record<string, string>;
-  const favorites = safeRecord(workspaceData.clientFavorites) as Record<string, boolean>;
-  const filtered = clients.filter((client) => `${client.name} ${client.phone} ${client.service}`.toLowerCase().includes(query.toLowerCase().trim()));
+function AnalyticsScreen({ light, bookings, services, clients }: { light: boolean; bookings: Booking[]; services: Service[]; clients: Client[] }) {
+  const t = theme(light);
+  const completed = bookings.filter((booking) => booking.status === 'completed');
+  const cancelled = bookings.filter((booking) => booking.status === 'cancelled' || booking.status === 'no_show');
+  const revenue = clients.reduce((sum, client) => sum + client.revenue, 0);
+  const conversion = len(bookings) > 0 ? Math.round((len(completed) / len(bookings)) * 100) : 0;
+  const topServices = services.map((service) => ({ ...service, count: bookings.filter((booking) => booking.service === service.name).length })).sort((a, b) => b.count - a.count).slice(0, 5);
 
-  async function toggleFavorite(client: ClientInsight) {
-    await updateWorkspaceSection('clientFavorites', { ...favorites, [client.id]: !favorites[client.id] });
-  }
-
-  async function saveNote(client: ClientInsight, note: string) {
-    await updateWorkspaceSection('clientNotes', { ...notes, [client.id]: note });
-  }
-
-  return (
-    <div className="space-y-3">
-      <MiniCard light={theme.light} className="p-4">
-        <MiniLabel light={theme.light}>клиенты</MiniLabel>
-        <div className={cn('mt-2 text-[28px] font-semibold leading-none tracking-[-0.085em]', tone.text)}>База</div>
-        <div className="mt-3"><MiniInput light={theme.light} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Поиск по имени, телефону, услуге" /></div>
-      </MiniCard>
-
-      {filtered.length === 0 ? (
-        <EmptyBlock theme={theme} title="Клиентов нет" text="База появится после первых записей и сообщений." icon={<Users2 className="size-5" />} />
-      ) : (
-        <div className="space-y-2">
-          {filtered.map((client) => (
-            <button key={client.id} type="button" onClick={() => setSelected(client)} className={cn('flex w-full items-center gap-3 rounded-[10px] border p-3 text-left transition active:scale-[0.99]', tone.panel)}>
-              <div className={cn('flex size-10 shrink-0 items-center justify-center rounded-[10px] border text-[11px] font-black tracking-[-0.05em]', tone.panel)}>{getInitials(client.name)}</div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <div className={cn('truncate text-[14px] font-semibold tracking-[-0.05em]', tone.text)}>{client.name}</div>
-                  {(favorites[client.id] || client.favorite) ? <Star className="size-3.5 fill-current" style={{ color: theme.accent }} /> : null}
-                </div>
-                <div className={cn('mt-1 truncate text-[11px]', tone.muted)}>{client.visits} визитов · {client.service || 'услуга'} · {client.phone}</div>
-              </div>
-              <ChevronRight className={cn('size-4 shrink-0', tone.faint)} />
-            </button>
-          ))}
-        </div>
-      )}
-
-      {selected ? (
-        <ClientSheet client={selected} note={notes[selected.id] ?? selected.note ?? ''} favorite={Boolean(favorites[selected.id] ?? selected.favorite)} onClose={() => setSelected(null)} onFavorite={() => void toggleFavorite(selected)} onSaveNote={(note) => void saveNote(selected, note)} theme={theme} />
-      ) : null}
-    </div>
-  );
+  return <><Card light={light} className="p-4"><Micro>Аналитика</Micro><div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.09em]">Показатели</div><div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Короткий мобильный срез.</div><div className="mt-4 grid grid-cols-2 gap-2"><Stat light={light} label="Выручка" value={rub(revenue)} /><Stat light={light} label="Конверсия" value={`${conversion}%`} /><Stat light={light} label="Пришли" value={String(len(completed))} /><Stat light={light} label="Срывы" value={String(len(cancelled))} /></div></Card><Card light={light} className="p-3"><Micro>Топ услуг</Micro><div className="mt-3 space-y-2">{len(topServices) === 0 ? <Empty light={light} title="Нет данных" text="Статистика появится после первых записей." /> : topServices.map((service) => <div key={service.id} className={cx('rounded-[11px] border p-3', t.panel)}><div className="flex items-center justify-between gap-3"><div className="min-w-0"><div className="truncate text-[13px] font-bold">{service.name}</div><div className={cx('mt-1 text-[11px]', t.muted)}>{rub(service.price)} · {service.duration} мин</div></div><div className="text-[18px] font-semibold tracking-[-0.06em]">{service.count}</div></div><div className={cx('mt-2 h-1.5 overflow-hidden rounded-full', light ? 'bg-black/[0.06]' : 'bg-white/[0.08]')}><div className="h-full rounded-full bg-[var(--mini-accent)]" style={{ width: `${Math.min(100, service.count * 18)}%` }} /></div></div>)}</div></Card></>;
 }
 
-function ClientSheet({ client, note, favorite, onClose, onFavorite, onSaveNote, theme }: { client: ClientInsight; note: string; favorite: boolean; onClose: () => void; onFavorite: () => void; onSaveNote: (note: string) => void; theme: ThemeTone }) {
-  const [draft, setDraft] = useState(note);
-  useEffect(() => setDraft(note), [note]);
-  return (
-    <BottomSheet theme={theme} onClose={onClose} title={client.name} subtitle={client.phone}>
-      <div className="space-y-3 p-4">
-        <div className="grid grid-cols-3 gap-2">
-          <StatBox theme={theme} label="Визиты" value={client.visits} />
-          <StatBox theme={theme} label="Чек" value={client.averageCheck ? RUB.format(client.averageCheck) : '—'} />
-          <StatBox theme={theme} label="Сумма" value={client.totalRevenue ? RUB.format(client.totalRevenue) : '—'} />
-        </div>
-        <MiniTextarea light={theme.light} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Заметка по клиенту" />
-        <div className="grid grid-cols-2 gap-2">
-          <MiniButton theme={theme} variant="secondary" onClick={onFavorite}>{favorite ? <Star className="size-4 fill-current" /> : <Star className="size-4" />}{favorite ? 'VIP' : 'В VIP'}</MiniButton>
-          <MiniButton theme={theme} variant="primary" onClick={() => onSaveNote(draft)}>Сохранить</MiniButton>
-        </div>
-      </div>
-    </BottomSheet>
-  );
-}
-
-function AnalyticsScreen({ dataset, theme }: { dataset: WorkspaceDataset; theme: ThemeTone }) {
-  const tone = toneClasses(theme.light);
-  const maxDaily = Math.max(1, ...dataset.daily.map((day) => day.requests));
-  const channels = dataset.channels.filter((channel) => channel.visitors > 0 || channel.bookings > 0).slice(0, 4);
-
-  return (
-    <div className="space-y-3">
-      <MiniCard light={theme.light} className="p-4">
-        <MiniLabel light={theme.light}>аналитика</MiniLabel>
-        <div className={cn('mt-2 text-[28px] font-semibold leading-none tracking-[-0.085em]', tone.text)}>Пульс</div>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <StatBox theme={theme} label="Записи" value={dataset.totals.bookings} />
-          <StatBox theme={theme} label="Выручка" value={RUB.format(dataset.totals.revenue || 0)} />
-          <StatBox theme={theme} label="Средний чек" value={dataset.totals.averageCheck ? RUB.format(dataset.totals.averageCheck) : '—'} />
-          <StatBox theme={theme} label="Возврат" value={`${dataset.totals.returnRate || 0}%`} />
-        </div>
-      </MiniCard>
-
-      <MiniCard light={theme.light} className="p-4">
-        <MiniLabel light={theme.light}>по дням</MiniLabel>
-        <div className="mt-4 space-y-3">
-          {(dataset.daily.length ? dataset.daily.slice(-7) : []).map((day) => (
-            <div key={day.date} className="grid grid-cols-[74px_1fr_36px] items-center gap-2">
-              <div className={cn('text-[10px] font-semibold', tone.muted)}>{day.label}</div>
-              <div className={cn('h-2 overflow-hidden rounded-full', theme.light ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}><div className="h-full rounded-full" style={{ width: `${Math.max(5, (day.requests / maxDaily) * 100)}%`, backgroundColor: theme.accent }} /></div>
-              <div className={cn('text-right text-[10px] font-semibold', tone.muted)}>{day.requests}</div>
-            </div>
-          ))}
-          {dataset.daily.length === 0 ? <div className={cn('text-[12px]', tone.muted)}>Данных пока нет.</div> : null}
-        </div>
-      </MiniCard>
-
-      <MiniCard light={theme.light} className="p-4">
-        <MiniLabel light={theme.light}>каналы</MiniLabel>
-        <div className="mt-3 space-y-2">
-          {(channels.length ? channels : dataset.channels.slice(0, 4)).map((channel) => (
-            <div key={channel.id} className={cn('flex items-center justify-between rounded-[10px] border px-3 py-2.5', tone.panel)}>
-              <div>
-                <div className={cn('text-[13px] font-semibold tracking-[-0.045em]', tone.text)}>{channel.label}</div>
-                <div className={cn('mt-1 text-[10px]', tone.faint)}>{channel.visitors} визитов · {channel.conversion}%</div>
-              </div>
-              <div className={cn('text-[12px] font-semibold', tone.text)}>{channel.bookings}</div>
-            </div>
-          ))}
-        </div>
-      </MiniCard>
-    </div>
-  );
-}
-
-function ProfileScreen({ profile, onSave, getPublicPath, theme }: { profile: MasterProfile; onSave: SaveProfile; getPublicPath: (slug: string) => string; theme: ThemeTone }) {
-  const tone = toneClasses(theme.light);
-  const [form, setForm] = useState(() => profileSavePayload(profile, {}));
+function ProfileScreen({ light, profile, workspaceId, publicUrl, reload }: { light: boolean; profile: Profile; workspaceId: string; publicUrl: string; reload: () => Promise<void> }) {
+  const t = theme(light);
+  const [form, setForm] = useState({ ...profile, servicesText: list<string>(profile.services).join('\n') });
   const [saving, setSaving] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    setForm(profileSavePayload(profile, {}));
-  }, [profile]);
-
-  async function save() {
+  const save = async () => {
+    const next: Profile = { ...profile, ...form, slug: slugify(form.slug || form.name), services: text(form.servicesText).split('\n').map((item) => text(item)).filter(Boolean) };
     setSaving(true);
-    await onSave(form);
+    await fetch('/api/profile', { method: 'POST', credentials: 'include', cache: 'no-store', headers: apiHeaders(true), body: JSON.stringify({ workspaceId, locale: 'ru', profile: next }) }).catch(() => null);
+    await reload();
     setSaving(false);
-  }
+  };
 
-  async function copyLink() {
-    const origin = typeof window === 'undefined' ? '' : window.location.origin;
-    const ok = await copyText(`${origin}${getPublicPath(form.slug || profile.slug)}`);
-    setCopied(ok);
-    window.setTimeout(() => setCopied(false), 1400);
-  }
-
-  return (
-    <div className="space-y-3">
-      <MiniCard light={theme.light} className="p-4">
-        <MiniLabel light={theme.light}>профиль</MiniLabel>
-        <div className={cn('mt-2 text-[28px] font-semibold leading-none tracking-[-0.085em]', tone.text)}>Публичная карточка</div>
-        <div className="mt-3 flex gap-2">
-          <MiniButton theme={theme} variant="secondary" onClick={copyLink} className="flex-1"><Copy className="size-4" />{copied ? 'Скопировано' : 'Ссылка'}</MiniButton>
-          <MiniButton theme={theme} variant="secondary" className="flex-1" onClick={() => { if (typeof window !== 'undefined') window.open(getPublicPath(profile.slug), '_blank'); }}><ExternalLink className="size-4" />Открыть</MiniButton>
-        </div>
-      </MiniCard>
-
-      <MiniCard light={theme.light} className="space-y-2 p-3">
-        <MiniInput light={theme.light} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="Имя" />
-        <MiniInput light={theme.light} value={form.profession} onChange={(event) => setForm((current) => ({ ...current, profession: event.target.value }))} placeholder="Специализация" />
-        <MiniInput light={theme.light} value={form.city} onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))} placeholder="Город" />
-        <MiniInput light={theme.light} value={form.slug} onChange={(event) => setForm((current) => ({ ...current, slug: event.target.value }))} placeholder="slug" />
-        <MiniTextarea light={theme.light} value={form.bio} onChange={(event) => setForm((current) => ({ ...current, bio: event.target.value }))} placeholder="Описание для клиента" />
-        <div className="grid grid-cols-2 gap-2">
-          <MiniInput light={theme.light} value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} placeholder="Телефон" />
-          <MiniInput light={theme.light} value={form.telegram} onChange={(event) => setForm((current) => ({ ...current, telegram: event.target.value }))} placeholder="Telegram" />
-        </div>
-        <MiniButton theme={theme} variant="primary" onClick={() => void save()} disabled={saving} className="w-full"><Save className="size-4" />{saving ? 'Сохраняю' : 'Сохранить профиль'}</MiniButton>
-      </MiniCard>
-    </div>
-  );
+  return <><Card light={light} className="p-4"><Micro>Профиль</Micro><div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.09em]">Анкета</div><div className={cx('mt-2 break-all text-[12px] leading-5', t.muted)}>{publicUrl}</div><div className="mt-4 grid grid-cols-2 gap-2"><Button light={light} onClick={() => navigator.clipboard?.writeText(publicUrl).catch(() => null)}><Copy className="size-4" />Копировать</Button><a href={publicUrl} target="_blank" rel="noreferrer" className={cx('inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border px-3 text-[12px] font-bold', t.ghost)}><ExternalLink className="size-4" />Открыть</a></div></Card><Card light={light} className="space-y-2 p-3"><Field light={light} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Имя" /><Field light={light} value={form.profession} onChange={(event) => setForm({ ...form, profession: event.target.value })} placeholder="Специализация" /><Field light={light} value={form.city} onChange={(event) => setForm({ ...form, city: event.target.value })} placeholder="Город" /><Field light={light} value={form.slug} onChange={(event) => setForm({ ...form, slug: event.target.value })} placeholder="slug" /><div className="grid grid-cols-2 gap-2"><Field light={light} value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder="Телефон" /><Field light={light} value={form.telegram} onChange={(event) => setForm({ ...form, telegram: event.target.value })} placeholder="Telegram" /></div><Field light={light} value={form.whatsapp} onChange={(event) => setForm({ ...form, whatsapp: event.target.value })} placeholder="WhatsApp" /><Area light={light} value={form.bio} onChange={(event) => setForm({ ...form, bio: event.target.value })} placeholder="Описание" /><Button light={light} primary disabled={saving || !text(form.name)} onClick={() => void save()} className="w-full"><Save className="size-4" />{saving ? 'Сохраняю' : 'Сохранить профиль'}</Button></Card></>;
 }
 
-function BottomSheet({ children, theme, onClose, title, subtitle }: { children: ReactNode; theme: ThemeTone; onClose: () => void; title: string; subtitle?: string }) {
-  const tone = toneClasses(theme.light);
-  return (
-    <div className="fixed inset-0 z-[80] flex items-end bg-black/45 px-3 pb-[calc(var(--tg-safe-bottom,0px)+10px)] backdrop-blur-[8px]">
-      <div className={cn('mx-auto max-h-[86svh] w-full max-w-[440px] overflow-hidden rounded-[16px] border shadow-[0_28px_90px_rgba(0,0,0,0.38)]', theme.light ? 'border-black/[0.09] bg-[#fbfbfa] text-black' : 'border-white/[0.10] bg-[#101010] text-white')}>
-        <div className={cn('flex items-start justify-between gap-3 border-b p-4', tone.line)}>
-          <div className="min-w-0">
-            <div className={cn('text-[19px] font-semibold leading-none tracking-[-0.075em]', tone.text)}>{title}</div>
-            {subtitle ? <div className={cn('mt-1.5 truncate text-[11px]', tone.muted)}>{subtitle}</div> : null}
-          </div>
-          <button type="button" onClick={onClose} className={cn('flex size-9 shrink-0 items-center justify-center rounded-[9px] border', tone.ghost)}><X className="size-4" /></button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
+function Sheet({ light, title, onClose, children }: { light: boolean; title: string; onClose: () => void; children: ReactNode }) {
+  const t = theme(light);
+  return <div className="fixed inset-0 z-[90] flex items-end bg-black/45 px-2 pb-2 backdrop-blur-[10px]" onClick={onClose}><div className={cx('mx-auto max-h-[88vh] w-full max-w-[460px] overflow-y-auto rounded-[18px] border p-4', t.card)} onClick={(event) => event.stopPropagation()}><div className="mb-4 flex items-center justify-between gap-3"><div className="text-[20px] font-semibold tracking-[-0.07em]">{title}</div><button type="button" onClick={onClose} className={cx('grid size-9 place-items-center rounded-[10px] border', t.ghost)}><X className="size-4" /></button></div>{children}</div></div>;
 }
 
-function BookingSheet({ booking, onClose, onStatus, services, theme }: { booking: Booking | null; onClose: () => void; onStatus: (bookingId: string, status: BookingStatus) => Promise<void>; services: ServiceInsight[]; theme: ThemeTone }) {
-  const tone = toneClasses(theme.light);
-  const [saving, setSaving] = useState<BookingStatus | null>(null);
-
+function BookingSheet({ light, booking, services, onClose, updateStatus }: { light: boolean; booking: Booking | null; services: Service[]; onClose: () => void; updateStatus: (id: string, status: BookingStatus) => Promise<void> }) {
+  const t = theme(light);
   if (!booking) return null;
-
-  async function changeStatus(status: BookingStatus) {
-    setSaving(status);
-    await onStatus(booking.id, status);
-    setSaving(null);
-    onClose();
-  }
-
-  return (
-    <BottomSheet theme={theme} onClose={onClose} title={booking.clientName} subtitle={`${formatDateHuman(booking.date, true)} · ${formatTime(booking.time)}`}>
-      <div className="space-y-3 p-4">
-        <MiniPanel light={theme.light} className="p-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <MiniLabel light={theme.light}>услуга</MiniLabel>
-              <div className={cn('mt-2 text-[16px] font-semibold tracking-[-0.06em]', tone.text)}>{booking.service}</div>
-              <div className={cn('mt-1 text-[11px]', tone.muted)}>{booking.clientPhone || 'телефон не указан'}</div>
-            </div>
-            <StatusPill status={booking.status} theme={theme} />
-          </div>
-          {booking.comment ? <div className={cn('mt-3 rounded-[9px] border p-3 text-[12px] leading-5', tone.panel, tone.muted)}>{booking.comment}</div> : null}
-          <div className={cn('mt-3 flex items-center justify-between text-[12px] font-semibold', tone.text)}>
-            <span>Сумма</span>
-            <span>{getBookingAmount(booking, services) ? RUB.format(getBookingAmount(booking, services)) : '—'}</span>
-          </div>
-        </MiniPanel>
-
-        <div className="grid grid-cols-2 gap-2">
-          <MiniButton theme={theme} variant="primary" disabled={Boolean(saving)} onClick={() => void changeStatus('completed')}><CheckCircle2 className="size-4" />Пришла</MiniButton>
-          <MiniButton theme={theme} variant="secondary" disabled={Boolean(saving)} onClick={() => void changeStatus('confirmed')}><Check className="size-4" />В плане</MiniButton>
-          <MiniButton theme={theme} variant="secondary" disabled={Boolean(saving)} onClick={() => void changeStatus('no_show')}><XCircle className="size-4" />Не пришла</MiniButton>
-          <MiniButton theme={theme} variant="danger" disabled={Boolean(saving)} onClick={() => void changeStatus('cancelled')}><X className="size-4" />Отмена</MiniButton>
-        </div>
-
-        {booking.clientPhone ? (
-          <a href={`tel:${booking.clientPhone}`} className={cn('flex h-10 items-center justify-center gap-2 rounded-[9px] border text-[12px] font-semibold', tone.ghost)}><Phone className="size-4" />Позвонить клиенту</a>
-        ) : null}
-        <button
-          type="button"
-          onClick={() => void copyText(`Здравствуйте, ${booking.clientName}! Напоминаю про запись ${formatDateHuman(booking.date)} в ${formatTime(booking.time)}: ${booking.service}.`)}
-          className={cn('flex h-10 w-full items-center justify-center gap-2 rounded-[9px] border text-[12px] font-semibold', tone.ghost)}
-        >
-          <Copy className="size-4" /> Скопировать напоминание
-        </button>
-      </div>
-    </BottomSheet>
-  );
+  const price = booking.priceAmount || services.find((service) => service.name === booking.service)?.price || 0;
+  const reminder = `${booking.clientName}, напоминаю про запись ${dateLabel(booking.date)} в ${booking.time}: ${booking.service}.`;
+  return <Sheet light={light} title="Запись" onClose={onClose}><div className="space-y-3"><div className={cx('rounded-[12px] border p-3', t.panel)}><div className="text-[18px] font-semibold tracking-[-0.06em]">{booking.clientName}</div><div className={cx('mt-1 text-[12px]', t.muted)}>{booking.clientPhone || 'без телефона'}</div><div className="mt-3 grid grid-cols-2 gap-2"><Stat light={light} label="Дата" value={dateLabel(booking.date)} /><Stat light={light} label="Время" value={booking.time} /><Stat light={light} label="Услуга" value={booking.service} /><Stat light={light} label="Цена" value={rub(price)} /></div>{booking.comment ? <div className={cx('mt-3 rounded-[10px] border p-2 text-[12px] leading-5', t.panel)}>{booking.comment}</div> : null}</div><div className="grid grid-cols-2 gap-2"><Button light={light} primary onClick={() => void updateStatus(booking.id, 'completed').then(onClose)}><CheckCircle2 className="size-4" />Пришла</Button><Button light={light} danger onClick={() => void updateStatus(booking.id, 'no_show').then(onClose)}><XCircle className="size-4" />Не пришла</Button><Button light={light} onClick={() => void updateStatus(booking.id, 'confirmed').then(onClose)}>В плане</Button><Button light={light} onClick={() => navigator.clipboard?.writeText(reminder).catch(() => null)}><Copy className="size-4" />Напомнить</Button></div>{booking.clientPhone ? <a href={`tel:${booking.clientPhone}`} className={cx('inline-flex h-10 w-full items-center justify-center gap-2 rounded-[10px] border text-[12px] font-bold', t.ghost)}><Phone className="size-4" />Позвонить</a> : null}</div></Sheet>;
 }
 
-function QuickBookingSheet({ profile, services, theme, onClose, onCreate }: { profile: MasterProfile; services: ServiceInsight[]; theme: ThemeTone; onClose: () => void; onCreate: CreateBooking }) {
-  const tone = toneClasses(theme.light);
-  const serviceOptions = getServiceOptions(profile, services);
-  const [form, setForm] = useState<BookingFormValues>({
-    clientName: '',
-    clientPhone: '',
-    service: serviceOptions[0] ?? '',
-    date: todayIso(),
-    time: '10:00',
-    comment: '',
-  });
+function QuickBookingSheet({ light, profile, services, onClose, reload }: { light: boolean; profile: Profile; services: Service[]; onClose: () => void; reload: () => Promise<void> }) {
+  const t = theme(light);
+  const availableServices = services.filter((service) => service.visible && service.status !== 'draft');
+  const [form, setForm] = useState({ clientName: '', clientPhone: '', service: availableServices[0]?.name || profile.services[0] || '', date: today(), time: '12:00', comment: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [done, setDone] = useState(false);
-
-  async function create() {
+  const create = async () => {
     setError('');
     setSaving(true);
-    const result = await onCreate(profile.slug, form);
-    setSaving(false);
-    if (!result.success) {
-      setError(result.error ?? 'Не удалось создать запись');
+    const response = await fetch('/api/bookings', { method: 'POST', credentials: 'include', cache: 'no-store', headers: apiHeaders(true), body: JSON.stringify({ masterSlug: profile.slug, source: 'Mini App', sourceChannel: 'telegram', values: form }) }).catch(() => null);
+    if (!response?.ok) {
+      const payload = response ? await parseJson(response).catch(() => ({})) : {};
+      setError(text(payload.error, 'Не удалось создать запись. Проверь услугу, график и телефон.'));
+      setSaving(false);
       return;
     }
-    setDone(true);
-    window.setTimeout(onClose, 650);
-  }
+    await reload();
+    setSaving(false);
+    onClose();
+  };
 
-  return (
-    <BottomSheet theme={theme} onClose={onClose} title="Новая запись" subtitle="Быстро добавить клиента вручную">
-      <div className="space-y-3 p-4">
-        <MiniPanel light={theme.light} className="p-3">
-          <div className={cn('text-[11px] leading-5', tone.muted)}>
-            Запись создаётся через общий API и сразу попадает в сегодняшнюю ленту, аналитику и карточку клиента.
-          </div>
-        </MiniPanel>
-
-        <div className="space-y-2">
-          <MiniInput light={theme.light} value={form.clientName} onChange={(event) => setForm((current) => ({ ...current, clientName: event.target.value }))} placeholder="Имя клиента" />
-          <MiniInput light={theme.light} value={form.clientPhone} onChange={(event) => setForm((current) => ({ ...current, clientPhone: event.target.value }))} placeholder="Телефон" inputMode="tel" />
-          <select
-            value={form.service}
-            onChange={(event) => setForm((current) => ({ ...current, service: event.target.value }))}
-            className={cn('h-10 w-full rounded-[9px] border px-3 text-[13px] font-medium tracking-[-0.03em] outline-none transition', tone.input)}
-          >
-            {serviceOptions.length === 0 ? <option value="">Сначала добавь услугу</option> : null}
-            {serviceOptions.map((service) => <option key={service} value={service}>{service}</option>)}
-          </select>
-          <div className="grid grid-cols-2 gap-2">
-            <MiniInput light={theme.light} type="date" value={form.date} onChange={(event) => setForm((current) => ({ ...current, date: event.target.value }))} />
-            <MiniInput light={theme.light} type="time" value={form.time} onChange={(event) => setForm((current) => ({ ...current, time: event.target.value }))} />
-          </div>
-          <MiniTextarea light={theme.light} value={form.comment} onChange={(event) => setForm((current) => ({ ...current, comment: event.target.value }))} placeholder="Комментарий: пожелание, перенос, источник" />
-        </div>
-
-        {error ? <div className={cn('rounded-[9px] border px-3 py-2 text-[11px] leading-4', theme.light ? 'border-rose-300/35 bg-rose-50 text-rose-700' : 'border-rose-300/15 bg-rose-400/10 text-rose-100')}>{error}</div> : null}
-        {done ? <div className={cn('rounded-[9px] border px-3 py-2 text-[11px] leading-4', tone.panel, tone.text)}>Запись создана</div> : null}
-
-        <MiniButton theme={theme} variant="primary" onClick={() => void create()} disabled={saving || !form.clientName.trim() || !form.clientPhone.trim() || !form.service} className="w-full">
-          <Plus className="size-4" /> {saving ? 'Создаю' : 'Создать запись'}
-        </MiniButton>
-      </div>
-    </BottomSheet>
-  );
+  return <Sheet light={light} title="Новая запись" onClose={onClose}><div className="space-y-2"><Field light={light} value={form.clientName} onChange={(event) => setForm({ ...form, clientName: event.target.value })} placeholder="Имя клиента" /><Field light={light} value={form.clientPhone} onChange={(event) => setForm({ ...form, clientPhone: event.target.value })} inputMode="tel" placeholder="Телефон" /><select value={form.service} onChange={(event) => setForm({ ...form, service: event.target.value })} className={cx('h-10 w-full rounded-[10px] border px-3 text-[13px] font-medium outline-none', t.input)}>{len(availableServices) === 0 ? <option value="">Сначала добавь услугу</option> : null}{availableServices.map((service) => <option key={service.id} value={service.name}>{service.name}</option>)}</select><div className="grid grid-cols-2 gap-2"><Field light={light} type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} /><Field light={light} type="time" value={form.time} onChange={(event) => setForm({ ...form, time: event.target.value })} /></div><Area light={light} value={form.comment} onChange={(event) => setForm({ ...form, comment: event.target.value })} placeholder="Комментарий" />{error ? <div className={cx('rounded-[10px] border px-3 py-2 text-[11px] leading-4', light ? 'border-rose-300/35 bg-rose-50 text-rose-700' : 'border-rose-300/15 bg-rose-400/10 text-rose-100')}>{error}</div> : null}<Button light={light} primary disabled={saving || !text(form.clientName) || !text(form.clientPhone) || !text(form.service)} onClick={() => void create()} className="w-full"><Plus className="size-4" />{saving ? 'Создаю' : 'Создать запись'}</Button></div></Sheet>;
 }
 
-function MiniOnboarding({ onSave, theme }: { onSave: SaveProfile; theme: ThemeTone }) {
-  const tone = toneClasses(theme.light);
-  const [form, setForm] = useState<MiniProfileSaveValues>({
-    name: '',
-    profession: '',
-    city: '',
-    bio: '',
-    servicesText: '',
-    phone: '',
-    telegram: '',
-    whatsapp: '',
-    locationMode: 'online',
-    address: '',
-    mapUrl: '',
-    hidePhone: false,
-    hideTelegram: false,
-    hideWhatsapp: false,
-    slug: '',
-    avatar: '',
-  });
+function Onboarding({ light, reload }: { light: boolean; reload: () => Promise<void> }) {
+  const t = theme(light);
+  const [form, setForm] = useState({ name: '', profession: '', city: '', phone: '', services: 'Консультация' });
   const [saving, setSaving] = useState(false);
-
-  async function save() {
-    if (!form.name.trim()) return;
+  const save = async () => {
+    const name = text(form.name);
+    if (!name) return;
+    const profile: Profile = { ...DEFAULT_PROFILE, id: id('profile'), name, slug: slugify(name), profession: text(form.profession, 'Специалист'), city: text(form.city), phone: text(form.phone), services: text(form.services).split('\n').map((item) => text(item)).filter(Boolean), bio: 'Онлайн-запись через КликБук' };
     setSaving(true);
-    await onSave({
-      ...form,
-      profession: form.profession.trim() || 'Специалист',
-      city: form.city.trim() || 'Город',
-      bio: form.bio.trim() || 'Онлайн-запись через КликБук',
-      servicesText: form.servicesText.trim() || 'Консультация',
-      slug: form.slug.trim() || form.name,
-    });
+    await fetch('/api/profile', { method: 'POST', credentials: 'include', cache: 'no-store', headers: apiHeaders(true), body: JSON.stringify({ workspaceId: null, locale: 'ru', profile }) }).catch(() => null);
+    await reload();
     setSaving(false);
-  }
+  };
 
-  return (
-    <main className={cn('min-h-[100svh] px-4 py-[calc(var(--tg-safe-top,0px)+16px)]', tone.page)}>
-      <div className="mx-auto w-full max-w-[440px] space-y-3">
-        <MiniCard light={theme.light} className="p-5">
-          <BrandLogo />
-          <div className={cn('mt-5 text-[30px] font-semibold leading-[0.95] tracking-[-0.095em]', tone.text)}>Создай мобильный профиль</div>
-          <div className={cn('mt-3 text-[12px] leading-5', tone.muted)}>Мини-апп подключится к тем же услугам, графику, заявкам и чатам.</div>
-        </MiniCard>
-        <MiniCard light={theme.light} className="space-y-2 p-3">
-          <MiniInput light={theme.light} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="Имя или название" />
-          <MiniInput light={theme.light} value={form.profession} onChange={(event) => setForm((current) => ({ ...current, profession: event.target.value }))} placeholder="Специализация" />
-          <MiniInput light={theme.light} value={form.city} onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))} placeholder="Город" />
-          <MiniTextarea light={theme.light} value={form.servicesText} onChange={(event) => setForm((current) => ({ ...current, servicesText: event.target.value }))} placeholder={'Услуги, каждая с новой строки'} />
-          <MiniButton theme={theme} variant="primary" onClick={() => void save()} disabled={saving || !form.name.trim()} className="w-full"><Sparkles className="size-4" />{saving ? 'Создаю' : 'Создать профиль'}</MiniButton>
-        </MiniCard>
-      </div>
-    </main>
-  );
+  return <main className={cx('min-h-screen px-4 py-[calc(var(--tg-safe-top,0px)+16px)]', t.page)}><div className="mx-auto w-full max-w-[440px] space-y-3"><Card light={light} className="p-5"><Logo light={light} /><div className="mt-5 text-[30px] font-semibold leading-[0.95] tracking-[-0.095em]">Создай профиль</div><div className={cx('mt-3 text-[12px] leading-5', t.muted)}>Mini app подключит услуги, график, заявки и чаты.</div></Card><Card light={light} className="space-y-2 p-3"><Field light={light} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Имя или название" /><Field light={light} value={form.profession} onChange={(event) => setForm({ ...form, profession: event.target.value })} placeholder="Специализация" /><Field light={light} value={form.city} onChange={(event) => setForm({ ...form, city: event.target.value })} placeholder="Город" /><Field light={light} value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder="Телефон" /><Area light={light} value={form.services} onChange={(event) => setForm({ ...form, services: event.target.value })} placeholder="Услуги, каждая с новой строки" /><Button light={light} primary disabled={saving || !text(form.name)} onClick={() => void save()} className="w-full">Создать профиль</Button></Card></div></main>;
 }
 
 export function MiniAppEntry() {
-  const {
-    hasHydrated,
-    ownedProfile,
-    bookings,
-    workspaceData,
-    saveProfile,
-    createBooking,
-    updateBookingStatus,
-    updateWorkspaceSection,
-    refreshWorkspace,
-    getPublicPath,
-  } = useApp();
-  const { locale } = useLocale();
-  const { resolvedTheme } = useTheme();
-  const light = resolvedTheme !== 'dark';
-  const [screen, setScreen] = useState<MiniScreen>('workday');
-  const [bootState, setBootState] = useState<'loading' | 'ready'>('loading');
+  const [screen, setScreen] = useState<Screen>('today');
+  const [loading, setLoading] = useState(true);
+  const [light, setLight] = useState(false);
+  const [workspaceId, setWorkspaceId] = useState('');
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [data, setData] = useState<Json>({});
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [week, setWeek] = useState<WorkDay[]>(DEFAULT_WEEK);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
-  const [quickBookingOpen, setQuickBookingOpen] = useState(false);
-  const bootedRef = useRef(false);
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [error, setError] = useState('');
 
-  const workspaceRecord = safeRecord(workspaceData);
-  const theme = useMemo<ThemeTone>(() => ({ light, accent: resolveAccent(workspaceRecord) }), [light, workspaceRecord]);
+  const accent = useMemo(() => getAccent(data), [data]);
+  const sortedBookings = useMemo(() => [...bookings].sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`)), [bookings]);
+  const clients = useMemo(() => buildClients(bookings, services), [bookings, services]);
+  const publicUrl = useMemo(() => {
+    const path = `/m/${profile?.slug || 'master'}`;
+    if (typeof window === 'undefined') return path;
+    return `${window.location.origin}${path}`;
+  }, [profile?.slug]);
 
-  const dataset = useMemo(() => {
-    if (!ownedProfile) return FALLBACK_DATASET;
+  const load = useCallback(async () => {
+    setError('');
+    setLight(isLightTheme());
+
     try {
-      return buildWorkspaceDatasetFromStored(ownedProfile, bookings, locale, workspaceData);
-    } catch {
-      return FALLBACK_DATASET;
-    }
-  }, [bookings, locale, ownedProfile, workspaceData]);
+      await authorizeTelegram().catch(() => null);
+      const response = await fetch('/api/workspace', { credentials: 'include', cache: 'no-store', headers: apiHeaders(false) });
 
-  const orderedBookings = useMemo(() => [...bookings].sort(descByCreated), [bookings]);
-
-  useEffect(() => {
-    if (bootedRef.current) return;
-    bootedRef.current = true;
-    let cancelled = false;
-
-    async function boot() {
-      if (hasTelegramMiniAppRuntime()) {
-        await authorizeTelegramMiniAppSession({ force: true, waitMs: 1800 }).catch(() => null);
+      if (response.status === 404) {
+        setWorkspaceId('');
+        setProfile(null);
+        setData({});
+        setBookings([]);
+        setServices([]);
+        setWeek(DEFAULT_WEEK);
+        return;
       }
-      await refreshWorkspace();
-      if (!cancelled) setBootState('ready');
+
+      if (response.status === 401) {
+        setError('Не удалось авторизоваться. Закрой mini app и открой заново из бота.');
+        return;
+      }
+
+      if (!response.ok) {
+        const payload = await parseJson(response).catch(() => ({}));
+        throw new Error(text(payload.error, 'workspace_load_failed'));
+      }
+
+      const workspace = await parseJson(response);
+      const nextData = obj(workspace.data);
+      const nextProfile = normalizeProfile(workspace.profile) ?? null;
+      const nextBookings = list(nextData.bookings).map((item, index) => normalizeBooking(item, index)).filter((item): item is Booking => Boolean(item));
+      const nextServices = normalizeServices(nextProfile, nextData);
+      const nextWeek = normalizeWeek(nextData);
+
+      setWorkspaceId(text(workspace.id));
+      setProfile(nextProfile);
+      setData(nextData);
+      setBookings(nextBookings);
+      setServices(nextServices);
+      setWeek(nextWeek);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Mini app не загрузилась');
+    } finally {
+      setLoading(false);
     }
+  }, []);
 
-    void boot();
-    return () => {
-      cancelled = true;
-    };
-  }, [refreshWorkspace]);
+  useEffect(() => { void load(); }, [load]);
 
-  if (!hasHydrated || bootState === 'loading') {
-    return <MiniLoading />;
+  const updateBookingStatus = async (bookingId: string, status: BookingStatus) => {
+    setBookings((current) => current.map((booking) => booking.id === bookingId ? { ...booking, status } : booking));
+    await fetch('/api/bookings', { method: 'PATCH', credentials: 'include', cache: 'no-store', headers: apiHeaders(true), body: JSON.stringify({ bookingId, status }) }).catch(() => null);
+    await load();
+  };
+
+  if (loading) return <LoadingScreen />;
+
+  if (error) {
+    return <main className="flex min-h-screen items-center justify-center bg-[#090909] px-5 text-white"><div className="w-full max-w-[350px] rounded-[18px] border border-white/[0.10] bg-[#101010] p-5 text-center"><Logo light={false} /><div className="mt-5 text-[22px] font-semibold tracking-[-0.08em]">Mini app не загрузилась</div><div className="mt-3 rounded-[10px] border border-white/[0.08] bg-white/[0.035] px-3 py-2 text-left text-[11px] leading-5 text-white/55">{error}</div><button type="button" onClick={() => { setLoading(true); void load(); }} className="mt-5 h-10 w-full rounded-[10px] border border-white/[0.12] bg-white text-[12px] font-bold text-black active:scale-[0.985]">Повторить</button></div></main>;
   }
 
-  if (!ownedProfile) {
-    return <MiniOnboarding onSave={saveProfile} theme={theme} />;
-  }
+  if (!profile) return <Onboarding light={light} reload={load} />;
 
-  return (
-    <>
-      <MiniShell screen={screen} setScreen={setScreen} profile={ownedProfile} theme={theme} onRefresh={() => void refreshWorkspace()}>
-        {screen === 'workday' ? (
-          <WorkdayScreen profile={ownedProfile} bookings={orderedBookings} dataset={dataset} onOpenBooking={setSelectedBooking} onQuickBooking={() => setQuickBookingOpen(true)} setScreen={setScreen} getPublicPath={getPublicPath} theme={theme} />
-        ) : null}
-        {screen === 'calendar' ? (
-          <CalendarScreen availability={dataset.availability} updateWorkspaceSection={updateWorkspaceSection} theme={theme} />
-        ) : null}
-        {screen === 'catalog' ? (
-          <CatalogScreen profile={ownedProfile} services={dataset.services} onSaveProfile={saveProfile} updateWorkspaceSection={updateWorkspaceSection} theme={theme} />
-        ) : null}
-        {screen === 'dialogs' ? <DialogsScreen theme={theme} /> : null}
-        {screen === 'hub' ? <HubScreen profile={ownedProfile} dataset={dataset} setScreen={setScreen} getPublicPath={getPublicPath} theme={theme} /> : null}
-        {screen === 'clients' ? <ClientsScreen clients={dataset.clients} workspaceData={workspaceRecord} updateWorkspaceSection={updateWorkspaceSection} theme={theme} /> : null}
-        {screen === 'analytics' ? <AnalyticsScreen dataset={dataset} theme={theme} /> : null}
-        {screen === 'profile' ? <ProfileScreen profile={ownedProfile} onSave={saveProfile} getPublicPath={getPublicPath} theme={theme} /> : null}
-      </MiniShell>
-      <BookingSheet booking={selectedBooking} onClose={() => setSelectedBooking(null)} onStatus={updateBookingStatus} services={dataset.services} theme={theme} />
-      {quickBookingOpen ? (
-        <QuickBookingSheet profile={ownedProfile} services={dataset.services} theme={theme} onClose={() => setQuickBookingOpen(false)} onCreate={createBooking} />
-      ) : null}
-    </>
-  );
+  return <>
+    <Shell light={light} accent={accent} profile={profile} screen={screen} setScreen={setScreen} refresh={() => void load()}>
+      {screen === 'today' ? <TodayScreen light={light} profile={profile} bookings={sortedBookings} services={services} week={week} setScreen={setScreen} openBooking={setSelectedBooking} openQuick={() => setQuickOpen(true)} publicUrl={publicUrl} /> : null}
+      {screen === 'schedule' ? <ScheduleScreen light={light} workspaceId={workspaceId} days={week} setDays={setWeek} reload={load} /> : null}
+      {screen === 'services' ? <ServicesScreen light={light} profile={profile} workspaceId={workspaceId} services={services} setServices={setServices} reload={load} /> : null}
+      {screen === 'chats' ? <ChatsScreen light={light} /> : null}
+      {screen === 'more' ? <MoreScreen light={light} profile={profile} clients={clients} bookings={bookings} services={services} publicUrl={publicUrl} setScreen={setScreen} /> : null}
+      {screen === 'clients' ? <ClientsScreen light={light} clients={clients} /> : null}
+      {screen === 'analytics' ? <AnalyticsScreen light={light} bookings={bookings} services={services} clients={clients} /> : null}
+      {screen === 'profile' ? <ProfileScreen light={light} profile={profile} workspaceId={workspaceId} publicUrl={publicUrl} reload={load} /> : null}
+    </Shell>
+    <BookingSheet light={light} booking={selectedBooking} services={services} onClose={() => setSelectedBooking(null)} updateStatus={updateBookingStatus} />
+    {quickOpen ? <QuickBookingSheet light={light} profile={profile} services={services} onClose={() => setQuickOpen(false)} reload={load} /> : null}
+  </>;
 }
