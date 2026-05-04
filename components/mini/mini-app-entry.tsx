@@ -22,6 +22,8 @@ import {
   Search,
   Send,
   Settings,
+  ShieldCheck,
+  Sparkles,
   Star,
   Trash2,
   UserRound,
@@ -41,11 +43,13 @@ type Screen =
   | 'more'
   | 'clients'
   | 'analytics'
-  | 'profile';
+  | 'profile'
+  | 'settings';
 
 type BookingStatus = 'new' | 'confirmed' | 'completed' | 'no_show' | 'cancelled';
 type DayStatus = 'workday' | 'short' | 'day-off';
 type ServiceStatus = 'active' | 'seasonal' | 'draft';
+type ClientSegment = 'all' | 'vip' | 'transfer' | 'no_show' | 'new';
 
 type Profile = {
   id: string;
@@ -71,6 +75,13 @@ type Booking = {
   comment: string;
   createdAt: string;
   priceAmount: number;
+  source: string;
+  channel: string;
+  transferRequested: boolean;
+  transferReason: string;
+  transferRequestedAt: string;
+  transferStatus: 'none' | 'requested' | 'accepted' | 'declined' | 'done';
+  clientNote: string;
 };
 
 type Service = {
@@ -122,6 +133,35 @@ type Client = {
   lastVisit: string;
   note: string;
   favorite: boolean;
+  bookingsCount: number;
+  transferCount: number;
+  noShowCount: number;
+  cancelledCount: number;
+  lastStatus: BookingStatus;
+  hasTransferRequest: boolean;
+  lastService: string;
+};
+
+type MiniSettings = {
+  publicBookingEnabled: boolean;
+  autoConfirmBookings: boolean;
+  allowClientReschedule: boolean;
+  reschedulePolicy: string;
+  reminderBeforeHours: number;
+  reminderTelegram: boolean;
+  reminderVk: boolean;
+  reminderWeb: boolean;
+  noShowAction: 'keep' | 'sleep' | 'blacklist_note';
+  bookingNotice: string;
+};
+
+type QuickBookingPreset = {
+  clientName?: string;
+  clientPhone?: string;
+  service?: string;
+  date?: string;
+  time?: string;
+  comment?: string;
 };
 
 type TgWindow = Window & {
@@ -145,6 +185,19 @@ const DEFAULT_PROFILE: Profile = {
   telegram: '',
   whatsapp: '',
   services: [],
+};
+
+const DEFAULT_SETTINGS: MiniSettings = {
+  publicBookingEnabled: true,
+  autoConfirmBookings: false,
+  allowClientReschedule: true,
+  reschedulePolicy: 'Клиент может запросить перенос. Мастер подтверждает новое время вручную.',
+  reminderBeforeHours: 3,
+  reminderTelegram: true,
+  reminderVk: true,
+  reminderWeb: true,
+  noShowAction: 'sleep',
+  bookingNotice: 'Пожалуйста, приходите вовремя. Если нужно перенести запись — напишите заранее.',
 };
 
 const DEFAULT_WEEK: WorkDay[] = [
@@ -195,6 +248,16 @@ function text(value: unknown, fallback = '') {
   return fallback;
 }
 
+function bool(value: unknown, fallback = false) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.toLowerCase().trim();
+    if (['true', '1', 'yes', 'да'].includes(normalized)) return true;
+    if (['false', '0', 'no', 'нет'].includes(normalized)) return false;
+  }
+  return fallback;
+}
+
 function moneyNumber(value: unknown, fallback = 0) {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
 
@@ -230,6 +293,12 @@ function addDays(date: string, days: number) {
     String(d.getMonth() + 1).padStart(2, '0'),
     String(d.getDate()).padStart(2, '0'),
   ].join('-');
+}
+
+function weekdayIndexFromDate(date: string) {
+  const d = new Date(`${date}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return 0;
+  return (d.getDay() + 6) % 7;
 }
 
 function dateLabel(value: string, long = false) {
@@ -293,6 +362,19 @@ function slugify(value: unknown) {
     .slice(0, 50) || 'master';
 }
 
+function toMinutes(value: string) {
+  const [hours, minutes] = timeLabel(value).split(':').map((part) => Number(part));
+  return (Number.isFinite(hours) ? hours : 0) * 60 + (Number.isFinite(minutes) ? minutes : 0);
+}
+
+function fromMinutes(value: number) {
+  const safe = Math.max(0, Math.min(24 * 60, Math.round(value)));
+  const hours = Math.floor(safe / 60);
+  const minutes = safe % 60;
+
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
 function normalizeStatus(value: unknown): BookingStatus {
   return value === 'confirmed' ||
     value === 'completed' ||
@@ -332,8 +414,30 @@ function normalizeBooking(value: unknown, index: number): Booking | null {
 
   if (Object.keys(row).length === 0) return null;
 
+  const metadata = obj(row.metadata);
+  const transfer = obj(row.transfer ?? row.reschedule ?? row.rescheduleRequest ?? metadata.transfer ?? metadata.reschedule);
   const date = text(row.date, today()).slice(0, 10);
   const time = timeLabel(row.time);
+
+  const transferRequested =
+    bool(row.transferRequested) ||
+    bool(row.transfer_requested) ||
+    bool(row.rescheduleRequested) ||
+    bool(row.reschedule_requested) ||
+    bool(metadata.transferRequested) ||
+    bool(metadata.rescheduleRequested) ||
+    text(transfer.status) === 'requested' ||
+    text(row.status) === 'transfer_requested';
+
+  const rawTransferStatus = text(
+    row.transferStatus ??
+      row.transfer_status ??
+      row.rescheduleStatus ??
+      row.reschedule_status ??
+      transfer.status ??
+      metadata.transferStatus,
+    transferRequested ? 'requested' : 'none',
+  );
 
   return {
     id: text(row.id, `booking-${index}-${date}-${time}`),
@@ -346,6 +450,34 @@ function normalizeBooking(value: unknown, index: number): Booking | null {
     comment: text(row.comment),
     createdAt: text(row.createdAt ?? row.created_at, new Date().toISOString()),
     priceAmount: moneyNumber(row.priceAmount ?? row.price_amount, 0),
+    source: text(row.source, 'Mini App'),
+    channel: text(row.channel ?? row.sourceChannel ?? row.source_channel, 'web'),
+    transferRequested,
+    transferReason: text(
+      row.transferReason ??
+        row.transfer_reason ??
+        row.rescheduleReason ??
+        row.reschedule_reason ??
+        transfer.reason ??
+        metadata.transferReason,
+    ),
+    transferRequestedAt: text(
+      row.transferRequestedAt ??
+        row.transfer_requested_at ??
+        row.rescheduleRequestedAt ??
+        row.reschedule_requested_at ??
+        transfer.createdAt ??
+        transfer.created_at ??
+        metadata.transferRequestedAt,
+    ),
+    transferStatus:
+      rawTransferStatus === 'accepted' ||
+      rawTransferStatus === 'declined' ||
+      rawTransferStatus === 'done' ||
+      rawTransferStatus === 'requested'
+        ? rawTransferStatus
+        : 'none',
+    clientNote: text(row.clientNote ?? row.client_note ?? metadata.clientNote),
   };
 }
 
@@ -447,6 +579,29 @@ function normalizeThread(value: unknown, index: number): ChatThread {
   };
 }
 
+function normalizeSettings(data: Json): MiniSettings {
+  const source = obj(data.settings ?? data.miniSettings ?? data.bookingSettings ?? {});
+  const reminders = obj(source.reminders ?? source.reminderChannels ?? {});
+
+  const rawNoShow = text(source.noShowAction, DEFAULT_SETTINGS.noShowAction);
+
+  return {
+    publicBookingEnabled: bool(source.publicBookingEnabled ?? source.public_booking_enabled, DEFAULT_SETTINGS.publicBookingEnabled),
+    autoConfirmBookings: bool(source.autoConfirmBookings ?? source.auto_confirm_bookings, DEFAULT_SETTINGS.autoConfirmBookings),
+    allowClientReschedule: bool(source.allowClientReschedule ?? source.allow_client_reschedule, DEFAULT_SETTINGS.allowClientReschedule),
+    reschedulePolicy: text(source.reschedulePolicy ?? source.reschedule_policy, DEFAULT_SETTINGS.reschedulePolicy),
+    reminderBeforeHours: Math.max(1, moneyNumber(source.reminderBeforeHours ?? source.reminder_before_hours, DEFAULT_SETTINGS.reminderBeforeHours)),
+    reminderTelegram: bool(reminders.telegram ?? source.reminderTelegram, DEFAULT_SETTINGS.reminderTelegram),
+    reminderVk: bool(reminders.vk ?? source.reminderVk, DEFAULT_SETTINGS.reminderVk),
+    reminderWeb: bool(reminders.web ?? source.reminderWeb, DEFAULT_SETTINGS.reminderWeb),
+    noShowAction:
+      rawNoShow === 'keep' || rawNoShow === 'blacklist_note' || rawNoShow === 'sleep'
+        ? rawNoShow
+        : DEFAULT_SETTINGS.noShowAction,
+    bookingNotice: text(source.bookingNotice ?? source.booking_notice, DEFAULT_SETTINGS.bookingNotice),
+  };
+}
+
 function buildClients(bookings: Booking[], services: Service[]): Client[] {
   const prices = new Map(services.map((service) => [service.name, service.price]));
   const map = new Map<string, Client>();
@@ -457,27 +612,66 @@ function buildClients(bookings: Booking[], services: Service[]): Client[] {
     if (!key) continue;
 
     const prev = map.get(key);
-    const revenue =
-      booking.status === 'completed'
-        ? booking.priceAmount || prices.get(booking.service) || 0
-        : 0;
+    const isCompleted = booking.status === 'completed';
+    const isNoShow = booking.status === 'no_show';
+    const isCancelled = booking.status === 'cancelled';
+    const revenue = isCompleted ? booking.priceAmount || prices.get(booking.service) || 0 : 0;
+    const lastVisit = `${booking.date} ${booking.time}`;
+    const isNewer = !prev || lastVisit > prev.lastVisit;
 
     map.set(key, {
       id: key,
       name: booking.clientName,
       phone: booking.clientPhone,
-      visits: (prev?.visits ?? 0) + (booking.status === 'completed' ? 1 : 0),
+      visits: (prev?.visits ?? 0) + (isCompleted ? 1 : 0),
       revenue: (prev?.revenue ?? 0) + revenue,
-      lastVisit:
-        !prev || `${booking.date} ${booking.time}` > prev.lastVisit
-          ? `${booking.date} ${booking.time}`
-          : prev.lastVisit,
-      note: prev?.note || booking.comment,
+      lastVisit: isNewer ? lastVisit : prev?.lastVisit ?? lastVisit,
+      note: prev?.note || booking.clientNote || booking.comment,
       favorite: prev?.favorite || revenue > 0,
+      bookingsCount: (prev?.bookingsCount ?? 0) + 1,
+      transferCount: (prev?.transferCount ?? 0) + (booking.transferRequested ? 1 : 0),
+      noShowCount: (prev?.noShowCount ?? 0) + (isNoShow ? 1 : 0),
+      cancelledCount: (prev?.cancelledCount ?? 0) + (isCancelled ? 1 : 0),
+      lastStatus: isNewer ? booking.status : prev?.lastStatus ?? booking.status,
+      hasTransferRequest: Boolean(prev?.hasTransferRequest || booking.transferRequested),
+      lastService: isNewer ? booking.service : prev?.lastService ?? booking.service,
     });
   }
 
   return Array.from(map.values()).sort((a, b) => b.lastVisit.localeCompare(a.lastVisit));
+}
+
+function buildSlots(date: string, week: WorkDay[], services: Service[], bookings: Booking[]) {
+  const day = week.find((item) => item.weekdayIndex === weekdayIndexFromDate(date)) ?? DEFAULT_WEEK[0];
+
+  if (day.status === 'day-off') return [];
+
+  const activeServices = services.filter((service) => service.visible && service.status !== 'draft');
+  const step = Math.max(30, Math.min(120, activeServices[0]?.duration || 60));
+  const start = toMinutes(day.start);
+  const end = toMinutes(day.end);
+  const breakStart = day.breakStart ? toMinutes(day.breakStart) : -1;
+  const breakEnd = day.breakEnd ? toMinutes(day.breakEnd) : -1;
+  const busy = new Set(
+    bookings
+      .filter((booking) => booking.date === date && booking.status !== 'cancelled')
+      .map((booking) => booking.time),
+  );
+
+  const slots: Array<{ time: string; busy: boolean; breakTime: boolean }> = [];
+
+  for (let current = start; current + step <= end; current += step) {
+    const time = fromMinutes(current);
+    const inBreak = breakStart >= 0 && breakEnd >= 0 && current >= breakStart && current < breakEnd;
+
+    slots.push({
+      time,
+      busy: busy.has(time),
+      breakTime: inBreak,
+    });
+  }
+
+  return slots;
 }
 
 async function parseJson(response: Response): Promise<Json> {
@@ -560,7 +754,7 @@ function getAccent(data: Json) {
   return text(appearance.accentColor ?? appearance.accent ?? data.accentColor, '#d7c7aa');
 }
 
-function theme(light: boolean) {
+function ui(light: boolean) {
   return {
     page: light ? 'bg-[#f4f4f2] text-[#090909]' : 'bg-[#090909] text-white',
     card: light
@@ -606,7 +800,7 @@ function Card({
   className?: string;
   children: ReactNode;
 }) {
-  return <div className={cx('rounded-[14px] border shadow-none', theme(light).card, className)}>{children}</div>;
+  return <div className={cx('rounded-[14px] border shadow-none', ui(light).card, className)}>{children}</div>;
 }
 
 function Micro({ children }: { children: ReactNode }) {
@@ -645,7 +839,7 @@ function Button({
             ? light
               ? 'border-rose-300/40 bg-rose-50 text-rose-700'
               : 'border-rose-300/15 bg-rose-400/10 text-rose-100'
-            : theme(light).ghost,
+            : ui(light).ghost,
         className,
       )}
     >
@@ -662,7 +856,7 @@ function Field(props: React.InputHTMLAttributes<HTMLInputElement> & { light: boo
       {...rest}
       className={cx(
         'h-10 w-full rounded-[10px] border px-3 text-[13px] font-medium outline-none',
-        theme(light).input,
+        ui(light).input,
         className,
       )}
     />
@@ -677,7 +871,7 @@ function Area(props: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { light
       {...rest}
       className={cx(
         'min-h-[84px] w-full resize-none rounded-[10px] border px-3 py-2 text-[13px] font-medium leading-5 outline-none',
-        theme(light).input,
+        ui(light).input,
         className,
       )}
     />
@@ -686,18 +880,69 @@ function Area(props: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { light
 
 function Empty({ light, title, text: body }: { light: boolean; title: string; text: string }) {
   return (
-    <div className={cx('rounded-[12px] border p-4 text-center', theme(light).panel)}>
+    <div className={cx('rounded-[12px] border p-4 text-center', ui(light).panel)}>
       <div className="text-[13px] font-bold tracking-[-0.03em]">{title}</div>
-      <div className={cx('mt-1 text-[11px] leading-4', theme(light).muted)}>{body}</div>
+      <div className={cx('mt-1 text-[11px] leading-4', ui(light).muted)}>{body}</div>
     </div>
   );
 }
 
 function Stat({ light, label, value }: { light: boolean; label: string; value: string }) {
   return (
-    <div className={cx('rounded-[11px] border p-3', theme(light).panel)}>
-      <div className={cx('text-[10px] font-bold uppercase tracking-[0.14em]', theme(light).muted)}>{label}</div>
+    <div className={cx('rounded-[11px] border p-3', ui(light).panel)}>
+      <div className={cx('text-[10px] font-bold uppercase tracking-[0.14em]', ui(light).muted)}>{label}</div>
       <div className="mt-1 truncate text-[17px] font-semibold tracking-[-0.06em]">{value}</div>
+    </div>
+  );
+}
+
+function Badge({
+  light,
+  children,
+  tone = 'neutral',
+}: {
+  light: boolean;
+  children: ReactNode;
+  tone?: 'neutral' | 'success' | 'warning' | 'danger' | 'accent';
+}) {
+  const className =
+    tone === 'success'
+      ? light
+        ? 'border-emerald-300/35 bg-emerald-50 text-emerald-700'
+        : 'border-emerald-300/15 bg-emerald-400/10 text-emerald-100'
+      : tone === 'warning'
+        ? light
+          ? 'border-amber-300/35 bg-amber-50 text-amber-700'
+          : 'border-amber-300/15 bg-amber-400/10 text-amber-100'
+        : tone === 'danger'
+          ? light
+            ? 'border-rose-300/35 bg-rose-50 text-rose-700'
+            : 'border-rose-300/15 bg-rose-400/10 text-rose-100'
+          : tone === 'accent'
+            ? light
+              ? 'border-black/[0.08] bg-black text-white'
+              : 'border-white/[0.12] bg-white text-black'
+            : light
+              ? 'border-black/[0.08] bg-white/70 text-black/65'
+              : 'border-white/[0.09] bg-white/[0.055] text-white/65';
+
+  return (
+    <span className={cx('inline-flex h-6 items-center rounded-full border px-2 text-[10px] font-bold', className)}>
+      {children}
+    </span>
+  );
+}
+
+function BookingBadges({ light, booking }: { light: boolean; booking: Booking }) {
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {booking.transferRequested ? <Badge light={light} tone="warning">Просит перенос</Badge> : null}
+      {booking.status === 'new' ? <Badge light={light} tone="accent">Новая</Badge> : null}
+      {booking.status === 'confirmed' ? <Badge light={light}>В плане</Badge> : null}
+      {booking.status === 'completed' ? <Badge light={light} tone="success">Пришла</Badge> : null}
+      {booking.status === 'no_show' ? <Badge light={light} tone="warning">Не пришла</Badge> : null}
+      {booking.status === 'cancelled' ? <Badge light={light} tone="danger">Отмена</Badge> : null}
+      {booking.channel ? <Badge light={light}>{booking.channel}</Badge> : null}
     </div>
   );
 }
@@ -719,7 +964,7 @@ function Shell({
   refresh: () => void;
   children: ReactNode;
 }) {
-  const t = theme(light);
+  const t = ui(light);
   const isChatOpen = screen === 'chat';
 
   const tabs: Array<{ id: Screen; label: string; icon: ReactNode }> = [
@@ -775,7 +1020,7 @@ function Shell({
               const active =
                 screen === tab.id ||
                 (tab.id === 'chats' && screen === 'chat') ||
-                (tab.id === 'more' && ['clients', 'analytics', 'profile'].includes(screen));
+                (tab.id === 'more' && ['clients', 'analytics', 'profile', 'settings'].includes(screen));
 
               return (
                 <button
@@ -814,15 +1059,91 @@ function LoadingScreen() {
   );
 }
 
+function BookingRow({ light, booking, onClick }: { light: boolean; booking: Booking; onClick: () => void }) {
+  const t = ui(light);
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cx(
+        'flex w-full items-start gap-3 rounded-[12px] border p-3 text-left transition active:scale-[0.995]',
+        booking.transferRequested
+          ? light
+            ? 'border-amber-300/35 bg-amber-50/70'
+            : 'border-amber-300/15 bg-amber-400/[0.075]'
+          : t.panel,
+      )}
+    >
+      <div className="w-[56px] shrink-0">
+        <div className="text-[18px] font-semibold tracking-[-0.07em]">{timeLabel(booking.time)}</div>
+        <div className={cx('mt-1 flex items-center gap-1 text-[10px] font-bold', t.muted)}>
+          <span className="size-1.5 rounded-full" style={{ backgroundColor: STATUS_DOT[booking.status] }} />
+          {STATUS_LABEL[booking.status]}
+        </div>
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[13px] font-bold tracking-[-0.03em]">{booking.clientName}</div>
+        <div className={cx('mt-1 truncate text-[11px]', t.muted)}>{booking.service}</div>
+        <BookingBadges light={light} booking={booking} />
+
+        {booking.transferRequested ? (
+          <div className={cx('mt-2 rounded-[9px] border px-2 py-1.5 text-[11px] leading-4', light ? 'border-amber-300/30 bg-white/60 text-amber-800' : 'border-amber-300/15 bg-black/10 text-amber-100')}>
+            Клиент просит перенос{booking.transferReason ? `: ${booking.transferReason}` : ''}
+          </div>
+        ) : null}
+      </div>
+
+      <ChevronRight className={cx('mt-1 size-4 shrink-0', t.muted)} />
+    </button>
+  );
+}
+
+function ReadyRow({
+  light,
+  done,
+  title,
+  text: body,
+  onClick,
+}: {
+  light: boolean;
+  done: boolean;
+  title: string;
+  text: string;
+  onClick: () => void;
+}) {
+  const t = ui(light);
+
+  return (
+    <button type="button" onClick={onClick} className={cx('flex w-full items-center gap-3 rounded-[11px] border p-3 text-left', t.panel)}>
+      <span
+        className={cx(
+          'grid size-8 shrink-0 place-items-center rounded-[9px]',
+          done ? (light ? 'bg-emerald-50 text-emerald-700' : 'bg-emerald-400/10 text-emerald-200') : t.ghost,
+        )}
+      >
+        {done ? <Check className="size-4" /> : <ChevronRight className="size-4" />}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[13px] font-bold tracking-[-0.03em]">{title}</span>
+        <span className={cx('mt-0.5 block text-[11px]', t.muted)}>{body}</span>
+      </span>
+    </button>
+  );
+}
+
 function TodayScreen({
   light,
   profile,
   bookings,
   services,
   week,
+  settings,
   setScreen,
   openBooking,
   openQuick,
+  openChatForBooking,
   publicUrl,
 }: {
   light: boolean;
@@ -830,18 +1151,23 @@ function TodayScreen({
   bookings: Booking[];
   services: Service[];
   week: WorkDay[];
+  settings: MiniSettings;
   setScreen: (value: Screen) => void;
   openBooking: (booking: Booking) => void;
-  openQuick: () => void;
+  openQuick: (preset?: QuickBookingPreset) => void;
+  openChatForBooking: (booking: Booking) => void;
   publicUrl: string;
 }) {
-  const t = theme(light);
+  const t = ui(light);
   const [date, setDate] = useState(today());
 
   const days = useMemo(() => Array.from({ length: 7 }, (_, index) => addDays(today(), index)), []);
   const dayBookings = bookings.filter((booking) => booking.date === date).sort((a, b) => a.time.localeCompare(b.time));
   const active = dayBookings.filter((booking) => booking.status !== 'cancelled' && booking.status !== 'no_show');
   const completed = dayBookings.filter((booking) => booking.status === 'completed');
+  const transferQueue = bookings
+    .filter((booking) => booking.transferRequested && booking.transferStatus !== 'done' && booking.transferStatus !== 'declined')
+    .sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
   const revenue = completed.reduce(
     (sum, booking) => sum + (booking.priceAmount || services.find((service) => service.name === booking.service)?.price || 0),
     0,
@@ -851,6 +1177,7 @@ function TodayScreen({
     len(services) > 0,
     week.some((day) => day.status !== 'day-off'),
     Boolean(profile.phone || profile.telegram || profile.whatsapp),
+    settings.publicBookingEnabled,
   ];
 
   return (
@@ -860,21 +1187,21 @@ function TodayScreen({
           <div>
             <Micro>Рабочий пульт</Micro>
             <div className="mt-2 text-[32px] font-semibold leading-[0.9] tracking-[-0.095em]">Сегодня</div>
-            <div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Записи, касса, быстрые действия и готовность профиля.</div>
+            <div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Записи, переносы, касса и быстрые действия.</div>
           </div>
           <div className={cx('rounded-full border px-2.5 py-1 text-[10px] font-bold', t.ghost)}>
-            {ready.filter(Boolean).length}/3
+            {ready.filter(Boolean).length}/4
           </div>
         </div>
 
         <div className="mt-4 grid grid-cols-3 gap-2">
           <Stat light={light} label="Записей" value={String(len(active))} />
-          <Stat light={light} label="Пришли" value={String(len(completed))} />
+          <Stat light={light} label="Переносы" value={String(len(transferQueue))} />
           <Stat light={light} label="Касса" value={rub(revenue)} />
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <Button light={light} primary onClick={openQuick}>
+          <Button light={light} primary onClick={() => openQuick()}>
             <Plus className="size-4" />
             Запись
           </Button>
@@ -884,6 +1211,45 @@ function TodayScreen({
           </Button>
         </div>
       </Card>
+
+      {len(transferQueue) > 0 ? (
+        <Card light={light} className={cx('p-3', light ? 'border-amber-300/35 bg-amber-50/70' : 'border-amber-300/15 bg-amber-400/[0.075]')}>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <Micro>Требуют внимания</Micro>
+              <div className="mt-1 text-[15px] font-bold tracking-[-0.04em]">Клиенты просят перенос</div>
+            </div>
+            <Badge light={light} tone="warning">{len(transferQueue)}</Badge>
+          </div>
+
+          <div className="mt-3 space-y-2">
+            {transferQueue.slice(0, 3).map((booking) => (
+              <div key={booking.id} className={cx('rounded-[11px] border p-3', light ? 'border-amber-300/25 bg-white/65' : 'border-amber-300/15 bg-black/10')}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-[13px] font-bold">{booking.clientName}</div>
+                    <div className={cx('mt-1 text-[11px]', t.muted)}>
+                      {dateLabel(booking.date)} · {booking.time} · {booking.service}
+                    </div>
+                    <div className="mt-2 text-[11px] leading-4 opacity-75">
+                      {booking.transferReason || 'Клиент запросил другое время.'}
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => openBooking(booking)} className={cx('grid size-9 shrink-0 place-items-center rounded-[10px] border', t.ghost)}>
+                    <ChevronRight className="size-4" />
+                  </button>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <Button light={light} onClick={() => openChatForBooking(booking)}>Открыть чат</Button>
+                  <Button light={light} primary onClick={() => openQuick({ clientName: booking.clientName, clientPhone: booking.clientPhone, service: booking.service, comment: `Перенос записи ${booking.date} ${booking.time}` })}>
+                    Создать перенос
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : null}
 
       <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {days.map((day) => {
@@ -913,7 +1279,7 @@ function TodayScreen({
             <Micro>Лента дня</Micro>
             <div className="mt-1 text-[15px] font-bold tracking-[-0.04em]">{dateLabel(date, true)}</div>
           </div>
-          <Button light={light} className="h-8 px-2" onClick={openQuick}>
+          <Button light={light} className="h-8 px-2" onClick={() => openQuick({ date })}>
             <Plus className="size-3.5" />
           </Button>
         </div>
@@ -953,67 +1319,16 @@ function TodayScreen({
             text="Телефон, Telegram или WhatsApp"
             onClick={() => setScreen('profile')}
           />
+          <ReadyRow
+            light={light}
+            done={ready[3]}
+            title="Публичная запись"
+            text={settings.publicBookingEnabled ? 'Клиенты могут записываться' : 'Запись временно выключена'}
+            onClick={() => setScreen('settings')}
+          />
         </div>
       </Card>
     </>
-  );
-}
-
-function BookingRow({ light, booking, onClick }: { light: boolean; booking: Booking; onClick: () => void }) {
-  const t = theme(light);
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cx('flex w-full items-center gap-3 rounded-[12px] border p-3 text-left', t.panel)}
-    >
-      <div className="w-[56px] shrink-0">
-        <div className="text-[18px] font-semibold tracking-[-0.07em]">{timeLabel(booking.time)}</div>
-        <div className={cx('mt-1 flex items-center gap-1 text-[10px] font-bold', t.muted)}>
-          <span className="size-1.5 rounded-full" style={{ backgroundColor: STATUS_DOT[booking.status] }} />
-          {STATUS_LABEL[booking.status]}
-        </div>
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-[13px] font-bold tracking-[-0.03em]">{booking.clientName}</div>
-        <div className={cx('mt-1 truncate text-[11px]', t.muted)}>{booking.service}</div>
-      </div>
-      <ChevronRight className={cx('size-4 shrink-0', t.muted)} />
-    </button>
-  );
-}
-
-function ReadyRow({
-  light,
-  done,
-  title,
-  text: body,
-  onClick,
-}: {
-  light: boolean;
-  done: boolean;
-  title: string;
-  text: string;
-  onClick: () => void;
-}) {
-  const t = theme(light);
-
-  return (
-    <button type="button" onClick={onClick} className={cx('flex w-full items-center gap-3 rounded-[11px] border p-3 text-left', t.panel)}>
-      <span
-        className={cx(
-          'grid size-8 shrink-0 place-items-center rounded-[9px]',
-          done ? (light ? 'bg-emerald-50 text-emerald-700' : 'bg-emerald-400/10 text-emerald-200') : t.ghost,
-        )}
-      >
-        {done ? <Check className="size-4" /> : <ChevronRight className="size-4" />}
-      </span>
-      <span className="min-w-0">
-        <span className="block text-[13px] font-bold tracking-[-0.03em]">{title}</span>
-        <span className={cx('mt-0.5 block text-[11px]', t.muted)}>{body}</span>
-      </span>
-    </button>
   );
 }
 
@@ -1021,28 +1336,38 @@ function ScheduleScreen({
   light,
   workspaceId,
   days,
+  bookings,
+  services,
   setDays,
   reload,
 }: {
   light: boolean;
   workspaceId: string;
   days: WorkDay[];
+  bookings: Booking[];
+  services: Service[];
   setDays: (days: WorkDay[]) => void;
   reload: () => Promise<void>;
 }) {
-  const t = theme(light);
+  const t = ui(light);
   const [saving, setSaving] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(today());
+
+  const selectedBookings = bookings.filter((booking) => booking.date === selectedDate && booking.status !== 'cancelled');
+  const previewSlots = buildSlots(selectedDate, days, services, bookings);
 
   const update = (dayId: string, patch: Partial<WorkDay>) => {
     setDays(days.map((day) => (day.id === dayId ? { ...day, ...patch } : day)));
   };
 
-  const preset = (mode: '5/2' | '7/0') => {
+  const preset = (mode: '5/2' | '2/2' | '7/0' | 'weekends') => {
     setDays(
-      DEFAULT_WEEK.map((day) => ({
-        ...day,
-        status: mode === '7/0' || day.weekdayIndex < 5 ? 'workday' : 'day-off',
-      })),
+      DEFAULT_WEEK.map((day) => {
+        if (mode === '7/0') return { ...day, status: 'workday' };
+        if (mode === 'weekends') return { ...day, status: day.weekdayIndex >= 5 ? 'workday' : 'day-off', start: '11:00', end: '18:00' };
+        if (mode === '2/2') return { ...day, status: day.weekdayIndex === 0 || day.weekdayIndex === 1 || day.weekdayIndex === 4 || day.weekdayIndex === 5 ? 'workday' : 'day-off' };
+        return { ...day, status: day.weekdayIndex < 5 ? 'workday' : 'day-off' };
+      }),
     );
   };
 
@@ -1070,18 +1395,60 @@ function ScheduleScreen({
       <Card light={light} className="p-4">
         <Micro>График</Micro>
         <div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.09em]">Рабочие окна</div>
-        <div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Дни, время и перерывы для записи клиентов.</div>
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          <Button light={light} onClick={() => preset('5/2')}>
-            5/2
-          </Button>
-          <Button light={light} onClick={() => preset('7/0')}>
-            7 дней
-          </Button>
-          <Button light={light} primary disabled={saving} onClick={() => void save()}>
-            <Save className="size-4" />
-            {saving ? '...' : 'Сохранить'}
-          </Button>
+        <div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Дни, время, перерывы и предпросмотр свободных слотов.</div>
+        <div className="mt-4 grid grid-cols-4 gap-2">
+          <Button light={light} onClick={() => preset('5/2')}>5/2</Button>
+          <Button light={light} onClick={() => preset('2/2')}>2/2</Button>
+          <Button light={light} onClick={() => preset('7/0')}>7/0</Button>
+          <Button light={light} onClick={() => preset('weekends')}>Вых</Button>
+        </div>
+        <Button light={light} primary disabled={saving} onClick={() => void save()} className="mt-2 w-full">
+          <Save className="size-4" />
+          {saving ? 'Сохраняю' : 'Сохранить график'}
+        </Button>
+      </Card>
+
+      <Card light={light} className="p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <Micro>Предпросмотр</Micro>
+            <div className="mt-1 text-[15px] font-bold tracking-[-0.04em]">Свободные слоты</div>
+          </div>
+          <Field light={light} type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} className="max-w-[145px]" />
+        </div>
+
+        {len(selectedBookings) > 0 ? (
+          <div className={cx('mt-3 rounded-[11px] border p-3 text-[11px] leading-4', light ? 'border-amber-300/35 bg-amber-50 text-amber-800' : 'border-amber-300/15 bg-amber-400/10 text-amber-100')}>
+            На эту дату уже есть {len(selectedBookings)} записей. Если поменяешь график, проверь, чтобы не сломать существующие слоты.
+          </div>
+        ) : null}
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          {len(previewSlots) === 0 ? (
+            <Badge light={light} tone="danger">Выходной или нет слотов</Badge>
+          ) : (
+            previewSlots.map((slot) => (
+              <span
+                key={slot.time}
+                className={cx(
+                  'inline-flex h-8 items-center rounded-[9px] border px-2.5 text-[11px] font-bold',
+                  slot.busy
+                    ? light
+                      ? 'border-rose-300/35 bg-rose-50 text-rose-700'
+                      : 'border-rose-300/15 bg-rose-400/10 text-rose-100'
+                    : slot.breakTime
+                      ? light
+                        ? 'border-amber-300/35 bg-amber-50 text-amber-700'
+                        : 'border-amber-300/15 bg-amber-400/10 text-amber-100'
+                      : light
+                        ? 'border-black/[0.08] bg-white/70 text-black/70'
+                        : 'border-white/[0.09] bg-white/[0.055] text-white/70',
+                )}
+              >
+                {slot.time}
+              </span>
+            ))
+          )}
         </div>
       </Card>
 
@@ -1128,6 +1495,7 @@ function ServicesScreen({
   profile,
   workspaceId,
   services,
+  bookings,
   setServices,
   reload,
 }: {
@@ -1135,11 +1503,30 @@ function ServicesScreen({
   profile: Profile;
   workspaceId: string;
   services: Service[];
+  bookings: Booking[];
   setServices: (services: Service[]) => void;
   reload: () => Promise<void>;
 }) {
-  const t = theme(light);
+  const t = ui(light);
   const [saving, setSaving] = useState(false);
+  const [filter, setFilter] = useState<'all' | ServiceStatus | 'hidden'>('all');
+  const categories = Array.from(new Set(services.map((service) => service.category || 'Основное')));
+
+  const filteredServices = services.filter((service) => {
+    if (filter === 'all') return true;
+    if (filter === 'hidden') return !service.visible;
+    return service.status === filter;
+  });
+
+  const statsFor = (service: Service) => {
+    const rows = bookings.filter((booking) => booking.service === service.name);
+    return {
+      all: len(rows),
+      completed: rows.filter((booking) => booking.status === 'completed').length,
+      transfer: rows.filter((booking) => booking.transferRequested).length,
+      revenue: rows.reduce((sum, booking) => sum + (booking.status === 'completed' ? booking.priceAmount || service.price : 0), 0),
+    };
+  };
 
   const update = (serviceId: string, patch: Partial<Service>) => {
     setServices(services.map((service) => (service.id === serviceId ? { ...service, ...patch } : service)));
@@ -1154,7 +1541,7 @@ function ServicesScreen({
       {
         id: makeId('service'),
         name: 'Новая услуга',
-        category: 'Основное',
+        category: categories[0] || 'Основное',
         duration: 60,
         price: 0,
         status: 'active',
@@ -1212,7 +1599,7 @@ function ServicesScreen({
       <Card light={light} className="p-4">
         <Micro>Услуги</Micro>
         <div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.09em]">Каталог</div>
-        <div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Цены, длительность и видимость для клиентов.</div>
+        <div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Цены, длительность, видимость и статистика по каждой услуге.</div>
         <div className="mt-4 grid grid-cols-2 gap-2">
           <Button light={light} onClick={add}>
             <Plus className="size-4" />
@@ -1225,47 +1612,81 @@ function ServicesScreen({
         </div>
       </Card>
 
+      <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {[
+          ['all', 'Все'],
+          ['active', 'Активные'],
+          ['seasonal', 'Сезонные'],
+          ['draft', 'Черновики'],
+          ['hidden', 'Скрытые'],
+        ].map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setFilter(id as typeof filter)}
+            className={cx(
+              'shrink-0 rounded-full border px-3 py-2 text-[11px] font-bold',
+              filter === id ? (light ? 'border-black bg-black text-white' : 'border-white bg-white text-black') : ui(light).ghost,
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div className="space-y-2">
-        {len(services) === 0 ? (
+        {len(filteredServices) === 0 ? (
           <Empty light={light} title="Услуг нет" text="Добавь первую услугу, чтобы клиенты могли записываться." />
         ) : (
-          services.map((service) => (
-            <Card light={light} key={service.id} className="p-3">
-              <div className="flex items-start gap-2">
-                <div className="min-w-0 flex-1 space-y-2">
-                  <Field light={light} value={service.name} onChange={(event) => update(service.id, { name: event.target.value })} placeholder="Название" />
-                  <div className="grid grid-cols-2 gap-2">
-                    <Field light={light} value={service.category} onChange={(event) => update(service.id, { category: event.target.value })} placeholder="Категория" />
-                    <Field light={light} type="number" value={service.price} onChange={(event) => update(service.id, { price: Number(event.target.value) })} placeholder="Цена" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Field light={light} type="number" value={service.duration} onChange={(event) => update(service.id, { duration: Number(event.target.value) })} placeholder="Минут" />
-                    <select
-                      value={service.status}
-                      onChange={(event) => update(service.id, { status: event.target.value as ServiceStatus })}
-                      className={cx('h-10 rounded-[10px] border px-3 text-[12px] font-bold outline-none', t.input)}
-                    >
-                      <option value="active">Активна</option>
-                      <option value="seasonal">Сезонная</option>
-                      <option value="draft">Черновик</option>
-                    </select>
-                  </div>
-                  <label className={cx('flex items-center gap-2 text-[11px] font-bold', t.muted)}>
-                    <input type="checkbox" checked={service.visible} onChange={(event) => update(service.id, { visible: event.target.checked })} />
-                    Показывать клиентам
-                  </label>
-                </div>
+          filteredServices.map((service) => {
+            const stat = statsFor(service);
 
-                <button
-                  type="button"
-                  onClick={() => remove(service.id)}
-                  className={cx('grid size-10 shrink-0 place-items-center rounded-[10px] border', t.ghost)}
-                >
-                  <Trash2 className="size-4" />
-                </button>
-              </div>
-            </Card>
-          ))
+            return (
+              <Card light={light} key={service.id} className="p-3">
+                <div className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <Field light={light} value={service.name} onChange={(event) => update(service.id, { name: event.target.value })} placeholder="Название" />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Field light={light} value={service.category} onChange={(event) => update(service.id, { category: event.target.value })} placeholder="Категория" />
+                      <Field light={light} type="number" value={service.price} onChange={(event) => update(service.id, { price: Number(event.target.value) })} placeholder="Цена" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Field light={light} type="number" value={service.duration} onChange={(event) => update(service.id, { duration: Number(event.target.value) })} placeholder="Минут" />
+                      <select
+                        value={service.status}
+                        onChange={(event) => update(service.id, { status: event.target.value as ServiceStatus })}
+                        className={cx('h-10 rounded-[10px] border px-3 text-[12px] font-bold outline-none', t.input)}
+                      >
+                        <option value="active">Активна</option>
+                        <option value="seasonal">Сезонная</option>
+                        <option value="draft">Черновик</option>
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-2">
+                      <Stat light={light} label="Записи" value={String(stat.all)} />
+                      <Stat light={light} label="Пришли" value={String(stat.completed)} />
+                      <Stat light={light} label="Перенос" value={String(stat.transfer)} />
+                      <Stat light={light} label="Доход" value={rub(stat.revenue)} />
+                    </div>
+
+                    <label className={cx('flex items-center gap-2 text-[11px] font-bold', t.muted)}>
+                      <input type="checkbox" checked={service.visible} onChange={(event) => update(service.id, { visible: event.target.checked })} />
+                      Показывать клиентам
+                    </label>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => remove(service.id)}
+                    className={cx('grid size-10 shrink-0 place-items-center rounded-[10px] border', t.ghost)}
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </div>
+              </Card>
+            );
+          })
         )}
       </div>
     </>
@@ -1298,7 +1719,7 @@ function ChatsScreen({
   openChat: (threadId: string) => void;
   reloadChats: () => Promise<void>;
 }) {
-  const t = theme(light);
+  const t = ui(light);
   const [query, setQuery] = useState('');
 
   const filtered = threads.filter((thread) => {
@@ -1318,9 +1739,7 @@ function ChatsScreen({
           <div>
             <Micro>Чаты</Micro>
             <div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.09em]">Диалоги</div>
-            <div className={cx('mt-2 text-[12px] leading-5', t.muted)}>
-              Как в Telegram: список диалогов, быстрый вход и отдельная страница чата.
-            </div>
+            <div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Список диалогов как в Telegram и отдельная страница чата.</div>
           </div>
           <button
             type="button"
@@ -1414,7 +1833,7 @@ function ChatDetailScreen({
   sendMessage: (threadId: string, body: string) => Promise<void>;
   reloadChats: () => Promise<void>;
 }) {
-  const t = theme(light);
+  const t = ui(light);
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
 
@@ -1512,7 +1931,7 @@ function ChatDetailScreen({
                   )}
                 >
                   <div>{item.body}</div>
-                  <div className={cx('mt-1 text-right text-[9px] font-semibold opacity-45')}>{timeFromDate(item.createdAt)}</div>
+                  <div className="mt-1 text-right text-[9px] font-semibold opacity-45">{timeFromDate(item.createdAt)}</div>
                 </div>
               </div>
             );
@@ -1590,12 +2009,13 @@ function MoreScreen({
   publicUrl: string;
   setScreen: (value: Screen) => void;
 }) {
-  const t = theme(light);
+  const t = ui(light);
 
   const items: Array<{ screen: Screen; title: string; info: string; icon: ReactNode }> = [
     { screen: 'clients', title: 'Клиенты', info: `${len(clients)} карточек`, icon: <Users2 className="size-4" /> },
     { screen: 'analytics', title: 'Аналитика', info: `${len(bookings)} заявок`, icon: <BarChart3 className="size-4" /> },
     { screen: 'profile', title: 'Профиль', info: `/${profile.slug}`, icon: <UserRound className="size-4" /> },
+    { screen: 'settings', title: 'Настройки записи', info: 'Переносы, напоминания, правила', icon: <ShieldCheck className="size-4" /> },
   ];
 
   return (
@@ -1603,7 +2023,7 @@ function MoreScreen({
       <Card light={light} className="p-4">
         <Micro>Ещё</Micro>
         <div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.09em]">Управление</div>
-        <div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Клиенты, аналитика, профиль и полный кабинет.</div>
+        <div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Клиенты, аналитика, профиль, настройки и полный кабинет.</div>
         <div className="mt-4 grid grid-cols-2 gap-2">
           <Button light={light} onClick={() => navigator.clipboard?.writeText(publicUrl).catch(() => null)}>
             <Copy className="size-4" />
@@ -1649,45 +2069,167 @@ function MoreScreen({
   );
 }
 
-function ClientsScreen({ light, clients }: { light: boolean; clients: Client[] }) {
-  const t = theme(light);
+function ClientsScreen({
+  light,
+  clients,
+  bookings,
+  openChatForClient,
+  openQuick,
+}: {
+  light: boolean;
+  clients: Client[];
+  bookings: Booking[];
+  openChatForClient: (client: Client) => void;
+  openQuick: (preset?: QuickBookingPreset) => void;
+}) {
+  const t = ui(light);
+  const [segment, setSegment] = useState<ClientSegment>('all');
+  const [query, setQuery] = useState('');
+  const [selected, setSelected] = useState<Client | null>(null);
+
+  const filtered = clients.filter((client) => {
+    const needle = query.toLowerCase().trim();
+    const matchesSearch = !needle || `${client.name} ${client.phone} ${client.lastService}`.toLowerCase().includes(needle);
+
+    if (!matchesSearch) return false;
+
+    if (segment === 'vip') return client.favorite;
+    if (segment === 'transfer') return client.hasTransferRequest;
+    if (segment === 'no_show') return client.noShowCount > 0;
+    if (segment === 'new') return client.bookingsCount <= 1;
+    return true;
+  });
+
+  const selectedBookings = selected
+    ? bookings
+        .filter((booking) => booking.clientPhone === selected.phone || booking.clientName === selected.name)
+        .sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`))
+    : [];
 
   return (
     <>
       <Card light={light} className="p-4">
         <Micro>Клиенты</Micro>
         <div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.09em]">База</div>
-        <div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Карточки собираются из записей.</div>
+        <div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Сегменты, история записей, переносы, no-show и быстрые действия.</div>
+
+        <div className={cx('mt-4 flex h-10 items-center gap-2 rounded-[11px] border px-3', t.input)}>
+          <Search className="size-4 shrink-0 opacity-45" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Поиск клиента"
+            className="h-full min-w-0 flex-1 bg-transparent text-[13px] font-medium outline-none placeholder:opacity-55"
+          />
+        </div>
       </Card>
 
+      <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {[
+          ['all', 'Все'],
+          ['vip', 'VIP'],
+          ['transfer', 'Переносы'],
+          ['no_show', 'No-show'],
+          ['new', 'Новые'],
+        ].map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setSegment(id as ClientSegment)}
+            className={cx(
+              'shrink-0 rounded-full border px-3 py-2 text-[11px] font-bold',
+              segment === id ? (light ? 'border-black bg-black text-white' : 'border-white bg-white text-black') : t.ghost,
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div className="space-y-2">
-        {len(clients) === 0 ? (
-          <Empty light={light} title="Клиентов пока нет" text="Новые клиенты появятся после записей." />
+        {len(filtered) === 0 ? (
+          <Empty light={light} title="Клиентов нет" text="Попробуй другой сегмент или дождись первых записей." />
         ) : (
-          clients.map((client) => (
+          filtered.map((client) => (
             <Card light={light} key={client.id} className="p-3">
-              <div className="flex items-center gap-3">
+              <button type="button" onClick={() => setSelected(client)} className="flex w-full items-center gap-3 text-left">
                 <div className={cx('grid size-10 place-items-center rounded-[10px] border', t.panel)}>
                   {client.favorite ? <Star className="size-4" /> : <UserRound className="size-4" />}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[14px] font-bold tracking-[-0.04em]">{client.name}</div>
                   <div className={cx('mt-1 truncate text-[11px]', t.muted)}>
-                    {client.phone || 'без телефона'} · {client.visits} визитов · {rub(client.revenue)}
+                    {client.phone || 'без телефона'} · {client.bookingsCount} записей · {rub(client.revenue)}
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {client.favorite ? <Badge light={light} tone="accent">VIP</Badge> : null}
+                    {client.hasTransferRequest ? <Badge light={light} tone="warning">Просит перенос</Badge> : null}
+                    {client.noShowCount > 0 ? <Badge light={light} tone="warning">No-show {client.noShowCount}</Badge> : null}
+                    {client.cancelledCount > 0 ? <Badge light={light} tone="danger">Отмены {client.cancelledCount}</Badge> : null}
                   </div>
                 </div>
-                {client.phone ? (
-                  <a href={`tel:${client.phone}`} className={cx('grid size-9 place-items-center rounded-[10px] border', t.ghost)}>
-                    <Phone className="size-4" />
-                  </a>
-                ) : null}
-              </div>
+                <ChevronRight className={cx('size-4', t.muted)} />
+              </button>
 
-              {client.note ? <div className={cx('mt-3 rounded-[10px] border p-2 text-[11px] leading-4', t.panel)}>{client.note}</div> : null}
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {client.phone ? (
+                  <a href={`tel:${client.phone}`} className={cx('inline-flex h-9 items-center justify-center rounded-[9px] border text-[11px] font-bold', t.ghost)}>
+                    Звонок
+                  </a>
+                ) : (
+                  <Button light={light} className="h-9" disabled>Звонок</Button>
+                )}
+                <Button light={light} className="h-9" onClick={() => openChatForClient(client)}>Чат</Button>
+                <Button light={light} primary className="h-9" onClick={() => openQuick({ clientName: client.name, clientPhone: client.phone, service: client.lastService })}>Запись</Button>
+              </div>
             </Card>
           ))
         )}
       </div>
+
+      {selected ? (
+        <Sheet light={light} title={selected.name} onClose={() => setSelected(null)}>
+          <div className="space-y-3">
+            <div className={cx('rounded-[12px] border p-3', t.panel)}>
+              <div className="flex items-center gap-3">
+                <div className={cx('grid size-11 place-items-center rounded-full border text-[12px] font-black', light ? 'border-black bg-black text-white' : 'border-white bg-white text-black')}>
+                  {initials(selected.name)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[17px] font-semibold tracking-[-0.06em]">{selected.name}</div>
+                  <div className={cx('mt-1 text-[12px]', t.muted)}>{selected.phone || 'без телефона'}</div>
+                </div>
+              </div>
+
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <Stat light={light} label="Записи" value={String(selected.bookingsCount)} />
+                <Stat light={light} label="Визиты" value={String(selected.visits)} />
+                <Stat light={light} label="Доход" value={rub(selected.revenue)} />
+              </div>
+
+              {selected.note ? <div className={cx('mt-3 rounded-[10px] border p-2 text-[11px] leading-4', t.panel)}>{selected.note}</div> : null}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <Button light={light} onClick={() => openChatForClient(selected)}>Открыть чат</Button>
+              <Button light={light} primary onClick={() => openQuick({ clientName: selected.name, clientPhone: selected.phone, service: selected.lastService })}>
+                Создать запись
+              </Button>
+            </div>
+
+            <Card light={light} className="p-3">
+              <Micro>История</Micro>
+              <div className="mt-3 space-y-2">
+                {len(selectedBookings) === 0 ? (
+                  <Empty light={light} title="Истории нет" text="У клиента пока нет записей." />
+                ) : (
+                  selectedBookings.map((booking) => <BookingRow key={booking.id} light={light} booking={booking} onClick={() => undefined} />)
+                )}
+              </div>
+            </Card>
+          </div>
+        </Sheet>
+      ) : null}
     </>
   );
 }
@@ -1703,9 +2245,10 @@ function AnalyticsScreen({
   services: Service[];
   clients: Client[];
 }) {
-  const t = theme(light);
+  const t = ui(light);
   const completed = bookings.filter((booking) => booking.status === 'completed');
   const cancelled = bookings.filter((booking) => booking.status === 'cancelled' || booking.status === 'no_show');
+  const transfers = bookings.filter((booking) => booking.transferRequested);
   const revenue = clients.reduce((sum, client) => sum + client.revenue, 0);
   const conversion = len(bookings) > 0 ? Math.round((len(completed) / len(bookings)) * 100) : 0;
   const topServices = services
@@ -1721,12 +2264,14 @@ function AnalyticsScreen({
       <Card light={light} className="p-4">
         <Micro>Аналитика</Micro>
         <div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.09em]">Показатели</div>
-        <div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Короткий мобильный срез.</div>
+        <div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Короткий мобильный срез по заявкам, клиентам и услугам.</div>
         <div className="mt-4 grid grid-cols-2 gap-2">
           <Stat light={light} label="Выручка" value={rub(revenue)} />
           <Stat light={light} label="Конверсия" value={`${conversion}%`} />
           <Stat light={light} label="Пришли" value={String(len(completed))} />
+          <Stat light={light} label="Переносы" value={String(len(transfers))} />
           <Stat light={light} label="Срывы" value={String(len(cancelled))} />
+          <Stat light={light} label="Клиенты" value={String(len(clients))} />
         </div>
       </Card>
 
@@ -1772,7 +2317,7 @@ function ProfileScreen({
   publicUrl: string;
   reload: () => Promise<void>;
 }) {
-  const t = theme(light);
+  const t = ui(light);
   const [form, setForm] = useState({ ...profile, servicesText: list<string>(profile.services).join('\n') });
   const [saving, setSaving] = useState(false);
 
@@ -1851,6 +2396,155 @@ function ProfileScreen({
   );
 }
 
+function SettingsScreen({
+  light,
+  workspaceId,
+  settings,
+  setSettings,
+  reload,
+}: {
+  light: boolean;
+  workspaceId: string;
+  settings: MiniSettings;
+  setSettings: (settings: MiniSettings) => void;
+  reload: () => Promise<void>;
+}) {
+  const t = ui(light);
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    setSaving(true);
+
+    await fetch('/api/workspace/section', {
+      method: 'PATCH',
+      credentials: 'include',
+      cache: 'no-store',
+      headers: apiHeaders(true),
+      body: JSON.stringify({
+        workspaceId,
+        section: 'settings',
+        value: settings,
+      }),
+    }).catch(() => null);
+
+    await reload();
+    setSaving(false);
+  };
+
+  const toggle = (key: keyof MiniSettings) => {
+    setSettings({ ...settings, [key]: !settings[key] });
+  };
+
+  return (
+    <>
+      <Card light={light} className="p-4">
+        <Micro>Настройки</Micro>
+        <div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.09em]">Правила записи</div>
+        <div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Публичная запись, переносы, напоминания и поведение при no-show.</div>
+        <Button light={light} primary disabled={saving} onClick={() => void save()} className="mt-4 w-full">
+          <Save className="size-4" />
+          {saving ? 'Сохраняю' : 'Сохранить настройки'}
+        </Button>
+      </Card>
+
+      <Card light={light} className="p-3">
+        <Micro>Публичная запись</Micro>
+        <div className="mt-3 space-y-2">
+          <SettingSwitch light={light} title="Клиенты могут записываться" text="Показывать свободные слоты на публичной странице." checked={settings.publicBookingEnabled} onClick={() => toggle('publicBookingEnabled')} />
+          <SettingSwitch light={light} title="Автоподтверждение" text="Новая запись сразу попадает в план без ручного подтверждения." checked={settings.autoConfirmBookings} onClick={() => toggle('autoConfirmBookings')} />
+          <SettingSwitch light={light} title="Разрешить переносы" text="Клиент может нажать «Перенести», а ты увидишь плашку в mini app." checked={settings.allowClientReschedule} onClick={() => toggle('allowClientReschedule')} />
+        </div>
+      </Card>
+
+      <Card light={light} className="p-3">
+        <Micro>Напоминания</Micro>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <SettingChip light={light} active={settings.reminderTelegram} label="Telegram" onClick={() => toggle('reminderTelegram')} />
+          <SettingChip light={light} active={settings.reminderVk} label="VK" onClick={() => toggle('reminderVk')} />
+          <SettingChip light={light} active={settings.reminderWeb} label="Web" onClick={() => toggle('reminderWeb')} />
+        </div>
+        <div className="mt-3">
+          <Field
+            light={light}
+            type="number"
+            value={settings.reminderBeforeHours}
+            onChange={(event) => setSettings({ ...settings, reminderBeforeHours: Number(event.target.value) })}
+            placeholder="За сколько часов напоминать"
+          />
+        </div>
+      </Card>
+
+      <Card light={light} className="space-y-2 p-3">
+        <Micro>Тексты и политика</Micro>
+        <Area
+          light={light}
+          value={settings.reschedulePolicy}
+          onChange={(event) => setSettings({ ...settings, reschedulePolicy: event.target.value })}
+          placeholder="Политика переносов"
+        />
+        <Area
+          light={light}
+          value={settings.bookingNotice}
+          onChange={(event) => setSettings({ ...settings, bookingNotice: event.target.value })}
+          placeholder="Текст для клиента перед записью"
+        />
+        <select
+          value={settings.noShowAction}
+          onChange={(event) => setSettings({ ...settings, noShowAction: event.target.value as MiniSettings['noShowAction'] })}
+          className={cx('h-10 w-full rounded-[10px] border px-3 text-[12px] font-bold outline-none', t.input)}
+        >
+          <option value="sleep">После no-show помечать как спящий</option>
+          <option value="blacklist_note">Добавлять заметку риска</option>
+          <option value="keep">Ничего не делать</option>
+        </select>
+      </Card>
+    </>
+  );
+}
+
+function SettingSwitch({
+  light,
+  title,
+  text: body,
+  checked,
+  onClick,
+}: {
+  light: boolean;
+  title: string;
+  text: string;
+  checked: boolean;
+  onClick: () => void;
+}) {
+  const t = ui(light);
+
+  return (
+    <button type="button" onClick={onClick} className={cx('flex w-full items-center gap-3 rounded-[11px] border p-3 text-left', t.panel)}>
+      <span className={cx('relative h-6 w-10 rounded-full border transition', checked ? (light ? 'border-black bg-black' : 'border-white bg-white') : t.ghost)}>
+        <span className={cx('absolute top-1 size-4 rounded-full transition', checked ? 'left-5 bg-white dark:bg-black' : 'left-1 bg-black/35 dark:bg-white/35')} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[13px] font-bold tracking-[-0.03em]">{title}</span>
+        <span className={cx('mt-0.5 block text-[11px] leading-4', t.muted)}>{body}</span>
+      </span>
+    </button>
+  );
+}
+
+function SettingChip({ light, active, label, onClick }: { light: boolean; active: boolean; label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cx(
+        'h-10 rounded-[10px] border text-[11px] font-bold',
+        active ? (light ? 'border-black bg-black text-white' : 'border-white bg-white text-black') : ui(light).ghost,
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
 function Sheet({
   light,
   title,
@@ -1862,7 +2556,7 @@ function Sheet({
   onClose: () => void;
   children: ReactNode;
 }) {
-  const t = theme(light);
+  const t = ui(light);
 
   return (
     <div className="fixed inset-0 z-[90] flex items-end bg-black/45 px-2 pb-2 backdrop-blur-[10px]" onClick={onClose}>
@@ -1888,14 +2582,20 @@ function BookingSheet({
   services,
   onClose,
   updateStatus,
+  updateTransfer,
+  openChat,
+  openQuick,
 }: {
   light: boolean;
   booking: Booking | null;
   services: Service[];
   onClose: () => void;
   updateStatus: (id: string, status: BookingStatus) => Promise<void>;
+  updateTransfer: (id: string, transferStatus: Booking['transferStatus']) => Promise<void>;
+  openChat: (booking: Booking) => void;
+  openQuick: (preset?: QuickBookingPreset) => void;
 }) {
-  const t = theme(light);
+  const t = ui(light);
 
   if (!booking) return null;
 
@@ -1906,8 +2606,13 @@ function BookingSheet({
     <Sheet light={light} title="Запись" onClose={onClose}>
       <div className="space-y-3">
         <div className={cx('rounded-[12px] border p-3', t.panel)}>
-          <div className="text-[18px] font-semibold tracking-[-0.06em]">{booking.clientName}</div>
-          <div className={cx('mt-1 text-[12px]', t.muted)}>{booking.clientPhone || 'без телефона'}</div>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="truncate text-[18px] font-semibold tracking-[-0.06em]">{booking.clientName}</div>
+              <div className={cx('mt-1 text-[12px]', t.muted)}>{booking.clientPhone || 'без телефона'}</div>
+            </div>
+            <BookingBadges light={light} booking={booking} />
+          </div>
 
           <div className="mt-3 grid grid-cols-2 gap-2">
             <Stat light={light} label="Дата" value={dateLabel(booking.date)} />
@@ -1917,6 +2622,19 @@ function BookingSheet({
           </div>
 
           {booking.comment ? <div className={cx('mt-3 rounded-[10px] border p-2 text-[12px] leading-5', t.panel)}>{booking.comment}</div> : null}
+
+          {booking.transferRequested ? (
+            <div className={cx('mt-3 rounded-[11px] border p-3 text-[12px] leading-5', light ? 'border-amber-300/35 bg-amber-50 text-amber-800' : 'border-amber-300/15 bg-amber-400/10 text-amber-100')}>
+              <div className="font-bold">Клиент просит перенос</div>
+              <div className="mt-1 opacity-80">{booking.transferReason || 'Причина не указана.'}</div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Button light={light} onClick={() => void updateTransfer(booking.id, 'declined').then(onClose)}>Отклонить</Button>
+                <Button light={light} primary onClick={() => openQuick({ clientName: booking.clientName, clientPhone: booking.clientPhone, service: booking.service, comment: `Перенос записи ${booking.date} ${booking.time}` })}>
+                  Новый слот
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="grid grid-cols-2 gap-2">
@@ -1931,9 +2649,16 @@ function BookingSheet({
           <Button light={light} onClick={() => void updateStatus(booking.id, 'confirmed').then(onClose)}>
             В плане
           </Button>
+          <Button light={light} onClick={() => void updateStatus(booking.id, 'cancelled').then(onClose)}>
+            Освободить слот
+          </Button>
           <Button light={light} onClick={() => navigator.clipboard?.writeText(reminder).catch(() => null)}>
             <Copy className="size-4" />
             Напомнить
+          </Button>
+          <Button light={light} onClick={() => openChat(booking)}>
+            <MessageCircle className="size-4" />
+            Чат
           </Button>
         </div>
 
@@ -1952,24 +2677,26 @@ function QuickBookingSheet({
   light,
   profile,
   services,
+  preset,
   onClose,
   reload,
 }: {
   light: boolean;
   profile: Profile;
   services: Service[];
+  preset?: QuickBookingPreset;
   onClose: () => void;
   reload: () => Promise<void>;
 }) {
-  const t = theme(light);
+  const t = ui(light);
   const availableServices = services.filter((service) => service.visible && service.status !== 'draft');
   const [form, setForm] = useState({
-    clientName: '',
-    clientPhone: '',
-    service: availableServices[0]?.name || profile.services[0] || '',
-    date: today(),
-    time: '12:00',
-    comment: '',
+    clientName: preset?.clientName || '',
+    clientPhone: preset?.clientPhone || '',
+    service: preset?.service || availableServices[0]?.name || profile.services[0] || '',
+    date: preset?.date || today(),
+    time: preset?.time || '12:00',
+    comment: preset?.comment || '',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -2045,7 +2772,7 @@ function QuickBookingSheet({
 }
 
 function Onboarding({ light, reload }: { light: boolean; reload: () => Promise<void> }) {
-  const t = theme(light);
+  const t = ui(light);
   const [form, setForm] = useState({
     name: '',
     profession: '',
@@ -2110,6 +2837,7 @@ function Onboarding({ light, reload }: { light: boolean; reload: () => Promise<v
           <Area light={light} value={form.services} onChange={(event) => setForm({ ...form, services: event.target.value })} placeholder="Услуги, каждая с новой строки" />
 
           <Button light={light} primary disabled={saving || !text(form.name)} onClick={() => void save()} className="w-full">
+            <Sparkles className="size-4" />
             Создать профиль
           </Button>
         </Card>
@@ -2125,6 +2853,7 @@ export function MiniAppEntry() {
   const [workspaceId, setWorkspaceId] = useState('');
   const [profile, setProfile] = useState<Profile | null>(null);
   const [data, setData] = useState<Json>({});
+  const [settings, setSettings] = useState<MiniSettings>(DEFAULT_SETTINGS);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [week, setWeek] = useState<WorkDay[]>(DEFAULT_WEEK);
@@ -2133,6 +2862,7 @@ export function MiniAppEntry() {
   const [activeThreadId, setActiveThreadId] = useState('');
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [quickOpen, setQuickOpen] = useState(false);
+  const [quickPreset, setQuickPreset] = useState<QuickBookingPreset | undefined>(undefined);
   const [error, setError] = useState('');
 
   const accent = useMemo(() => getAccent(data), [data]);
@@ -2171,14 +2901,11 @@ export function MiniAppEntry() {
       const nextThreads = list(payload.threads).map((item, index) => normalizeThread(item, index));
 
       setThreads(nextThreads);
-
-      if (!activeThreadId && nextThreads[0]) {
-        setActiveThreadId(nextThreads[0].id);
-      }
+      setActiveThreadId((current) => current || nextThreads[0]?.id || '');
     }
 
     setThreadsLoading(false);
-  }, [activeThreadId]);
+  }, []);
 
   const load = useCallback(async () => {
     setError('');
@@ -2197,6 +2924,7 @@ export function MiniAppEntry() {
         setWorkspaceId('');
         setProfile(null);
         setData({});
+        setSettings(DEFAULT_SETTINGS);
         setBookings([]);
         setServices([]);
         setWeek(DEFAULT_WEEK);
@@ -2221,6 +2949,7 @@ export function MiniAppEntry() {
         .filter((item): item is Booking => Boolean(item));
       const nextServices = normalizeServices(nextProfile, nextData);
       const nextWeek = normalizeWeek(nextData);
+      const nextSettings = normalizeSettings(nextData);
 
       setWorkspaceId(text(workspace.id));
       setProfile(nextProfile);
@@ -2228,6 +2957,7 @@ export function MiniAppEntry() {
       setBookings(nextBookings);
       setServices(nextServices);
       setWeek(nextWeek);
+      setSettings(nextSettings);
 
       void loadChats();
     } catch (err) {
@@ -2254,6 +2984,34 @@ export function MiniAppEntry() {
       body: JSON.stringify({
         bookingId,
         status,
+      }),
+    }).catch(() => null);
+
+    await load();
+  };
+
+  const updateTransfer = async (bookingId: string, transferStatus: Booking['transferStatus']) => {
+    setBookings((current) =>
+      current.map((booking) =>
+        booking.id === bookingId
+          ? {
+              ...booking,
+              transferStatus,
+              transferRequested: transferStatus === 'requested',
+            }
+          : booking,
+      ),
+    );
+
+    await fetch('/api/bookings', {
+      method: 'PATCH',
+      credentials: 'include',
+      cache: 'no-store',
+      headers: apiHeaders(true),
+      body: JSON.stringify({
+        bookingId,
+        transferStatus,
+        transferRequested: transferStatus === 'requested',
       }),
     }).catch(() => null);
 
@@ -2302,9 +3060,46 @@ export function MiniAppEntry() {
     await loadChats();
   };
 
+  const openQuick = (preset?: QuickBookingPreset) => {
+    setQuickPreset(preset);
+    setQuickOpen(true);
+  };
+
   const openChat = (threadId: string) => {
     setActiveThreadId(threadId);
     setScreen('chat');
+  };
+
+  const openChatForBooking = (booking: Booking) => {
+    const found = threads.find((thread) => {
+      const phoneMatch = booking.clientPhone && thread.clientPhone && booking.clientPhone === thread.clientPhone;
+      const nameMatch = booking.clientName && thread.clientName && booking.clientName.toLowerCase() === thread.clientName.toLowerCase();
+      return phoneMatch || nameMatch;
+    });
+
+    if (found) {
+      openChat(found.id);
+      setSelectedBooking(null);
+      return;
+    }
+
+    setScreen('chats');
+    setSelectedBooking(null);
+  };
+
+  const openChatForClient = (client: Client) => {
+    const found = threads.find((thread) => {
+      const phoneMatch = client.phone && thread.clientPhone && client.phone === thread.clientPhone;
+      const nameMatch = client.name && thread.clientName && client.name.toLowerCase() === thread.clientName.toLowerCase();
+      return phoneMatch || nameMatch;
+    });
+
+    if (found) {
+      openChat(found.id);
+      return;
+    }
+
+    setScreen('chats');
   };
 
   if (loading) return <LoadingScreen />;
@@ -2352,9 +3147,11 @@ export function MiniAppEntry() {
             bookings={sortedBookings}
             services={services}
             week={week}
+            settings={settings}
             setScreen={setScreen}
             openBooking={setSelectedBooking}
-            openQuick={() => setQuickOpen(true)}
+            openQuick={openQuick}
+            openChatForBooking={openChatForBooking}
             publicUrl={publicUrl}
           />
         ) : null}
@@ -2364,6 +3161,8 @@ export function MiniAppEntry() {
             light={light}
             workspaceId={workspaceId}
             days={week}
+            bookings={bookings}
+            services={services}
             setDays={setWeek}
             reload={load}
           />
@@ -2375,6 +3174,7 @@ export function MiniAppEntry() {
             profile={profile}
             workspaceId={workspaceId}
             services={services}
+            bookings={bookings}
             setServices={setServices}
             reload={load}
           />
@@ -2412,7 +3212,15 @@ export function MiniAppEntry() {
           />
         ) : null}
 
-        {screen === 'clients' ? <ClientsScreen light={light} clients={clients} /> : null}
+        {screen === 'clients' ? (
+          <ClientsScreen
+            light={light}
+            clients={clients}
+            bookings={bookings}
+            openChatForClient={openChatForClient}
+            openQuick={openQuick}
+          />
+        ) : null}
 
         {screen === 'analytics' ? (
           <AnalyticsScreen
@@ -2432,6 +3240,16 @@ export function MiniAppEntry() {
             reload={load}
           />
         ) : null}
+
+        {screen === 'settings' ? (
+          <SettingsScreen
+            light={light}
+            workspaceId={workspaceId}
+            settings={settings}
+            setSettings={setSettings}
+            reload={load}
+          />
+        ) : null}
       </Shell>
 
       <BookingSheet
@@ -2440,14 +3258,22 @@ export function MiniAppEntry() {
         services={services}
         onClose={() => setSelectedBooking(null)}
         updateStatus={updateBookingStatus}
+        updateTransfer={updateTransfer}
+        openChat={openChatForBooking}
+        openQuick={openQuick}
       />
 
       {quickOpen ? (
         <QuickBookingSheet
+          key={`${quickPreset?.clientPhone || ''}-${quickPreset?.date || ''}-${quickPreset?.time || ''}-${quickPreset?.comment || ''}`}
           light={light}
           profile={profile}
           services={services}
-          onClose={() => setQuickOpen(false)}
+          preset={quickPreset}
+          onClose={() => {
+            setQuickOpen(false);
+            setQuickPreset(undefined);
+          }}
           reload={load}
         />
       ) : null}
