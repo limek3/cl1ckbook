@@ -5,7 +5,6 @@ import { useEffect } from 'react';
 type TelegramWebApp = {
   ready?: () => void;
   expand?: () => void;
-  disableVerticalSwipes?: () => void;
   viewportHeight?: number;
   viewportStableHeight?: number;
   safeAreaInset?: { top?: number; bottom?: number; left?: number; right?: number };
@@ -20,27 +19,16 @@ type TelegramWindow = Window & {
   };
 };
 
-function safeRun(action: () => void) {
+function safe(action: () => void) {
   try {
     action();
-  } catch {
-    // Telegram WebView versions differ. Some methods/events exist in typings
-    // but throw inside older mobile clients. Never let viewport helpers crash app.
-  }
+  } catch {}
 }
 
-function setCssVar(name: string, value?: number) {
+function setPx(name: string, value: unknown) {
   if (typeof document === 'undefined') return;
-  if (typeof value !== 'number' || !Number.isFinite(value)) return;
-  document.documentElement.style.setProperty(name, `${Math.max(0, Math.round(value))}px`);
-}
-
-function subscribe(webApp: TelegramWebApp | undefined, event: string, callback: () => void) {
-  safeRun(() => webApp?.onEvent?.(event, callback));
-}
-
-function unsubscribe(webApp: TelegramWebApp | undefined, event: string, callback: () => void) {
-  safeRun(() => webApp?.offEvent?.(event, callback));
+  const number = typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  document.documentElement.style.setProperty(name, `${Math.max(0, Math.round(number))}px`);
 }
 
 export function TelegramMiniAppViewport() {
@@ -49,32 +37,27 @@ export function TelegramMiniAppViewport() {
 
     const webApp = (window as TelegramWindow).Telegram?.WebApp;
 
-    const applyViewport = () => {
-      safeRun(() => {
-        const safe = webApp?.safeAreaInset ?? {};
-        const contentSafe = webApp?.contentSafeAreaInset ?? {};
-        setCssVar('--tg-safe-top', Math.max(safe.top ?? 0, contentSafe.top ?? 0));
-        setCssVar('--tg-safe-bottom', Math.max(safe.bottom ?? 0, contentSafe.bottom ?? 0));
-        setCssVar('--tg-viewport-height', webApp?.viewportStableHeight ?? webApp?.viewportHeight);
-      });
+    const apply = () => {
+      const safeArea = webApp?.safeAreaInset ?? {};
+      const contentSafeArea = webApp?.contentSafeAreaInset ?? {};
+      setPx('--tg-safe-top', Math.max(safeArea.top ?? 0, contentSafeArea.top ?? 0));
+      setPx('--tg-safe-bottom', Math.max(safeArea.bottom ?? 0, contentSafeArea.bottom ?? 0));
+      setPx('--tg-viewport-height', webApp?.viewportStableHeight ?? webApp?.viewportHeight ?? window.innerHeight);
     };
 
-    safeRun(() => webApp?.ready?.());
-    safeRun(() => webApp?.expand?.());
-    safeRun(() => webApp?.disableVerticalSwipes?.());
+    safe(() => window.setTimeout(() => webApp?.ready?.(), 0));
+    safe(() => window.setTimeout(() => webApp?.expand?.(), 0));
+    safe(apply);
 
-    applyViewport();
-
-    // viewportChanged is the stable Telegram event. The safe-area events are
-    // wrapped because older Telegram mobile clients may throw on unknown events.
-    subscribe(webApp, 'viewportChanged', applyViewport);
-    subscribe(webApp, 'safeAreaChanged', applyViewport);
-    subscribe(webApp, 'contentSafeAreaChanged', applyViewport);
+    const handler = () => safe(apply);
+    safe(() => webApp?.onEvent?.('viewportChanged', handler));
+    window.addEventListener('resize', handler);
+    window.addEventListener('orientationchange', handler);
 
     return () => {
-      unsubscribe(webApp, 'viewportChanged', applyViewport);
-      unsubscribe(webApp, 'safeAreaChanged', applyViewport);
-      unsubscribe(webApp, 'contentSafeAreaChanged', applyViewport);
+      safe(() => webApp?.offEvent?.('viewportChanged', handler));
+      window.removeEventListener('resize', handler);
+      window.removeEventListener('orientationchange', handler);
     };
   }, []);
 
