@@ -4,6 +4,7 @@ import Link from 'next/link';
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type ReactNode,
@@ -33,8 +34,8 @@ import {
   XCircle,
 } from 'lucide-react';
 
-import { BrandLogo } from '@/components/brand/brand-logo';
 import { useApp } from '@/lib/app-context';
+import { authorizeTelegramMiniAppSession } from '@/lib/telegram-miniapp-auth-client';
 import { cn } from '@/lib/utils';
 import type {
   Booking,
@@ -154,6 +155,12 @@ function sortBookings(a: Booking, b: Booking) {
   return `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`);
 }
 
+function safeWorkspaceRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
 function profileToForm(profile: MasterProfile | null): MasterProfileFormValues {
   return {
     name: profile?.name ?? '',
@@ -172,10 +179,22 @@ function profileToForm(profile: MasterProfile | null): MasterProfileFormValues {
   };
 }
 
-function safeWorkspaceRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
+function MiniWordmark() {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex size-8 items-center justify-center rounded-[10px] border border-white/[0.10] bg-white/[0.055] text-[12px] font-bold text-white">
+        КБ
+      </div>
+      <div>
+        <div className="text-[15px] font-semibold leading-none tracking-[-0.055em] text-white">
+          КликБук
+        </div>
+        <div className="mt-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-white/30">
+          кабинет мастера
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function MiniCard({
@@ -188,7 +207,7 @@ function MiniCard({
   return (
     <section
       className={cn(
-        'rounded-[22px] border border-white/[0.08] bg-[#101010]/92 shadow-none backdrop-blur-[18px]',
+        'rounded-[20px] border border-white/[0.08] bg-[#101010]/92 shadow-none backdrop-blur-[18px]',
         className,
       )}
     >
@@ -223,8 +242,7 @@ function MiniButton({
       onClick={onClick}
       className={cn(
         'flex h-10 items-center justify-center gap-2 rounded-[14px] px-3 text-[12px] font-semibold tracking-[-0.035em] transition active:scale-[0.985] disabled:pointer-events-none disabled:opacity-45',
-        variant === 'primary' &&
-          'bg-white text-black hover:bg-white/90',
+        variant === 'primary' && 'bg-white text-black hover:bg-white/90',
         variant === 'secondary' &&
           'border border-white/[0.08] bg-white/[0.055] text-white hover:bg-white/[0.08]',
         variant === 'danger' &&
@@ -267,6 +285,9 @@ function MiniInput({
   placeholder?: string;
   textarea?: boolean;
 }) {
+  const className =
+    'w-full rounded-[15px] border border-white/[0.08] !bg-[#141414] px-3 text-[14px] font-medium tracking-[-0.035em] !text-white outline-none placeholder:!text-white/25 focus:border-white/[0.16] focus:!bg-[#171717]';
+
   return (
     <label className="block">
       <div className="mb-2 text-[11px] font-semibold tracking-[-0.03em] text-white/58">
@@ -278,63 +299,18 @@ function MiniInput({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
-          rows={5}
-          className="w-full resize-none rounded-[16px] border border-white/[0.08] bg-white/[0.045] px-3 py-3 text-[14px] font-medium tracking-[-0.035em] text-white outline-none placeholder:text-white/25 focus:border-white/[0.16] focus:bg-white/[0.065]"
+          rows={4}
+          className={cn(className, 'min-h-[112px] resize-none py-3')}
         />
       ) : (
         <input
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
-          className="h-11 w-full rounded-[16px] border border-white/[0.08] bg-white/[0.045] px-3 text-[14px] font-medium tracking-[-0.035em] text-white outline-none placeholder:text-white/25 focus:border-white/[0.16] focus:bg-white/[0.065]"
+          className={cn(className, 'h-11')}
         />
       )}
     </label>
-  );
-}
-
-function MiniToggle({
-  checked,
-  label,
-  description,
-  onChange,
-}: {
-  checked: boolean;
-  label: string;
-  description: string;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!checked)}
-      className="flex w-full items-center justify-between gap-4 rounded-[18px] border border-white/[0.08] bg-white/[0.035] p-3 text-left"
-    >
-      <span>
-        <span className="block text-[13px] font-semibold tracking-[-0.04em] text-white">
-          {label}
-        </span>
-        <span className="mt-1 block text-[11px] leading-4 text-white/42">
-          {description}
-        </span>
-      </span>
-
-      <span
-        className={cn(
-          'relative h-7 w-12 shrink-0 rounded-full border transition',
-          checked
-            ? 'border-white/20 bg-white text-black'
-            : 'border-white/[0.08] bg-white/[0.055]',
-        )}
-      >
-        <span
-          className={cn(
-            'absolute top-1 size-5 rounded-full transition',
-            checked ? 'left-6 bg-black' : 'left-1 bg-white/35',
-          )}
-        />
-      </span>
-    </button>
   );
 }
 
@@ -348,8 +324,8 @@ function EmptyState({
   icon?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-[20px] border border-dashed border-white/[0.08] bg-white/[0.025] px-5 py-8 text-center">
-      <div className="mb-3 flex size-11 items-center justify-center rounded-[16px] border border-white/[0.08] bg-white/[0.045] text-white/55">
+    <div className="flex flex-col items-center justify-center rounded-[18px] border border-dashed border-white/[0.08] bg-white/[0.025] px-5 py-7 text-center">
+      <div className="mb-3 flex size-10 items-center justify-center rounded-[14px] border border-white/[0.08] bg-white/[0.045] text-white/55">
         {icon ?? <CalendarClock className="size-5" />}
       </div>
       <div className="text-[15px] font-semibold tracking-[-0.045em] text-white">
@@ -362,45 +338,22 @@ function EmptyState({
   );
 }
 
-function MiniLogoHeader({
-  profile,
-  onRefresh,
-}: {
-  profile: MasterProfile | null;
-  onRefresh: () => void;
-}) {
+function MiniLoading() {
   return (
-    <header className="mb-4 flex items-center justify-between gap-3">
-      <div className="flex min-w-0 items-center gap-2.5">
-        <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-[11px] border border-white/[0.08] bg-white/[0.055]">
-          {profile?.avatar ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={profile.avatar} alt="" className="size-full object-cover" />
-          ) : (
-            <span className="text-[10px] font-bold text-white">
-              {getInitials(profile?.name)}
-            </span>
-          )}
-        </div>
+    <main className="flex min-h-screen items-center justify-center bg-[#090909] px-6 text-white">
+      <div className="flex w-full max-w-[310px] flex-col items-center rounded-[22px] border border-white/[0.08] bg-[#101010]/92 px-5 py-6 text-center">
+        <MiniWordmark />
 
-        <div className="min-w-0">
-          <div className="truncate text-[13px] font-semibold tracking-[-0.045em] text-white">
-            {profile?.name || 'КликБук'}
-          </div>
-          <div className="truncate text-[10px] font-semibold tracking-[-0.03em] text-white/35">
-            кабинет мастера
-          </div>
+        <div className="mt-5 size-8 animate-spin rounded-full border border-white/[0.08] border-t-white/60" />
+
+        <div className="mt-5 text-[15px] font-semibold tracking-[-0.045em]">
+          Загружаем кабинет
+        </div>
+        <div className="mt-1 max-w-[230px] text-[12px] leading-5 text-white/42">
+          Проверяем Telegram-сессию и загружаем профиль мастера.
         </div>
       </div>
-
-      <button
-        type="button"
-        onClick={onRefresh}
-        className="flex size-8 items-center justify-center rounded-[11px] border border-white/[0.08] bg-white/[0.045] text-white/55 active:scale-95"
-      >
-        <RefreshCcw className="size-3.5" />
-      </button>
-    </header>
+    </main>
   );
 }
 
@@ -439,7 +392,38 @@ function MiniShell({
       className="cb-mini-app-root min-h-screen bg-[#090909] px-3 text-white"
     >
       <div className="mx-auto w-full max-w-[430px]">
-        <MiniLogoHeader profile={profile} onRefresh={onRefresh} />
+        <header className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-[11px] border border-white/[0.08] bg-white/[0.055]">
+              {profile?.avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={profile.avatar} alt="" className="size-full object-cover" />
+              ) : (
+                <span className="text-[10px] font-bold text-white">
+                  {getInitials(profile?.name)}
+                </span>
+              )}
+            </div>
+
+            <div className="min-w-0">
+              <div className="truncate text-[13px] font-semibold tracking-[-0.045em] text-white">
+                {profile?.name || 'КликБук'}
+              </div>
+              <div className="truncate text-[10px] font-semibold tracking-[-0.03em] text-white/35">
+                кабинет мастера
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onRefresh}
+            className="flex size-8 items-center justify-center rounded-[11px] border border-white/[0.08] bg-white/[0.045] text-white/55 active:scale-95"
+          >
+            <RefreshCcw className="size-3.5" />
+          </button>
+        </header>
+
         {children}
       </div>
 
@@ -475,25 +459,6 @@ function MiniShell({
   );
 }
 
-function MiniLoading() {
-  return (
-    <main className="flex min-h-screen items-center justify-center bg-[#090909] px-6 text-white">
-      <div className="flex w-full max-w-[310px] flex-col items-center rounded-[22px] border border-white/[0.08] bg-[#101010]/92 px-5 py-6 text-center">
-        <BrandLogo />
-
-        <div className="mt-5 size-9 animate-spin rounded-full border border-white/[0.08] border-t-white/60" />
-
-        <div className="mt-5 text-[15px] font-semibold tracking-[-0.045em]">
-          Загружаем кабинет
-        </div>
-        <div className="mt-1 max-w-[230px] text-[12px] leading-5 text-white/42">
-          Поднимаем сессию, записи, чаты и настройки мастера.
-        </div>
-      </div>
-    </main>
-  );
-}
-
 function MiniOnboarding({
   onSave,
 }: {
@@ -522,15 +487,15 @@ function MiniOnboarding({
   const steps = [
     {
       title: 'Основное',
-      text: 'Имя, город и короткое описание.',
+      text: 'Имя, город и описание.',
     },
     {
       title: 'Услуги',
-      text: 'Что клиент сможет выбрать при записи.',
+      text: 'Что клиент сможет выбрать.',
     },
     {
       title: 'Контакты',
-      text: 'Куда писать клиенту и как показать страницу.',
+      text: 'Телефон, Telegram и ссылка.',
     },
   ];
 
@@ -566,7 +531,7 @@ function MiniOnboarding({
 
   return (
     <main
-      className="min-h-screen bg-[#090909] px-3 text-white"
+      className="cb-mini-app-root min-h-screen bg-[#090909] px-3 text-white"
       style={{
         paddingTop: 'calc(var(--tg-safe-top, 0px) + 10px)',
         paddingBottom: 'calc(var(--tg-safe-bottom, 0px) + 24px)',
@@ -574,21 +539,21 @@ function MiniOnboarding({
     >
       <div className="mx-auto w-full max-w-[430px]">
         <header className="mb-5 flex items-center justify-between">
-          <BrandLogo />
+          <MiniWordmark />
           <div className="rounded-full border border-white/[0.08] bg-white/[0.045] px-3 py-1 text-[10px] font-semibold text-white/52">
-            шаг {step + 1}/{steps.length}
+            {step + 1}/{steps.length}
           </div>
         </header>
 
-        <div className="mb-5">
+        <section className="mb-4">
           <MiniLabel>быстрый старт</MiniLabel>
-          <h1 className="mt-2 text-[30px] font-semibold leading-none tracking-[-0.075em]">
+          <h1 className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.075em]">
             Создадим страницу
           </h1>
-          <p className="mt-2 max-w-[310px] text-[13px] leading-5 text-white/45">
-            Минимум данных сейчас. Остальное можно донастроить позже в кабинете.
+          <p className="mt-2 max-w-[320px] text-[13px] leading-5 text-white/45">
+            Заполните минимум. Остальное можно донастроить позже.
           </p>
-        </div>
+        </section>
 
         <MiniCard className="overflow-hidden">
           <div className="border-b border-white/[0.08] p-4">
@@ -641,8 +606,7 @@ function MiniOnboarding({
                   textarea
                 />
                 <div className="rounded-[16px] border border-white/[0.08] bg-white/[0.035] p-3 text-[12px] leading-5 text-white/42">
-                  Каждую услугу лучше писать с новой строки. Потом можно добавить длительность,
-                  цену и описание.
+                  Каждую услугу лучше писать с новой строки.
                 </div>
               </>
             ) : null}
@@ -687,7 +651,7 @@ function MiniOnboarding({
             Назад
           </MiniButton>
           <MiniButton variant="primary" disabled={saving} onClick={handleNext}>
-            {saving ? 'Сохраняем...' : step === steps.length - 1 ? 'Сохранить профиль' : 'Далее'}
+            {saving ? 'Сохраняем...' : step === steps.length - 1 ? 'Сохранить' : 'Далее'}
           </MiniButton>
         </div>
       </div>
@@ -732,7 +696,7 @@ function TodayScreen({
           Сегодня
         </h1>
         <p className="mt-2 max-w-[320px] text-[12px] leading-5 text-white/42">
-          Быстрый пульт мастера: ближайшая запись, статусы, клиенты и действия на день.
+          Ближайшая запись, статусы, клиенты и быстрые действия.
         </p>
       </section>
 
@@ -744,7 +708,7 @@ function TodayScreen({
           <div className="mt-2 text-[22px] font-semibold tracking-[-0.07em]">
             {todayBookings.length}
           </div>
-          <div className="text-[10px] text-white/35">на сегодня</div>
+          <div className="text-[10px] text-white/35">сегодня</div>
         </MiniCard>
 
         <MiniCard className="p-3">
@@ -754,7 +718,7 @@ function TodayScreen({
           <div className="mt-2 text-[22px] font-semibold tracking-[-0.07em]">
             {RUB.format(revenue)}
           </div>
-          <div className="text-[10px] text-white/35">по услугам</div>
+          <div className="text-[10px] text-white/35">услуги</div>
         </MiniCard>
 
         <MiniCard className="p-3">
@@ -764,7 +728,7 @@ function TodayScreen({
           <div className="mt-2 text-[22px] font-semibold tracking-[-0.07em]">
             {riskCount}
           </div>
-          <div className="text-[10px] text-white/35">проверить</div>
+          <div className="text-[10px] text-white/35">контроль</div>
         </MiniCard>
       </div>
 
@@ -817,7 +781,7 @@ function TodayScreen({
           <div className="p-4">
             <EmptyState
               title="Сегодня свободно"
-              text="На сегодня нет записей. Можно добавить запись или проверить график."
+              text="На сегодня нет записей. Можно проверить график или веб-кабинет."
             />
           </div>
         )}
@@ -827,7 +791,7 @@ function TodayScreen({
         <div className="border-b border-white/[0.08] p-4">
           <div className="text-[15px] font-semibold tracking-[-0.045em]">День</div>
           <div className="mt-1 text-[11px] text-white/38">
-            все записи компактным списком
+            компактный список записей
           </div>
         </div>
 
@@ -877,7 +841,6 @@ function ScheduleScreen({
   onOpenBooking: (booking: Booking) => void;
 }) {
   const [selectedDate, setSelectedDate] = useState(todayKey());
-
   const days = useMemo(() => Array.from({ length: 7 }, (_, index) => addDaysKey(index)), []);
 
   const selectedBookings = useMemo(
@@ -893,7 +856,7 @@ function ScheduleScreen({
           График
         </h1>
         <p className="mt-2 text-[12px] leading-5 text-white/42">
-          Быстрый просмотр ближайших дней без тяжёлых таблиц.
+          Ближайшие дни без тяжёлых таблиц.
         </p>
       </section>
 
@@ -918,7 +881,7 @@ function ScheduleScreen({
                 <div className="text-[11px] font-semibold capitalize tracking-[-0.035em]">
                   {formatDayLabel(day)}
                 </div>
-                <div className={cn('mt-2 text-[20px] font-semibold tracking-[-0.07em]', active ? 'text-black' : 'text-white')}>
+                <div className="mt-2 text-[20px] font-semibold tracking-[-0.07em]">
                   {count}
                 </div>
                 <div className={cn('text-[10px]', active ? 'text-black/45' : 'text-white/35')}>
@@ -937,7 +900,7 @@ function ScheduleScreen({
           </div>
           <div className="mt-1 text-[11px] text-white/38">
             {selectedBookings.length > 0
-              ? `${selectedBookings.length} записей в этот день`
+              ? `${selectedBookings.length} записей`
               : 'свободный день'}
           </div>
         </div>
@@ -968,7 +931,7 @@ function ScheduleScreen({
           ) : (
             <EmptyState
               title="Нет записей"
-              text="Можно оставить день свободным или добавить клиента из веб-кабинета."
+              text="День свободен. Новые записи появятся здесь."
               icon={<CalendarDays className="size-5" />}
             />
           )}
@@ -1002,7 +965,7 @@ function ChatsScreen({ bookings }: { bookings: Booking[] }) {
           Чаты
         </h1>
         <p className="mt-2 text-[12px] leading-5 text-white/42">
-          Быстрый список клиентов и шаблоны сообщений.
+          Клиенты и быстрые сообщения.
         </p>
       </section>
 
@@ -1018,13 +981,6 @@ function ChatsScreen({ bookings }: { bookings: Booking[] }) {
       </div>
 
       <MiniCard className="overflow-hidden">
-        <div className="border-b border-white/[0.08] p-4">
-          <div className="text-[15px] font-semibold tracking-[-0.045em]">Диалоги</div>
-          <div className="mt-1 text-[11px] text-white/38">
-            последние клиенты и записи
-          </div>
-        </div>
-
         <div className="space-y-2 p-3">
           {chatRows.length > 0 ? (
             chatRows.map((booking) => (
@@ -1056,7 +1012,7 @@ function ChatsScreen({ bookings }: { bookings: Booking[] }) {
           ) : (
             <EmptyState
               title="Чатов пока нет"
-              text="Когда появятся записи и клиенты, быстрые диалоги будут здесь."
+              text="Когда появятся записи, диалоги будут здесь."
               icon={<MessageCircle className="size-5" />}
             />
           )}
@@ -1113,7 +1069,7 @@ function ClientsScreen({ bookings }: { bookings: Booking[] }) {
           Клиенты
         </h1>
         <p className="mt-2 text-[12px] leading-5 text-white/42">
-          Компактная клиентская база для телефона.
+          Компактная клиентская база.
         </p>
       </section>
 
@@ -1214,7 +1170,7 @@ function ProfileScreen({
           Профиль
         </h1>
         <p className="mt-2 text-[12px] leading-5 text-white/42">
-          Быстрая правка основной информации с телефона.
+          Быстрая правка информации.
         </p>
       </section>
 
@@ -1243,37 +1199,12 @@ function ProfileScreen({
       ) : null}
 
       <MiniCard className="space-y-4 p-4">
-        <MiniInput
-          label="Имя"
-          value={form.name}
-          onChange={(value) => update('name', value)}
-        />
-        <MiniInput
-          label="Специализация"
-          value={form.profession}
-          onChange={(value) => update('profession', value)}
-        />
-        <MiniInput
-          label="Город"
-          value={form.city}
-          onChange={(value) => update('city', value)}
-        />
-        <MiniInput
-          label="Описание"
-          value={form.bio}
-          onChange={(value) => update('bio', value)}
-          textarea
-        />
-        <MiniInput
-          label="Телефон"
-          value={form.phone}
-          onChange={(value) => update('phone', value)}
-        />
-        <MiniInput
-          label="Telegram"
-          value={form.telegram}
-          onChange={(value) => update('telegram', value)}
-        />
+        <MiniInput label="Имя" value={form.name} onChange={(value) => update('name', value)} />
+        <MiniInput label="Специализация" value={form.profession} onChange={(value) => update('profession', value)} />
+        <MiniInput label="Город" value={form.city} onChange={(value) => update('city', value)} />
+        <MiniInput label="Описание" value={form.bio} onChange={(value) => update('bio', value)} textarea />
+        <MiniInput label="Телефон" value={form.phone} onChange={(value) => update('phone', value)} />
+        <MiniInput label="Telegram" value={form.telegram} onChange={(value) => update('telegram', value)} />
 
         {resultText ? (
           <div className="rounded-[15px] border border-white/[0.08] bg-white/[0.035] p-3 text-[12px] text-white/58">
@@ -1331,7 +1262,7 @@ function ServicesScreen({
           Услуги
         </h1>
         <p className="mt-2 text-[12px] leading-5 text-white/42">
-          Быстро обновите список услуг, который видят клиенты.
+          Список услуг, который видят клиенты.
         </p>
       </section>
 
@@ -1362,7 +1293,7 @@ function ServicesScreen({
           ) : (
             <EmptyState
               title="Услуги не заполнены"
-              text="Добавьте услуги по одной строке, чтобы клиент мог выбрать нужную."
+              text="Добавьте услуги по одной строке."
               icon={<Scissors className="size-5" />}
             />
           )}
@@ -1414,7 +1345,7 @@ function AnalyticsScreen({ bookings }: { bookings: Booking[] }) {
           Аналитика
         </h1>
         <p className="mt-2 text-[12px] leading-5 text-white/42">
-          Только самое важное для телефона: записи, деньги, явка и динамика недели.
+          Записи, деньги, явка и динамика недели.
         </p>
       </section>
 
@@ -1466,9 +1397,7 @@ function AnalyticsScreen({ bookings }: { bookings: Booking[] }) {
             <div className="text-[15px] font-semibold tracking-[-0.045em]">
               График недели
             </div>
-            <div className="mt-1 text-[11px] text-white/38">
-              записи по дням
-            </div>
+            <div className="mt-1 text-[11px] text-white/38">записи по дням</div>
           </div>
           <BarChart3 className="size-5 text-white/35" />
         </div>
@@ -1480,10 +1409,7 @@ function AnalyticsScreen({ bookings }: { bookings: Booking[] }) {
             return (
               <div key={item.day} className="flex flex-1 flex-col items-center gap-2">
                 <div className="flex h-[120px] w-full items-end rounded-full bg-white/[0.035] p-1">
-                  <div
-                    className="w-full rounded-full bg-white"
-                    style={{ height }}
-                  />
+                  <div className="w-full rounded-full bg-white" style={{ height }} />
                 </div>
                 <div className="text-[9px] font-semibold uppercase text-white/35">
                   {new Date(`${item.day}T12:00:00`).toLocaleDateString('ru-RU', {
@@ -1509,15 +1435,6 @@ function AppearanceScreen({
   const appearance = safeWorkspaceRecord(workspaceData.appearance);
   const [mode, setMode] = useState(String(appearance.mode ?? 'dark'));
   const [accent, setAccent] = useState(String(appearance.accent ?? 'mono'));
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState('');
-
-  const accents = [
-    { id: 'mono', label: 'Моно' },
-    { id: 'blue', label: 'Синий' },
-    { id: 'rose', label: 'Розовый' },
-    { id: 'gold', label: 'Золото' },
-  ];
 
   async function save(next?: { mode?: string; accent?: string }) {
     const payload = {
@@ -1525,13 +1442,7 @@ function AppearanceScreen({
       accent: next?.accent ?? accent,
     };
 
-    setSaving(true);
-    setMessage('');
-
-    const ok = await updateWorkspaceSection('appearance', payload);
-
-    setSaving(false);
-    setMessage(ok ? 'Внешний вид сохранён.' : 'Не удалось сохранить.');
+    await updateWorkspaceSection('appearance', payload);
   }
 
   return (
@@ -1542,7 +1453,7 @@ function AppearanceScreen({
           Внешний вид
         </h1>
         <p className="mt-2 text-[12px] leading-5 text-white/42">
-          Быстрые настройки оформления для страницы и кабинета.
+          Тема и акцент для страницы.
         </p>
       </section>
 
@@ -1581,7 +1492,12 @@ function AppearanceScreen({
             Акцент
           </div>
           <div className="grid grid-cols-2 gap-2">
-            {accents.map((item) => (
+            {[
+              { id: 'mono', label: 'Моно' },
+              { id: 'blue', label: 'Синий' },
+              { id: 'rose', label: 'Розовый' },
+              { id: 'gold', label: 'Золото' },
+            ].map((item) => (
               <button
                 key={item.id}
                 type="button"
@@ -1602,12 +1518,6 @@ function AppearanceScreen({
             ))}
           </div>
         </div>
-
-        {message ? (
-          <div className="rounded-[15px] border border-white/[0.08] bg-white/[0.035] p-3 text-[12px] text-white/58">
-            {saving ? 'Сохраняем...' : message}
-          </div>
-        ) : null}
       </MiniCard>
     </div>
   );
@@ -1642,35 +1552,54 @@ function SettingsScreen({
           Настройки
         </h1>
         <p className="mt-2 text-[12px] leading-5 text-white/42">
-          Мобильные настройки уведомлений и рабочего дня.
+          Уведомления и рабочий день.
         </p>
       </section>
 
       <MiniCard className="space-y-2 p-3">
-        <MiniToggle
-          checked={settings.reminders}
-          label="Напоминания клиентам"
-          description="Отправлять клиенту напоминание перед записью."
-          onChange={(value) => void update('reminders', value)}
-        />
-        <MiniToggle
-          checked={settings.autoConfirm}
-          label="Автоподтверждение"
-          description="Помечать запись подтверждённой после ответа клиента."
-          onChange={(value) => void update('autoConfirm', value)}
-        />
-        <MiniToggle
-          checked={settings.noShowControl}
-          label="Контроль неявок"
-          description="Подсвечивать клиентов с риском не прийти."
-          onChange={(value) => void update('noShowControl', value)}
-        />
-        <MiniToggle
-          checked={settings.dailyDigest}
-          label="Итоги дня"
-          description="Показывать короткий итог по записям и деньгам."
-          onChange={(value) => void update('dailyDigest', value)}
-        />
+        {[
+          ['reminders', 'Напоминания клиентам', 'Отправлять клиенту напоминание перед записью.'],
+          ['autoConfirm', 'Автоподтверждение', 'Помечать запись подтверждённой после ответа клиента.'],
+          ['noShowControl', 'Контроль неявок', 'Подсвечивать клиентов с риском не прийти.'],
+          ['dailyDigest', 'Итоги дня', 'Показывать короткий итог по записям и деньгам.'],
+        ].map(([key, label, description]) => {
+          const typedKey = key as keyof typeof settings;
+          const checked = settings[typedKey];
+
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => void update(typedKey, !checked)}
+              className="flex w-full items-center justify-between gap-4 rounded-[18px] border border-white/[0.08] bg-white/[0.035] p-3 text-left"
+            >
+              <span>
+                <span className="block text-[13px] font-semibold tracking-[-0.04em] text-white">
+                  {label}
+                </span>
+                <span className="mt-1 block text-[11px] leading-4 text-white/42">
+                  {description}
+                </span>
+              </span>
+
+              <span
+                className={cn(
+                  'relative h-7 w-12 shrink-0 rounded-full border transition',
+                  checked
+                    ? 'border-white/20 bg-white text-black'
+                    : 'border-white/[0.08] bg-white/[0.055]',
+                )}
+              >
+                <span
+                  className={cn(
+                    'absolute top-1 size-5 rounded-full transition',
+                    checked ? 'left-6 bg-black' : 'left-1 bg-white/35',
+                  )}
+                />
+              </span>
+            </button>
+          );
+        })}
       </MiniCard>
     </div>
   );
@@ -1683,48 +1612,13 @@ function MoreScreen({ setScreen }: { setScreen: (screen: MiniScreen) => void }) 
     description: string;
     icon: ReactNode;
   }> = [
-    {
-      id: 'profile',
-      label: 'Профиль',
-      description: 'страница мастера',
-      icon: <UserRound className="size-4" />,
-    },
-    {
-      id: 'services',
-      label: 'Услуги',
-      description: 'витрина и цены',
-      icon: <Scissors className="size-4" />,
-    },
-    {
-      id: 'clients',
-      label: 'Клиенты',
-      description: 'база и история',
-      icon: <UserRound className="size-4" />,
-    },
-    {
-      id: 'analytics',
-      label: 'Аналитика',
-      description: 'записи и доход',
-      icon: <BarChart3 className="size-4" />,
-    },
-    {
-      id: 'appearance',
-      label: 'Внешний вид',
-      description: 'тема и акцент',
-      icon: <Palette className="size-4" />,
-    },
-    {
-      id: 'settings',
-      label: 'Настройки',
-      description: 'уведомления и день',
-      icon: <Settings className="size-4" />,
-    },
-    {
-      id: 'desktop',
-      label: 'Веб-кабинет',
-      description: 'полная версия',
-      icon: <LayoutDashboard className="size-4" />,
-    },
+    { id: 'profile', label: 'Профиль', description: 'страница мастера', icon: <UserRound className="size-4" /> },
+    { id: 'services', label: 'Услуги', description: 'витрина и цены', icon: <Scissors className="size-4" /> },
+    { id: 'clients', label: 'Клиенты', description: 'база и история', icon: <UserRound className="size-4" /> },
+    { id: 'analytics', label: 'Аналитика', description: 'записи и доход', icon: <BarChart3 className="size-4" /> },
+    { id: 'appearance', label: 'Внешний вид', description: 'тема и акцент', icon: <Palette className="size-4" /> },
+    { id: 'settings', label: 'Настройки', description: 'уведомления', icon: <Settings className="size-4" /> },
+    { id: 'desktop', label: 'Веб-кабинет', description: 'полная версия', icon: <LayoutDashboard className="size-4" /> },
   ];
 
   return (
@@ -1735,7 +1629,7 @@ function MoreScreen({ setScreen }: { setScreen: (screen: MiniScreen) => void }) 
           Ещё
         </h1>
         <p className="mt-2 text-[12px] leading-5 text-white/42">
-          Дополнительные разделы в компактном стиле.
+          Дополнительные разделы.
         </p>
       </section>
 
@@ -1790,11 +1684,13 @@ function BookingSheet({
   onClose: () => void;
   onStatus: (bookingId: string, status: BookingStatus) => Promise<void>;
 }) {
-  if (!booking) return null;
-
   const [updating, setUpdating] = useState<BookingStatus | null>(null);
 
+  if (!booking) return null;
+
   async function update(status: BookingStatus) {
+    if (!booking) return;
+
     setUpdating(status);
     await onStatus(booking.id, status);
     setUpdating(null);
@@ -1832,60 +1728,19 @@ function BookingSheet({
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.035] p-3">
-              <div className="text-[11px] text-white/35">Телефон</div>
-              <div className="mt-1 truncate text-[13px] font-semibold tracking-[-0.04em]">
-                {booking.clientPhone || '—'}
-              </div>
-            </div>
-
-            <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.035] p-3">
-              <div className="text-[11px] text-white/35">Сумма</div>
-              <div className="mt-1 text-[13px] font-semibold tracking-[-0.04em]">
-                {RUB.format(getBookingAmount(booking))}
-              </div>
-            </div>
-          </div>
-
-          {booking.comment ? (
-            <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.035] p-3">
-              <div className="text-[11px] text-white/35">Комментарий</div>
-              <div className="mt-1 text-[13px] leading-5 text-white/68">
-                {booking.comment}
-              </div>
-            </div>
-          ) : null}
-
-          <div className="grid grid-cols-2 gap-2">
-            <MiniButton
-              variant="primary"
-              disabled={Boolean(updating)}
-              onClick={() => void update('completed')}
-            >
+            <MiniButton variant="primary" disabled={Boolean(updating)} onClick={() => void update('completed')}>
               <CheckCircle2 className="size-4" />
               Пришла
             </MiniButton>
-            <MiniButton
-              variant="secondary"
-              disabled={Boolean(updating)}
-              onClick={() => void update('confirmed')}
-            >
+            <MiniButton variant="secondary" disabled={Boolean(updating)} onClick={() => void update('confirmed')}>
               <ShieldCheck className="size-4" />
               Подтвердить
             </MiniButton>
-            <MiniButton
-              variant="secondary"
-              disabled={Boolean(updating)}
-              onClick={() => void update('new')}
-            >
+            <MiniButton variant="secondary" disabled={Boolean(updating)} onClick={() => void update('new')}>
               <Bell className="size-4" />
               Новая
             </MiniButton>
-            <MiniButton
-              variant="danger"
-              disabled={Boolean(updating)}
-              onClick={() => void update('no_show')}
-            >
+            <MiniButton variant="danger" disabled={Boolean(updating)} onClick={() => void update('no_show')}>
               <XCircle className="size-4" />
               Не пришла
             </MiniButton>
@@ -1911,10 +1766,42 @@ export function MiniAppEntry() {
 
   const [screen, setScreen] = useState<MiniScreen>('today');
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [bootState, setBootState] = useState<'loading' | 'ready'>('loading');
+  const bootedRef = useRef(false);
 
   const workspaceRecord = safeWorkspaceRecord(workspaceData);
 
-  if (!hasHydrated) {
+  useEffect(() => {
+    if (bootedRef.current) return;
+    bootedRef.current = true;
+
+    let cancelled = false;
+
+    async function boot() {
+      try {
+        await authorizeTelegramMiniAppSession({
+          force: true,
+          waitMs: 2600,
+        });
+      } catch {
+        // Если Telegram initData недоступна, всё равно пробуем загрузить workspace по cookie/header.
+      }
+
+      await refreshWorkspace();
+
+      if (!cancelled) {
+        setBootState('ready');
+      }
+    }
+
+    void boot();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshWorkspace]);
+
+  if (!hasHydrated || bootState === 'loading') {
     return <MiniLoading />;
   }
 
