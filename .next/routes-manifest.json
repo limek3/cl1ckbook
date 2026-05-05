@@ -370,6 +370,12 @@
       "namedRegex": "^/login(?:/)?$"
     },
     {
+      "page": "/miniapp",
+      "regex": "^/miniapp(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/miniapp(?:/)?$"
+    },
+    {
       "page": "/preview",
       "regex": "^/preview(?:/)?$",
       "routeKeys": {},

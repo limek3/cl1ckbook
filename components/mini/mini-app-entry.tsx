@@ -1,10 +1,18 @@
 'use client';
 
-import type * as React from 'react';
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import Link from 'next/link';
 import {
-  ArrowLeft,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
+import {
   BarChart3,
+  Bell,
   CalendarClock,
   Check,
   CheckCircle2,
@@ -12,15 +20,16 @@ import {
   Clock3,
   Copy,
   ExternalLink,
+  Eye,
   LayoutDashboard,
+  MapPin,
   MessageCircle,
-  MoreVertical,
+  MoreHorizontal,
+  Palette,
   Phone,
   Plus,
   RefreshCcw,
-  Save,
   Scissors,
-  Search,
   Send,
   Settings,
   ShieldCheck,
@@ -33,3327 +42,3185 @@ import {
   XCircle,
 } from 'lucide-react';
 
-type Json = Record<string, unknown>;
+import { BrandLogo } from '@/components/brand/brand-logo';
+import { useApp } from '@/lib/app-context';
+import {
+  authorizeTelegramMiniAppSession,
+  getTelegramAppSessionHeaders,
+} from '@/lib/telegram-miniapp-auth-client';
+import { cn } from '@/lib/utils';
+import type {
+  Booking,
+  BookingStatus,
+  MasterProfile,
+  MasterProfileFormValues,
+  WorkGalleryItem,
+} from '@/lib/types';
 
-type Screen =
+type MiniScreen =
   | 'today'
-  | 'schedule'
-  | 'services'
+  | 'availability'
   | 'chats'
-  | 'chat'
-  | 'more'
   | 'clients'
-  | 'analytics'
+  | 'more'
   | 'profile'
+  | 'services'
+  | 'analytics'
+  | 'appearance'
   | 'settings';
 
-type BookingStatus = 'new' | 'confirmed' | 'completed' | 'no_show' | 'cancelled';
-type DayStatus = 'workday' | 'short' | 'day-off';
-type ServiceStatus = 'active' | 'seasonal' | 'draft';
-type ClientSegment = 'all' | 'vip' | 'transfer' | 'no_show' | 'new';
+type MiniProfileSaveValues = MasterProfileFormValues &
+  Partial<
+    Pick<
+      MasterProfile,
+      | 'priceHint'
+      | 'experienceLabel'
+      | 'responseTime'
+      | 'workGallery'
+      | 'reviews'
+      | 'rating'
+      | 'reviewCount'
+      | 'locationMode'
+      | 'address'
+      | 'mapUrl'
+    >
+  >;
 
-type Profile = {
-  id: string;
-  slug: string;
-  name: string;
-  profession: string;
-  city: string;
-  bio: string;
-  phone: string;
-  telegram: string;
-  whatsapp: string;
-  services: string[];
-};
-
-type Booking = {
-  id: string;
-  clientName: string;
-  clientPhone: string;
-  service: string;
-  date: string;
-  time: string;
-  status: BookingStatus;
-  comment: string;
-  createdAt: string;
-  priceAmount: number;
-  source: string;
-  channel: string;
-  transferRequested: boolean;
-  transferReason: string;
-  transferRequestedAt: string;
-  transferStatus: 'none' | 'requested' | 'accepted' | 'declined' | 'done';
-  clientNote: string;
-};
-
-type Service = {
-  id: string;
-  name: string;
-  category: string;
-  duration: number;
-  price: number;
-  status: ServiceStatus;
-  visible: boolean;
-};
-
-type WorkDay = {
+type AvailabilityDay = {
   id: string;
   label: string;
   short: string;
-  weekdayIndex: number;
-  status: DayStatus;
+  enabled: boolean;
   start: string;
   end: string;
-  breakStart: string;
-  breakEnd: string;
+  interval: number;
+  breakStart?: string;
+  breakEnd?: string;
+  slots: string[];
 };
 
-type ChatMessage = {
+type ServiceItem = {
   id: string;
-  author: string;
-  body: string;
+  name: string;
+  price: string;
+  duration: string;
+  category: string;
+  status: 'active' | 'seasonal' | 'draft';
+  visible: boolean;
+};
+
+type MiniChatMessage = {
+  id: string;
+  from: 'client' | 'master' | 'system';
+  text: string;
   createdAt: string;
 };
 
-type ChatThread = {
+type MiniChatThread = {
   id: string;
   clientName: string;
-  clientPhone: string;
-  channel: string;
-  unreadCount: number;
-  messages: ChatMessage[];
-  lastMessage: string;
-  updatedAt: string;
-};
-
-type Client = {
-  id: string;
-  name: string;
-  phone: string;
-  visits: number;
-  revenue: number;
-  lastVisit: string;
-  note: string;
-  favorite: boolean;
-  bookingsCount: number;
-  transferCount: number;
-  noShowCount: number;
-  cancelledCount: number;
-  lastStatus: BookingStatus;
-  hasTransferRequest: boolean;
-  lastService: string;
-};
-
-type MiniSettings = {
-  publicBookingEnabled: boolean;
-  autoConfirmBookings: boolean;
-  allowClientReschedule: boolean;
-  reschedulePolicy: string;
-  reminderBeforeHours: number;
-  reminderTelegram: boolean;
-  reminderVk: boolean;
-  reminderWeb: boolean;
-  noShowAction: 'keep' | 'sleep' | 'blacklist_note';
-  bookingNotice: string;
-};
-
-type QuickBookingPreset = {
-  clientName?: string;
   clientPhone?: string;
-  service?: string;
-  date?: string;
-  time?: string;
-  comment?: string;
+  source?: string;
+  priority?: 'normal' | 'high' | 'low';
+  botConnected?: boolean;
+  lastMessage?: string;
+  updatedAt?: string;
+  messages: MiniChatMessage[];
 };
 
-type TgWindow = Window & {
-  Telegram?: {
-    WebApp?: {
-      initData?: string;
-      ready?: () => void;
-      expand?: () => void;
-    };
-  };
+const STATUS_META: Record<
+  BookingStatus,
+  {
+    label: string;
+    dot: string;
+    pill: string;
+  }
+> = {
+  new: {
+    label: 'Новая',
+    dot: 'bg-sky-400',
+    pill: 'bg-sky-400/12 text-sky-100 border-sky-300/20',
+  },
+  confirmed: {
+    label: 'Запланирована',
+    dot: 'bg-blue-400',
+    pill: 'bg-blue-400/12 text-blue-100 border-blue-300/20',
+  },
+  completed: {
+    label: 'Пришла',
+    dot: 'bg-emerald-400',
+    pill: 'bg-emerald-400/12 text-emerald-100 border-emerald-300/20',
+  },
+  no_show: {
+    label: 'Не пришла',
+    dot: 'bg-orange-400',
+    pill: 'bg-orange-400/12 text-orange-100 border-orange-300/20',
+  },
+  cancelled: {
+    label: 'Отмена',
+    dot: 'bg-rose-400',
+    pill: 'bg-rose-400/12 text-rose-100 border-rose-300/20',
+  },
 };
 
-const DEFAULT_PROFILE: Profile = {
-  id: 'profile',
-  slug: 'master',
-  name: '',
-  profession: '',
-  city: '',
-  bio: '',
-  phone: '',
-  telegram: '',
-  whatsapp: '',
-  services: [],
-};
-
-const DEFAULT_SETTINGS: MiniSettings = {
-  publicBookingEnabled: true,
-  autoConfirmBookings: false,
-  allowClientReschedule: true,
-  reschedulePolicy: 'Клиент может запросить перенос. Мастер подтверждает новое время вручную.',
-  reminderBeforeHours: 3,
-  reminderTelegram: true,
-  reminderVk: true,
-  reminderWeb: true,
-  noShowAction: 'sleep',
-  bookingNotice: 'Пожалуйста, приходите вовремя. Если нужно перенести запись — напишите заранее.',
-};
-
-const DEFAULT_WEEK: WorkDay[] = [
-  { id: 'mon', label: 'Понедельник', short: 'Пн', weekdayIndex: 0, status: 'workday', start: '10:00', end: '20:00', breakStart: '14:00', breakEnd: '15:00' },
-  { id: 'tue', label: 'Вторник', short: 'Вт', weekdayIndex: 1, status: 'workday', start: '10:00', end: '20:00', breakStart: '14:00', breakEnd: '15:00' },
-  { id: 'wed', label: 'Среда', short: 'Ср', weekdayIndex: 2, status: 'workday', start: '10:00', end: '20:00', breakStart: '14:00', breakEnd: '15:00' },
-  { id: 'thu', label: 'Четверг', short: 'Чт', weekdayIndex: 3, status: 'workday', start: '10:00', end: '20:00', breakStart: '14:00', breakEnd: '15:00' },
-  { id: 'fri', label: 'Пятница', short: 'Пт', weekdayIndex: 4, status: 'workday', start: '10:00', end: '19:00', breakStart: '14:00', breakEnd: '15:00' },
-  { id: 'sat', label: 'Суббота', short: 'Сб', weekdayIndex: 5, status: 'short', start: '11:00', end: '17:00', breakStart: '', breakEnd: '' },
-  { id: 'sun', label: 'Воскресенье', short: 'Вс', weekdayIndex: 6, status: 'day-off', start: '11:00', end: '16:00', breakStart: '', breakEnd: '' },
+const ACCENT_OPTIONS = [
+  {
+    id: 'mono',
+    label: 'Моно',
+    value: '#ffffff',
+    soft: 'rgba(255,255,255,0.10)',
+  },
+  {
+    id: 'blue',
+    label: 'Синий',
+    value: '#8bbcff',
+    soft: 'rgba(139,188,255,0.14)',
+  },
+  {
+    id: 'rose',
+    label: 'Розовый',
+    value: '#f5a3bd',
+    soft: 'rgba(245,163,189,0.14)',
+  },
+  {
+    id: 'gold',
+    label: 'Золото',
+    value: '#e8c77a',
+    soft: 'rgba(232,199,122,0.14)',
+  },
+  {
+    id: 'sage',
+    label: 'Шалфей',
+    value: '#a8d5ba',
+    soft: 'rgba(168,213,186,0.14)',
+  },
 ];
 
-const STATUS_LABEL: Record<BookingStatus, string> = {
-  new: 'Новая',
-  confirmed: 'В плане',
-  completed: 'Пришла',
-  no_show: 'Не пришла',
-  cancelled: 'Отмена',
-};
+const DEFAULT_AVAILABILITY: AvailabilityDay[] = [
+  {
+    id: 'mon',
+    label: 'Понедельник',
+    short: 'Пн',
+    enabled: true,
+    start: '10:00',
+    end: '20:00',
+    interval: 60,
+    breakStart: '14:00',
+    breakEnd: '15:00',
+    slots: ['10:00', '11:00', '12:00', '13:00', '15:00', '16:00', '17:00', '18:00', '19:00'],
+  },
+  {
+    id: 'tue',
+    label: 'Вторник',
+    short: 'Вт',
+    enabled: true,
+    start: '10:00',
+    end: '20:00',
+    interval: 60,
+    breakStart: '14:00',
+    breakEnd: '15:00',
+    slots: ['10:00', '11:00', '12:00', '13:00', '15:00', '16:00', '17:00', '18:00', '19:00'],
+  },
+  {
+    id: 'wed',
+    label: 'Среда',
+    short: 'Ср',
+    enabled: true,
+    start: '10:00',
+    end: '20:00',
+    interval: 60,
+    breakStart: '14:00',
+    breakEnd: '15:00',
+    slots: ['10:00', '11:00', '12:00', '13:00', '15:00', '16:00', '17:00', '18:00', '19:00'],
+  },
+  {
+    id: 'thu',
+    label: 'Четверг',
+    short: 'Чт',
+    enabled: true,
+    start: '10:00',
+    end: '20:00',
+    interval: 60,
+    breakStart: '14:00',
+    breakEnd: '15:00',
+    slots: ['10:00', '11:00', '12:00', '13:00', '15:00', '16:00', '17:00', '18:00', '19:00'],
+  },
+  {
+    id: 'fri',
+    label: 'Пятница',
+    short: 'Пт',
+    enabled: true,
+    start: '10:00',
+    end: '19:00',
+    interval: 60,
+    breakStart: '14:00',
+    breakEnd: '15:00',
+    slots: ['10:00', '11:00', '12:00', '13:00', '15:00', '16:00', '17:00', '18:00'],
+  },
+  {
+    id: 'sat',
+    label: 'Суббота',
+    short: 'Сб',
+    enabled: true,
+    start: '11:00',
+    end: '17:00',
+    interval: 60,
+    slots: ['11:00', '12:00', '13:00', '14:00', '15:00', '16:00'],
+  },
+  {
+    id: 'sun',
+    label: 'Воскресенье',
+    short: 'Вс',
+    enabled: false,
+    start: '11:00',
+    end: '17:00',
+    interval: 60,
+    slots: [],
+  },
+];
 
-const STATUS_DOT: Record<BookingStatus, string> = {
-  new: '#9fbdf6',
-  confirmed: '#c8b98f',
-  completed: '#96d2aa',
-  no_show: '#e2b169',
-  cancelled: '#e59b9b',
-};
+const RUB = new Intl.NumberFormat('ru-RU', {
+  style: 'currency',
+  currency: 'RUB',
+  maximumFractionDigits: 0,
+});
 
-function cx(...items: Array<string | false | null | undefined>) {
-  return items.filter(Boolean).join(' ');
-}
-
-function obj(value: unknown): Json {
-  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Json) : {};
-}
-
-function list<T = unknown>(value: unknown): T[] {
-  return Array.isArray(value) ? (value as T[]) : [];
-}
-
-function len(value: unknown) {
-  return Array.isArray(value) || typeof value === 'string' ? value.length : 0;
-}
-
-function text(value: unknown, fallback = '') {
-  if (typeof value === 'string') return value.trim();
-  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
-  return fallback;
-}
-
-function bool(value: unknown, fallback = false) {
-  if (typeof value === 'boolean') return value;
-  if (typeof value === 'string') {
-    const normalized = value.toLowerCase().trim();
-    if (['true', '1', 'yes', 'да'].includes(normalized)) return true;
-    if (['false', '0', 'no', 'нет'].includes(normalized)) return false;
-  }
-  return fallback;
-}
-
-function moneyNumber(value: unknown, fallback = 0) {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-
-  const parsed = Number(
-    String(value ?? '')
-      .replace(/[^\d.,-]/g, '')
-      .replace(',', '.'),
-  );
-
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function makeId(prefix: string) {
-  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
-}
-
-function today() {
-  const d = new Date();
+function todayKey() {
+  const date = new Date();
 
   return [
-    d.getFullYear(),
-    String(d.getMonth() + 1).padStart(2, '0'),
-    String(d.getDate()).padStart(2, '0'),
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
   ].join('-');
 }
 
-function addDays(date: string, days: number) {
-  const d = new Date(`${date}T12:00:00`);
-  d.setDate(d.getDate() + days);
+function addDaysKey(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
 
   return [
-    d.getFullYear(),
-    String(d.getMonth() + 1).padStart(2, '0'),
-    String(d.getDate()).padStart(2, '0'),
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
   ].join('-');
 }
 
-function weekdayIndexFromDate(date: string) {
-  const d = new Date(`${date}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return 0;
-  return (d.getDay() + 6) % 7;
-}
+function formatDayLabel(dateKey: string) {
+  const date = new Date(`${dateKey}T12:00:00`);
 
-function dateLabel(value: string, long = false) {
-  const safe = text(value, today()).slice(0, 10);
-  const d = new Date(`${safe}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return dateKey;
 
-  if (Number.isNaN(d.getTime())) return safe;
-
-  return d.toLocaleDateString('ru-RU', {
-    weekday: long ? 'long' : 'short',
+  return date.toLocaleDateString('ru-RU', {
+    weekday: 'short',
     day: 'numeric',
     month: 'short',
   });
 }
 
-function timeLabel(value: unknown) {
-  const raw = text(value, '10:00');
-  return /^\d{2}:\d{2}/.test(raw) ? raw.slice(0, 5) : '10:00';
+function formatTime(value: string) {
+  return value?.slice(0, 5) || '—';
 }
 
-function timeFromDate(value: unknown) {
-  const raw = text(value);
-  const d = raw ? new Date(raw) : null;
-
-  if (!d || Number.isNaN(d.getTime())) return '';
-
-  return d.toLocaleTimeString('ru-RU', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+function getBookingAmount(booking: Booking) {
+  return typeof booking.priceAmount === 'number' && Number.isFinite(booking.priceAmount)
+    ? booking.priceAmount
+    : 0;
 }
 
-function rub(value: unknown) {
-  return `${Math.round(moneyNumber(value)).toLocaleString('ru-RU')} ₽`;
+function getInitials(name?: string | null) {
+  const safe = (name || 'КБ').trim();
+
+  return safe
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase();
 }
 
-function initials(value: unknown) {
-  const raw = text(value, 'Клиент');
-  const parts = raw.split(/\s+/).filter(Boolean);
-
-  if (parts.length >= 2) return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase();
-
-  return raw.slice(0, 2).toUpperCase();
+function sortBookings(a: Booking, b: Booking) {
+  return `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`);
 }
 
-function slugify(value: unknown) {
-  const raw = text(value, 'master').toLowerCase();
-  const latin = raw
-    .replace(/[а]/g, 'a').replace(/[б]/g, 'b').replace(/[в]/g, 'v').replace(/[г]/g, 'g')
-    .replace(/[д]/g, 'd').replace(/[её]/g, 'e').replace(/[ж]/g, 'zh').replace(/[з]/g, 'z')
-    .replace(/[и]/g, 'i').replace(/[й]/g, 'y').replace(/[к]/g, 'k').replace(/[л]/g, 'l')
-    .replace(/[м]/g, 'm').replace(/[н]/g, 'n').replace(/[о]/g, 'o').replace(/[п]/g, 'p')
-    .replace(/[р]/g, 'r').replace(/[с]/g, 's').replace(/[т]/g, 't').replace(/[у]/g, 'u')
-    .replace(/[ф]/g, 'f').replace(/[х]/g, 'h').replace(/[ц]/g, 'c').replace(/[ч]/g, 'ch')
-    .replace(/[ш]/g, 'sh').replace(/[щ]/g, 'sch').replace(/[ы]/g, 'y').replace(/[э]/g, 'e')
-    .replace(/[ю]/g, 'yu').replace(/[я]/g, 'ya').replace(/[ьъ]/g, '');
+function safeRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
 
-  return latin
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 50) || 'master';
+function safeArray<T = unknown>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function getString(value: unknown, fallback = '') {
+  return typeof value === 'string' ? value : fallback;
+}
+
+function profileToForm(profile: MasterProfile | null): MiniProfileSaveValues {
+  return {
+    name: profile?.name ?? '',
+    profession: profile?.profession ?? '',
+    city: profile?.city ?? '',
+    bio: profile?.bio ?? '',
+    servicesText: profile?.services?.join('\n') ?? '',
+    slug: profile?.slug ?? '',
+    phone: profile?.phone ?? '',
+    telegram: profile?.telegram ?? '',
+    whatsapp: profile?.whatsapp ?? '',
+    avatar: profile?.avatar ?? '',
+    hidePhone: Boolean(profile?.hidePhone),
+    hideTelegram: Boolean(profile?.hideTelegram),
+    hideWhatsapp: Boolean(profile?.hideWhatsapp),
+    priceHint: profile?.priceHint ?? '',
+    experienceLabel: profile?.experienceLabel ?? '',
+    responseTime: profile?.responseTime ?? '',
+    address: profile?.address ?? '',
+    mapUrl: profile?.mapUrl ?? '',
+    locationMode: profile?.locationMode ?? 'online',
+    workGallery: profile?.workGallery ?? [],
+    reviews: profile?.reviews ?? [],
+    rating: profile?.rating,
+    reviewCount: profile?.reviewCount,
+  };
 }
 
 function toMinutes(value: string) {
-  const [hours, minutes] = timeLabel(value).split(':').map((part) => Number(part));
-  return (Number.isFinite(hours) ? hours : 0) * 60 + (Number.isFinite(minutes) ? minutes : 0);
+  const [h, m] = value.split(':').map((part) => Number(part));
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return 0;
+  return h * 60 + m;
 }
 
 function fromMinutes(value: number) {
-  const safe = Math.max(0, Math.min(24 * 60, Math.round(value)));
-  const hours = Math.floor(safe / 60);
-  const minutes = safe % 60;
-
-  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  const h = Math.floor(value / 60);
+  const m = value % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-function normalizeStatus(value: unknown): BookingStatus {
-  return value === 'confirmed' ||
-    value === 'completed' ||
-    value === 'no_show' ||
-    value === 'cancelled' ||
-    value === 'new'
-    ? value
-    : 'new';
-}
+function generateSlots(day: AvailabilityDay) {
+  if (!day.enabled) return [];
 
-function normalizeProfile(value: unknown): Profile | null {
-  const row = obj(value);
-  const name = text(row.name ?? row.title ?? row.masterName);
-
-  if (!name && Object.keys(row).length === 0) return null;
-
-  const serviceNames = list(row.services)
-    .map((item) => (typeof item === 'string' ? item : text(obj(item).name ?? obj(item).title)))
-    .filter(Boolean);
-
-  return {
-    id: text(row.id, 'profile'),
-    slug: slugify(row.slug || name || 'master'),
-    name: name || 'Мастер',
-    profession: text(row.profession ?? row.specialization, 'Специалист'),
-    city: text(row.city, ''),
-    bio: text(row.bio ?? row.description, 'Онлайн-запись через КликБук'),
-    phone: text(row.phone),
-    telegram: text(row.telegram),
-    whatsapp: text(row.whatsapp),
-    services: serviceNames,
-  };
-}
-
-function normalizeBooking(value: unknown, index: number): Booking | null {
-  const row = obj(value);
-
-  if (Object.keys(row).length === 0) return null;
-
-  const metadata = obj(row.metadata);
-  const transfer = obj(row.transfer ?? row.reschedule ?? row.rescheduleRequest ?? metadata.transfer ?? metadata.reschedule);
-  const date = text(row.date, today()).slice(0, 10);
-  const time = timeLabel(row.time);
-
-  const transferRequested =
-    bool(row.transferRequested) ||
-    bool(row.transfer_requested) ||
-    bool(row.rescheduleRequested) ||
-    bool(row.reschedule_requested) ||
-    bool(metadata.transferRequested) ||
-    bool(metadata.rescheduleRequested) ||
-    text(transfer.status) === 'requested' ||
-    text(row.status) === 'transfer_requested';
-
-  const rawTransferStatus = text(
-    row.transferStatus ??
-      row.transfer_status ??
-      row.rescheduleStatus ??
-      row.reschedule_status ??
-      transfer.status ??
-      metadata.transferStatus ??
-      metadata.rescheduleStatus,
-    transferRequested ? 'requested' : 'none',
-  );
-
-  return {
-    id: text(row.id, `booking-${index}-${date}-${time}`),
-    clientName: text(row.clientName ?? row.client_name ?? row.name, 'Клиент'),
-    clientPhone: text(row.clientPhone ?? row.client_phone ?? row.phone),
-    service: text(row.service ?? row.serviceName ?? row.service_name, 'Услуга'),
-    date,
-    time,
-    status: normalizeStatus(row.status),
-    comment: text(row.comment),
-    createdAt: text(row.createdAt ?? row.created_at, new Date().toISOString()),
-    priceAmount: moneyNumber(row.priceAmount ?? row.price_amount, 0),
-    source: text(row.source, 'Mini App'),
-    channel: text(row.channel ?? row.sourceChannel ?? row.source_channel, 'web'),
-    transferRequested,
-    transferReason: text(
-      row.transferReason ??
-        row.transfer_reason ??
-        row.rescheduleReason ??
-        row.reschedule_reason ??
-        transfer.reason ??
-        metadata.transferReason,
-    ),
-    transferRequestedAt: text(
-      row.transferRequestedAt ??
-        row.transfer_requested_at ??
-        row.rescheduleRequestedAt ??
-        row.reschedule_requested_at ??
-        transfer.createdAt ??
-        transfer.created_at ??
-        metadata.transferRequestedAt,
-    ),
-    transferStatus:
-      rawTransferStatus === 'accepted' ||
-      rawTransferStatus === 'declined' ||
-      rawTransferStatus === 'done' ||
-      rawTransferStatus === 'requested'
-        ? rawTransferStatus
-        : rawTransferStatus === 'offered'
-          ? 'requested'
-          : 'none',
-    clientNote: text(row.clientNote ?? row.client_note ?? metadata.clientNote),
-  };
-}
-
-function normalizeServices(profile: Profile | null, data: Json): Service[] {
-  const stored = list(data.services)
-    .map((item, index) => {
-      const row = obj(item);
-      const name = text(row.name ?? row.title ?? row.service);
-
-      if (!name) return null;
-
-      const rawStatus = text(row.status, 'active');
-
-      return {
-        id: text(row.id, `service-${index}-${slugify(name)}`),
-        name,
-        category: text(row.category, 'Основное'),
-        duration: Math.max(15, moneyNumber(row.duration ?? row.durationMinutes ?? row.duration_minutes, 60)),
-        price: Math.max(0, moneyNumber(row.price ?? row.priceAmount ?? row.price_amount, 0)),
-        status: (rawStatus === 'draft' || rawStatus === 'seasonal' ? rawStatus : 'active') as ServiceStatus,
-        visible: row.visible === false ? false : true,
-      } satisfies Service;
-    })
-    .filter((item): item is Service => Boolean(item));
-
-  if (len(stored) > 0) return stored;
-
-  return list<string>(profile?.services).map((name, index) => ({
-    id: `profile-service-${index}-${slugify(name)}`,
-    name,
-    category: 'Основное',
-    duration: 60,
-    price: 0,
-    status: 'active',
-    visible: true,
-  }));
-}
-
-function normalizeWeek(data: Json): WorkDay[] {
-  const stored = list(data.availability);
-
-  if (len(stored) === 0) return DEFAULT_WEEK;
-
-  return DEFAULT_WEEK.map((base) => {
-    const found = stored.find((item) => {
-      const row = obj(item);
-
-      return text(row.id) === base.id ||
-        moneyNumber(row.weekdayIndex ?? row.weekday_index, -1) === base.weekdayIndex;
-    });
-
-    if (!found) return base;
-
-    const row = obj(found);
-    const rawStatus = text(row.status, base.status);
-
-    const slots = list<string>(row.slots);
-    const firstSlot = slots[0] ?? '';
-    const lastSlot = slots[slots.length - 1] ?? '';
-    const firstStart = firstSlot.includes('–') ? firstSlot.split('–')[0] : '';
-    const lastEnd = lastSlot.includes('–') ? lastSlot.split('–')[1] : '';
-    const breaks = list<string>(row.breaks);
-    const firstBreak = breaks[0] ?? '';
-    const breakStart = firstBreak.includes('–') ? firstBreak.split('–')[0] : '';
-    const breakEnd = firstBreak.includes('–') ? firstBreak.split('–')[1] : '';
-
-    return {
-      ...base,
-      status: (rawStatus === 'day-off' || rawStatus === 'short' ? rawStatus : 'workday') as DayStatus,
-      start: timeLabel((row.start ?? row.startTime ?? row.start_time ?? firstStart) || base.start),
-      end: timeLabel((row.end ?? row.endTime ?? row.end_time ?? lastEnd) || base.end),
-      breakStart: text(row.breakStart ?? row.break_start ?? breakStart)
-        ? timeLabel(row.breakStart ?? row.break_start ?? breakStart)
-        : '',
-      breakEnd: text(row.breakEnd ?? row.break_end ?? breakEnd)
-        ? timeLabel(row.breakEnd ?? row.break_end ?? breakEnd)
-        : '',
-    };
-  });
-}
-
-function normalizeThread(value: unknown, index: number): ChatThread {
-  const row = obj(value);
-
-  const messages = list(row.messages)
-    .map((message, messageIndex) => {
-      const msg = obj(message);
-
-      return {
-        id: text(msg.id, `msg-${index}-${messageIndex}`),
-        author: text(msg.author, 'client'),
-        body: text(msg.body ?? msg.text ?? msg.message),
-        createdAt: text(msg.createdAt ?? msg.created_at, new Date().toISOString()),
-      } satisfies ChatMessage;
-    })
-    .filter((message) => Boolean(message.body));
-
-  const last = messages[messages.length - 1];
-
-  return {
-    id: text(row.id, `thread-${index}`),
-    clientName: text(row.clientName ?? row.client_name ?? row.name, 'Клиент'),
-    clientPhone: text(row.clientPhone ?? row.client_phone ?? row.phone),
-    channel: text(row.channel, 'Web'),
-    unreadCount: moneyNumber(row.unreadCount ?? row.unread_count, 0),
-    messages,
-    lastMessage: text(row.lastMessage ?? row.last_message, last?.body || 'Диалог без сообщений'),
-    updatedAt: text(row.updatedAt ?? row.updated_at, last?.createdAt || new Date().toISOString()),
-  };
-}
-
-function normalizeSettings(data: Json): MiniSettings {
-  const source = obj(data.settings ?? data.miniSettings ?? data.bookingSettings ?? {});
-  const reminders = obj(source.reminders ?? source.reminderChannels ?? {});
-
-  const rawNoShow = text(source.noShowAction, DEFAULT_SETTINGS.noShowAction);
-
-  return {
-    publicBookingEnabled: bool(source.publicBookingEnabled ?? source.public_booking_enabled, DEFAULT_SETTINGS.publicBookingEnabled),
-    autoConfirmBookings: bool(source.autoConfirmBookings ?? source.auto_confirm_bookings, DEFAULT_SETTINGS.autoConfirmBookings),
-    allowClientReschedule: bool(source.allowClientReschedule ?? source.allow_client_reschedule, DEFAULT_SETTINGS.allowClientReschedule),
-    reschedulePolicy: text(source.reschedulePolicy ?? source.reschedule_policy, DEFAULT_SETTINGS.reschedulePolicy),
-    reminderBeforeHours: Math.max(1, moneyNumber(source.reminderBeforeHours ?? source.reminder_before_hours, DEFAULT_SETTINGS.reminderBeforeHours)),
-    reminderTelegram: bool(reminders.telegram ?? source.reminderTelegram, DEFAULT_SETTINGS.reminderTelegram),
-    reminderVk: bool(reminders.vk ?? source.reminderVk, DEFAULT_SETTINGS.reminderVk),
-    reminderWeb: bool(reminders.web ?? source.reminderWeb, DEFAULT_SETTINGS.reminderWeb),
-    noShowAction:
-      rawNoShow === 'keep' || rawNoShow === 'blacklist_note' || rawNoShow === 'sleep'
-        ? rawNoShow
-        : DEFAULT_SETTINGS.noShowAction,
-    bookingNotice: text(source.bookingNotice ?? source.booking_notice, DEFAULT_SETTINGS.bookingNotice),
-  };
-}
-
-function buildClients(bookings: Booking[], services: Service[]): Client[] {
-  const prices = new Map(services.map((service) => [service.name, service.price]));
-  const map = new Map<string, Client>();
-
-  for (const booking of bookings) {
-    const key = booking.clientPhone || booking.clientName;
-
-    if (!key) continue;
-
-    const prev = map.get(key);
-    const isCompleted = booking.status === 'completed';
-    const isNoShow = booking.status === 'no_show';
-    const isCancelled = booking.status === 'cancelled';
-    const revenue = isCompleted ? booking.priceAmount || prices.get(booking.service) || 0 : 0;
-    const lastVisit = `${booking.date} ${booking.time}`;
-    const isNewer = !prev || lastVisit > prev.lastVisit;
-
-    map.set(key, {
-      id: key,
-      name: booking.clientName,
-      phone: booking.clientPhone,
-      visits: (prev?.visits ?? 0) + (isCompleted ? 1 : 0),
-      revenue: (prev?.revenue ?? 0) + revenue,
-      lastVisit: isNewer ? lastVisit : prev?.lastVisit ?? lastVisit,
-      note: prev?.note || booking.clientNote || booking.comment,
-      favorite: prev?.favorite || revenue > 0,
-      bookingsCount: (prev?.bookingsCount ?? 0) + 1,
-      transferCount: (prev?.transferCount ?? 0) + (booking.transferRequested ? 1 : 0),
-      noShowCount: (prev?.noShowCount ?? 0) + (isNoShow ? 1 : 0),
-      cancelledCount: (prev?.cancelledCount ?? 0) + (isCancelled ? 1 : 0),
-      lastStatus: isNewer ? booking.status : prev?.lastStatus ?? booking.status,
-      hasTransferRequest: Boolean(prev?.hasTransferRequest || booking.transferRequested),
-      lastService: isNewer ? booking.service : prev?.lastService ?? booking.service,
-    });
-  }
-
-  return Array.from(map.values()).sort((a, b) => b.lastVisit.localeCompare(a.lastVisit));
-}
-
-function buildSlots(date: string, week: WorkDay[], services: Service[], bookings: Booking[]) {
-  const day = week.find((item) => item.weekdayIndex === weekdayIndexFromDate(date)) ?? DEFAULT_WEEK[0];
-
-  if (day.status === 'day-off') return [];
-
-  const activeServices = services.filter((service) => service.visible && service.status !== 'draft');
-  const step = Math.max(30, Math.min(120, activeServices[0]?.duration || 60));
   const start = toMinutes(day.start);
   const end = toMinutes(day.end);
-  const breakStart = day.breakStart ? toMinutes(day.breakStart) : -1;
-  const breakEnd = day.breakEnd ? toMinutes(day.breakEnd) : -1;
-  const busy = new Set(
-    bookings
-      .filter((booking) => booking.date === date && booking.status !== 'cancelled')
-      .map((booking) => booking.time),
-  );
+  const breakStart = day.breakStart ? toMinutes(day.breakStart) : null;
+  const breakEnd = day.breakEnd ? toMinutes(day.breakEnd) : null;
+  const interval = Math.max(15, Number(day.interval) || 60);
 
-  const slots: Array<{ time: string; busy: boolean; breakTime: boolean }> = [];
+  const slots: string[] = [];
 
-  for (let current = start; current + step <= end; current += step) {
-    const time = fromMinutes(current);
-    const inBreak = breakStart >= 0 && breakEnd >= 0 && current >= breakStart && current < breakEnd;
+  for (let current = start; current < end; current += interval) {
+    const insideBreak =
+      breakStart !== null && breakEnd !== null && current >= breakStart && current < breakEnd;
 
-    slots.push({
-      time,
-      busy: busy.has(time),
-      breakTime: inBreak,
-    });
+    if (!insideBreak) {
+      slots.push(fromMinutes(current));
+    }
   }
 
   return slots;
 }
 
-async function parseJson(response: Response): Promise<Json> {
-  const body = await response.text().catch(() => '');
+function normalizeAvailability(value: unknown): AvailabilityDay[] {
+  if (!Array.isArray(value)) return DEFAULT_AVAILABILITY;
 
-  if (!body) return {};
+  const byId = new Map(
+    value.map((item) => {
+      const row = safeRecord(item);
 
-  try {
-    return obj(JSON.parse(body));
-  } catch {
-    return { error: body };
-  }
+      return [
+        String(row.id || ''),
+        {
+          id: String(row.id || ''),
+          label: String(row.label || ''),
+          short: String(row.short || ''),
+          enabled: row.enabled !== false,
+          start: String(row.start || '10:00'),
+          end: String(row.end || '20:00'),
+          interval: Number(row.interval || 60),
+          breakStart: typeof row.breakStart === 'string' ? row.breakStart : undefined,
+          breakEnd: typeof row.breakEnd === 'string' ? row.breakEnd : undefined,
+          slots: safeArray<string>(row.slots),
+        } satisfies AvailabilityDay,
+      ] as const;
+    }),
+  );
+
+  return DEFAULT_AVAILABILITY.map((fallback) => {
+    const saved = byId.get(fallback.id);
+    if (!saved) return fallback;
+
+    return {
+      ...fallback,
+      ...saved,
+      label: fallback.label,
+      short: fallback.short,
+      slots: saved.slots.length > 0 ? saved.slots : generateSlots(saved),
+    };
+  });
 }
 
-function storedToken() {
-  if (typeof window === 'undefined') return '';
+function getAccentFromWorkspace(workspaceData: Record<string, unknown>) {
+  const appearance = safeRecord(workspaceData.appearance);
+  const id = String(
+    appearance.accentTone ||
+      appearance.publicAccent ||
+      appearance.accent ||
+      workspaceData.accentTone ||
+      'mono',
+  );
 
-  try {
-    return window.localStorage.getItem('clickbook_app_session_token') || '';
-  } catch {
-    return '';
-  }
+  return ACCENT_OPTIONS.find((item) => item.id === id) ?? ACCENT_OPTIONS[0];
 }
 
-function apiHeaders(json = false) {
-  const token = storedToken();
+function parseServicesFromProfile(profile: MasterProfile | null, workspaceData: Record<string, unknown>) {
+  const stored = safeArray<Record<string, unknown>>(workspaceData.serviceCatalog);
+
+  if (stored.length > 0) {
+    return stored.map((item, index) => ({
+      id: String(item.id || `service-${index}`),
+      name: String(item.name || item.title || `Услуга ${index + 1}`),
+      price: String(item.price || item.priceAmount || ''),
+      duration: String(item.duration || item.durationMinutes || ''),
+      category: String(item.category || 'Основное'),
+      status:
+        item.status === 'seasonal' || item.status === 'draft'
+          ? item.status
+          : 'active',
+      visible: item.visible !== false,
+    })) as ServiceItem[];
+  }
+
+  return (profile?.services ?? []).map((service, index) => {
+    const priceMatch = service.match(/(\d[\d\s]*)\s*₽?/);
+    const price = priceMatch ? priceMatch[1].replace(/\s/g, '') : '';
+
+    return {
+      id: `service-${index}`,
+      name: service.replace(/\s*[—-]\s*\d[\d\s]*\s*₽?/, '').trim() || service,
+      price,
+      duration: '',
+      category: 'Основное',
+      status: 'active',
+      visible: true,
+    } satisfies ServiceItem;
+  });
+}
+
+function serviceItemsToText(items: ServiceItem[]) {
+  return items
+    .filter((item) => item.visible && item.name.trim())
+    .map((item) => {
+      const price = item.price.trim() ? ` — ${item.price.trim()} ₽` : '';
+      return `${item.name.trim()}${price}`;
+    })
+    .join('\n');
+}
+
+function normalizeChatThread(value: unknown, index: number): MiniChatThread {
+  const row = safeRecord(value);
+  const messages = safeArray<Record<string, unknown>>(row.messages).map((message, messageIndex) => ({
+    id: String(message.id || `message-${index}-${messageIndex}`),
+    from:
+      message.from === 'master' || message.sender === 'master'
+        ? 'master'
+        : message.from === 'system' || message.sender === 'system'
+          ? 'system'
+          : 'client',
+    text: String(message.text || message.body || message.message || ''),
+    createdAt: String(message.createdAt || message.created_at || new Date().toISOString()),
+  })) satisfies MiniChatMessage[];
 
   return {
-    ...(json ? { 'Content-Type': 'application/json' } : {}),
-    ...(token ? { 'X-ClickBook-App-Session': token } : {}),
+    id: String(row.id || row.threadId || `thread-${index}`),
+    clientName: String(row.clientName || row.client_name || row.name || `Клиент ${index + 1}`),
+    clientPhone: typeof row.clientPhone === 'string' ? row.clientPhone : typeof row.phone === 'string' ? row.phone : undefined,
+    source: typeof row.source === 'string' ? row.source : undefined,
+    priority: row.priority === 'high' || row.priority === 'low' ? row.priority : 'normal',
+    botConnected: row.botConnected !== false,
+    lastMessage: String(row.lastMessage || row.last_message || messages.at(-1)?.text || ''),
+    updatedAt: String(row.updatedAt || row.updated_at || new Date().toISOString()),
+    messages,
   };
 }
 
-async function authorizeTelegram() {
-  if (typeof window === 'undefined') return;
-
-  const webApp = (window as TgWindow).Telegram?.WebApp;
-  const initData = text(webApp?.initData);
+async function parseJsonSafe<T>(response: Response): Promise<T | null> {
+  const text = await response.text();
+  if (!text) return null;
 
   try {
-    webApp?.ready?.();
-  } catch {}
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
 
-  try {
-    webApp?.expand?.();
-  } catch {}
+async function fetchMini(path: string, init?: RequestInit) {
+  const headers = new Headers(init?.headers);
 
-  if (!initData) return;
+  Object.entries(getTelegramAppSessionHeaders()).forEach(([key, value]) => {
+    headers.set(key, value);
+  });
 
-  const response = await fetch('/api/auth/telegram-miniapp', {
-    method: 'POST',
+  return fetch(path, {
+    ...init,
     credentials: 'include',
     cache: 'no-store',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData }),
-  }).catch(() => null);
-
-  if (!response?.ok) return;
-
-  const payload = await parseJson(response);
-  const token = text(payload.appSessionToken ?? payload.app_session_token ?? payload.token);
-
-  if (!token) return;
-
-  try {
-    window.localStorage.setItem('clickbook_app_session_token', token);
-  } catch {}
+    headers,
+  });
 }
 
-function isLightTheme() {
-  if (typeof document === 'undefined') return false;
-
-  return !document.documentElement.classList.contains('dark') &&
-    !document.body.classList.contains('dark');
-}
-
-function getAccent(data: Json) {
-  const appearance = obj(data.appearance);
-
-  return text(appearance.accentColor ?? appearance.accent ?? data.accentColor, '#d7c7aa');
-}
-
-function ui(light: boolean) {
-  return {
-    page: light ? 'bg-[#f4f4f2] text-[#090909]' : 'bg-[#090909] text-white',
-    card: light
-      ? 'border-black/[0.08] bg-[#fbfbfa] text-[#090909]'
-      : 'border-white/[0.08] bg-[#101010] text-white',
-    panel: light
-      ? 'border-black/[0.07] bg-black/[0.025]'
-      : 'border-white/[0.08] bg-white/[0.035]',
-    input: light
-      ? 'border-black/[0.08] bg-white/75 text-black placeholder:text-black/35'
-      : 'border-white/[0.09] bg-white/[0.055] text-white placeholder:text-white/35',
-    ghost: light
-      ? 'border-black/[0.08] bg-white/60 text-black'
-      : 'border-white/[0.09] bg-white/[0.055] text-white',
-    muted: light ? 'text-black/48' : 'text-white/45',
-    soft: light ? 'text-black/62' : 'text-white/62',
-    divider: light ? 'border-black/[0.07]' : 'border-white/[0.08]',
-  };
-}
-
-function Logo({ light }: { light: boolean }) {
-  return (
-    <div className="flex items-center gap-2">
-      <div
-        className={cx(
-          'grid size-8 place-items-center rounded-[10px] border',
-          light ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.04]',
-        )}
-      >
-        <div className={cx('size-3.5 rounded-[4px] border', light ? 'border-black' : 'border-white')} />
-      </div>
-      <div className="text-[15px] font-semibold tracking-[-0.06em]">КликБук</div>
-    </div>
-  );
-}
-
-function Card({
-  light,
-  className,
+function MiniCard({
   children,
-}: {
-  light: boolean;
-  className?: string;
-  children: ReactNode;
-}) {
-  return <div className={cx('rounded-[14px] border shadow-none', ui(light).card, className)}>{children}</div>;
-}
-
-function Micro({ children }: { children: ReactNode }) {
-  return <div className="text-[10px] font-bold uppercase tracking-[0.18em] opacity-50">{children}</div>;
-}
-
-function Button({
-  light,
-  primary,
-  danger,
   className,
-  children,
-  disabled,
-  onClick,
 }: {
-  light: boolean;
-  primary?: boolean;
-  danger?: boolean;
-  className?: string;
   children: ReactNode;
-  disabled?: boolean;
-  onClick?: () => void;
+  className?: string;
 }) {
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className={cx(
-        'inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border px-3 text-[12px] font-bold transition active:scale-[0.985] disabled:pointer-events-none disabled:opacity-45',
-        primary
-          ? light
-            ? 'border-black bg-black text-white'
-            : 'border-white bg-white text-black'
-          : danger
-            ? light
-              ? 'border-rose-300/40 bg-rose-50 text-rose-700'
-              : 'border-rose-300/15 bg-rose-400/10 text-rose-100'
-            : ui(light).ghost,
+    <section
+      className={cn(
+        'rounded-[20px] border border-white/[0.08] bg-[#101010]/92 shadow-none backdrop-blur-[18px]',
         className,
       )}
     >
       {children}
-    </button>
-  );
-}
-
-function Field(props: React.InputHTMLAttributes<HTMLInputElement> & { light: boolean }) {
-  const { light, className, ...rest } = props;
-
-  return (
-    <input
-      {...rest}
-      className={cx(
-        'h-10 w-full rounded-[10px] border px-3 text-[13px] font-medium outline-none',
-        ui(light).input,
-        className,
-      )}
-    />
-  );
-}
-
-function Area(props: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { light: boolean }) {
-  const { light, className, ...rest } = props;
-
-  return (
-    <textarea
-      {...rest}
-      className={cx(
-        'min-h-[84px] w-full resize-none rounded-[10px] border px-3 py-2 text-[13px] font-medium leading-5 outline-none',
-        ui(light).input,
-        className,
-      )}
-    />
-  );
-}
-
-function Empty({ light, title, text: body }: { light: boolean; title: string; text: string }) {
-  return (
-    <div className={cx('rounded-[12px] border p-4 text-center', ui(light).panel)}>
-      <div className="text-[13px] font-bold tracking-[-0.03em]">{title}</div>
-      <div className={cx('mt-1 text-[11px] leading-4', ui(light).muted)}>{body}</div>
-    </div>
-  );
-}
-
-function Stat({ light, label, value }: { light: boolean; label: string; value: string }) {
-  return (
-    <div className={cx('rounded-[11px] border p-3', ui(light).panel)}>
-      <div className={cx('text-[10px] font-bold uppercase tracking-[0.14em]', ui(light).muted)}>{label}</div>
-      <div className="mt-1 truncate text-[17px] font-semibold tracking-[-0.06em]">{value}</div>
-    </div>
-  );
-}
-
-function Badge({
-  light,
-  children,
-  tone = 'neutral',
-}: {
-  light: boolean;
-  children: ReactNode;
-  tone?: 'neutral' | 'success' | 'warning' | 'danger' | 'accent';
-}) {
-  const className =
-    tone === 'success'
-      ? light
-        ? 'border-emerald-300/35 bg-emerald-50 text-emerald-700'
-        : 'border-emerald-300/15 bg-emerald-400/10 text-emerald-100'
-      : tone === 'warning'
-        ? light
-          ? 'border-amber-300/35 bg-amber-50 text-amber-700'
-          : 'border-amber-300/15 bg-amber-400/10 text-amber-100'
-        : tone === 'danger'
-          ? light
-            ? 'border-rose-300/35 bg-rose-50 text-rose-700'
-            : 'border-rose-300/15 bg-rose-400/10 text-rose-100'
-          : tone === 'accent'
-            ? light
-              ? 'border-black/[0.08] bg-black text-white'
-              : 'border-white/[0.12] bg-white text-black'
-            : light
-              ? 'border-black/[0.08] bg-white/70 text-black/65'
-              : 'border-white/[0.09] bg-white/[0.055] text-white/65';
-
-  return (
-    <span className={cx('inline-flex h-6 items-center rounded-full border px-2 text-[10px] font-bold', className)}>
-      {children}
-    </span>
-  );
-}
-
-function BookingBadges({ light, booking }: { light: boolean; booking: Booking }) {
-  return (
-    <div className="mt-2 flex flex-wrap gap-1.5">
-      {booking.transferRequested ? <Badge light={light} tone="warning">Просит перенос</Badge> : null}
-      {booking.status === 'new' ? <Badge light={light} tone="accent">Новая</Badge> : null}
-      {booking.status === 'confirmed' ? <Badge light={light}>В плане</Badge> : null}
-      {booking.status === 'completed' ? <Badge light={light} tone="success">Пришла</Badge> : null}
-      {booking.status === 'no_show' ? <Badge light={light} tone="warning">Не пришла</Badge> : null}
-      {booking.status === 'cancelled' ? <Badge light={light} tone="danger">Отмена</Badge> : null}
-      {booking.channel ? <Badge light={light}>{booking.channel}</Badge> : null}
-    </div>
-  );
-}
-
-function Shell({
-  light,
-  accent,
-  profile,
-  screen,
-  setScreen,
-  refresh,
-  children,
-}: {
-  light: boolean;
-  accent: string;
-  profile: Profile;
-  screen: Screen;
-  setScreen: (value: Screen) => void;
-  refresh: () => void;
-  children: ReactNode;
-}) {
-  const t = ui(light);
-  const isChatOpen = screen === 'chat';
-
-  const tabs: Array<{ id: Screen; label: string; icon: ReactNode }> = [
-    { id: 'today', label: 'Сегодня', icon: <CalendarClock className="size-4" /> },
-    { id: 'schedule', label: 'График', icon: <Clock3 className="size-4" /> },
-    { id: 'chats', label: 'Чаты', icon: <MessageCircle className="size-4" /> },
-    { id: 'clients', label: 'Клиенты', icon: <Users2 className="size-4" /> },
-    { id: 'more', label: 'Ещё', icon: <Settings className="size-4" /> },
-  ];
-
-  return (
-    <main
-      className={cx(
-        'min-h-screen overflow-x-hidden pt-[calc(var(--tg-safe-top,0px)+8px)]',
-        isChatOpen ? 'pb-0' : 'pb-[calc(84px+var(--tg-safe-bottom,0px))]',
-        t.page,
-      )}
-      style={{ '--mini-accent': accent } as CSSProperties}
-    >
-      <div className={cx('mx-auto flex w-full max-w-[460px] flex-col gap-3 px-3', isChatOpen ? 'px-0' : '')}>
-        {!isChatOpen ? (
-          <header className="sticky top-0 z-20 -mx-3 bg-inherit px-3 pb-2 pt-[calc(var(--tg-safe-top,0px)+8px)]">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <Logo light={light} />
-                <div className={cx('mt-1 truncate text-[10px] font-semibold', t.muted)}>
-                  {profile.name || 'Мастер'} · {profile.profession || 'Mini app'}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={refresh}
-                className={cx('grid size-9 place-items-center rounded-[10px] border', t.ghost)}
-              >
-                <RefreshCcw className="size-4" />
-              </button>
-            </div>
-          </header>
-        ) : null}
-
-        {children}
-      </div>
-
-      {!isChatOpen ? (
-        <nav
-          className={cx(
-            'fixed inset-x-0 bottom-0 z-40 border-t px-3 pb-[calc(var(--tg-safe-bottom,0px)+8px)] pt-2 backdrop-blur-[20px]',
-            light ? 'border-black/[0.08] bg-[#f4f4f2]/92' : 'border-white/[0.08] bg-[#090909]/92',
-          )}
-        >
-          <div className="mx-auto grid max-w-[460px] grid-cols-5 gap-1">
-            {tabs.map((tab) => {
-              const currentScreen = screen as string;
-              const currentTab = tab.id as string;
-              const active = currentTab === 'chats'
-                ? currentScreen === 'chats' || currentScreen === 'chat'
-                : currentTab === 'more'
-                  ? ['services', 'analytics', 'profile', 'settings', 'more'].includes(currentScreen)
-                  : currentScreen === currentTab;
-
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setScreen(tab.id)}
-                  className={cx(
-                    'flex h-12 flex-col items-center justify-center gap-1 rounded-[11px] text-[10px] font-bold transition active:scale-[0.98]',
-                    active ? (light ? 'bg-black text-white' : 'bg-white text-black') : t.muted,
-                  )}
-                >
-                  {tab.icon}
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-        </nav>
-      ) : null}
-    </main>
-  );
-}
-
-function LoadingScreen() {
-  return (
-    <main className="flex min-h-screen items-center justify-center bg-[#090909] px-6 text-white">
-      <div className="w-full max-w-[340px] rounded-[18px] border border-white/[0.10] bg-[#101010] p-5 text-center">
-        <Logo light={false} />
-        <div className="mt-5 text-[24px] font-semibold tracking-[-0.08em]">Загружаю mini app</div>
-        <div className="mt-2 text-[12px] leading-5 text-white/45">Профиль, записи, услуги, график и чаты.</div>
-        <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-          <div className="h-full w-1/2 animate-pulse rounded-full bg-white/70" />
-        </div>
-      </div>
-    </main>
-  );
-}
-
-function BookingRow({ light, booking, onClick }: { light: boolean; booking: Booking; onClick: () => void }) {
-  const t = ui(light);
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cx(
-        'flex w-full items-start gap-3 rounded-[12px] border p-3 text-left transition active:scale-[0.995]',
-        booking.transferRequested
-          ? light
-            ? 'border-amber-300/35 bg-amber-50/70'
-            : 'border-amber-300/15 bg-amber-400/[0.075]'
-          : t.panel,
-      )}
-    >
-      <div className="w-[56px] shrink-0">
-        <div className="text-[18px] font-semibold tracking-[-0.07em]">{timeLabel(booking.time)}</div>
-        <div className={cx('mt-1 flex items-center gap-1 text-[10px] font-bold', t.muted)}>
-          <span className="size-1.5 rounded-full" style={{ backgroundColor: STATUS_DOT[booking.status] }} />
-          {STATUS_LABEL[booking.status]}
-        </div>
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-[13px] font-bold tracking-[-0.03em]">{booking.clientName}</div>
-        <div className={cx('mt-1 truncate text-[11px]', t.muted)}>{booking.service}</div>
-        <BookingBadges light={light} booking={booking} />
-
-        {booking.transferRequested ? (
-          <div className={cx('mt-2 rounded-[9px] border px-2 py-1.5 text-[11px] leading-4', light ? 'border-amber-300/30 bg-white/60 text-amber-800' : 'border-amber-300/15 bg-black/10 text-amber-100')}>
-            Клиент просит перенос{booking.transferReason ? `: ${booking.transferReason}` : ''}
-          </div>
-        ) : null}
-      </div>
-
-      <ChevronRight className={cx('mt-1 size-4 shrink-0', t.muted)} />
-    </button>
-  );
-}
-
-function ReadyRow({
-  light,
-  done,
-  title,
-  text: body,
-  onClick,
-}: {
-  light: boolean;
-  done: boolean;
-  title: string;
-  text: string;
-  onClick: () => void;
-}) {
-  const t = ui(light);
-
-  return (
-    <button type="button" onClick={onClick} className={cx('flex w-full items-center gap-3 rounded-[11px] border p-3 text-left', t.panel)}>
-      <span
-        className={cx(
-          'grid size-8 shrink-0 place-items-center rounded-[9px]',
-          done ? (light ? 'bg-emerald-50 text-emerald-700' : 'bg-emerald-400/10 text-emerald-200') : t.ghost,
-        )}
-      >
-        {done ? <Check className="size-4" /> : <ChevronRight className="size-4" />}
-      </span>
-      <span className="min-w-0">
-        <span className="block text-[13px] font-bold tracking-[-0.03em]">{title}</span>
-        <span className={cx('mt-0.5 block text-[11px]', t.muted)}>{body}</span>
-      </span>
-    </button>
-  );
-}
-
-function TodayScreen({
-  light,
-  profile,
-  bookings,
-  services,
-  week,
-  settings,
-  setScreen,
-  openBooking,
-  openQuick,
-  openChatForBooking,
-  publicUrl,
-}: {
-  light: boolean;
-  profile: Profile;
-  bookings: Booking[];
-  services: Service[];
-  week: WorkDay[];
-  settings: MiniSettings;
-  setScreen: (value: Screen) => void;
-  openBooking: (booking: Booking) => void;
-  openQuick: (preset?: QuickBookingPreset) => void;
-  openChatForBooking: (booking: Booking) => void;
-  publicUrl: string;
-}) {
-  const t = ui(light);
-  const [date, setDate] = useState(today());
-
-  const days = useMemo(() => Array.from({ length: 7 }, (_, index) => addDays(today(), index)), []);
-  const dayBookings = bookings.filter((booking) => booking.date === date).sort((a, b) => a.time.localeCompare(b.time));
-  const active = dayBookings.filter((booking) => booking.status !== 'cancelled' && booking.status !== 'no_show');
-  const completed = dayBookings.filter((booking) => booking.status === 'completed');
-  const transferQueue = bookings
-    .filter((booking) => booking.transferRequested && booking.transferStatus !== 'done' && booking.transferStatus !== 'declined')
-    .sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
-  const revenue = completed.reduce(
-    (sum, booking) => sum + (booking.priceAmount || services.find((service) => service.name === booking.service)?.price || 0),
-    0,
-  );
-
-  const ready = [
-    len(services) > 0,
-    week.some((day) => day.status !== 'day-off'),
-    Boolean(profile.phone || profile.telegram || profile.whatsapp),
-    settings.publicBookingEnabled,
-  ];
-
-  return (
-    <>
-      <Card light={light} className="overflow-hidden p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <Micro>Рабочий пульт</Micro>
-            <div className="mt-2 text-[32px] font-semibold leading-[0.9] tracking-[-0.095em]">Сегодня</div>
-            <div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Записи, переносы, касса и быстрые действия.</div>
-          </div>
-          <div className={cx('rounded-full border px-2.5 py-1 text-[10px] font-bold', t.ghost)}>
-            {ready.filter(Boolean).length}/4
-          </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          <Stat light={light} label="Записей" value={String(len(active))} />
-          <Stat light={light} label="Переносы" value={String(len(transferQueue))} />
-          <Stat light={light} label="Касса" value={rub(revenue)} />
-        </div>
-
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <Button light={light} primary onClick={() => openQuick()}>
-            <Plus className="size-4" />
-            Запись
-          </Button>
-          <Button light={light} onClick={() => navigator.clipboard?.writeText(publicUrl).catch(() => null)}>
-            <Copy className="size-4" />
-            Ссылка
-          </Button>
-        </div>
-      </Card>
-
-      {len(transferQueue) > 0 ? (
-        <Card light={light} className={cx('p-3', light ? 'border-amber-300/35 bg-amber-50/70' : 'border-amber-300/15 bg-amber-400/[0.075]')}>
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <Micro>Требуют внимания</Micro>
-              <div className="mt-1 text-[15px] font-bold tracking-[-0.04em]">Клиенты просят перенос</div>
-            </div>
-            <Badge light={light} tone="warning">{len(transferQueue)}</Badge>
-          </div>
-
-          <div className="mt-3 space-y-2">
-            {transferQueue.slice(0, 3).map((booking) => (
-              <div key={booking.id} className={cx('rounded-[11px] border p-3', light ? 'border-amber-300/25 bg-white/65' : 'border-amber-300/15 bg-black/10')}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate text-[13px] font-bold">{booking.clientName}</div>
-                    <div className={cx('mt-1 text-[11px]', t.muted)}>
-                      {dateLabel(booking.date)} · {booking.time} · {booking.service}
-                    </div>
-                    <div className="mt-2 text-[11px] leading-4 opacity-75">
-                      {booking.transferReason || 'Клиент запросил другое время.'}
-                    </div>
-                  </div>
-                  <button type="button" onClick={() => openBooking(booking)} className={cx('grid size-9 shrink-0 place-items-center rounded-[10px] border', t.ghost)}>
-                    <ChevronRight className="size-4" />
-                  </button>
-                </div>
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <Button light={light} onClick={() => openChatForBooking(booking)}>Открыть чат</Button>
-                  <Button light={light} primary onClick={() => openBooking(booking)}>
-                    Разобрать перенос
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      ) : null}
-
-      <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {days.map((day) => {
-          const isActive = day === date;
-          const count = bookings.filter((booking) => booking.date === day).length;
-
-          return (
-            <button
-              key={day}
-              type="button"
-              onClick={() => setDate(day)}
-              className={cx(
-                'min-w-[78px] rounded-[12px] border p-2 text-left transition',
-                isActive ? (light ? 'border-black bg-black text-white' : 'border-white bg-white text-black') : t.ghost,
-              )}
-            >
-              <div className="text-[11px] font-bold capitalize">{dateLabel(day)}</div>
-              <div className="mt-1 text-[10px] opacity-55">{count} записей</div>
-            </button>
-          );
-        })}
-      </div>
-
-      <Card light={light} className="p-3">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <Micro>Лента дня</Micro>
-            <div className="mt-1 text-[15px] font-bold tracking-[-0.04em]">{dateLabel(date, true)}</div>
-          </div>
-          <Button light={light} className="h-8 px-2" onClick={() => openQuick({ date })}>
-            <Plus className="size-3.5" />
-          </Button>
-        </div>
-
-        <div className="space-y-2">
-          {len(dayBookings) === 0 ? (
-            <Empty light={light} title="Записей нет" text="Добавь запись вручную или отправь клиенту ссылку." />
-          ) : (
-            dayBookings.map((booking) => (
-              <BookingRow key={booking.id} light={light} booking={booking} onClick={() => openBooking(booking)} />
-            ))
-          )}
-        </div>
-      </Card>
-
-      <Card light={light} className="p-3">
-        <Micro>Готовность</Micro>
-        <div className="mt-3 space-y-2">
-          <ReadyRow
-            light={light}
-            done={ready[0]}
-            title="Услуги"
-            text={len(services) > 0 ? `${len(services)} услуг в каталоге` : 'Добавь услуги и цены'}
-            onClick={() => setScreen('services')}
-          />
-          <ReadyRow
-            light={light}
-            done={ready[1]}
-            title="График"
-            text="Рабочие дни и перерывы"
-            onClick={() => setScreen('schedule')}
-          />
-          <ReadyRow
-            light={light}
-            done={ready[2]}
-            title="Контакты"
-            text="Телефон, Telegram или WhatsApp"
-            onClick={() => setScreen('profile')}
-          />
-          <ReadyRow
-            light={light}
-            done={ready[3]}
-            title="Публичная запись"
-            text={settings.publicBookingEnabled ? 'Клиенты могут записываться' : 'Запись временно выключена'}
-            onClick={() => setScreen('settings')}
-          />
-        </div>
-      </Card>
-    </>
-  );
-}
-
-function ScheduleScreen({
-  light,
-  workspaceId,
-  days,
-  bookings,
-  services,
-  setDays,
-  reload,
-}: {
-  light: boolean;
-  workspaceId: string;
-  days: WorkDay[];
-  bookings: Booking[];
-  services: Service[];
-  setDays: (days: WorkDay[]) => void;
-  reload: () => Promise<void>;
-}) {
-  const t = ui(light);
-  const [saving, setSaving] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(today());
-
-  const selectedBookings = bookings.filter((booking) => booking.date === selectedDate && booking.status !== 'cancelled');
-  const previewSlots = buildSlots(selectedDate, days, services, bookings);
-
-  const update = (dayId: string, patch: Partial<WorkDay>) => {
-    setDays(days.map((day) => (day.id === dayId ? { ...day, ...patch } : day)));
-  };
-
-  const preset = (mode: '5/2' | '2/2' | '7/0' | 'weekends') => {
-    setDays(
-      DEFAULT_WEEK.map((day) => {
-        if (mode === '7/0') return { ...day, status: 'workday' };
-        if (mode === 'weekends') return { ...day, status: day.weekdayIndex >= 5 ? 'workday' : 'day-off', start: '11:00', end: '18:00' };
-        if (mode === '2/2') return { ...day, status: day.weekdayIndex === 0 || day.weekdayIndex === 1 || day.weekdayIndex === 4 || day.weekdayIndex === 5 ? 'workday' : 'day-off' };
-        return { ...day, status: day.weekdayIndex < 5 ? 'workday' : 'day-off' };
-      }),
-    );
-  };
-
-  const save = async () => {
-    setSaving(true);
-
-    await fetch('/api/workspace/section', {
-      method: 'PATCH',
-      credentials: 'include',
-      cache: 'no-store',
-      headers: apiHeaders(true),
-      body: JSON.stringify({
-        workspaceId,
-        section: 'availability',
-        value: days.map((day) => ({
-          id: day.id,
-          label: day.label,
-          weekdayIndex: day.weekdayIndex,
-          status: day.status,
-          slots: day.status === 'day-off' ? [] : [`${day.start}–${day.end}`],
-          breaks: day.breakStart && day.breakEnd ? [`${day.breakStart}–${day.breakEnd}`] : [],
-          custom: false,
-        })),
-      }),
-    }).catch(() => null);
-
-    await reload();
-    setSaving(false);
-  };
-
-  return (
-    <>
-      <Card light={light} className="p-4">
-        <Micro>График</Micro>
-        <div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.09em]">Рабочие окна</div>
-        <div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Дни, время, перерывы и предпросмотр свободных слотов.</div>
-        <div className="mt-4 grid grid-cols-4 gap-2">
-          <Button light={light} onClick={() => preset('5/2')}>5/2</Button>
-          <Button light={light} onClick={() => preset('2/2')}>2/2</Button>
-          <Button light={light} onClick={() => preset('7/0')}>7/0</Button>
-          <Button light={light} onClick={() => preset('weekends')}>Вых</Button>
-        </div>
-        <Button light={light} primary disabled={saving} onClick={() => void save()} className="mt-2 w-full">
-          <Save className="size-4" />
-          {saving ? 'Сохраняю' : 'Сохранить график'}
-        </Button>
-      </Card>
-
-      <Card light={light} className="p-3">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <Micro>Предпросмотр</Micro>
-            <div className="mt-1 text-[15px] font-bold tracking-[-0.04em]">Свободные слоты</div>
-          </div>
-          <Field light={light} type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} className="max-w-[145px]" />
-        </div>
-
-        {len(selectedBookings) > 0 ? (
-          <div className={cx('mt-3 rounded-[11px] border p-3 text-[11px] leading-4', light ? 'border-amber-300/35 bg-amber-50 text-amber-800' : 'border-amber-300/15 bg-amber-400/10 text-amber-100')}>
-            На эту дату уже есть {len(selectedBookings)} записей. Если поменяешь график, проверь, чтобы не сломать существующие слоты.
-          </div>
-        ) : null}
-
-        <div className="mt-3 flex flex-wrap gap-2">
-          {len(previewSlots) === 0 ? (
-            <Badge light={light} tone="danger">Выходной или нет слотов</Badge>
-          ) : (
-            previewSlots.map((slot) => (
-              <span
-                key={slot.time}
-                className={cx(
-                  'inline-flex h-8 items-center rounded-[9px] border px-2.5 text-[11px] font-bold',
-                  slot.busy
-                    ? light
-                      ? 'border-rose-300/35 bg-rose-50 text-rose-700'
-                      : 'border-rose-300/15 bg-rose-400/10 text-rose-100'
-                    : slot.breakTime
-                      ? light
-                        ? 'border-amber-300/35 bg-amber-50 text-amber-700'
-                        : 'border-amber-300/15 bg-amber-400/10 text-amber-100'
-                      : light
-                        ? 'border-black/[0.08] bg-white/70 text-black/70'
-                        : 'border-white/[0.09] bg-white/[0.055] text-white/70',
-                )}
-              >
-                {slot.time}
-              </span>
-            ))
-          )}
-        </div>
-      </Card>
-
-      <div className="space-y-2">
-        {days.map((day) => (
-          <Card light={light} key={day.id} className="p-3">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-[15px] font-bold tracking-[-0.04em]">{day.label}</div>
-                <div className={cx('mt-1 text-[11px]', t.muted)}>
-                  {day.status === 'day-off'
-                    ? 'Выходной'
-                    : `${day.start}–${day.end}${day.breakStart ? ` · перерыв ${day.breakStart}–${day.breakEnd}` : ''}`}
-                </div>
-              </div>
-              <select
-                value={day.status}
-                onChange={(event) => update(day.id, { status: event.target.value as DayStatus })}
-                className={cx('h-9 rounded-[10px] border px-2 text-[11px] font-bold outline-none', t.input)}
-              >
-                <option value="workday">Рабочий</option>
-                <option value="short">Короткий</option>
-                <option value="day-off">Выходной</option>
-              </select>
-            </div>
-
-            {day.status !== 'day-off' ? (
-              <div className="mt-3 grid grid-cols-4 gap-2">
-                <Field light={light} type="time" value={day.start} onChange={(event) => update(day.id, { start: event.target.value })} />
-                <Field light={light} type="time" value={day.end} onChange={(event) => update(day.id, { end: event.target.value })} />
-                <Field light={light} type="time" value={day.breakStart} onChange={(event) => update(day.id, { breakStart: event.target.value })} />
-                <Field light={light} type="time" value={day.breakEnd} onChange={(event) => update(day.id, { breakEnd: event.target.value })} />
-              </div>
-            ) : null}
-          </Card>
-        ))}
-      </div>
-    </>
-  );
-}
-
-function ServicesScreen({
-  light,
-  profile,
-  workspaceId,
-  services,
-  bookings,
-  setServices,
-  reload,
-}: {
-  light: boolean;
-  profile: Profile;
-  workspaceId: string;
-  services: Service[];
-  bookings: Booking[];
-  setServices: (services: Service[]) => void;
-  reload: () => Promise<void>;
-}) {
-  const t = ui(light);
-  const [saving, setSaving] = useState(false);
-  const [filter, setFilter] = useState<'all' | ServiceStatus | 'hidden'>('all');
-  const categories = Array.from(new Set(services.map((service) => service.category || 'Основное')));
-
-  const filteredServices = services.filter((service) => {
-    if (filter === 'all') return true;
-    if (filter === 'hidden') return !service.visible;
-    return service.status === filter;
-  });
-
-  const statsFor = (service: Service) => {
-    const rows = bookings.filter((booking) => booking.service === service.name);
-    return {
-      all: len(rows),
-      completed: rows.filter((booking) => booking.status === 'completed').length,
-      transfer: rows.filter((booking) => booking.transferRequested).length,
-      revenue: rows.reduce((sum, booking) => sum + (booking.status === 'completed' ? booking.priceAmount || service.price : 0), 0),
-    };
-  };
-
-  const update = (serviceId: string, patch: Partial<Service>) => {
-    setServices(services.map((service) => (service.id === serviceId ? { ...service, ...patch } : service)));
-  };
-
-  const remove = (serviceId: string) => {
-    setServices(services.filter((service) => service.id !== serviceId));
-  };
-
-  const add = () => {
-    setServices([
-      {
-        id: makeId('service'),
-        name: 'Новая услуга',
-        category: categories[0] || 'Основное',
-        duration: 60,
-        price: 0,
-        status: 'active',
-        visible: true,
-      },
-      ...services,
-    ]);
-  };
-
-  const save = async () => {
-    setSaving(true);
-
-    const value = services
-      .filter((service) => text(service.name))
-      .map((service) => ({
-        ...service,
-        name: text(service.name),
-      }));
-
-    await fetch('/api/workspace/section', {
-      method: 'PATCH',
-      credentials: 'include',
-      cache: 'no-store',
-      headers: apiHeaders(true),
-      body: JSON.stringify({
-        workspaceId,
-        section: 'services',
-        value,
-      }),
-    }).catch(() => null);
-
-    await fetch('/api/profile', {
-      method: 'POST',
-      credentials: 'include',
-      cache: 'no-store',
-      headers: apiHeaders(true),
-      body: JSON.stringify({
-        workspaceId,
-        locale: 'ru',
-        profile: {
-          ...profile,
-          services: value
-            .filter((service) => service.visible && service.status !== 'draft')
-            .map((service) => service.name),
-        },
-      }),
-    }).catch(() => null);
-
-    await reload();
-    setSaving(false);
-  };
-
-  return (
-    <>
-      <Card light={light} className="p-4">
-        <Micro>Услуги</Micro>
-        <div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.09em]">Каталог</div>
-        <div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Цены, длительность, видимость и статистика по каждой услуге.</div>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <Button light={light} onClick={add}>
-            <Plus className="size-4" />
-            Добавить
-          </Button>
-          <Button light={light} primary disabled={saving} onClick={() => void save()}>
-            <Save className="size-4" />
-            {saving ? '...' : 'Сохранить'}
-          </Button>
-        </div>
-      </Card>
-
-      <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {[
-          ['all', 'Все'],
-          ['active', 'Активные'],
-          ['seasonal', 'Сезонные'],
-          ['draft', 'Черновики'],
-          ['hidden', 'Скрытые'],
-        ].map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setFilter(id as typeof filter)}
-            className={cx(
-              'shrink-0 rounded-full border px-3 py-2 text-[11px] font-bold',
-              filter === id ? (light ? 'border-black bg-black text-white' : 'border-white bg-white text-black') : ui(light).ghost,
-            )}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <div className="space-y-2">
-        {len(filteredServices) === 0 ? (
-          <Empty light={light} title="Услуг нет" text="Добавь первую услугу, чтобы клиенты могли записываться." />
-        ) : (
-          filteredServices.map((service) => {
-            const stat = statsFor(service);
-
-            return (
-              <Card light={light} key={service.id} className="p-3">
-                <div className="flex items-start gap-2">
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <Field light={light} value={service.name} onChange={(event) => update(service.id, { name: event.target.value })} placeholder="Название" />
-                    <div className="grid grid-cols-2 gap-2">
-                      <Field light={light} value={service.category} onChange={(event) => update(service.id, { category: event.target.value })} placeholder="Категория" />
-                      <Field light={light} type="number" value={service.price} onChange={(event) => update(service.id, { price: Number(event.target.value) })} placeholder="Цена" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Field light={light} type="number" value={service.duration} onChange={(event) => update(service.id, { duration: Number(event.target.value) })} placeholder="Минут" />
-                      <select
-                        value={service.status}
-                        onChange={(event) => update(service.id, { status: event.target.value as ServiceStatus })}
-                        className={cx('h-10 rounded-[10px] border px-3 text-[12px] font-bold outline-none', t.input)}
-                      >
-                        <option value="active">Активна</option>
-                        <option value="seasonal">Сезонная</option>
-                        <option value="draft">Черновик</option>
-                      </select>
-                    </div>
-
-                    <div className="grid grid-cols-4 gap-2">
-                      <Stat light={light} label="Записи" value={String(stat.all)} />
-                      <Stat light={light} label="Пришли" value={String(stat.completed)} />
-                      <Stat light={light} label="Перенос" value={String(stat.transfer)} />
-                      <Stat light={light} label="Доход" value={rub(stat.revenue)} />
-                    </div>
-
-                    <label className={cx('flex items-center gap-2 text-[11px] font-bold', t.muted)}>
-                      <input type="checkbox" checked={service.visible} onChange={(event) => update(service.id, { visible: event.target.checked })} />
-                      Показывать клиентам
-                    </label>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => remove(service.id)}
-                    className={cx('grid size-10 shrink-0 place-items-center rounded-[10px] border', t.ghost)}
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
-                </div>
-              </Card>
-            );
-          })
-        )}
-      </div>
-    </>
-  );
-}
-
-function ChatAvatar({ light, name }: { light: boolean; name: string }) {
-  return (
-    <div
-      className={cx(
-        'grid size-11 shrink-0 place-items-center rounded-full border text-[12px] font-black tracking-[-0.04em]',
-        light ? 'border-black/[0.08] bg-black text-white' : 'border-white/[0.10] bg-white text-black',
-      )}
-    >
-      {initials(name)}
-    </div>
-  );
-}
-
-function ChatsScreen({
-  light,
-  threads,
-  loading,
-  openChat,
-  reloadChats,
-}: {
-  light: boolean;
-  threads: ChatThread[];
-  loading: boolean;
-  openChat: (threadId: string) => void;
-  reloadChats: () => Promise<void>;
-}) {
-  const t = ui(light);
-  const [query, setQuery] = useState('');
-
-  const filtered = threads.filter((thread) => {
-    const needle = query.toLowerCase().trim();
-
-    if (!needle) return true;
-
-    return `${thread.clientName} ${thread.clientPhone} ${thread.channel} ${thread.lastMessage}`
-      .toLowerCase()
-      .includes(needle);
-  });
-
-  return (
-    <>
-      <Card light={light} className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <Micro>Чаты</Micro>
-            <div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.09em]">Диалоги</div>
-            <div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Список диалогов как в Telegram и отдельная страница чата.</div>
-          </div>
-          <button
-            type="button"
-            onClick={() => void reloadChats()}
-            className={cx('grid size-9 place-items-center rounded-[10px] border', t.ghost)}
-          >
-            <RefreshCcw className="size-4" />
-          </button>
-        </div>
-
-        <div className={cx('mt-4 flex h-10 items-center gap-2 rounded-[11px] border px-3', t.input)}>
-          <Search className="size-4 shrink-0 opacity-45" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Поиск по клиентам и сообщениям"
-            className="h-full min-w-0 flex-1 bg-transparent text-[13px] font-medium outline-none placeholder:opacity-55"
-          />
-        </div>
-      </Card>
-
-      <Card light={light} className="overflow-hidden">
-        {loading ? (
-          <div className="p-3">
-            <Empty light={light} title="Загружаю чаты" text="Собираю диалоги клиентов." />
-          </div>
-        ) : len(filtered) === 0 ? (
-          <div className="p-3">
-            <Empty light={light} title="Чатов нет" text="Когда клиент напишет или запишется, диалог появится здесь." />
-          </div>
-        ) : (
-          <div className="divide-y divide-black/[0.06] dark:divide-white/[0.08]">
-            {filtered.map((thread) => {
-              const lastTime = timeFromDate(thread.updatedAt);
-
-              return (
-                <button
-                  key={thread.id}
-                  type="button"
-                  onClick={() => openChat(thread.id)}
-                  className={cx(
-                    'flex w-full items-center gap-3 px-3 py-3 text-left transition active:scale-[0.995]',
-                    light ? 'hover:bg-black/[0.025]' : 'hover:bg-white/[0.035]',
-                  )}
-                >
-                  <ChatAvatar light={light} name={thread.clientName} />
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="truncate text-[14px] font-bold tracking-[-0.04em]">{thread.clientName}</div>
-                      <div className={cx('shrink-0 text-[10px] font-semibold', t.muted)}>{lastTime}</div>
-                    </div>
-                    <div className="mt-1 flex items-center gap-2">
-                      <div className={cx('truncate text-[12px]', t.muted)}>{thread.lastMessage}</div>
-                      {thread.unreadCount > 0 ? (
-                        <span
-                          className={cx(
-                            'ml-auto grid min-w-5 shrink-0 place-items-center rounded-full px-1.5 py-0.5 text-[10px] font-black',
-                            light ? 'bg-black text-white' : 'bg-white text-black',
-                          )}
-                        >
-                          {thread.unreadCount}
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className={cx('mt-1 text-[10px] font-bold uppercase tracking-[0.12em]', t.muted)}>
-                      {thread.channel}
-                      {thread.clientPhone ? ` · ${thread.clientPhone}` : ''}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </Card>
-    </>
-  );
-}
-
-function ChatDetailScreen({
-  light,
-  thread,
-  goBack,
-  sendMessage,
-  reloadChats,
-}: {
-  light: boolean;
-  thread: ChatThread | null;
-  goBack: () => void;
-  sendMessage: (threadId: string, body: string) => Promise<void>;
-  reloadChats: () => Promise<void>;
-}) {
-  const t = ui(light);
-  const [message, setMessage] = useState('');
-  const [sending, setSending] = useState(false);
-
-  const messages = list<ChatMessage>(thread?.messages);
-  const quickReplies = [
-    'Здравствуйте! Подтверждаю запись.',
-    'Напишите, пожалуйста, удобное время для переноса.',
-    'Спасибо, буду ждать вас.',
-    'Подскажите, пожалуйста, услугу и удобный день.',
-  ];
-
-  const submit = async (body = message) => {
-    const finalBody = text(body);
-
-    if (!thread || !finalBody || sending) return;
-
-    setSending(true);
-    setMessage('');
-    await sendMessage(thread.id, finalBody);
-    setSending(false);
-  };
-
-  if (!thread) {
-    return (
-      <div className="flex min-h-screen flex-col px-3 py-[calc(var(--tg-safe-top,0px)+12px)]">
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={goBack} className={cx('grid size-10 place-items-center rounded-full border', t.ghost)}>
-            <ArrowLeft className="size-5" />
-          </button>
-          <div className="text-[15px] font-bold">Чат не найден</div>
-        </div>
-        <div className="mt-4">
-          <Empty light={light} title="Диалог не найден" text="Вернись к списку чатов и открой диалог заново." />
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <section className={cx('flex min-h-screen flex-col', t.page)}>
-      <header
-        className={cx(
-          'sticky top-0 z-30 border-b px-3 pb-2 pt-[calc(var(--tg-safe-top,0px)+8px)] backdrop-blur-[20px]',
-          light ? 'border-black/[0.08] bg-[#f4f4f2]/92' : 'border-white/[0.08] bg-[#090909]/92',
-        )}
-      >
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={goBack} className={cx('grid size-10 place-items-center rounded-full border', t.ghost)}>
-            <ArrowLeft className="size-5" />
-          </button>
-
-          <ChatAvatar light={light} name={thread.clientName} />
-
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-[15px] font-bold tracking-[-0.045em]">{thread.clientName}</div>
-            <div className={cx('mt-0.5 truncate text-[11px]', t.muted)}>
-              {thread.channel}
-              {thread.clientPhone ? ` · ${thread.clientPhone}` : ''}
-            </div>
-          </div>
-
-          {thread.clientPhone ? (
-            <a href={`tel:${thread.clientPhone}`} className={cx('grid size-10 place-items-center rounded-full border', t.ghost)}>
-              <Phone className="size-4" />
-            </a>
-          ) : null}
-
-          <button type="button" onClick={() => void reloadChats()} className={cx('grid size-10 place-items-center rounded-full border', t.ghost)}>
-            <MoreVertical className="size-4" />
-          </button>
-        </div>
-      </header>
-
-      <div className="flex-1 space-y-2 px-3 py-3">
-        {len(messages) === 0 ? (
-          <div className="pt-12">
-            <Empty light={light} title="Сообщений нет" text="Напиши клиенту первым сообщением." />
-          </div>
-        ) : (
-          messages.map((item) => {
-            const mine = item.author === 'master' || item.author === 'me' || item.author === 'owner';
-
-            return (
-              <div key={item.id} className={cx('flex', mine ? 'justify-end' : 'justify-start')}>
-                <div
-                  className={cx(
-                    'max-w-[82%] rounded-[18px] border px-3 py-2 text-[13px] leading-5 shadow-none',
-                    mine
-                      ? light
-                        ? 'rounded-br-[6px] border-black bg-black text-white'
-                        : 'rounded-br-[6px] border-white bg-white text-black'
-                      : light
-                        ? 'rounded-bl-[6px] border-black/[0.07] bg-white text-black'
-                        : 'rounded-bl-[6px] border-white/[0.08] bg-white/[0.055] text-white',
-                  )}
-                >
-                  <div>{item.body}</div>
-                  <div className="mt-1 text-right text-[9px] font-semibold opacity-45">{timeFromDate(item.createdAt)}</div>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      <footer
-        className={cx(
-          'sticky bottom-0 z-30 border-t px-3 pb-[calc(var(--tg-safe-bottom,0px)+8px)] pt-2 backdrop-blur-[20px]',
-          light ? 'border-black/[0.08] bg-[#f4f4f2]/92' : 'border-white/[0.08] bg-[#090909]/92',
-        )}
-      >
-        <div className="mb-2 flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {quickReplies.map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => void submit(item)}
-              className={cx('shrink-0 rounded-full border px-3 py-1.5 text-[10px] font-bold', t.ghost)}
-            >
-              {item}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-end gap-2">
-          <textarea
-            value={message}
-            onChange={(event) => setMessage(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                void submit();
-              }
-            }}
-            placeholder="Сообщение"
-            rows={1}
-            className={cx(
-              'max-h-28 min-h-11 flex-1 resize-none rounded-[16px] border px-3 py-3 text-[13px] font-medium leading-5 outline-none',
-              t.input,
-            )}
-          />
-          <button
-            type="button"
-            disabled={!text(message) || sending}
-            onClick={() => void submit()}
-            className={cx(
-              'grid size-11 shrink-0 place-items-center rounded-full border transition active:scale-[0.96] disabled:pointer-events-none disabled:opacity-35',
-              light ? 'border-black bg-black text-white' : 'border-white bg-white text-black',
-            )}
-          >
-            <Send className="size-4" />
-          </button>
-        </div>
-      </footer>
     </section>
   );
 }
 
-function MoreScreen({
-  light,
-  profile,
-  clients,
-  bookings,
-  services,
-  publicUrl,
-  setScreen,
-}: {
-  light: boolean;
-  profile: Profile;
-  clients: Client[];
-  bookings: Booking[];
-  services: Service[];
-  publicUrl: string;
-  setScreen: (value: Screen) => void;
-}) {
-  const t = ui(light);
-
-  const items: Array<{ screen: Screen; title: string; info: string; icon: ReactNode }> = [
-    { screen: 'services', title: 'Услуги', info: `${len(services)} позиций`, icon: <Scissors className="size-4" /> },
-    { screen: 'analytics', title: 'Аналитика', info: `${len(bookings)} заявок`, icon: <BarChart3 className="size-4" /> },
-    { screen: 'profile', title: 'Профиль', info: `/${profile.slug}`, icon: <UserRound className="size-4" /> },
-    { screen: 'settings', title: 'Настройки записи', info: 'Переносы, напоминания, правила', icon: <ShieldCheck className="size-4" /> },
-  ];
-
+function MiniLabel({ children }: { children: ReactNode }) {
   return (
-    <>
-      <Card light={light} className="p-4">
-        <Micro>Ещё</Micro>
-        <div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.09em]">Управление</div>
-        <div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Клиенты, аналитика, профиль, настройки и полный кабинет.</div>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <Button light={light} onClick={() => navigator.clipboard?.writeText(publicUrl).catch(() => null)}>
-            <Copy className="size-4" />
-            Ссылка
-          </Button>
-          <a
-            href="/dashboard"
-            className={cx('inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border px-3 text-[12px] font-bold', t.ghost)}
-          >
-            <LayoutDashboard className="size-4" />
-            Кабинет
-          </a>
-        </div>
-      </Card>
-
-      <div className="space-y-2">
-        {items.map((item) => (
-          <button
-            key={item.screen}
-            type="button"
-            onClick={() => setScreen(item.screen)}
-            className={cx('flex w-full items-center gap-3 rounded-[13px] border p-3 text-left', t.card)}
-          >
-            <span className={cx('grid size-10 place-items-center rounded-[10px] border', t.panel)}>{item.icon}</span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[14px] font-bold tracking-[-0.04em]">{item.title}</span>
-              <span className={cx('mt-1 block text-[11px]', t.muted)}>{item.info}</span>
-            </span>
-            <ChevronRight className={cx('size-4', t.muted)} />
-          </button>
-        ))}
-      </div>
-
-      <Card light={light} className="p-3">
-        <Micro>Состояние</Micro>
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          <Stat light={light} label="Услуги" value={String(len(services))} />
-          <Stat light={light} label="Клиенты" value={String(len(clients))} />
-          <Stat light={light} label="Заявки" value={String(len(bookings))} />
-        </div>
-      </Card>
-    </>
+    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">
+      {children}
+    </div>
   );
 }
 
-function ClientsScreen({
-  light,
-  clients,
-  bookings,
-  openChatForClient,
-  openQuick,
-}: {
-  light: boolean;
-  clients: Client[];
-  bookings: Booking[];
-  openChatForClient: (client: Client) => void;
-  openQuick: (preset?: QuickBookingPreset) => void;
-}) {
-  const t = ui(light);
-  const [segment, setSegment] = useState<ClientSegment>('all');
-  const [query, setQuery] = useState('');
-  const [selected, setSelected] = useState<Client | null>(null);
-
-  const filtered = clients.filter((client) => {
-    const needle = query.toLowerCase().trim();
-    const matchesSearch = !needle || `${client.name} ${client.phone} ${client.lastService}`.toLowerCase().includes(needle);
-
-    if (!matchesSearch) return false;
-
-    if (segment === 'vip') return client.favorite;
-    if (segment === 'transfer') return client.hasTransferRequest;
-    if (segment === 'no_show') return client.noShowCount > 0;
-    if (segment === 'new') return client.bookingsCount <= 1;
-    return true;
-  });
-
-  const selectedBookings = selected
-    ? bookings
-        .filter((booking) => booking.clientPhone === selected.phone || booking.clientName === selected.name)
-        .sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`))
-    : [];
-
-  return (
-    <>
-      <Card light={light} className="p-4">
-        <Micro>Клиенты</Micro>
-        <div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.09em]">База</div>
-        <div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Сегменты, история записей, переносы, no-show и быстрые действия.</div>
-
-        <div className={cx('mt-4 flex h-10 items-center gap-2 rounded-[11px] border px-3', t.input)}>
-          <Search className="size-4 shrink-0 opacity-45" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Поиск клиента"
-            className="h-full min-w-0 flex-1 bg-transparent text-[13px] font-medium outline-none placeholder:opacity-55"
-          />
-        </div>
-      </Card>
-
-      <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {[
-          ['all', 'Все'],
-          ['vip', 'VIP'],
-          ['transfer', 'Переносы'],
-          ['no_show', 'No-show'],
-          ['new', 'Новые'],
-        ].map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setSegment(id as ClientSegment)}
-            className={cx(
-              'shrink-0 rounded-full border px-3 py-2 text-[11px] font-bold',
-              segment === id ? (light ? 'border-black bg-black text-white' : 'border-white bg-white text-black') : t.ghost,
-            )}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <div className="space-y-2">
-        {len(filtered) === 0 ? (
-          <Empty light={light} title="Клиентов нет" text="Попробуй другой сегмент или дождись первых записей." />
-        ) : (
-          filtered.map((client) => (
-            <Card light={light} key={client.id} className="p-3">
-              <button type="button" onClick={() => setSelected(client)} className="flex w-full items-center gap-3 text-left">
-                <div className={cx('grid size-10 place-items-center rounded-[10px] border', t.panel)}>
-                  {client.favorite ? <Star className="size-4" /> : <UserRound className="size-4" />}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[14px] font-bold tracking-[-0.04em]">{client.name}</div>
-                  <div className={cx('mt-1 truncate text-[11px]', t.muted)}>
-                    {client.phone || 'без телефона'} · {client.bookingsCount} записей · {rub(client.revenue)}
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {client.favorite ? <Badge light={light} tone="accent">VIP</Badge> : null}
-                    {client.hasTransferRequest ? <Badge light={light} tone="warning">Просит перенос</Badge> : null}
-                    {client.noShowCount > 0 ? <Badge light={light} tone="warning">No-show {client.noShowCount}</Badge> : null}
-                    {client.cancelledCount > 0 ? <Badge light={light} tone="danger">Отмены {client.cancelledCount}</Badge> : null}
-                  </div>
-                </div>
-                <ChevronRight className={cx('size-4', t.muted)} />
-              </button>
-
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                {client.phone ? (
-                  <a href={`tel:${client.phone}`} className={cx('inline-flex h-9 items-center justify-center rounded-[9px] border text-[11px] font-bold', t.ghost)}>
-                    Звонок
-                  </a>
-                ) : (
-                  <Button light={light} className="h-9" disabled>Звонок</Button>
-                )}
-                <Button light={light} className="h-9" onClick={() => openChatForClient(client)}>Чат</Button>
-                <Button light={light} primary className="h-9" onClick={() => openQuick({ clientName: client.name, clientPhone: client.phone, service: client.lastService })}>Запись</Button>
-              </div>
-            </Card>
-          ))
-        )}
-      </div>
-
-      {selected ? (
-        <Sheet light={light} title={selected.name} onClose={() => setSelected(null)}>
-          <div className="space-y-3">
-            <div className={cx('rounded-[12px] border p-3', t.panel)}>
-              <div className="flex items-center gap-3">
-                <div className={cx('grid size-11 place-items-center rounded-full border text-[12px] font-black', light ? 'border-black bg-black text-white' : 'border-white bg-white text-black')}>
-                  {initials(selected.name)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[17px] font-semibold tracking-[-0.06em]">{selected.name}</div>
-                  <div className={cx('mt-1 text-[12px]', t.muted)}>{selected.phone || 'без телефона'}</div>
-                </div>
-              </div>
-
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                <Stat light={light} label="Записи" value={String(selected.bookingsCount)} />
-                <Stat light={light} label="Визиты" value={String(selected.visits)} />
-                <Stat light={light} label="Доход" value={rub(selected.revenue)} />
-              </div>
-
-              {selected.note ? <div className={cx('mt-3 rounded-[10px] border p-2 text-[11px] leading-4', t.panel)}>{selected.note}</div> : null}
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <Button light={light} onClick={() => openChatForClient(selected)}>Открыть чат</Button>
-              <Button light={light} primary onClick={() => openQuick({ clientName: selected.name, clientPhone: selected.phone, service: selected.lastService })}>
-                Создать запись
-              </Button>
-            </div>
-
-            <Card light={light} className="p-3">
-              <Micro>История</Micro>
-              <div className="mt-3 space-y-2">
-                {len(selectedBookings) === 0 ? (
-                  <Empty light={light} title="Истории нет" text="У клиента пока нет записей." />
-                ) : (
-                  selectedBookings.map((booking) => <BookingRow key={booking.id} light={light} booking={booking} onClick={() => undefined} />)
-                )}
-              </div>
-            </Card>
-          </div>
-        </Sheet>
-      ) : null}
-    </>
-  );
-}
-
-function AnalyticsScreen({
-  light,
-  bookings,
-  services,
-  clients,
-}: {
-  light: boolean;
-  bookings: Booking[];
-  services: Service[];
-  clients: Client[];
-}) {
-  const t = ui(light);
-  const completed = bookings.filter((booking) => booking.status === 'completed');
-  const cancelled = bookings.filter((booking) => booking.status === 'cancelled' || booking.status === 'no_show');
-  const transfers = bookings.filter((booking) => booking.transferRequested);
-  const revenue = clients.reduce((sum, client) => sum + client.revenue, 0);
-  const conversion = len(bookings) > 0 ? Math.round((len(completed) / len(bookings)) * 100) : 0;
-  const topServices = services
-    .map((service) => ({
-      ...service,
-      count: bookings.filter((booking) => booking.service === service.name).length,
-    }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
-
-  return (
-    <>
-      <Card light={light} className="p-4">
-        <Micro>Аналитика</Micro>
-        <div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.09em]">Показатели</div>
-        <div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Короткий мобильный срез по заявкам, клиентам и услугам.</div>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <Stat light={light} label="Выручка" value={rub(revenue)} />
-          <Stat light={light} label="Конверсия" value={`${conversion}%`} />
-          <Stat light={light} label="Пришли" value={String(len(completed))} />
-          <Stat light={light} label="Переносы" value={String(len(transfers))} />
-          <Stat light={light} label="Срывы" value={String(len(cancelled))} />
-          <Stat light={light} label="Клиенты" value={String(len(clients))} />
-        </div>
-      </Card>
-
-      <Card light={light} className="p-3">
-        <Micro>Топ услуг</Micro>
-        <div className="mt-3 space-y-2">
-          {len(topServices) === 0 ? (
-            <Empty light={light} title="Нет данных" text="Статистика появится после первых записей." />
-          ) : (
-            topServices.map((service) => (
-              <div key={service.id} className={cx('rounded-[11px] border p-3', t.panel)}>
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate text-[13px] font-bold">{service.name}</div>
-                    <div className={cx('mt-1 text-[11px]', t.muted)}>
-                      {rub(service.price)} · {service.duration} мин
-                    </div>
-                  </div>
-                  <div className="text-[18px] font-semibold tracking-[-0.06em]">{service.count}</div>
-                </div>
-                <div className={cx('mt-2 h-1.5 overflow-hidden rounded-full', light ? 'bg-black/[0.06]' : 'bg-white/[0.08]')}>
-                  <div className="h-full rounded-full bg-[var(--mini-accent)]" style={{ width: `${Math.min(100, service.count * 18)}%` }} />
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </Card>
-    </>
-  );
-}
-
-function ProfileScreen({
-  light,
-  profile,
-  workspaceId,
-  publicUrl,
-  reload,
-}: {
-  light: boolean;
-  profile: Profile;
-  workspaceId: string;
-  publicUrl: string;
-  reload: () => Promise<void>;
-}) {
-  const t = ui(light);
-  const [form, setForm] = useState({ ...profile, servicesText: list<string>(profile.services).join('\n') });
-  const [saving, setSaving] = useState(false);
-
-  const save = async () => {
-    const next: Profile = {
-      ...profile,
-      ...form,
-      slug: slugify(form.slug || form.name),
-      services: text(form.servicesText)
-        .split('\n')
-        .map((item) => text(item))
-        .filter(Boolean),
-    };
-
-    setSaving(true);
-
-    await fetch('/api/profile', {
-      method: 'POST',
-      credentials: 'include',
-      cache: 'no-store',
-      headers: apiHeaders(true),
-      body: JSON.stringify({
-        workspaceId,
-        locale: 'ru',
-        profile: next,
-      }),
-    }).catch(() => null);
-
-    await reload();
-    setSaving(false);
-  };
-
-  return (
-    <>
-      <Card light={light} className="p-4">
-        <Micro>Профиль</Micro>
-        <div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.09em]">Анкета</div>
-        <div className={cx('mt-2 break-all text-[12px] leading-5', t.muted)}>{publicUrl}</div>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <Button light={light} onClick={() => navigator.clipboard?.writeText(publicUrl).catch(() => null)}>
-            <Copy className="size-4" />
-            Копировать
-          </Button>
-          <a
-            href={publicUrl}
-            target="_blank"
-            rel="noreferrer"
-            className={cx('inline-flex h-10 items-center justify-center gap-2 rounded-[10px] border px-3 text-[12px] font-bold', t.ghost)}
-          >
-            <ExternalLink className="size-4" />
-            Открыть
-          </a>
-        </div>
-      </Card>
-
-      <Card light={light} className="space-y-2 p-3">
-        <Field light={light} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Имя" />
-        <Field light={light} value={form.profession} onChange={(event) => setForm({ ...form, profession: event.target.value })} placeholder="Специализация" />
-        <Field light={light} value={form.city} onChange={(event) => setForm({ ...form, city: event.target.value })} placeholder="Город" />
-        <Field light={light} value={form.slug} onChange={(event) => setForm({ ...form, slug: event.target.value })} placeholder="slug" />
-
-        <div className="grid grid-cols-2 gap-2">
-          <Field light={light} value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder="Телефон" />
-          <Field light={light} value={form.telegram} onChange={(event) => setForm({ ...form, telegram: event.target.value })} placeholder="Telegram" />
-        </div>
-
-        <Field light={light} value={form.whatsapp} onChange={(event) => setForm({ ...form, whatsapp: event.target.value })} placeholder="WhatsApp" />
-        <Area light={light} value={form.bio} onChange={(event) => setForm({ ...form, bio: event.target.value })} placeholder="Описание" />
-
-        <Button light={light} primary disabled={saving || !text(form.name)} onClick={() => void save()} className="w-full">
-          <Save className="size-4" />
-          {saving ? 'Сохраняю' : 'Сохранить профиль'}
-        </Button>
-      </Card>
-    </>
-  );
-}
-
-function SettingsScreen({
-  light,
-  workspaceId,
-  settings,
-  setSettings,
-  reload,
-}: {
-  light: boolean;
-  workspaceId: string;
-  settings: MiniSettings;
-  setSettings: (settings: MiniSettings) => void;
-  reload: () => Promise<void>;
-}) {
-  const t = ui(light);
-  const [saving, setSaving] = useState(false);
-
-  const save = async () => {
-    setSaving(true);
-
-    await fetch('/api/workspace/section', {
-      method: 'PATCH',
-      credentials: 'include',
-      cache: 'no-store',
-      headers: apiHeaders(true),
-      body: JSON.stringify({
-        workspaceId,
-        section: 'settings',
-        value: settings,
-      }),
-    }).catch(() => null);
-
-    await reload();
-    setSaving(false);
-  };
-
-  const toggle = (key: keyof MiniSettings) => {
-    setSettings({ ...settings, [key]: !settings[key] });
-  };
-
-  return (
-    <>
-      <Card light={light} className="p-4">
-        <Micro>Настройки</Micro>
-        <div className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.09em]">Правила записи</div>
-        <div className={cx('mt-2 text-[12px] leading-5', t.muted)}>Публичная запись, переносы, напоминания и поведение при no-show.</div>
-        <Button light={light} primary disabled={saving} onClick={() => void save()} className="mt-4 w-full">
-          <Save className="size-4" />
-          {saving ? 'Сохраняю' : 'Сохранить настройки'}
-        </Button>
-      </Card>
-
-      <Card light={light} className="p-3">
-        <Micro>Публичная запись</Micro>
-        <div className="mt-3 space-y-2">
-          <SettingSwitch light={light} title="Клиенты могут записываться" text="Показывать свободные слоты на публичной странице." checked={settings.publicBookingEnabled} onClick={() => toggle('publicBookingEnabled')} />
-          <SettingSwitch light={light} title="Автоподтверждение" text="Новая запись сразу попадает в план без ручного подтверждения." checked={settings.autoConfirmBookings} onClick={() => toggle('autoConfirmBookings')} />
-          <SettingSwitch light={light} title="Разрешить переносы" text="Клиент может нажать «Перенести», а ты увидишь плашку в mini app." checked={settings.allowClientReschedule} onClick={() => toggle('allowClientReschedule')} />
-        </div>
-      </Card>
-
-      <Card light={light} className="p-3">
-        <Micro>Напоминания</Micro>
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          <SettingChip light={light} active={settings.reminderTelegram} label="Telegram" onClick={() => toggle('reminderTelegram')} />
-          <SettingChip light={light} active={settings.reminderVk} label="VK" onClick={() => toggle('reminderVk')} />
-          <SettingChip light={light} active={settings.reminderWeb} label="Web" onClick={() => toggle('reminderWeb')} />
-        </div>
-        <div className="mt-3">
-          <Field
-            light={light}
-            type="number"
-            value={settings.reminderBeforeHours}
-            onChange={(event) => setSettings({ ...settings, reminderBeforeHours: Number(event.target.value) })}
-            placeholder="За сколько часов напоминать"
-          />
-        </div>
-      </Card>
-
-      <Card light={light} className="space-y-2 p-3">
-        <Micro>Тексты и политика</Micro>
-        <Area
-          light={light}
-          value={settings.reschedulePolicy}
-          onChange={(event) => setSettings({ ...settings, reschedulePolicy: event.target.value })}
-          placeholder="Политика переносов"
-        />
-        <Area
-          light={light}
-          value={settings.bookingNotice}
-          onChange={(event) => setSettings({ ...settings, bookingNotice: event.target.value })}
-          placeholder="Текст для клиента перед записью"
-        />
-        <select
-          value={settings.noShowAction}
-          onChange={(event) => setSettings({ ...settings, noShowAction: event.target.value as MiniSettings['noShowAction'] })}
-          className={cx('h-10 w-full rounded-[10px] border px-3 text-[12px] font-bold outline-none', t.input)}
-        >
-          <option value="sleep">После no-show помечать как спящий</option>
-          <option value="blacklist_note">Добавлять заметку риска</option>
-          <option value="keep">Ничего не делать</option>
-        </select>
-      </Card>
-    </>
-  );
-}
-
-function SettingSwitch({
-  light,
-  title,
-  text: body,
-  checked,
+function MiniButton({
+  children,
   onClick,
+  variant = 'secondary',
+  disabled,
+  type = 'button',
 }: {
-  light: boolean;
-  title: string;
-  text: string;
-  checked: boolean;
-  onClick: () => void;
+  children: ReactNode;
+  onClick?: () => void;
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'accent';
+  disabled?: boolean;
+  type?: 'button' | 'submit';
 }) {
-  const t = ui(light);
-
-  return (
-    <button type="button" onClick={onClick} className={cx('flex w-full items-center gap-3 rounded-[11px] border p-3 text-left', t.panel)}>
-      <span className={cx('relative h-6 w-10 rounded-full border transition', checked ? (light ? 'border-black bg-black' : 'border-white bg-white') : t.ghost)}>
-        <span className={cx('absolute top-1 size-4 rounded-full transition', checked ? 'left-5 bg-white dark:bg-black' : 'left-1 bg-black/35 dark:bg-white/35')} />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-[13px] font-bold tracking-[-0.03em]">{title}</span>
-        <span className={cx('mt-0.5 block text-[11px] leading-4', t.muted)}>{body}</span>
-      </span>
-    </button>
-  );
-}
-
-function SettingChip({ light, active, label, onClick }: { light: boolean; active: boolean; label: string; onClick: () => void }) {
   return (
     <button
-      type="button"
+      type={type}
+      disabled={disabled}
       onClick={onClick}
-      className={cx(
-        'h-10 rounded-[10px] border text-[11px] font-bold',
-        active ? (light ? 'border-black bg-black text-white' : 'border-white bg-white text-black') : ui(light).ghost,
+      className={cn(
+        'flex h-10 items-center justify-center gap-2 rounded-[14px] px-3 text-[12px] font-semibold tracking-[-0.035em] transition active:scale-[0.985] disabled:pointer-events-none disabled:opacity-45',
+        variant === 'primary' && 'bg-white text-black hover:bg-white/90',
+        variant === 'accent' && 'bg-[var(--mini-accent)] text-black hover:opacity-90',
+        variant === 'secondary' &&
+          'border border-white/[0.08] bg-white/[0.055] text-white hover:bg-white/[0.08]',
+        variant === 'danger' &&
+          'border border-rose-300/15 bg-rose-400/10 text-rose-100 hover:bg-rose-400/14',
+        variant === 'ghost' &&
+          'bg-transparent text-white/55 hover:bg-white/[0.05] hover:text-white',
       )}
     >
-      {label}
+      {children}
     </button>
   );
 }
 
-function Sheet({
-  light,
-  title,
-  onClose,
-  children,
-}: {
-  light: boolean;
-  title: string;
-  onClose: () => void;
-  children: ReactNode;
-}) {
-  const t = ui(light);
+function StatusPill({ status }: { status: BookingStatus }) {
+  const meta = STATUS_META[status] ?? STATUS_META.new;
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-end bg-black/45 px-2 pb-2 backdrop-blur-[10px]" onClick={onClose}>
-      <div
-        className={cx('mx-auto max-h-[88vh] w-full max-w-[460px] overflow-y-auto rounded-[18px] border p-4', t.card)}
-        onClick={(event) => event.stopPropagation()}
+    <span
+      className={cn(
+        'inline-flex h-6 items-center gap-1.5 rounded-full border px-2 text-[10px] font-semibold tracking-[-0.03em]',
+        meta.pill,
+      )}
+    >
+      <span className={cn('size-1.5 rounded-full', meta.dot)} />
+      {meta.label}
+    </span>
+  );
+}
+
+function MiniInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+  textarea,
+  type = 'text',
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  textarea?: boolean;
+  type?: string;
+}) {
+  const className =
+    'w-full rounded-[15px] border border-white/[0.08] !bg-[#141414] px-3 text-[14px] font-medium tracking-[-0.035em] !text-white outline-none placeholder:!text-white/25 focus:border-white/[0.16] focus:!bg-[#171717]';
+
+  return (
+    <label className="block">
+      <div className="mb-2 text-[11px] font-semibold tracking-[-0.03em] text-white/58">
+        {label}
+      </div>
+
+      {textarea ? (
+        <textarea
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+          rows={4}
+          className={cn(className, 'min-h-[112px] resize-none py-3')}
+        />
+      ) : (
+        <input
+          type={type}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+          className={cn(className, 'h-11')}
+        />
+      )}
+    </label>
+  );
+}
+
+function MiniSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block">
+      <div className="mb-2 text-[11px] font-semibold tracking-[-0.03em] text-white/58">
+        {label}
+      </div>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-11 w-full rounded-[15px] border border-white/[0.08] bg-[#141414] px-3 text-[14px] font-medium tracking-[-0.035em] text-white outline-none focus:border-white/[0.16]"
       >
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div className="text-[20px] font-semibold tracking-[-0.07em]">{title}</div>
-          <button type="button" onClick={onClose} className={cx('grid size-9 place-items-center rounded-[10px] border', t.ghost)}>
-            <X className="size-4" />
-          </button>
-        </div>
-        {children}
+        {options.map((option) => (
+          <option key={option.value} value={option.value} className="bg-[#141414] text-white">
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function EmptyState({
+  title,
+  text,
+  icon,
+}: {
+  title: string;
+  text: string;
+  icon?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-[18px] border border-dashed border-white/[0.08] bg-white/[0.025] px-5 py-7 text-center">
+      <div className="mb-3 flex size-10 items-center justify-center rounded-[14px] border border-white/[0.08] bg-white/[0.045] text-white/55">
+        {icon ?? <CalendarClock className="size-5" />}
+      </div>
+      <div className="text-[15px] font-semibold tracking-[-0.045em] text-white">
+        {title}
+      </div>
+      <div className="mt-1 max-w-[230px] text-[12px] leading-5 text-white/42">
+        {text}
       </div>
     </div>
   );
 }
 
-function BookingSheet({
-  light,
-  booking,
-  services,
-  onClose,
-  updateStatus,
-  updateTransfer,
-  offerTransfer,
-  openChat,
-  openQuick,
-}: {
-  light: boolean;
-  booking: Booking | null;
-  services: Service[];
-  onClose: () => void;
-  updateStatus: (id: string, status: BookingStatus) => Promise<void>;
-  updateTransfer: (id: string, transferStatus: Booking['transferStatus']) => Promise<void>;
-  offerTransfer: (id: string, date: string, time: string) => Promise<void>;
-  openChat: (booking: Booking) => void;
-  openQuick: (preset?: QuickBookingPreset) => void;
-}) {
-  const t = ui(light);
-  const [proposedDate, setProposedDate] = useState(today());
-  const [proposedTime, setProposedTime] = useState('12:00');
-  const [offering, setOffering] = useState(false);
-
-  if (!booking) return null;
-
-  const price = booking.priceAmount || services.find((service) => service.name === booking.service)?.price || 0;
-  const reminder = `${booking.clientName}, напоминаю про запись ${dateLabel(booking.date)} в ${booking.time}: ${booking.service}.`;
-
+function MiniLoading() {
   return (
-    <Sheet light={light} title="Запись" onClose={onClose}>
-      <div className="space-y-3">
-        <div className={cx('rounded-[12px] border p-3', t.panel)}>
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="truncate text-[18px] font-semibold tracking-[-0.06em]">{booking.clientName}</div>
-              <div className={cx('mt-1 text-[12px]', t.muted)}>{booking.clientPhone || 'без телефона'}</div>
-            </div>
-            <BookingBadges light={light} booking={booking} />
-          </div>
+    <main className="flex min-h-screen items-center justify-center bg-[#090909] px-6 text-white">
+      <div className="flex w-full max-w-[310px] flex-col items-center rounded-[22px] border border-white/[0.08] bg-[#101010]/92 px-5 py-6 text-center">
+        <BrandLogo />
 
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <Stat light={light} label="Дата" value={dateLabel(booking.date)} />
-            <Stat light={light} label="Время" value={booking.time} />
-            <Stat light={light} label="Услуга" value={booking.service} />
-            <Stat light={light} label="Цена" value={rub(price)} />
-          </div>
+        <div className="mt-5 size-8 animate-spin rounded-full border border-white/[0.08] border-t-white/60" />
 
-          {booking.comment ? <div className={cx('mt-3 rounded-[10px] border p-2 text-[12px] leading-5', t.panel)}>{booking.comment}</div> : null}
-
-          {booking.transferRequested ? (
-            <div className={cx('mt-3 rounded-[11px] border p-3 text-[12px] leading-5', light ? 'border-amber-300/35 bg-amber-50 text-amber-800' : 'border-amber-300/15 bg-amber-400/10 text-amber-100')}>
-              <div className="font-bold">Клиент просит перенос</div>
-              <div className="mt-1 opacity-80">{booking.transferReason || 'Причина не указана.'}</div>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <Field light={light} type="date" value={proposedDate} onChange={(event) => setProposedDate(event.target.value)} />
-                <Field light={light} type="time" value={proposedTime} onChange={(event) => setProposedTime(event.target.value)} />
-              </div>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <Button light={light} onClick={() => void updateTransfer(booking.id, 'declined').then(onClose)}>Отклонить</Button>
-                <Button
-                  light={light}
-                  primary
-                  disabled={offering}
-                  onClick={() => {
-                    setOffering(true);
-                    void offerTransfer(booking.id, proposedDate, proposedTime).then(() => {
-                      setOffering(false);
-                      onClose();
-                    });
-                  }}
-                >
-                  {offering ? 'Отправляю' : 'Предложить время'}
-                </Button>
-              </div>
-            </div>
-          ) : null}
+        <div className="mt-5 text-[15px] font-semibold tracking-[-0.045em]">
+          Загружаем кабинет
         </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <Button light={light} primary onClick={() => void updateStatus(booking.id, 'completed').then(onClose)}>
-            <CheckCircle2 className="size-4" />
-            Пришла
-          </Button>
-          <Button light={light} danger onClick={() => void updateStatus(booking.id, 'no_show').then(onClose)}>
-            <XCircle className="size-4" />
-            Не пришла
-          </Button>
-          <Button light={light} onClick={() => void updateStatus(booking.id, 'confirmed').then(onClose)}>
-            В плане
-          </Button>
-          <Button light={light} onClick={() => void updateStatus(booking.id, 'cancelled').then(onClose)}>
-            Освободить слот
-          </Button>
-          <Button light={light} onClick={() => navigator.clipboard?.writeText(reminder).catch(() => null)}>
-            <Copy className="size-4" />
-            Напомнить
-          </Button>
-          <Button light={light} onClick={() => openChat(booking)}>
-            <MessageCircle className="size-4" />
-            Чат
-          </Button>
+        <div className="mt-1 max-w-[230px] text-[12px] leading-5 text-white/42">
+          Проверяем Telegram-сессию и загружаем профиль мастера.
         </div>
-
-        {booking.clientPhone ? (
-          <a href={`tel:${booking.clientPhone}`} className={cx('inline-flex h-10 w-full items-center justify-center gap-2 rounded-[10px] border text-[12px] font-bold', t.ghost)}>
-            <Phone className="size-4" />
-            Позвонить
-          </a>
-        ) : null}
-      </div>
-    </Sheet>
-  );
-}
-
-function QuickBookingSheet({
-  light,
-  profile,
-  services,
-  preset,
-  onClose,
-  reload,
-}: {
-  light: boolean;
-  profile: Profile;
-  services: Service[];
-  preset?: QuickBookingPreset;
-  onClose: () => void;
-  reload: () => Promise<void>;
-}) {
-  const t = ui(light);
-  const availableServices = services.filter((service) => service.visible && service.status !== 'draft');
-  const [form, setForm] = useState({
-    clientName: preset?.clientName || '',
-    clientPhone: preset?.clientPhone || '',
-    service: preset?.service || availableServices[0]?.name || profile.services[0] || '',
-    date: preset?.date || today(),
-    time: preset?.time || '12:00',
-    comment: preset?.comment || '',
-  });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-
-  const create = async () => {
-    setError('');
-    setSaving(true);
-
-    const response = await fetch('/api/bookings', {
-      method: 'POST',
-      credentials: 'include',
-      cache: 'no-store',
-      headers: apiHeaders(true),
-      body: JSON.stringify({
-        masterSlug: profile.slug,
-        source: 'Mini App',
-        sourceChannel: 'telegram',
-        values: form,
-      }),
-    }).catch(() => null);
-
-    if (!response?.ok) {
-      const payload = (response ? await parseJson(response).catch(() => ({})) : {}) as Json;
-      setError(text(payload.error, 'Не удалось создать запись. Проверь услугу, график и телефон.'));
-      setSaving(false);
-      return;
-    }
-
-    await reload();
-    setSaving(false);
-    onClose();
-  };
-
-  return (
-    <Sheet light={light} title="Новая запись" onClose={onClose}>
-      <div className="space-y-2">
-        <Field light={light} value={form.clientName} onChange={(event) => setForm({ ...form, clientName: event.target.value })} placeholder="Имя клиента" />
-        <Field light={light} value={form.clientPhone} onChange={(event) => setForm({ ...form, clientPhone: event.target.value })} inputMode="tel" placeholder="Телефон" />
-
-        <select
-          value={form.service}
-          onChange={(event) => setForm({ ...form, service: event.target.value })}
-          className={cx('h-10 w-full rounded-[10px] border px-3 text-[13px] font-medium outline-none', t.input)}
-        >
-          {len(availableServices) === 0 ? <option value="">Сначала добавь услугу</option> : null}
-          {availableServices.map((service) => (
-            <option key={service.id} value={service.name}>
-              {service.name}
-            </option>
-          ))}
-        </select>
-
-        <div className="grid grid-cols-2 gap-2">
-          <Field light={light} type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} />
-          <Field light={light} type="time" value={form.time} onChange={(event) => setForm({ ...form, time: event.target.value })} />
-        </div>
-
-        <Area light={light} value={form.comment} onChange={(event) => setForm({ ...form, comment: event.target.value })} placeholder="Комментарий" />
-
-        {error ? (
-          <div className={cx('rounded-[10px] border px-3 py-2 text-[11px] leading-4', light ? 'border-rose-300/35 bg-rose-50 text-rose-700' : 'border-rose-300/15 bg-rose-400/10 text-rose-100')}>
-            {error}
-          </div>
-        ) : null}
-
-        <Button light={light} primary disabled={saving || !text(form.clientName) || !text(form.clientPhone) || !text(form.service)} onClick={() => void create()} className="w-full">
-          <Plus className="size-4" />
-          {saving ? 'Создаю' : 'Создать запись'}
-        </Button>
-      </div>
-    </Sheet>
-  );
-}
-
-function Onboarding({ light, reload }: { light: boolean; reload: () => Promise<void> }) {
-  const t = ui(light);
-  const [form, setForm] = useState({
-    name: '',
-    profession: '',
-    city: '',
-    phone: '',
-    services: 'Консультация',
-  });
-  const [saving, setSaving] = useState(false);
-
-  const save = async () => {
-    const name = text(form.name);
-
-    if (!name) return;
-
-    const profile: Profile = {
-      ...DEFAULT_PROFILE,
-      id: makeId('profile'),
-      name,
-      slug: slugify(name),
-      profession: text(form.profession, 'Специалист'),
-      city: text(form.city),
-      phone: text(form.phone),
-      services: text(form.services)
-        .split('\n')
-        .map((item) => text(item))
-        .filter(Boolean),
-      bio: 'Онлайн-запись через КликБук',
-    };
-
-    setSaving(true);
-
-    await fetch('/api/profile', {
-      method: 'POST',
-      credentials: 'include',
-      cache: 'no-store',
-      headers: apiHeaders(true),
-      body: JSON.stringify({
-        workspaceId: null,
-        locale: 'ru',
-        profile,
-      }),
-    }).catch(() => null);
-
-    await reload();
-    setSaving(false);
-  };
-
-  return (
-    <main className={cx('min-h-screen px-4 py-[calc(var(--tg-safe-top,0px)+16px)]', t.page)}>
-      <div className="mx-auto w-full max-w-[440px] space-y-3">
-        <Card light={light} className="p-5">
-          <Logo light={light} />
-          <div className="mt-5 text-[30px] font-semibold leading-[0.95] tracking-[-0.095em]">Создай профиль</div>
-          <div className={cx('mt-3 text-[12px] leading-5', t.muted)}>Mini app подключит услуги, график, заявки и чаты.</div>
-        </Card>
-
-        <Card light={light} className="space-y-2 p-3">
-          <Field light={light} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Имя или название" />
-          <Field light={light} value={form.profession} onChange={(event) => setForm({ ...form, profession: event.target.value })} placeholder="Специализация" />
-          <Field light={light} value={form.city} onChange={(event) => setForm({ ...form, city: event.target.value })} placeholder="Город" />
-          <Field light={light} value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder="Телефон" />
-          <Area light={light} value={form.services} onChange={(event) => setForm({ ...form, services: event.target.value })} placeholder="Услуги, каждая с новой строки" />
-
-          <Button light={light} primary disabled={saving || !text(form.name)} onClick={() => void save()} className="w-full">
-            <Sparkles className="size-4" />
-            Создать профиль
-          </Button>
-        </Card>
       </div>
     </main>
   );
 }
 
-export function MiniAppEntry() {
-  const [screen, setScreen] = useState<Screen>('today');
-  const [loading, setLoading] = useState(true);
-  const [light, setLight] = useState(false);
-  const [workspaceId, setWorkspaceId] = useState('');
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [data, setData] = useState<Json>({});
-  const [settings, setSettings] = useState<MiniSettings>(DEFAULT_SETTINGS);
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [week, setWeek] = useState<WorkDay[]>(DEFAULT_WEEK);
-  const [threads, setThreads] = useState<ChatThread[]>([]);
-  const [threadsLoading, setThreadsLoading] = useState(false);
-  const [activeThreadId, setActiveThreadId] = useState('');
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
-  const [quickOpen, setQuickOpen] = useState(false);
-  const [quickPreset, setQuickPreset] = useState<QuickBookingPreset | undefined>(undefined);
+function MiniShell({
+  screen,
+  setScreen,
+  children,
+  profile,
+  onRefresh,
+  accent,
+}: {
+  screen: MiniScreen;
+  setScreen: (screen: MiniScreen) => void;
+  children: ReactNode;
+  profile: MasterProfile | null;
+  onRefresh: () => void;
+  accent: (typeof ACCENT_OPTIONS)[number];
+}) {
+  const shellStyle = {
+    paddingTop: 'calc(var(--tg-safe-top, 0px) + 10px)',
+    paddingBottom: 'calc(var(--tg-safe-bottom, 0px) + 96px)',
+    '--mini-accent': accent.value,
+    '--mini-accent-soft': accent.soft,
+  } as CSSProperties & Record<string, string>;
+
+  const navItems: Array<{
+    id: MiniScreen;
+    label: string;
+    icon: ReactNode;
+  }> = [
+    { id: 'today', label: 'Сегодня', icon: <CalendarClock className="size-4" /> },
+    { id: 'availability', label: 'График', icon: <Clock3 className="size-4" /> },
+    { id: 'chats', label: 'Чаты', icon: <MessageCircle className="size-4" /> },
+    { id: 'more', label: 'Ещё', icon: <MoreHorizontal className="size-4" /> },
+  ];
+
+  return (
+    <main
+      style={shellStyle}
+      className="cb-mini-app-root min-h-screen bg-[#090909] px-3 text-white"
+    >
+      <div className="mx-auto w-full max-w-[430px]">
+        <header className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-[11px] border border-white/[0.08] bg-white/[0.055]">
+              {profile?.avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={profile.avatar} alt="" className="size-full object-cover" />
+              ) : (
+                <span className="text-[10px] font-bold text-white">
+                  {getInitials(profile?.name)}
+                </span>
+              )}
+            </div>
+
+            <div className="min-w-0">
+              <div className="truncate text-[13px] font-semibold tracking-[-0.045em] text-white">
+                {profile?.name || 'КликБук'}
+              </div>
+              <div className="truncate text-[10px] font-semibold tracking-[-0.03em] text-white/35">
+                кабинет мастера
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onRefresh}
+            className="flex size-8 items-center justify-center rounded-[11px] border border-white/[0.08] bg-white/[0.045] text-white/55 active:scale-95"
+          >
+            <RefreshCcw className="size-3.5" />
+          </button>
+        </header>
+
+        {children}
+      </div>
+
+      <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-[430px] px-3 pb-[calc(var(--tg-safe-bottom,0px)+10px)]">
+        <div className="grid grid-cols-4 gap-1 rounded-[22px] border border-white/[0.08] bg-[#101010]/90 p-1.5 shadow-[0_18px_60px_rgba(0,0,0,0.45)] backdrop-blur-[24px]">
+          {navItems.map((item) => {
+            const active =
+              screen === item.id ||
+              (item.id === 'more' &&
+                ['more', 'profile', 'services', 'analytics', 'appearance', 'settings', 'clients'].includes(screen));
+
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setScreen(item.id)}
+                className={cn(
+                  'flex h-12 flex-col items-center justify-center gap-1 rounded-[16px] text-[10px] font-semibold tracking-[-0.04em] transition active:scale-[0.98]',
+                  active
+                    ? 'bg-white/[0.08] text-white'
+                    : 'text-white/42 hover:bg-white/[0.04] hover:text-white/72',
+                )}
+              >
+                <span className={cn(active && 'text-[var(--mini-accent)]')}>{item.icon}</span>
+                {item.label}
+                {active ? (
+                  <span
+                    className="size-1 rounded-full"
+                    style={{ backgroundColor: 'var(--mini-accent)' }}
+                  />
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+    </main>
+  );
+}
+
+function MiniOnboarding({
+  onSave,
+}: {
+  onSave: (values: MiniProfileSaveValues) => Promise<{ success: boolean; error?: string }>;
+}) {
+  const [step, setStep] = useState(0);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const accent = useMemo(() => getAccent(data), [data]);
+  const [form, setForm] = useState<MiniProfileSaveValues>({
+    name: '',
+    profession: '',
+    city: '',
+    bio: '',
+    servicesText: '',
+    slug: '',
+    phone: '',
+    telegram: '',
+    whatsapp: '',
+    avatar: '',
+    hidePhone: false,
+    hideTelegram: false,
+    hideWhatsapp: false,
+    priceHint: '',
+    experienceLabel: '',
+    responseTime: '',
+    address: '',
+    mapUrl: '',
+    locationMode: 'online',
+    workGallery: [],
+    reviews: [],
+  });
 
-  const sortedBookings = useMemo(
-    () => [...bookings].sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`)),
-    [bookings],
-  );
+  const steps = [
+    {
+      title: 'Основное',
+      text: 'Имя, город и описание.',
+    },
+    {
+      title: 'Услуги',
+      text: 'Что клиент сможет выбрать.',
+    },
+    {
+      title: 'Контакты',
+      text: 'Телефон, Telegram и ссылка.',
+    },
+  ];
 
-  const clients = useMemo(() => buildClients(bookings, services), [bookings, services]);
+  const update = <K extends keyof MiniProfileSaveValues>(
+    key: K,
+    value: MiniProfileSaveValues[K],
+  ) => {
+    setForm((current) => ({ ...current, [key]: value }));
+  };
 
-  const activeThread = useMemo(
-    () => threads.find((thread) => thread.id === activeThreadId) ?? null,
-    [threads, activeThreadId],
-  );
+  async function handleNext() {
+    setError('');
 
-  const publicUrl = useMemo(() => {
-    const path = `/m/${profile?.slug || 'master'}`;
-
-    if (typeof window === 'undefined') return path;
-
-    return `${window.location.origin}${path}`;
-  }, [profile?.slug]);
-
-  const loadChats = useCallback(async () => {
-    setThreadsLoading(true);
-
-    const response = await fetch('/api/chats', {
-      credentials: 'include',
-      cache: 'no-store',
-      headers: apiHeaders(false),
-    }).catch(() => null);
-
-    if (response?.ok) {
-      const payload = await parseJson(response);
-      const nextThreads = list(payload.threads).map((item, index) => normalizeThread(item, index));
-
-      setThreads(nextThreads);
-      setActiveThreadId((current) => current || nextThreads[0]?.id || '');
+    if (step < steps.length - 1) {
+      setStep((current) => current + 1);
+      return;
     }
 
-    setThreadsLoading(false);
-  }, []);
+    setSaving(true);
 
-  const load = useCallback(async () => {
+    const result = await onSave({
+      ...form,
+      slug: form.slug || form.name,
+      bio: form.bio || 'Онлайн-запись к мастеру через КликБук.',
+    });
+
+    setSaving(false);
+
+    if (!result.success) {
+      setError(result.error || 'Не удалось сохранить профиль.');
+    }
+  }
+
+  return (
+    <main
+      className="cb-mini-app-root min-h-screen bg-[#090909] px-3 text-white"
+      style={{
+        paddingTop: 'calc(var(--tg-safe-top, 0px) + 10px)',
+        paddingBottom: 'calc(var(--tg-safe-bottom, 0px) + 24px)',
+      }}
+    >
+      <div className="mx-auto w-full max-w-[430px]">
+        <header className="mb-5 flex items-center justify-between">
+          <BrandLogo />
+          <div className="rounded-full border border-white/[0.08] bg-white/[0.045] px-3 py-1 text-[10px] font-semibold text-white/52">
+            {step + 1}/{steps.length}
+          </div>
+        </header>
+
+        <section className="mb-4">
+          <MiniLabel>быстрый старт</MiniLabel>
+          <h1 className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.075em]">
+            Создадим страницу
+          </h1>
+          <p className="mt-2 max-w-[320px] text-[13px] leading-5 text-white/45">
+            Заполните минимум. Остальное можно донастроить позже.
+          </p>
+        </section>
+
+        <MiniCard className="overflow-hidden">
+          <div className="border-b border-white/[0.08] p-4">
+            <div className="text-[20px] font-semibold tracking-[-0.06em]">
+              {steps[step].title}
+            </div>
+            <div className="mt-1 text-[12px] leading-5 text-white/42">
+              {steps[step].text}
+            </div>
+          </div>
+
+          <div className="space-y-4 p-4">
+            {step === 0 ? (
+              <>
+                <MiniInput
+                  label="Имя или название"
+                  value={form.name}
+                  onChange={(value) => update('name', value)}
+                  placeholder="Например, Анна Nails"
+                />
+                <MiniInput
+                  label="Специализация"
+                  value={form.profession}
+                  onChange={(value) => update('profession', value)}
+                  placeholder="Маникюр, тату, массаж..."
+                />
+                <MiniInput
+                  label="Город"
+                  value={form.city}
+                  onChange={(value) => update('city', value)}
+                  placeholder="Москва"
+                />
+                <MiniInput
+                  label="Описание"
+                  value={form.bio}
+                  onChange={(value) => update('bio', value)}
+                  placeholder="Коротко о себе"
+                  textarea
+                />
+              </>
+            ) : null}
+
+            {step === 1 ? (
+              <>
+                <MiniInput
+                  label="Услуги"
+                  value={form.servicesText}
+                  onChange={(value) => update('servicesText', value)}
+                  placeholder={'Маникюр — 2500 ₽\nПедикюр — 3000 ₽\nКоррекция — 2000 ₽'}
+                  textarea
+                />
+                <div className="rounded-[16px] border border-white/[0.08] bg-white/[0.035] p-3 text-[12px] leading-5 text-white/42">
+                  Каждую услугу лучше писать с новой строки.
+                </div>
+              </>
+            ) : null}
+
+            {step === 2 ? (
+              <>
+                <MiniInput
+                  label="Телефон"
+                  value={form.phone}
+                  onChange={(value) => update('phone', value)}
+                  placeholder="+7..."
+                />
+                <MiniInput
+                  label="Telegram"
+                  value={form.telegram}
+                  onChange={(value) => update('telegram', value)}
+                  placeholder="@username"
+                />
+                <MiniInput
+                  label="Ссылка"
+                  value={form.slug}
+                  onChange={(value) => update('slug', value)}
+                  placeholder="anna-nails"
+                />
+              </>
+            ) : null}
+
+            {error ? (
+              <div className="rounded-[16px] border border-rose-300/15 bg-rose-400/10 p-3 text-[12px] leading-5 text-rose-100">
+                {error}
+              </div>
+            ) : null}
+          </div>
+        </MiniCard>
+
+        <div className="mt-4 grid grid-cols-[96px_1fr] gap-2">
+          <MiniButton
+            variant="secondary"
+            disabled={step === 0 || saving}
+            onClick={() => setStep((current) => Math.max(0, current - 1))}
+          >
+            Назад
+          </MiniButton>
+          <MiniButton variant="primary" disabled={saving} onClick={handleNext}>
+            {saving ? 'Сохраняем...' : step === steps.length - 1 ? 'Сохранить' : 'Далее'}
+          </MiniButton>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function TodayScreen({
+  bookings,
+  onOpenBooking,
+}: {
+  bookings: Booking[];
+  onOpenBooking: (booking: Booking) => void;
+}) {
+  const today = todayKey();
+
+  const todayBookings = useMemo(
+    () => bookings.filter((booking) => booking.date === today).sort(sortBookings),
+    [bookings, today],
+  );
+
+  const upcomingBookings = useMemo(
+    () =>
+      bookings
+        .filter((booking) => `${booking.date} ${booking.time}` >= `${today} 00:00`)
+        .sort(sortBookings),
+    [bookings, today],
+  );
+
+  const list = todayBookings.length > 0 ? todayBookings : upcomingBookings.slice(0, 5);
+  const nearest = list[0] ?? null;
+  const revenue = todayBookings.reduce((sum, booking) => sum + getBookingAmount(booking), 0);
+  const riskCount = todayBookings.filter(
+    (booking) => booking.status === 'new' || booking.status === 'no_show',
+  ).length;
+
+  return (
+    <div className="space-y-3">
+      <section>
+        <MiniLabel>рабочий день</MiniLabel>
+        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
+          Сегодня
+        </h1>
+        <p className="mt-2 max-w-[320px] text-[12px] leading-5 text-white/42">
+          Ближайшая запись, статусы, клиенты и быстрые действия.
+        </p>
+      </section>
+
+      <div className="grid grid-cols-3 gap-2">
+        <MiniCard className="p-3">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
+            записи
+          </div>
+          <div className="mt-2 text-[22px] font-semibold tracking-[-0.07em]">
+            {todayBookings.length}
+          </div>
+          <div className="text-[10px] text-white/35">сегодня</div>
+        </MiniCard>
+
+        <MiniCard className="p-3">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
+            доход
+          </div>
+          <div className="mt-2 text-[22px] font-semibold tracking-[-0.07em]">
+            {RUB.format(revenue)}
+          </div>
+          <div className="text-[10px] text-white/35">услуги</div>
+        </MiniCard>
+
+        <MiniCard className="p-3">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
+            риск
+          </div>
+          <div className="mt-2 text-[22px] font-semibold tracking-[-0.07em]">
+            {riskCount}
+          </div>
+          <div className="text-[10px] text-white/35">контроль</div>
+        </MiniCard>
+      </div>
+
+      <MiniCard className="overflow-hidden">
+        <div className="flex items-center justify-between border-b border-white/[0.08] p-4">
+          <div>
+            <MiniLabel>ближайшая</MiniLabel>
+            <div className="mt-1 text-[12px] text-white/42">что нужно сделать сейчас</div>
+          </div>
+
+          <Link
+            href="/dashboard"
+            className="flex h-8 items-center gap-1.5 rounded-[11px] border border-white/[0.08] bg-white/[0.045] px-2.5 text-[11px] font-semibold text-white/58"
+          >
+            ПК <ExternalLink className="size-3" />
+          </Link>
+        </div>
+
+        {nearest ? (
+          <button
+            type="button"
+            onClick={() => onOpenBooking(nearest)}
+            className="block w-full p-4 text-left active:scale-[0.995]"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[34px] font-semibold leading-none tracking-[-0.08em]">
+                  {formatTime(nearest.time)}
+                </div>
+                <div className="mt-3 text-[19px] font-semibold tracking-[-0.06em]">
+                  {nearest.clientName}
+                </div>
+                <div className="mt-1 text-[12px] text-white/42">{nearest.service}</div>
+              </div>
+
+              <StatusPill status={nearest.status} />
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <span className="flex h-10 items-center justify-center rounded-[14px] bg-white text-[12px] font-semibold text-black">
+                Открыть
+              </span>
+              <span className="flex h-10 items-center justify-center gap-2 rounded-[14px] border border-white/[0.08] bg-white/[0.055] text-[12px] font-semibold text-white">
+                <Phone className="size-3.5" />
+                Позвонить
+              </span>
+            </div>
+          </button>
+        ) : (
+          <div className="p-4">
+            <EmptyState
+              title="Сегодня свободно"
+              text="На сегодня нет записей. Можно проверить график или веб-кабинет."
+            />
+          </div>
+        )}
+      </MiniCard>
+
+      <MiniCard className="overflow-hidden">
+        <div className="border-b border-white/[0.08] p-4">
+          <div className="text-[15px] font-semibold tracking-[-0.045em]">День</div>
+          <div className="mt-1 text-[11px] text-white/38">
+            компактный список записей
+          </div>
+        </div>
+
+        <div className="space-y-2 p-3">
+          {list.length > 0 ? (
+            list.map((booking) => (
+              <button
+                key={booking.id}
+                type="button"
+                onClick={() => onOpenBooking(booking)}
+                className="flex w-full items-center gap-3 rounded-[17px] border border-white/[0.07] bg-white/[0.035] p-3 text-left active:scale-[0.99]"
+              >
+                <div className="w-12 shrink-0 text-[17px] font-semibold tracking-[-0.06em]">
+                  {formatTime(booking.time)}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px] font-semibold tracking-[-0.04em]">
+                    {booking.clientName}
+                  </div>
+                  <div className="mt-1 truncate text-[11px] text-white/38">
+                    {booking.service} · {RUB.format(getBookingAmount(booking))}
+                  </div>
+                </div>
+
+                <StatusPill status={booking.status} />
+                <ChevronRight className="size-4 shrink-0 text-white/26" />
+              </button>
+            ))
+          ) : (
+            <EmptyState
+              title="Записей пока нет"
+              text="Когда клиенты начнут записываться, они появятся здесь."
+            />
+          )}
+        </div>
+      </MiniCard>
+    </div>
+  );
+}
+
+function AvailabilityScreen({
+  workspaceData,
+  updateWorkspaceSection,
+}: {
+  workspaceData: Record<string, unknown>;
+  updateWorkspaceSection: <T>(section: string, value: T) => Promise<boolean>;
+}) {
+  const [days, setDays] = useState(() => normalizeAvailability(workspaceData.availability));
+  const [selectedId, setSelectedId] = useState(days[0]?.id ?? 'mon');
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const selectedDay = days.find((day) => day.id === selectedId) ?? days[0];
+
+  useEffect(() => {
+    setDays(normalizeAvailability(workspaceData.availability));
+  }, [workspaceData.availability]);
+
+  function updateDay(patch: Partial<AvailabilityDay>) {
+    setDays((current) =>
+      current.map((day) => {
+        if (day.id !== selectedDay.id) return day;
+
+        const next = {
+          ...day,
+          ...patch,
+        };
+
+        return {
+          ...next,
+          slots: generateSlots(next),
+        };
+      }),
+    );
+  }
+
+  async function saveAvailability(nextDays = days) {
+    setSaving(true);
+    setMessage('');
+
+    const ok = await updateWorkspaceSection('availability', nextDays);
+
+    setSaving(false);
+    setMessage(ok ? 'График сохранён.' : 'Не удалось сохранить график.');
+  }
+
+  async function copyMonday() {
+    const monday = days.find((day) => day.id === 'mon') ?? days[0];
+
+    const next = days.map((day) => {
+      if (day.id === 'mon') return day;
+
+      const copy = {
+        ...day,
+        enabled: monday.enabled,
+        start: monday.start,
+        end: monday.end,
+        interval: monday.interval,
+        breakStart: monday.breakStart,
+        breakEnd: monday.breakEnd,
+      };
+
+      return {
+        ...copy,
+        slots: generateSlots(copy),
+      };
+    });
+
+    setDays(next);
+    await saveAvailability(next);
+  }
+
+  return (
+    <div className="space-y-3">
+      <section>
+        <MiniLabel>рабочее время</MiniLabel>
+        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
+          График
+        </h1>
+        <p className="mt-2 text-[12px] leading-5 text-white/42">
+          Управляйте днями, интервалами и слотами, которые увидит клиент.
+        </p>
+      </section>
+
+      <div className="-mx-3 overflow-x-auto px-3">
+        <div className="flex gap-2 pb-1">
+          {days.map((day) => {
+            const active = day.id === selectedDay.id;
+
+            return (
+              <button
+                key={day.id}
+                type="button"
+                onClick={() => setSelectedId(day.id)}
+                className={cn(
+                  'min-w-[72px] rounded-[18px] border p-3 text-left transition active:scale-[0.98]',
+                  active
+                    ? 'border-white/[0.16] bg-white text-black'
+                    : 'border-white/[0.08] bg-white/[0.045] text-white',
+                )}
+              >
+                <div className="text-[13px] font-semibold tracking-[-0.04em]">
+                  {day.short}
+                </div>
+                <div className={cn('mt-2 text-[20px] font-semibold tracking-[-0.07em]', active ? 'text-black' : 'text-white')}>
+                  {day.enabled ? day.slots.length : '—'}
+                </div>
+                <div className={cn('text-[10px]', active ? 'text-black/45' : 'text-white/35')}>
+                  слотов
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <MiniCard className="overflow-hidden">
+        <div className="flex items-start justify-between gap-3 border-b border-white/[0.08] p-4">
+          <div>
+            <div className="text-[20px] font-semibold tracking-[-0.06em]">
+              {selectedDay.label}
+            </div>
+            <div className="mt-1 text-[12px] text-white/42">
+              {selectedDay.enabled ? `${selectedDay.slots.length} доступных слотов` : 'выходной'}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => updateDay({ enabled: !selectedDay.enabled })}
+            className={cn(
+              'h-8 rounded-full border px-3 text-[11px] font-semibold',
+              selectedDay.enabled
+                ? 'border-[var(--mini-accent)] bg-[var(--mini-accent-soft)] text-white'
+                : 'border-white/[0.08] bg-white/[0.045] text-white/45',
+            )}
+          >
+            {selectedDay.enabled ? 'Рабочий' : 'Выходной'}
+          </button>
+        </div>
+
+        <div className="space-y-4 p-4">
+          <div className="grid grid-cols-2 gap-3">
+            <MiniInput
+              label="Начало"
+              type="time"
+              value={selectedDay.start}
+              onChange={(value) => updateDay({ start: value })}
+            />
+            <MiniInput
+              label="Конец"
+              type="time"
+              value={selectedDay.end}
+              onChange={(value) => updateDay({ end: value })}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <MiniInput
+              label="Перерыв с"
+              type="time"
+              value={selectedDay.breakStart ?? ''}
+              onChange={(value) => updateDay({ breakStart: value })}
+            />
+            <MiniInput
+              label="Перерыв до"
+              type="time"
+              value={selectedDay.breakEnd ?? ''}
+              onChange={(value) => updateDay({ breakEnd: value })}
+            />
+          </div>
+
+          <MiniSelect
+            label="Шаг слота"
+            value={String(selectedDay.interval)}
+            onChange={(value) => updateDay({ interval: Number(value) })}
+            options={[
+              { value: '30', label: '30 минут' },
+              { value: '45', label: '45 минут' },
+              { value: '60', label: '60 минут' },
+              { value: '90', label: '90 минут' },
+              { value: '120', label: '120 минут' },
+            ]}
+          />
+
+          <div>
+            <div className="mb-2 text-[11px] font-semibold tracking-[-0.03em] text-white/58">
+              Слоты клиента
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {selectedDay.enabled && selectedDay.slots.length > 0 ? (
+                selectedDay.slots.map((slot) => (
+                  <span
+                    key={slot}
+                    className="rounded-full border border-white/[0.08] bg-white/[0.045] px-3 py-1.5 text-[12px] font-semibold text-white/72"
+                  >
+                    {slot}
+                  </span>
+                ))
+              ) : (
+                <div className="rounded-[16px] border border-white/[0.08] bg-white/[0.035] p-3 text-[12px] text-white/42">
+                  В этот день клиент не сможет выбрать время.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {message ? (
+            <div className="rounded-[15px] border border-white/[0.08] bg-white/[0.035] p-3 text-[12px] text-white/58">
+              {message}
+            </div>
+          ) : null}
+
+          <div className="grid grid-cols-2 gap-2">
+            <MiniButton disabled={saving} onClick={() => void copyMonday()}>
+              Копировать Пн
+            </MiniButton>
+            <MiniButton variant="accent" disabled={saving} onClick={() => void saveAvailability()}>
+              {saving ? 'Сохраняем...' : 'Сохранить'}
+            </MiniButton>
+          </div>
+        </div>
+      </MiniCard>
+    </div>
+  );
+}
+
+function ChatsScreen() {
+  const [threads, setThreads] = useState<MiniChatThread[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [messageText, setMessageText] = useState('');
+  const [newClientName, setNewClientName] = useState('');
+  const [newClientPhone, setNewClientPhone] = useState('');
+  const [error, setError] = useState('');
+
+  const selectedThread = threads.find((thread) => thread.id === selectedId) ?? null;
+
+  const loadChats = useCallback(async () => {
+    setLoading(true);
     setError('');
-    setLight(isLightTheme());
 
     try {
-      await authorizeTelegram().catch(() => null);
-
-      const response = await fetch('/api/workspace', {
-        credentials: 'include',
-        cache: 'no-store',
-        headers: apiHeaders(false),
-      });
-
-      if (response.status === 404) {
-        setWorkspaceId('');
-        setProfile(null);
-        setData({});
-        setSettings(DEFAULT_SETTINGS);
-        setBookings([]);
-        setServices([]);
-        setWeek(DEFAULT_WEEK);
-        return;
-      }
-
-      if (response.status === 401) {
-        setError('Не удалось авторизоваться. Закрой mini app и открой заново из бота.');
-        return;
-      }
+      const response = await fetchMini('/api/chats');
 
       if (!response.ok) {
-        const payload = (await parseJson(response).catch(() => ({}))) as Json;
-        throw new Error(text(payload.error, 'workspace_load_failed'));
+        throw new Error('chats_load_failed');
       }
 
-      const workspace = await parseJson(response);
-      const nextData = obj(workspace.data);
-      const nextProfile = normalizeProfile(workspace.profile) ?? null;
-      const nextBookings = list(nextData.bookings)
-        .map((item, index) => normalizeBooking(item, index))
-        .filter((item): item is Booking => Boolean(item));
-      const nextServices = normalizeServices(nextProfile, nextData);
-      const nextWeek = normalizeWeek(nextData);
-      const nextSettings = normalizeSettings(nextData);
+      const payload = await parseJsonSafe<Record<string, unknown>>(response);
+      const rawThreads =
+        safeArray(payload?.threads) ||
+        safeArray(payload?.chats) ||
+        safeArray(payload?.items);
 
-      setWorkspaceId(text(workspace.id));
-      setProfile(nextProfile);
-      setData(nextData);
-      setBookings(nextBookings);
-      setServices(nextServices);
-      setWeek(nextWeek);
-      setSettings(nextSettings);
+      const normalized = rawThreads.map(normalizeChatThread);
 
-      void loadChats();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Mini app не загрузилась');
+      setThreads(normalized);
+      setSelectedId((current) => current ?? normalized[0]?.id ?? null);
+    } catch {
+      setError('Не удалось загрузить чаты. Проверьте подключение бота.');
     } finally {
       setLoading(false);
     }
-  }, [loadChats]);
+  }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void loadChats();
+  }, [loadChats]);
 
-  const updateBookingStatus = async (bookingId: string, status: BookingStatus) => {
-    setBookings((current) =>
-      current.map((booking) => (booking.id === bookingId ? { ...booking, status } : booking)),
-    );
+  async function sendMessage(text = messageText) {
+    const clean = text.trim();
+    if (!clean || !selectedThread) return;
 
-    await fetch('/api/bookings', {
-      method: 'PATCH',
-      credentials: 'include',
-      cache: 'no-store',
-      headers: apiHeaders(true),
-      body: JSON.stringify({
-        bookingId,
-        status,
-      }),
-    }).catch(() => null);
-
-    await load();
-  };
-
-  const updateTransfer = async (bookingId: string, transferStatus: Booking['transferStatus']) => {
-    setBookings((current) =>
-      current.map((booking) =>
-        booking.id === bookingId
-          ? {
-              ...booking,
-              transferStatus,
-              transferRequested: transferStatus === 'requested',
-            }
-          : booking,
-      ),
-    );
-
-    await fetch('/api/bookings', {
-      method: 'PATCH',
-      credentials: 'include',
-      cache: 'no-store',
-      headers: apiHeaders(true),
-      body: JSON.stringify({
-        bookingId,
-        action: transferStatus === 'declined' ? 'decline_reschedule' : transferStatus === 'requested' ? 'request_reschedule' : undefined,
-        transferStatus,
-        transferRequested: transferStatus === 'requested',
-      }),
-    }).catch(() => null);
-
-    await load();
-  };
-
-  const offerTransfer = async (bookingId: string, date: string, time: string) => {
-    setBookings((current) =>
-      current.map((booking) =>
-        booking.id === bookingId
-          ? {
-              ...booking,
-              transferRequested: true,
-              transferStatus: 'requested',
-            }
-          : booking,
-      ),
-    );
-
-    await fetch('/api/bookings', {
-      method: 'PATCH',
-      credentials: 'include',
-      cache: 'no-store',
-      headers: apiHeaders(true),
-      body: JSON.stringify({
-        bookingId,
-        action: 'offer_reschedule',
-        proposedDate: date,
-        proposedTime: time,
-      }),
-    }).catch(() => null);
-
-    await load();
-    await loadChats();
-  };
-
-  const sendChatMessage = async (threadId: string, body: string) => {
-    const finalBody = text(body);
-
-    if (!threadId || !finalBody) return;
-
-    const optimistic: ChatMessage = {
-      id: makeId('msg'),
-      author: 'master',
-      body: finalBody,
+    const optimistic: MiniChatMessage = {
+      id: `local-${Date.now()}`,
+      from: 'master',
+      text: clean,
       createdAt: new Date().toISOString(),
     };
 
     setThreads((current) =>
       current.map((thread) =>
-        thread.id === threadId
+        thread.id === selectedThread.id
           ? {
               ...thread,
-              messages: [...list<ChatMessage>(thread.messages), optimistic],
-              lastMessage: finalBody,
+              lastMessage: clean,
               updatedAt: optimistic.createdAt,
+              messages: [...thread.messages, optimistic],
             }
           : thread,
       ),
     );
 
-    await fetch('/api/chats', {
-      method: 'POST',
-      credentials: 'include',
-      cache: 'no-store',
-      headers: apiHeaders(true),
-      body: JSON.stringify({
-        threadId,
-        body: finalBody,
-        author: 'master',
-        viaBot: true,
-        clientMessageKey: `${threadId}-${Date.now()}`,
-      }),
-    }).catch(() => null);
+    setMessageText('');
 
-    await loadChats();
-  };
+    try {
+      const response = await fetchMini('/api/chats', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          threadId: selectedThread.id,
+          message: clean,
+          text: clean,
+        }),
+      });
 
-  const openQuick = (preset?: QuickBookingPreset) => {
-    setQuickPreset(preset);
-    setQuickOpen(true);
-  };
+      if (!response.ok) {
+        throw new Error('message_send_failed');
+      }
 
-  const openChat = (threadId: string) => {
-    setActiveThreadId(threadId);
-    setScreen('chat');
-  };
+      const payload = await parseJsonSafe<Record<string, unknown>>(response);
+      const maybeThread = payload?.thread || payload?.chat;
 
-  const openChatForBooking = (booking: Booking) => {
-    const found = threads.find((thread) => {
-      const phoneMatch = booking.clientPhone && thread.clientPhone && booking.clientPhone === thread.clientPhone;
-      const nameMatch = booking.clientName && thread.clientName && booking.clientName.toLowerCase() === thread.clientName.toLowerCase();
-      return phoneMatch || nameMatch;
-    });
-
-    if (found) {
-      openChat(found.id);
-      setSelectedBooking(null);
-      return;
+      if (maybeThread) {
+        const normalized = normalizeChatThread(maybeThread, 0);
+        setThreads((current) =>
+          current.map((thread) => (thread.id === selectedThread.id ? normalized : thread)),
+        );
+      }
+    } catch {
+      setError('Сообщение добавлено локально, но API чата не ответил.');
     }
+  }
 
-    setScreen('chats');
-    setSelectedBooking(null);
-  };
+  async function createThread() {
+    const name = newClientName.trim();
+    if (!name) return;
 
-  const openChatForClient = (client: Client) => {
-    const found = threads.find((thread) => {
-      const phoneMatch = client.phone && thread.clientPhone && client.phone === thread.clientPhone;
-      const nameMatch = client.name && thread.clientName && client.name.toLowerCase() === thread.clientName.toLowerCase();
-      return phoneMatch || nameMatch;
-    });
+    const localThread: MiniChatThread = {
+      id: `local-thread-${Date.now()}`,
+      clientName: name,
+      clientPhone: newClientPhone.trim(),
+      priority: 'normal',
+      botConnected: true,
+      lastMessage: 'Новый диалог',
+      updatedAt: new Date().toISOString(),
+      messages: [
+        {
+          id: `local-message-${Date.now()}`,
+          from: 'system',
+          text: 'Диалог создан из Mini App.',
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    };
 
-    if (found) {
-      openChat(found.id);
-      return;
+    setThreads((current) => [localThread, ...current]);
+    setSelectedId(localThread.id);
+    setNewClientName('');
+    setNewClientPhone('');
+
+    try {
+      await fetchMini('/api/chats', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          clientName: name,
+          clientPhone: newClientPhone.trim(),
+          message: 'Диалог создан из Mini App.',
+        }),
+      });
+    } catch {
+      // Локальный поток уже создан.
     }
+  }
 
-    setScreen('chats');
-  };
-
-  if (loading) return <LoadingScreen />;
-
-  if (error) {
+  if (selectedThread) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#090909] px-5 text-white">
-        <div className="w-full max-w-[350px] rounded-[18px] border border-white/[0.10] bg-[#101010] p-5 text-center">
-          <Logo light={false} />
-          <div className="mt-5 text-[22px] font-semibold tracking-[-0.08em]">Mini app не загрузилась</div>
-          <div className="mt-3 rounded-[10px] border border-white/[0.08] bg-white/[0.035] px-3 py-2 text-left text-[11px] leading-5 text-white/55">
-            {error}
+      <div className="space-y-3">
+        <section className="flex items-start justify-between gap-3">
+          <div>
+            <MiniLabel>диалог</MiniLabel>
+            <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
+              {selectedThread.clientName}
+            </h1>
+            <p className="mt-2 text-[12px] leading-5 text-white/42">
+              {selectedThread.clientPhone || 'контакт не указан'} · {selectedThread.source || 'КликБук'}
+            </p>
           </div>
+
           <button
             type="button"
-            onClick={() => {
-              setLoading(true);
-              void load();
-            }}
-            className="mt-5 h-10 w-full rounded-[10px] border border-white/[0.12] bg-white text-[12px] font-bold text-black active:scale-[0.985]"
+            onClick={() => setSelectedId(null)}
+            className="flex size-9 items-center justify-center rounded-[13px] border border-white/[0.08] bg-white/[0.045] text-white/55"
           >
-            Повторить
+            <X className="size-4" />
           </button>
-        </div>
-      </main>
+        </section>
+
+        <MiniCard className="overflow-hidden">
+          <div className="flex items-center justify-between border-b border-white/[0.08] p-3">
+            <div className="flex items-center gap-2">
+              <span
+                className={cn(
+                  'size-2 rounded-full',
+                  selectedThread.botConnected ? 'bg-emerald-400' : 'bg-white/25',
+                )}
+              />
+              <span className="text-[11px] font-semibold text-white/48">
+                {selectedThread.botConnected ? 'бот подключен' : 'бот не подключен'}
+              </span>
+            </div>
+
+            <span className="rounded-full border border-white/[0.08] bg-white/[0.035] px-2 py-1 text-[10px] font-semibold text-white/45">
+              {selectedThread.priority === 'high' ? 'важный' : 'обычный'}
+            </span>
+          </div>
+
+          <div className="max-h-[360px] space-y-2 overflow-y-auto p-3">
+            {selectedThread.messages.length > 0 ? (
+              selectedThread.messages.map((message) => {
+                const mine = message.from === 'master';
+
+                return (
+                  <div
+                    key={message.id}
+                    className={cn('flex', mine ? 'justify-end' : 'justify-start')}
+                  >
+                    <div
+                      className={cn(
+                        'max-w-[78%] rounded-[17px] px-3 py-2 text-[13px] leading-5',
+                        mine
+                          ? 'bg-[var(--mini-accent)] text-black'
+                          : message.from === 'system'
+                            ? 'border border-white/[0.08] bg-white/[0.035] text-white/45'
+                            : 'bg-white/[0.065] text-white',
+                      )}
+                    >
+                      {message.text}
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <EmptyState
+                title="Сообщений нет"
+                text="Напишите клиенту или выберите быстрый шаблон."
+                icon={<MessageCircle className="size-5" />}
+              />
+            )}
+          </div>
+
+          <div className="border-t border-white/[0.08] p-3">
+            <div className="mb-2 flex gap-2 overflow-x-auto">
+              {['Подтверждаю запись', 'Пришлите удобное время', 'Напомню адрес', 'Спасибо за визит'].map(
+                (template) => (
+                  <button
+                    key={template}
+                    type="button"
+                    onClick={() => void sendMessage(template)}
+                    className="shrink-0 rounded-full border border-white/[0.08] bg-white/[0.045] px-3 py-1.5 text-[11px] font-semibold text-white/55"
+                  >
+                    {template}
+                  </button>
+                ),
+              )}
+            </div>
+
+            <div className="grid grid-cols-[1fr_44px] gap-2">
+              <input
+                value={messageText}
+                onChange={(event) => setMessageText(event.target.value)}
+                placeholder="Сообщение клиенту..."
+                className="h-11 rounded-[15px] border border-white/[0.08] bg-[#141414] px-3 text-[14px] font-medium text-white outline-none placeholder:text-white/25"
+              />
+              <button
+                type="button"
+                onClick={() => void sendMessage()}
+                className="flex h-11 items-center justify-center rounded-[15px] bg-[var(--mini-accent)] text-black"
+              >
+                <Send className="size-4" />
+              </button>
+            </div>
+          </div>
+        </MiniCard>
+      </div>
     );
   }
 
-  if (!profile) return <Onboarding light={light} reload={load} />;
+  return (
+    <div className="space-y-3">
+      <section>
+        <MiniLabel>коммуникации</MiniLabel>
+        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
+          Чаты
+        </h1>
+        <p className="mt-2 text-[12px] leading-5 text-white/42">
+          Клиенты, быстрые сообщения и шаблоны.
+        </p>
+      </section>
+
+      <MiniCard className="space-y-3 p-4">
+        <div className="text-[15px] font-semibold tracking-[-0.045em]">Новый диалог</div>
+        <MiniInput
+          label="Имя клиента"
+          value={newClientName}
+          onChange={setNewClientName}
+          placeholder="Анна"
+        />
+        <MiniInput
+          label="Телефон"
+          value={newClientPhone}
+          onChange={setNewClientPhone}
+          placeholder="+7..."
+        />
+        <MiniButton variant="accent" onClick={() => void createThread()}>
+          <Plus className="size-4" />
+          Создать чат
+        </MiniButton>
+      </MiniCard>
+
+      <MiniCard className="overflow-hidden">
+        <div className="flex items-center justify-between border-b border-white/[0.08] p-4">
+          <div>
+            <div className="text-[15px] font-semibold tracking-[-0.045em]">Диалоги</div>
+            <div className="mt-1 text-[11px] text-white/38">
+              {loading ? 'загружаем...' : `${threads.length} чатов`}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void loadChats()}
+            className="flex size-8 items-center justify-center rounded-[11px] border border-white/[0.08] bg-white/[0.045] text-white/55"
+          >
+            <RefreshCcw className="size-3.5" />
+          </button>
+        </div>
+
+        <div className="space-y-2 p-3">
+          {threads.length > 0 ? (
+            threads.map((thread) => (
+              <button
+                key={thread.id}
+                type="button"
+                onClick={() => setSelectedId(thread.id)}
+                className="flex w-full items-center gap-3 rounded-[17px] border border-white/[0.07] bg-white/[0.035] p-3 text-left"
+              >
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-[14px] border border-white/[0.08] bg-white/[0.055] text-[11px] font-bold">
+                  {getInitials(thread.clientName)}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px] font-semibold tracking-[-0.04em]">
+                    {thread.clientName}
+                  </div>
+                  <div className="mt-1 truncate text-[11px] text-white/38">
+                    {thread.lastMessage || 'Открыть диалог'}
+                  </div>
+                </div>
+
+                {thread.priority === 'high' ? (
+                  <span className="size-2 rounded-full bg-[var(--mini-accent)]" />
+                ) : null}
+
+                <ChevronRight className="size-4 text-white/25" />
+              </button>
+            ))
+          ) : (
+            <EmptyState
+              title={error || 'Чатов пока нет'}
+              text="Создайте диалог или дождитесь первого сообщения от клиента."
+              icon={<MessageCircle className="size-5" />}
+            />
+          )}
+        </div>
+      </MiniCard>
+    </div>
+  );
+}
+
+function ClientsScreen({
+  bookings,
+  onOpenBooking,
+}: {
+  bookings: Booking[];
+  onOpenBooking: (booking: Booking) => void;
+}) {
+  const [selectedClientKey, setSelectedClientKey] = useState<string | null>(null);
+  const [favoriteKeys, setFavoriteKeys] = useState<string[]>([]);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+
+  const clients = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        key: string;
+        name: string;
+        phone: string;
+        visits: number;
+        total: number;
+        last: string;
+        service: string;
+        bookings: Booking[];
+      }
+    >();
+
+    bookings.forEach((booking) => {
+      const key = booking.clientPhone || booking.clientName;
+      const current = map.get(key);
+
+      if (!current) {
+        map.set(key, {
+          key,
+          name: booking.clientName,
+          phone: booking.clientPhone,
+          visits: 1,
+          total: getBookingAmount(booking),
+          last: booking.date,
+          service: booking.service,
+          bookings: [booking],
+        });
+        return;
+      }
+
+      current.visits += 1;
+      current.total += getBookingAmount(booking);
+      current.bookings.push(booking);
+
+      if (booking.date > current.last) {
+        current.last = booking.date;
+        current.service = booking.service;
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => b.last.localeCompare(a.last));
+  }, [bookings]);
+
+  const selectedClient = clients.find((client) => client.key === selectedClientKey) ?? null;
+
+  if (selectedClient) {
+    const favorite = favoriteKeys.includes(selectedClient.key);
+
+    return (
+      <div className="space-y-3">
+        <section className="flex items-start justify-between gap-3">
+          <div>
+            <MiniLabel>карточка клиента</MiniLabel>
+            <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
+              {selectedClient.name}
+            </h1>
+            <p className="mt-2 text-[12px] leading-5 text-white/42">
+              {selectedClient.visits} визита · {RUB.format(selectedClient.total)}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setSelectedClientKey(null)}
+            className="flex size-9 items-center justify-center rounded-[13px] border border-white/[0.08] bg-white/[0.045] text-white/55"
+          >
+            <X className="size-4" />
+          </button>
+        </section>
+
+        <div className="grid grid-cols-2 gap-2">
+          <MiniButton
+            variant={favorite ? 'accent' : 'secondary'}
+            onClick={() =>
+              setFavoriteKeys((current) =>
+                favorite
+                  ? current.filter((key) => key !== selectedClient.key)
+                  : [...current, selectedClient.key],
+              )
+            }
+          >
+            <Star className="size-4" />
+            {favorite ? 'VIP' : 'В VIP'}
+          </MiniButton>
+          <MiniButton>
+            <Phone className="size-4" />
+            Позвонить
+          </MiniButton>
+        </div>
+
+        <MiniCard className="space-y-3 p-4">
+          <MiniInput
+            label="Заметка мастера"
+            value={notes[selectedClient.key] ?? ''}
+            onChange={(value) =>
+              setNotes((current) => ({
+                ...current,
+                [selectedClient.key]: value,
+              }))
+            }
+            placeholder="Предпочтения, нюансы, что важно помнить..."
+            textarea
+          />
+        </MiniCard>
+
+        <MiniCard className="overflow-hidden">
+          <div className="border-b border-white/[0.08] p-4">
+            <div className="text-[15px] font-semibold tracking-[-0.045em]">История</div>
+            <div className="mt-1 text-[11px] text-white/38">записи клиента</div>
+          </div>
+
+          <div className="space-y-2 p-3">
+            {selectedClient.bookings.slice().sort(sortBookings).map((booking) => (
+              <button
+                key={booking.id}
+                type="button"
+                onClick={() => onOpenBooking(booking)}
+                className="flex w-full items-center gap-3 rounded-[17px] border border-white/[0.07] bg-white/[0.035] p-3 text-left"
+              >
+                <div className="w-16 text-[12px] font-semibold text-white/58">
+                  {formatDayLabel(booking.date)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px] font-semibold tracking-[-0.04em]">
+                    {booking.service}
+                  </div>
+                  <div className="mt-1 text-[11px] text-white/38">
+                    {formatTime(booking.time)} · {RUB.format(getBookingAmount(booking))}
+                  </div>
+                </div>
+                <StatusPill status={booking.status} />
+              </button>
+            ))}
+          </div>
+        </MiniCard>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <section>
+        <MiniLabel>база</MiniLabel>
+        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
+          Клиенты
+        </h1>
+        <p className="mt-2 text-[12px] leading-5 text-white/42">
+          Карточки клиентов, визиты, суммы и история.
+        </p>
+      </section>
+
+      <div className="grid grid-cols-3 gap-2">
+        <MiniCard className="p-3">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
+            всего
+          </div>
+          <div className="mt-2 text-[22px] font-semibold tracking-[-0.07em]">
+            {clients.length}
+          </div>
+        </MiniCard>
+        <MiniCard className="p-3">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
+            VIP
+          </div>
+          <div className="mt-2 text-[22px] font-semibold tracking-[-0.07em]">
+            {favoriteKeys.length}
+          </div>
+        </MiniCard>
+        <MiniCard className="p-3">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
+            визиты
+          </div>
+          <div className="mt-2 text-[22px] font-semibold tracking-[-0.07em]">
+            {bookings.length}
+          </div>
+        </MiniCard>
+      </div>
+
+      <MiniCard className="overflow-hidden">
+        <div className="space-y-2 p-3">
+          {clients.length > 0 ? (
+            clients.map((client) => (
+              <button
+                key={client.key}
+                type="button"
+                onClick={() => setSelectedClientKey(client.key)}
+                className="flex w-full items-center gap-3 rounded-[17px] border border-white/[0.07] bg-white/[0.035] p-3 text-left"
+              >
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-[14px] border border-white/[0.08] bg-white/[0.055] text-[11px] font-bold">
+                  {getInitials(client.name)}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <div className="truncate text-[13px] font-semibold tracking-[-0.04em]">
+                      {client.name}
+                    </div>
+                    {favoriteKeys.includes(client.key) ? (
+                      <Star className="size-3 fill-[var(--mini-accent)] text-[var(--mini-accent)]" />
+                    ) : null}
+                  </div>
+                  <div className="mt-1 truncate text-[11px] text-white/38">
+                    {client.visits} визита · {RUB.format(client.total)} · {formatDayLabel(client.last)}
+                  </div>
+                </div>
+
+                <ChevronRight className="size-4 text-white/25" />
+              </button>
+            ))
+          ) : (
+            <EmptyState
+              title="Клиентов пока нет"
+              text="Клиенты появятся после первых записей."
+              icon={<Users2 className="size-5" />}
+            />
+          )}
+        </div>
+      </MiniCard>
+    </div>
+  );
+}
+
+function ProfileScreen({
+  profile,
+  onSave,
+  getPublicPath,
+}: {
+  profile: MasterProfile | null;
+  onSave: (values: MiniProfileSaveValues) => Promise<{ success: boolean; error?: string }>;
+  getPublicPath: (slug: string) => string;
+}) {
+  const [tab, setTab] = useState<'base' | 'place' | 'portfolio' | 'reviews' | 'contacts'>('base');
+  const [form, setForm] = useState<MiniProfileSaveValues>(() => profileToForm(profile));
+  const [portfolioText, setPortfolioText] = useState(
+    (profile?.workGallery ?? []).map((item) => `${item.title || 'Работа'} | ${item.image || ''}`).join('\n'),
+  );
+  const [reviewsText, setReviewsText] = useState(
+    (profile?.reviews ?? []).map((item) => `${item.author}: ${item.text}`).join('\n'),
+  );
+  const [saving, setSaving] = useState(false);
+  const [resultText, setResultText] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    setForm(profileToForm(profile));
+    setPortfolioText(
+      (profile?.workGallery ?? []).map((item) => `${item.title || 'Работа'} | ${item.image || ''}`).join('\n'),
+    );
+    setReviewsText((profile?.reviews ?? []).map((item) => `${item.author}: ${item.text}`).join('\n'));
+  }, [profile]);
+
+  const publicUrl =
+    typeof window !== 'undefined' && profile?.slug
+      ? `${window.location.origin}${getPublicPath(profile.slug)}`
+      : '';
+
+  const update = <K extends keyof MiniProfileSaveValues>(
+    key: K,
+    value: MiniProfileSaveValues[K],
+  ) => {
+    setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  function parsePortfolio(): WorkGalleryItem[] {
+    return portfolioText
+      .split('\n')
+      .map((line, index) => {
+        const [title, image] = line.split('|').map((part) => part.trim());
+
+        if (!title && !image) return null;
+
+        return {
+          id: `work-${index}`,
+          title: title || `Работа ${index + 1}`,
+          image: image || '',
+        };
+      })
+      .filter((item): item is WorkGalleryItem => Boolean(item));
+  }
+
+  function parseReviews() {
+    return reviewsText
+      .split('\n')
+      .map((line, index) => {
+        const [author, ...rest] = line.split(':');
+        const text = rest.join(':').trim();
+
+        if (!author.trim() && !text) return null;
+
+        return {
+          id: `review-${index}`,
+          author: author.trim() || 'Клиент',
+          text: text || line.trim(),
+          rating: 5,
+        };
+      })
+      .filter(Boolean) as NonNullable<MasterProfile['reviews']>;
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setResultText('');
+
+    const result = await onSave({
+      ...form,
+      workGallery: parsePortfolio(),
+      reviews: parseReviews(),
+      reviewCount: parseReviews().length || form.reviewCount,
+    });
+
+    setSaving(false);
+    setResultText(
+      result.success ? 'Профиль сохранён.' : result.error || 'Не удалось сохранить профиль.',
+    );
+  }
+
+  async function copyLink() {
+    if (!publicUrl) return;
+
+    try {
+      await navigator.clipboard.writeText(publicUrl);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {}
+  }
+
+  const tabs = [
+    { id: 'base', label: 'Основа' },
+    { id: 'place', label: 'Место' },
+    { id: 'portfolio', label: 'Портфолио' },
+    { id: 'reviews', label: 'Отзывы' },
+    { id: 'contacts', label: 'Контакты' },
+  ] as const;
+
+  return (
+    <div className="space-y-3">
+      <section>
+        <MiniLabel>публичная страница</MiniLabel>
+        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
+          Профиль
+        </h1>
+        <p className="mt-2 text-[12px] leading-5 text-white/42">
+          Та же логика профиля, но компактно для телефона.
+        </p>
+      </section>
+
+      {publicUrl ? (
+        <MiniCard className="p-4">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/32">
+            ссылка
+          </div>
+          <div className="mt-2 truncate text-[18px] font-semibold tracking-[-0.06em]">
+            {getPublicPath(profile?.slug || '')}
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <MiniButton onClick={copyLink}>
+              <Copy className="size-4" />
+              {copied ? 'Скопировано' : 'Копировать'}
+            </MiniButton>
+            <Link
+              href={publicUrl}
+              className="flex h-10 items-center justify-center gap-2 rounded-[14px] border border-white/[0.08] bg-white/[0.055] text-[12px] font-semibold tracking-[-0.035em] text-white"
+            >
+              <ExternalLink className="size-4" />
+              Открыть
+            </Link>
+          </div>
+        </MiniCard>
+      ) : null}
+
+      <div className="-mx-3 overflow-x-auto px-3">
+        <div className="flex gap-2 pb-1">
+          {tabs.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setTab(item.id)}
+              className={cn(
+                'h-9 shrink-0 rounded-full border px-3 text-[12px] font-semibold tracking-[-0.035em]',
+                tab === item.id
+                  ? 'border-[var(--mini-accent)] bg-[var(--mini-accent-soft)] text-white'
+                  : 'border-white/[0.08] bg-white/[0.045] text-white/45',
+              )}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <MiniCard className="space-y-4 p-4">
+        {tab === 'base' ? (
+          <>
+            <MiniInput label="Фото / аватар" value={form.avatar} onChange={(value) => update('avatar', value)} placeholder="URL изображения" />
+            <MiniInput label="Имя" value={form.name} onChange={(value) => update('name', value)} />
+            <MiniInput label="Специализация" value={form.profession} onChange={(value) => update('profession', value)} />
+            <MiniInput label="Город" value={form.city} onChange={(value) => update('city', value)} />
+            <MiniInput label="Описание" value={form.bio} onChange={(value) => update('bio', value)} textarea />
+            <MiniInput label="Опыт" value={getString(form.experienceLabel)} onChange={(value) => update('experienceLabel', value)} placeholder="5 лет опыта" />
+            <MiniInput label="Средний чек / цена" value={getString(form.priceHint)} onChange={(value) => update('priceHint', value)} placeholder="от 2500 ₽" />
+          </>
+        ) : null}
+
+        {tab === 'place' ? (
+          <>
+            <MiniSelect
+              label="Формат работы"
+              value={getString(form.locationMode, 'online')}
+              onChange={(value) => update('locationMode', value as MasterProfile['locationMode'])}
+              options={[
+                { value: 'online', label: 'Без адреса / онлайн' },
+                { value: 'address', label: 'Показывать адрес' },
+              ]}
+            />
+            <MiniInput label="Адрес" value={getString(form.address)} onChange={(value) => update('address', value)} placeholder="Город, улица, дом" />
+            <MiniInput label="Ссылка на карту" value={getString(form.mapUrl)} onChange={(value) => update('mapUrl', value)} placeholder="https://..." />
+          </>
+        ) : null}
+
+        {tab === 'portfolio' ? (
+          <>
+            <MiniInput
+              label="Портфолио"
+              value={portfolioText}
+              onChange={setPortfolioText}
+              placeholder={'Маникюр нюд | https://...\nРабота после коррекции | https://...'}
+              textarea
+            />
+            <div className="rounded-[16px] border border-white/[0.08] bg-white/[0.035] p-3 text-[12px] leading-5 text-white/42">
+              Формат: название работы | ссылка на изображение.
+            </div>
+          </>
+        ) : null}
+
+        {tab === 'reviews' ? (
+          <>
+            <MiniInput
+              label="Отзывы"
+              value={reviewsText}
+              onChange={setReviewsText}
+              placeholder={'Анна: Очень аккуратная работа\nМария: Всё понравилось'}
+              textarea
+            />
+            <div className="rounded-[16px] border border-white/[0.08] bg-white/[0.035] p-3 text-[12px] leading-5 text-white/42">
+              Формат: имя клиента: текст отзыва.
+            </div>
+          </>
+        ) : null}
+
+        {tab === 'contacts' ? (
+          <>
+            <MiniInput label="Телефон" value={form.phone} onChange={(value) => update('phone', value)} />
+            <MiniInput label="Telegram" value={form.telegram} onChange={(value) => update('telegram', value)} />
+            <MiniInput label="WhatsApp / VK" value={form.whatsapp} onChange={(value) => update('whatsapp', value)} />
+            <MiniInput label="Ссылка" value={form.slug} onChange={(value) => update('slug', value)} />
+            <MiniInput label="Скорость ответа" value={getString(form.responseTime)} onChange={(value) => update('responseTime', value)} placeholder="обычно отвечаю за 15 минут" />
+          </>
+        ) : null}
+
+        {resultText ? (
+          <div className="rounded-[15px] border border-white/[0.08] bg-white/[0.035] p-3 text-[12px] text-white/58">
+            {resultText}
+          </div>
+        ) : null}
+
+        <MiniButton variant="accent" onClick={handleSave} disabled={saving}>
+          {saving ? 'Сохраняем...' : 'Сохранить профиль'}
+        </MiniButton>
+      </MiniCard>
+    </div>
+  );
+}
+
+function ServicesScreen({
+  profile,
+  workspaceData,
+  onSave,
+  updateWorkspaceSection,
+}: {
+  profile: MasterProfile | null;
+  workspaceData: Record<string, unknown>;
+  onSave: (values: MiniProfileSaveValues) => Promise<{ success: boolean; error?: string }>;
+  updateWorkspaceSection: <T>(section: string, value: T) => Promise<boolean>;
+}) {
+  const [items, setItems] = useState<ServiceItem[]>(() => parseServicesFromProfile(profile, workspaceData));
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    setItems(parseServicesFromProfile(profile, workspaceData));
+  }, [profile, workspaceData]);
+
+  function updateItem(id: string, patch: Partial<ServiceItem>) {
+    setItems((current) =>
+      current.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+    );
+  }
+
+  function addItem() {
+    setItems((current) => [
+      ...current,
+      {
+        id: `service-${Date.now()}`,
+        name: '',
+        price: '',
+        duration: '60',
+        category: 'Основное',
+        status: 'active',
+        visible: true,
+      },
+    ]);
+  }
+
+  function removeItem(id: string) {
+    setItems((current) => current.filter((item) => item.id !== id));
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setMessage('');
+
+    const cleaned = items.filter((item) => item.name.trim());
+    const base = profileToForm(profile);
+
+    const ok = await updateWorkspaceSection('serviceCatalog', cleaned);
+    const result = await onSave({
+      ...base,
+      servicesText: serviceItemsToText(cleaned),
+    });
+
+    setSaving(false);
+    setMessage(ok && result.success ? 'Услуги сохранены.' : result.error || 'Не удалось сохранить.');
+  }
+
+  return (
+    <div className="space-y-3">
+      <section>
+        <MiniLabel>витрина</MiniLabel>
+        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
+          Услуги
+        </h1>
+        <p className="mt-2 text-[12px] leading-5 text-white/42">
+          Услуги, цены, длительность и видимость для клиента.
+        </p>
+      </section>
+
+      <MiniButton variant="accent" onClick={addItem}>
+        <Plus className="size-4" />
+        Добавить услугу
+      </MiniButton>
+
+      <div className="space-y-3">
+        {items.length > 0 ? (
+          items.map((item, index) => (
+            <MiniCard key={item.id} className="space-y-3 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="flex size-7 items-center justify-center rounded-full border border-white/[0.08] text-[10px] font-semibold text-white/42">
+                    {index + 1}
+                  </span>
+                  <div>
+                    <div className="text-[14px] font-semibold tracking-[-0.045em]">
+                      {item.name || 'Новая услуга'}
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-white/35">
+                      {item.visible ? 'видна клиентам' : 'скрыта'}
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => removeItem(item.id)}
+                  className="flex size-8 items-center justify-center rounded-[12px] border border-white/[0.08] bg-white/[0.035] text-white/45"
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              </div>
+
+              <MiniInput label="Название" value={item.name} onChange={(value) => updateItem(item.id, { name: value })} />
+              <div className="grid grid-cols-2 gap-3">
+                <MiniInput label="Цена" value={item.price} onChange={(value) => updateItem(item.id, { price: value })} placeholder="2500" />
+                <MiniInput label="Минут" value={item.duration} onChange={(value) => updateItem(item.id, { duration: value })} placeholder="60" />
+              </div>
+              <MiniInput label="Категория" value={item.category} onChange={(value) => updateItem(item.id, { category: value })} placeholder="Основное" />
+              <MiniSelect
+                label="Статус"
+                value={item.status}
+                onChange={(value) => updateItem(item.id, { status: value as ServiceItem['status'] })}
+                options={[
+                  { value: 'active', label: 'Активная' },
+                  { value: 'seasonal', label: 'Сезонная' },
+                  { value: 'draft', label: 'Черновик' },
+                ]}
+              />
+
+              <button
+                type="button"
+                onClick={() => updateItem(item.id, { visible: !item.visible })}
+                className={cn(
+                  'flex h-10 items-center justify-center gap-2 rounded-[14px] border text-[12px] font-semibold',
+                  item.visible
+                    ? 'border-[var(--mini-accent)] bg-[var(--mini-accent-soft)] text-white'
+                    : 'border-white/[0.08] bg-white/[0.035] text-white/45',
+                )}
+              >
+                <Eye className="size-4" />
+                {item.visible ? 'Показывать клиентам' : 'Скрыто'}
+              </button>
+            </MiniCard>
+          ))
+        ) : (
+          <EmptyState
+            title="Услуги не заполнены"
+            text="Добавьте услуги, чтобы клиенты могли записываться."
+            icon={<Scissors className="size-5" />}
+          />
+        )}
+      </div>
+
+      {message ? (
+        <div className="rounded-[15px] border border-white/[0.08] bg-white/[0.035] p-3 text-[12px] text-white/58">
+          {message}
+        </div>
+      ) : null}
+
+      <MiniButton variant="accent" onClick={handleSave} disabled={saving}>
+        {saving ? 'Сохраняем...' : 'Сохранить услуги'}
+      </MiniButton>
+    </div>
+  );
+}
+
+function AnalyticsScreen({ bookings }: { bookings: Booking[] }) {
+  const days = useMemo(() => Array.from({ length: 7 }, (_, index) => addDaysKey(index - 6)), []);
+
+  const dayStats = useMemo(
+    () =>
+      days.map((day) => {
+        const dayBookings = bookings.filter((booking) => booking.date === day);
+        const revenue = dayBookings.reduce((sum, booking) => sum + getBookingAmount(booking), 0);
+
+        return {
+          day,
+          count: dayBookings.length,
+          revenue,
+        };
+      }),
+    [bookings, days],
+  );
+
+  const statusStats = useMemo(() => {
+    const result: Array<{ status: BookingStatus; count: number }> = [
+      { status: 'new', count: 0 },
+      { status: 'confirmed', count: 0 },
+      { status: 'completed', count: 0 },
+      { status: 'no_show', count: 0 },
+      { status: 'cancelled', count: 0 },
+    ];
+
+    bookings.forEach((booking) => {
+      const row = result.find((item) => item.status === booking.status);
+      if (row) row.count += 1;
+    });
+
+    return result;
+  }, [bookings]);
+
+  const serviceStats = useMemo(() => {
+    const map = new Map<string, { name: string; count: number; revenue: number }>();
+
+    bookings.forEach((booking) => {
+      const current = map.get(booking.service) ?? {
+        name: booking.service,
+        count: 0,
+        revenue: 0,
+      };
+
+      current.count += 1;
+      current.revenue += getBookingAmount(booking);
+      map.set(booking.service, current);
+    });
+
+    return Array.from(map.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 4);
+  }, [bookings]);
+
+  const totalBookings = bookings.length;
+  const totalRevenue = bookings.reduce((sum, booking) => sum + getBookingAmount(booking), 0);
+  const completed = bookings.filter((booking) => booking.status === 'completed').length;
+  const noShow = bookings.filter((booking) => booking.status === 'no_show').length;
+  const uniqueClients = new Set(bookings.map((booking) => booking.clientPhone || booking.clientName)).size;
+  const showRate = totalBookings > 0 ? Math.round((completed / totalBookings) * 100) : 0;
+  const maxCount = Math.max(1, ...dayStats.map((item) => item.count), ...statusStats.map((item) => item.count));
+
+  return (
+    <div className="space-y-3">
+      <section>
+        <MiniLabel>короткая аналитика</MiniLabel>
+        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
+          Аналитика
+        </h1>
+        <p className="mt-2 text-[12px] leading-5 text-white/42">
+          Записи, деньги, явка, клиенты и популярные услуги.
+        </p>
+      </section>
+
+      <div className="grid grid-cols-2 gap-2">
+        <MiniCard className="p-3">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
+            записи
+          </div>
+          <div className="mt-2 text-[26px] font-semibold tracking-[-0.08em]">
+            {totalBookings}
+          </div>
+          <div className="text-[10px] text-white/35">всего</div>
+        </MiniCard>
+
+        <MiniCard className="p-3">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
+            доход
+          </div>
+          <div className="mt-2 text-[26px] font-semibold tracking-[-0.08em]">
+            {RUB.format(totalRevenue)}
+          </div>
+          <div className="text-[10px] text-white/35">по записям</div>
+        </MiniCard>
+
+        <MiniCard className="p-3">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
+            явка
+          </div>
+          <div className="mt-2 text-[26px] font-semibold tracking-[-0.08em]">
+            {showRate}%
+          </div>
+          <div className="text-[10px] text-white/35">{completed} пришли</div>
+        </MiniCard>
+
+        <MiniCard className="p-3">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
+            клиенты
+          </div>
+          <div className="mt-2 text-[26px] font-semibold tracking-[-0.08em]">
+            {uniqueClients}
+          </div>
+          <div className="text-[10px] text-white/35">{noShow} неявки</div>
+        </MiniCard>
+      </div>
+
+      <MiniCard className="p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-[15px] font-semibold tracking-[-0.045em]">
+              График недели
+            </div>
+            <div className="mt-1 text-[11px] text-white/38">записи по дням</div>
+          </div>
+          <BarChart3 className="size-5 text-white/35" />
+        </div>
+
+        <div className="mt-5 flex h-[150px] items-end gap-2">
+          {dayStats.map((item) => {
+            const height = Math.max(8, (item.count / maxCount) * 120);
+
+            return (
+              <div key={item.day} className="flex flex-1 flex-col items-center gap-2">
+                <div className="flex h-[120px] w-full items-end rounded-full bg-white/[0.035] p-1">
+                  <div
+                    className="w-full rounded-full bg-[var(--mini-accent)]"
+                    style={{ height }}
+                  />
+                </div>
+                <div className="text-[9px] font-semibold uppercase text-white/35">
+                  {new Date(`${item.day}T12:00:00`).toLocaleDateString('ru-RU', {
+                    weekday: 'short',
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </MiniCard>
+
+      <MiniCard className="p-4">
+        <div className="text-[15px] font-semibold tracking-[-0.045em]">
+          Воронка статусов
+        </div>
+        <div className="mt-4 space-y-3">
+          {statusStats.map((item) => {
+            const width = `${Math.max(4, (item.count / maxCount) * 100)}%`;
+            const meta = STATUS_META[item.status];
+
+            return (
+              <div key={item.status}>
+                <div className="mb-1 flex justify-between text-[11px] font-semibold text-white/45">
+                  <span>{meta.label}</span>
+                  <span>{item.count}</span>
+                </div>
+                <div className="h-2 rounded-full bg-white/[0.045]">
+                  <div
+                    className="h-2 rounded-full bg-[var(--mini-accent)]"
+                    style={{ width }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </MiniCard>
+
+      <MiniCard className="p-4">
+        <div className="text-[15px] font-semibold tracking-[-0.045em]">
+          Популярные услуги
+        </div>
+        <div className="mt-3 space-y-2">
+          {serviceStats.length > 0 ? (
+            serviceStats.map((item, index) => (
+              <div
+                key={item.name}
+                className="flex items-center gap-3 rounded-[16px] border border-white/[0.07] bg-white/[0.035] p-3"
+              >
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-white/[0.08] text-[10px] font-semibold text-white/42">
+                  {index + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px] font-semibold tracking-[-0.04em]">
+                    {item.name}
+                  </div>
+                  <div className="mt-1 text-[11px] text-white/38">
+                    {item.count} записей · {RUB.format(item.revenue)}
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <EmptyState
+              title="Нет данных"
+              text="Аналитика появится после первых записей."
+              icon={<BarChart3 className="size-5" />}
+            />
+          )}
+        </div>
+      </MiniCard>
+    </div>
+  );
+}
+
+function AppearanceScreen({
+  workspaceData,
+  updateWorkspaceSection,
+}: {
+  workspaceData: Record<string, unknown>;
+  updateWorkspaceSection: <T>(section: string, value: T) => Promise<boolean>;
+}) {
+  const appearance = safeRecord(workspaceData.appearance);
+  const currentAccent = getAccentFromWorkspace(workspaceData);
+
+  const [accentId, setAccentId] = useState(currentAccent.id);
+  const [density, setDensity] = useState(String(appearance.density || 'normal'));
+  const [cardStyle, setCardStyle] = useState(String(appearance.cardStyle || 'soft'));
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    setAccentId(currentAccent.id);
+    setDensity(String(appearance.density || 'normal'));
+    setCardStyle(String(appearance.cardStyle || 'soft'));
+  }, [currentAccent.id, appearance.density, appearance.cardStyle]);
+
+  async function save(next?: Partial<{ accentId: string; density: string; cardStyle: string }>) {
+    const selectedAccent = next?.accentId ?? accentId;
+    const selectedDensity = next?.density ?? density;
+    const selectedCardStyle = next?.cardStyle ?? cardStyle;
+
+    setMessage('');
+
+    const ok = await updateWorkspaceSection('appearance', {
+      ...appearance,
+      accent: selectedAccent,
+      accentTone: selectedAccent,
+      publicAccent: selectedAccent,
+      density: selectedDensity,
+      cardStyle: selectedCardStyle,
+    });
+
+    setMessage(ok ? 'Внешний вид сохранён.' : 'Не удалось сохранить.');
+  }
+
+  return (
+    <div className="space-y-3">
+      <section>
+        <MiniLabel>стиль</MiniLabel>
+        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
+          Внешний вид
+        </h1>
+        <p className="mt-2 text-[12px] leading-5 text-white/42">
+          Адаптация тех же настроек внешнего вида под Mini App.
+        </p>
+      </section>
+
+      <MiniCard className="space-y-4 p-4">
+        <div>
+          <div className="mb-2 text-[11px] font-semibold tracking-[-0.03em] text-white/58">
+            Акцент
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {ACCENT_OPTIONS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  setAccentId(item.id);
+                  void save({ accentId: item.id });
+                }}
+                className={cn(
+                  'flex h-12 items-center justify-between rounded-[16px] border px-3 text-[13px] font-semibold tracking-[-0.04em]',
+                  accentId === item.id
+                    ? 'border-white/20 bg-white text-black'
+                    : 'border-white/[0.08] bg-white/[0.045] text-white/55',
+                )}
+              >
+                <span className="flex items-center gap-2">
+                  <span
+                    className="size-3 rounded-full"
+                    style={{ backgroundColor: item.value }}
+                  />
+                  {item.label}
+                </span>
+                {accentId === item.id ? <CheckCircle2 className="size-4" /> : null}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-2 text-[11px] font-semibold tracking-[-0.03em] text-white/58">
+            Плотность
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { id: 'compact', label: 'Компактно' },
+              { id: 'normal', label: 'Обычно' },
+            ].map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  setDensity(item.id);
+                  void save({ density: item.id });
+                }}
+                className={cn(
+                  'h-11 rounded-[15px] border text-[12px] font-semibold',
+                  density === item.id
+                    ? 'border-[var(--mini-accent)] bg-[var(--mini-accent-soft)] text-white'
+                    : 'border-white/[0.08] bg-white/[0.045] text-white/45',
+                )}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-2 text-[11px] font-semibold tracking-[-0.03em] text-white/58">
+            Карточки
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { id: 'soft', label: 'Мягкие' },
+              { id: 'glass', label: 'Glass' },
+            ].map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  setCardStyle(item.id);
+                  void save({ cardStyle: item.id });
+                }}
+                className={cn(
+                  'h-11 rounded-[15px] border text-[12px] font-semibold',
+                  cardStyle === item.id
+                    ? 'border-[var(--mini-accent)] bg-[var(--mini-accent-soft)] text-white'
+                    : 'border-white/[0.08] bg-white/[0.045] text-white/45',
+                )}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <MiniCard className="border-white/[0.06] bg-white/[0.035] p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-[14px] font-semibold tracking-[-0.045em]">
+                Превью
+              </div>
+              <div className="mt-1 text-[11px] text-white/38">
+                Так будет выглядеть активный элемент.
+              </div>
+            </div>
+            <div className="flex size-10 items-center justify-center rounded-[14px] bg-[var(--mini-accent)] text-black">
+              <Sparkles className="size-4" />
+            </div>
+          </div>
+        </MiniCard>
+
+        {message ? (
+          <div className="rounded-[15px] border border-white/[0.08] bg-white/[0.035] p-3 text-[12px] text-white/58">
+            {message}
+          </div>
+        ) : null}
+      </MiniCard>
+    </div>
+  );
+}
+
+function SettingsScreen({
+  workspaceData,
+  updateWorkspaceSection,
+}: {
+  workspaceData: Record<string, unknown>;
+  updateWorkspaceSection: <T>(section: string, value: T) => Promise<boolean>;
+}) {
+  const stored = safeRecord(workspaceData.miniSettings);
+  const [settings, setSettings] = useState({
+    reminders: stored.reminders !== false,
+    autoConfirm: Boolean(stored.autoConfirm),
+    noShowControl: stored.noShowControl !== false,
+    dailyDigest: stored.dailyDigest !== false,
+  });
+
+  async function update<K extends keyof typeof settings>(key: K, value: boolean) {
+    const next = { ...settings, [key]: value };
+    setSettings(next);
+    await updateWorkspaceSection('miniSettings', next);
+  }
+
+  return (
+    <div className="space-y-3">
+      <section>
+        <MiniLabel>управление</MiniLabel>
+        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
+          Настройки
+        </h1>
+        <p className="mt-2 text-[12px] leading-5 text-white/42">
+          Уведомления и рабочий день.
+        </p>
+      </section>
+
+      <MiniCard className="space-y-2 p-3">
+        {[
+          ['reminders', 'Напоминания клиентам', 'Отправлять клиенту напоминание перед записью.'],
+          ['autoConfirm', 'Автоподтверждение', 'Помечать запись подтверждённой после ответа клиента.'],
+          ['noShowControl', 'Контроль неявок', 'Подсвечивать клиентов с риском не прийти.'],
+          ['dailyDigest', 'Итоги дня', 'Показывать короткий итог по записям и деньгам.'],
+        ].map(([key, label, description]) => {
+          const typedKey = key as keyof typeof settings;
+          const checked = settings[typedKey];
+
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => void update(typedKey, !checked)}
+              className="flex w-full items-center justify-between gap-4 rounded-[18px] border border-white/[0.08] bg-white/[0.035] p-3 text-left"
+            >
+              <span>
+                <span className="block text-[13px] font-semibold tracking-[-0.04em] text-white">
+                  {label}
+                </span>
+                <span className="mt-1 block text-[11px] leading-4 text-white/42">
+                  {description}
+                </span>
+              </span>
+
+              <span
+                className={cn(
+                  'relative h-7 w-12 shrink-0 rounded-full border transition',
+                  checked
+                    ? 'border-[var(--mini-accent)] bg-[var(--mini-accent)] text-black'
+                    : 'border-white/[0.08] bg-white/[0.055]',
+                )}
+              >
+                <span
+                  className={cn(
+                    'absolute top-1 size-5 rounded-full transition',
+                    checked ? 'left-6 bg-black' : 'left-1 bg-white/35',
+                  )}
+                />
+              </span>
+            </button>
+          );
+        })}
+      </MiniCard>
+    </div>
+  );
+}
+
+function MoreScreen({ setScreen }: { setScreen: (screen: MiniScreen) => void }) {
+  const rows: Array<{
+    id: MiniScreen | 'desktop';
+    label: string;
+    description: string;
+    icon: ReactNode;
+  }> = [
+    { id: 'profile', label: 'Профиль', description: 'страница мастера', icon: <UserRound className="size-4" /> },
+    { id: 'services', label: 'Услуги', description: 'витрина и цены', icon: <Scissors className="size-4" /> },
+    { id: 'clients', label: 'Клиенты', description: 'база и история', icon: <Users2 className="size-4" /> },
+    { id: 'analytics', label: 'Аналитика', description: 'записи и доход', icon: <BarChart3 className="size-4" /> },
+    { id: 'appearance', label: 'Внешний вид', description: 'тема и акцент', icon: <Palette className="size-4" /> },
+    { id: 'settings', label: 'Настройки', description: 'уведомления', icon: <Settings className="size-4" /> },
+    { id: 'desktop', label: 'Веб-кабинет', description: 'полная версия', icon: <LayoutDashboard className="size-4" /> },
+  ];
+
+  return (
+    <div className="space-y-3">
+      <section>
+        <MiniLabel>меню</MiniLabel>
+        <h1 className="mt-1 text-[30px] font-semibold leading-none tracking-[-0.075em]">
+          Ещё
+        </h1>
+        <p className="mt-2 text-[12px] leading-5 text-white/42">
+          Дополнительные разделы.
+        </p>
+      </section>
+
+      <MiniCard className="p-2">
+        <div className="space-y-1">
+          {rows.map((row, index) => (
+            <button
+              key={row.id}
+              type="button"
+              onClick={() => {
+                if (row.id === 'desktop') {
+                  window.location.href = '/dashboard';
+                  return;
+                }
+
+                setScreen(row.id);
+              }}
+              className="group flex w-full items-center gap-3 rounded-[17px] px-2.5 py-3 text-left text-white/58 transition hover:bg-white/[0.045] hover:text-white active:scale-[0.99]"
+            >
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-white/[0.08] text-[10px] font-semibold text-white/36 group-hover:border-white/[0.14] group-hover:text-white/70">
+                {index + 1}
+              </span>
+
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-[13px] border border-white/[0.07] bg-white/[0.035] text-white/42 group-hover:text-white/78">
+                {row.icon}
+              </span>
+
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[14px] font-semibold tracking-[-0.045em]">
+                  {row.label}
+                </span>
+                <span className="mt-0.5 block truncate text-[11px] text-white/32">
+                  {row.description}
+                </span>
+              </span>
+
+              <ChevronRight className="size-4 shrink-0 text-white/24" />
+            </button>
+          ))}
+        </div>
+      </MiniCard>
+    </div>
+  );
+}
+
+function BookingSheet({
+  booking,
+  onClose,
+  onStatus,
+}: {
+  booking: Booking | null;
+  onClose: () => void;
+  onStatus: (bookingId: string, status: BookingStatus) => Promise<void>;
+}) {
+  const [updating, setUpdating] = useState<BookingStatus | null>(null);
+
+  if (!booking) return null;
+
+  async function update(status: BookingStatus) {
+    if (!booking) return;
+
+    setUpdating(status);
+    await onStatus(booking.id, status);
+    setUpdating(null);
+  }
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end bg-black/55 px-3 pb-[calc(var(--tg-safe-bottom,0px)+10px)] backdrop-blur-[8px]">
+      <div className="mx-auto w-full max-w-[430px] overflow-hidden rounded-[26px] border border-white/[0.10] bg-[#101010] shadow-[0_28px_90px_rgba(0,0,0,0.72)]">
+        <div className="flex items-start justify-between gap-4 border-b border-white/[0.08] p-4">
+          <div>
+            <MiniLabel>запись</MiniLabel>
+            <div className="mt-2 text-[26px] font-semibold leading-none tracking-[-0.075em]">
+              {booking.clientName}
+            </div>
+            <div className="mt-2 text-[12px] text-white/42">
+              {formatDayLabel(booking.date)}, {formatTime(booking.time)}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex size-9 items-center justify-center rounded-[13px] border border-white/[0.08] bg-white/[0.045] text-white/55"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="space-y-3 p-4">
+          <div className="rounded-[18px] border border-white/[0.08] bg-white/[0.035] p-3">
+            <div className="text-[11px] text-white/35">Услуга</div>
+            <div className="mt-1 text-[15px] font-semibold tracking-[-0.045em]">
+              {booking.service}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <MiniButton variant="accent" disabled={Boolean(updating)} onClick={() => void update('completed')}>
+              <CheckCircle2 className="size-4" />
+              Пришла
+            </MiniButton>
+            <MiniButton variant="secondary" disabled={Boolean(updating)} onClick={() => void update('confirmed')}>
+              <ShieldCheck className="size-4" />
+              Подтвердить
+            </MiniButton>
+            <MiniButton variant="secondary" disabled={Boolean(updating)} onClick={() => void update('new')}>
+              <Bell className="size-4" />
+              Новая
+            </MiniButton>
+            <MiniButton variant="danger" disabled={Boolean(updating)} onClick={() => void update('no_show')}>
+              <XCircle className="size-4" />
+              Не пришла
+            </MiniButton>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function MiniAppEntry() {
+  const {
+    hasHydrated,
+    ownedProfile,
+    bookings,
+    workspaceData,
+    saveProfile,
+    updateBookingStatus,
+    updateWorkspaceSection,
+    refreshWorkspace,
+    getPublicPath,
+  } = useApp();
+
+  const [screen, setScreen] = useState<MiniScreen>('today');
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [bootState, setBootState] = useState<'loading' | 'ready'>('loading');
+  const bootedRef = useRef(false);
+
+  const workspaceRecord = safeRecord(workspaceData);
+  const accent = getAccentFromWorkspace(workspaceRecord);
+
+  useEffect(() => {
+    if (bootedRef.current) return;
+    bootedRef.current = true;
+
+    let cancelled = false;
+
+    async function boot() {
+      try {
+        await authorizeTelegramMiniAppSession({
+          force: true,
+          waitMs: 2600,
+        });
+      } catch {
+        // Если Telegram initData недоступна, всё равно пробуем загрузить workspace по cookie/header.
+      }
+
+      await refreshWorkspace();
+
+      if (!cancelled) {
+        setBootState('ready');
+      }
+    }
+
+    void boot();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshWorkspace]);
+
+  if (!hasHydrated || bootState === 'loading') {
+    return <MiniLoading />;
+  }
+
+  if (!ownedProfile) {
+    return <MiniOnboarding onSave={saveProfile} />;
+  }
 
   return (
     <>
-      <Shell
-        light={light}
-        accent={accent}
-        profile={profile}
+      <MiniShell
         screen={screen}
         setScreen={setScreen}
-        refresh={() => void load()}
+        profile={ownedProfile}
+        onRefresh={() => void refreshWorkspace()}
+        accent={accent}
       >
         {screen === 'today' ? (
-          <TodayScreen
-            light={light}
-            profile={profile}
-            bookings={sortedBookings}
-            services={services}
-            week={week}
-            settings={settings}
-            setScreen={setScreen}
-            openBooking={setSelectedBooking}
-            openQuick={openQuick}
-            openChatForBooking={openChatForBooking}
-            publicUrl={publicUrl}
+          <TodayScreen bookings={bookings} onOpenBooking={setSelectedBooking} />
+        ) : null}
+
+        {screen === 'availability' ? (
+          <AvailabilityScreen
+            workspaceData={workspaceRecord}
+            updateWorkspaceSection={updateWorkspaceSection}
           />
         ) : null}
 
-        {screen === 'schedule' ? (
-          <ScheduleScreen
-            light={light}
-            workspaceId={workspaceId}
-            days={week}
-            bookings={bookings}
-            services={services}
-            setDays={setWeek}
-            reload={load}
+        {screen === 'chats' ? <ChatsScreen /> : null}
+
+        {screen === 'clients' ? (
+          <ClientsScreen bookings={bookings} onOpenBooking={setSelectedBooking} />
+        ) : null}
+
+        {screen === 'profile' ? (
+          <ProfileScreen
+            profile={ownedProfile}
+            onSave={saveProfile}
+            getPublicPath={getPublicPath}
           />
         ) : null}
 
         {screen === 'services' ? (
           <ServicesScreen
-            light={light}
-            profile={profile}
-            workspaceId={workspaceId}
-            services={services}
-            bookings={bookings}
-            setServices={setServices}
-            reload={load}
+            profile={ownedProfile}
+            workspaceData={workspaceRecord}
+            onSave={saveProfile}
+            updateWorkspaceSection={updateWorkspaceSection}
           />
         ) : null}
 
-        {screen === 'chats' ? (
-          <ChatsScreen
-            light={light}
-            threads={threads}
-            loading={threadsLoading}
-            openChat={openChat}
-            reloadChats={loadChats}
-          />
-        ) : null}
+        {screen === 'analytics' ? <AnalyticsScreen bookings={bookings} /> : null}
 
-        {screen === 'chat' ? (
-          <ChatDetailScreen
-            light={light}
-            thread={activeThread}
-            goBack={() => setScreen('chats')}
-            sendMessage={sendChatMessage}
-            reloadChats={loadChats}
-          />
-        ) : null}
-
-        {screen === 'more' ? (
-          <MoreScreen
-            light={light}
-            profile={profile}
-            clients={clients}
-            bookings={bookings}
-            services={services}
-            publicUrl={publicUrl}
-            setScreen={setScreen}
-          />
-        ) : null}
-
-        {screen === 'clients' ? (
-          <ClientsScreen
-            light={light}
-            clients={clients}
-            bookings={bookings}
-            openChatForClient={openChatForClient}
-            openQuick={openQuick}
-          />
-        ) : null}
-
-        {screen === 'analytics' ? (
-          <AnalyticsScreen
-            light={light}
-            bookings={bookings}
-            services={services}
-            clients={clients}
-          />
-        ) : null}
-
-        {screen === 'profile' ? (
-          <ProfileScreen
-            light={light}
-            profile={profile}
-            workspaceId={workspaceId}
-            publicUrl={publicUrl}
-            reload={load}
+        {screen === 'appearance' ? (
+          <AppearanceScreen
+            workspaceData={workspaceRecord}
+            updateWorkspaceSection={updateWorkspaceSection}
           />
         ) : null}
 
         {screen === 'settings' ? (
           <SettingsScreen
-            light={light}
-            workspaceId={workspaceId}
-            settings={settings}
-            setSettings={setSettings}
-            reload={load}
+            workspaceData={workspaceRecord}
+            updateWorkspaceSection={updateWorkspaceSection}
           />
         ) : null}
-      </Shell>
+
+        {screen === 'more' ? <MoreScreen setScreen={setScreen} /> : null}
+      </MiniShell>
 
       <BookingSheet
-        light={light}
         booking={selectedBooking}
-        services={services}
         onClose={() => setSelectedBooking(null)}
-        updateStatus={updateBookingStatus}
-        updateTransfer={updateTransfer}
-        offerTransfer={offerTransfer}
-        openChat={openChatForBooking}
-        openQuick={openQuick}
+        onStatus={updateBookingStatus}
       />
-
-      {quickOpen ? (
-        <QuickBookingSheet
-          key={`${quickPreset?.clientPhone || ''}-${quickPreset?.date || ''}-${quickPreset?.time || ''}-${quickPreset?.comment || ''}`}
-          light={light}
-          profile={profile}
-          services={services}
-          preset={quickPreset}
-          onClose={() => {
-            setQuickOpen(false);
-            setQuickPreset(undefined);
-          }}
-          reload={load}
-        />
-      ) : null}
     </>
   );
 }

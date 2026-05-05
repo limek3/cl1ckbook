@@ -6,5 +6,5 @@ R.c("server/chunks/4d4ea_@supabase_supabase-js_dist_index_mjs_80222416._.js")
 R.c("server/chunks/979b6_next_dist_esm_build_templates_app-route_f916a0f5.js")
 R.c("server/chunks/[root-of-the-server]__8ecb8e44._.js")
 R.c("server/chunks/_next-internal_server_app_api_vk_webhook_route_actions_1a30e9ce.js")
-R.m(3007)
-module.exports=R.m(3007).exports
+R.m(703007)
+module.exports=R.m(703007).exports

@@ -1,3 +1,3 @@
-module.exports=[93695,(a,b,c)=>{b.exports=a.x("next/dist/shared/lib/no-fallback-error.external.js",()=>require("next/dist/shared/lib/no-fallback-error.external.js"))},70864,a=>{a.n(a.i(33290))},43604,a=>{a.n(a.i(46899))},7907,a=>{a.n(a.i(66478))},45019,a=>{a.n(a.i(25284))},42523,a=>{a.n(a.i(43199))},14085,a=>{"use strict";a.i(28820);var b=a.i(69799);function c(){(0,b.redirect)("/about")}a.s(["default",()=>c])}];
+module.exports=[193695,(a,b,c)=>{b.exports=a.x("next/dist/shared/lib/no-fallback-error.external.js",()=>require("next/dist/shared/lib/no-fallback-error.external.js"))},70864,a=>{a.n(a.i(233290))},243604,a=>{a.n(a.i(446899))},7907,a=>{a.n(a.i(666478))},45019,a=>{a.n(a.i(725284))},142523,a=>{a.n(a.i(543199))},14085,a=>{"use strict";a.i(828820);var b=a.i(369799);function c(){(0,b.redirect)("/about")}a.s(["default",()=>c])}];
 
 //# sourceMappingURL=%5Broot-of-the-server%5D__d1c94872._.js.map

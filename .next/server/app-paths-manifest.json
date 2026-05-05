@@ -53,6 +53,7 @@
   "/login/page": "app/login/page.js",
   "/m/[slug]/page": "app/m/[slug]/page.js",
   "/m/[slug]/review/page": "app/m/[slug]/review/page.js",
+  "/miniapp/page": "app/miniapp/page.js",
   "/page": "app/page.js",
   "/preview/page": "app/preview/page.js",
   "/prewie/page": "app/prewie/page.js",

@@ -1,0 +1,3737 @@
+[00:00:00.909] Server  LOG     ✓ Ready in 635ms
+[00:00:03.911] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:06.332] Browser ERROR   uncaughtError: Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+      <LoadingBoundary name="miniapp/" loading={null}>
+        <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/miniapp" tree={[...]} params={{}} cacheNode={{rsc:<Fragment>, ...}} ...>
+                <SegmentViewNode type="page" pagePath="miniapp/pa...">
+                  <SegmentTrieNode>
+                  <ClientPageRoot Component={function MiniAppPage} serverProvidedParams={{...}}>
+                    <MiniAppPage params={Promise} searchParams={Promise}>
+                      <MiniApp mode="light">
+                        <ThemeProvider initialMode="light">
+                          <MiniAppInner initialTab="home" initialSub={null}>
+                            <div
+                              style={{
++                               width: "100%"
+-                               width: "100%"
++                               maxWidth: 390
++                               height: "100dvh"
+-                               height: "100dvh"
++                               background: "#fafaf9"
++                               color: "#0a0a0a"
+-                               color: "rgb(250, 250, 250)"
++                               display: "flex"
+-                               display: "flex"
++                               flexDirection: "column"
++                               fontFamily: "'Inter', -apple-system, system-ui, sans-serif"
++                               overflow: "hidden"
++                               margin: "0 auto"
++                               transition: "background 0.2s, color 0.2s"
+-                               max-width: "390px"
+-                               background-color: "rgb(10, 10, 10)"
+-                               background-position-x: "0%"
+-                               background-position-y: "0%"
+-                               background-repeat: "repeat"
+-                               background-attachment: "scroll"
+-                               background-image: "none"
+-                               background-size: "auto"
+-                               background-origin: "padding-box"
+-                               background-clip: "border-box"
+-                               flex-direction: "column"
+-                               font-family: "\"Inter\", -apple-system, system-ui, sans-serif"
+-                               overflow-x: "hidden"
+-                               overflow-y: "hidden"
+-                               margin-top: "0px"
+-                               margin-right: "auto"
+-                               margin-bottom: "0px"
+-                               margin-left: "auto"
+-                               transition-property: "background, color"
+-                               transition-duration: "0.2s, 0.2s"
+-                               transition-timing-function: "ease, ease"
+-                               transition-delay: "0s, 0s"
+-                               transition-behavior: "normal, normal"
+                              }}
+                            >
+                              <TgHeader onToggleTheme={function ThemeProvider.useMemo[value]}>
+                                <div
+                                  style={{
++                                   flexShrink: 0
++                                   padding: "10px 16px"
++                                   display: "flex"
+-                                   display: "flex"
++                                   alignItems: "center"
++                                   justifyContent: "space-between"
++                                   background: "#fafaf9"
++                                   borderBottom: "1px solid rgba(10,10,10,0.06)"
+-                                   flex-shrink: "0"
+-                                   padding-top: "10px"
+-                                   padding-right: "16px"
+-                                   padding-bottom: "10px"
+-                                   padding-left: "16px"
+-                                   align-items: "center"
+-                                   justify-content: "space-between"
+-                                   background-color: "rgb(10, 10, 10)"
+-                                   background-position-x: "0%"
+-                                   background-position-y: "0%"
+-                                   background-repeat: "repeat"
+-                                   background-attachment: "scroll"
+-                                   background-image: "none"
+-                                   background-size: "auto"
+-                                   background-origin: "padding-box"
+-                                   background-clip: "border-box"
+-                                   border-bottom-width: "1px"
+-                                   border-bottom-style: "solid"
+-                                   border-bottom-color: "rgba(255, 255, 255, 0.06)"
+                                  }}
+                                >
+                                  <div style={{display:"flex", ...}}>
+                                    <div
+                                      style={{
++                                       width: 28
+-                                       width: "28px"
++                                       height: 28
+-                                       height: "28px"
++                                       borderRadius: 8
++                                       background: "#ffffff"
++                                       border: "1px solid rgba(10,10,10,0.06)"
++                                       display: "flex"
+-                                       display: "flex"
++                                       alignItems: "center"
++                                       justifyContent: "center"
++                                       fontSize: 11
++                                       color: "#0a0a0a"
+-                                       color: "rgb(250, 250, 250)"
++                                       fontWeight: 600
+-                                       border-top-left-radius: "8px"
+-                                       border-top-right-radius: "8px"
+-                                       border-bottom-right-radius: "8px"
+-                                       border-bottom-left-radius: "8px"
+-                                       background-color: "rgb(20, 20, 20)"
+-                                       background-position-x: "0%"
+-                                       background-position-y: "0%"
+-                                       background-repeat: "repeat"
+-                                       background-attachment: "scroll"
+-                                       background-image: "none"
+-                                       background-size: "auto"
+-                                       background-origin: "padding-box"
+-                                       background-clip: "border-box"
+-                                       border-top-width: "1px"
+-                                       border-top-style: "solid"
+-                                       border-top-color: "rgba(255, 255, 255, 0.06)"
+-                                       border-right-width: "1px"
+-                                       border-right-style: "solid"
+-                                       border-right-color: "rgba(255, 255, 255, 0.06)"
+-                                       border-bottom-width: "1px"
+-                                       border-bottom-style: "solid"
+-                                       border-bottom-color: "rgba(255, 255, 255, 0.06)"
+-                                       border-left-width: "1px"
+-                                       border-left-style: "solid"
+-                                       border-left-color: "rgba(255, 255, 255, 0.06)"
+-                                       border-image-outset: "0"
+-                                       border-image-repeat: "stretch"
+-                                       border-image-slice: "100%"
+-                                       border-image-source: "none"
+-                                       border-image-width: "1"
+-                                       align-items: "center"
+-                                       justify-content: "center"
+-                                       font-size: "11px"
+-                                       font-weight: "600"
+                                      }}
+                                    >
++                                     К
+                                    <div>
+                                      <div
+                                        style={{
++                                         fontSize: 13
++                                         fontWeight: 500
++                                         color: "#0a0a0a"
+-                                         color: "rgb(250, 250, 250)"
++                                         lineHeight: 1.1
+-                                         font-size: "13px"
+-                                         font-weight: "500"
+-                                         line-height: "1.1"
+                                        }}
+                                      >
++                                       КликБук
+                                      <div
+                                        style={{
++                                         fontSize: 10
++                                         color: "rgba(10,10,10,0.3)"
+-                                         color: "rgba(250, 250, 250, 0.3)"
++                                         marginTop: 1
+-                                         font-size: "10px"
+-                                         margin-top: "1px"
+                                        }}
+                                      >
++                                       mini app
+                                  <div style={{display:"flex", ...}}>
+                                    <button
+                                      onClick={function ThemeProvider.useMemo[value]}
+                                      aria-label="theme"
+                                      style={{
++                                       width: 32
+-                                       width: "32px"
++                                       height: 32
+-                                       height: "32px"
++                                       background: "transparent"
++                                       border: "none"
++                                       cursor: "pointer"
+-                                       cursor: "pointer"
++                                       color: "rgba(10,10,10,0.5)"
+-                                       color: "rgba(250, 250, 250, 0.5)"
++                                       padding: 0
++                                       display: "flex"
+-                                       display: "flex"
++                                       alignItems: "center"
++                                       justifyContent: "center"
+-                                       background-color: "transparent"
+-                                       background-position-x: "0%"
+-                                       background-position-y: "0%"
+-                                       background-repeat: "repeat"
+-                                       background-attachment: "scroll"
+-                                       background-image: "none"
+-                                       background-size: "auto"
+-                                       background-origin: "padding-box"
+-                                       background-clip: "border-box"
+-                                       border-top-width: "medium"
+-                                       border-top-style: "none"
+-                                       border-top-color: "currentcolor"
+-                                       border-right-width: "medium"
+-                                       border-right-style: "none"
+-                                       border-right-color: "currentcolor"
+-                                       border-bottom-width: "medium"
+-                                       border-bottom-style: "none"
+-                                       border-bottom-color: "currentcolor"
+-                                       border-left-width: "medium"
+-                                       border-left-style: "none"
+-                                       border-left-color: "currentcolor"
+-                                       border-image-outset: "0"
+-                                       border-image-repeat: "stretch"
+-                                       border-image-slice: "100%"
+-                                       border-image-source: "none"
+-                                       border-image-width: "1"
+-                                       padding-top: "0px"
+-                                       padding-right: "0px"
+-                                       padding-bottom: "0px"
+-                                       padding-left: "0px"
+-                                       align-items: "center"
+-                                       justify-content: "center"
+                                      }}
+                                    >
+                                      <Icon name="moon" size={16}>
+                                        <Moon size={16} strokeWidth={1.5} color="currentColor">
+                                          <svg
+                                            ref={null}
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            width={16}
+                                            height={16}
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth={1.5}
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
++                                           className="lucide lucide-moon"
+-                                           className="lucide lucide-sun"
+                                            aria-hidden="true"
+                                          >
++                                           <path
++                                             d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0..."
++                                           >
+-                                           <circle cx="12" cy="12" r="4">
+                                    ...
+                              ...
+                ...
+              ...
+
+[00:00:06.332] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[00:00:06.332] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[00:00:06.332] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[00:00:06.332] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[00:00:06.332] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[00:00:06.333] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[00:00:06.333] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[00:00:06.333] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[00:00:06.333] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[00:00:06.333] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[00:00:06.333] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[00:00:06.333] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[00:00:06.333] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[00:00:06.333] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[00:00:06.333] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[00:00:06.333] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[00:00:06.333] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[00:00:06.333] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[00:00:06.333] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[00:00:06.333] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[00:00:06.333] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[00:00:06.333] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[00:00:06.333] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[00:00:06.333] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:07.619] Server  ERROR   ⨯ ./components/mini/screens/analytics.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Pill, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | export function AnalyticsScreen({ back }: { back: () => void }) {
+  11 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/analytics.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/analytics.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.624] Server  ERROR   ⨯ ./components/mini/screens/analytics.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Pill, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | export function AnalyticsScreen({ back }: { back: () => void }) {
+  11 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/analytics.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/analytics.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.627] Server  ERROR   ⨯ ./components/mini/screens/analytics.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Pill, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | export function AnalyticsScreen({ back }: { back: () => void }) {
+  11 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/analytics.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/analytics.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.630] Server  ERROR   ⨯ ./components/mini/screens/analytics.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Pill, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | export function AnalyticsScreen({ back }: { back: () => void }) {
+  11 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/analytics.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/analytics.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.633] Server  ERROR   ⨯ ./components/mini/screens/appointments.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { FieldLabel, NavBtn, StatusDot, Icon } from '../primitives/atoms';
+   6 | import { type Appointment } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function AppointmentsScreen({ openAppt }: { openAppt?: (a: Appointment) => void }) {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/appointments.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/appointments.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.636] Server  ERROR   ⨯ ./components/mini/screens/appointments.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { FieldLabel, NavBtn, StatusDot, Icon } from '../primitives/atoms';
+   6 | import { type Appointment } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function AppointmentsScreen({ openAppt }: { openAppt?: (a: Appointment) => void }) {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/appointments.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/appointments.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.638] Server  ERROR   ⨯ ./components/mini/screens/appointments.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { FieldLabel, NavBtn, StatusDot, Icon } from '../primitives/atoms';
+   6 | import { type Appointment } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function AppointmentsScreen({ openAppt }: { openAppt?: (a: Appointment) => void }) {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/appointments.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/appointments.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.641] Server  ERROR   ⨯ ./components/mini/screens/appointments.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { FieldLabel, NavBtn, StatusDot, Icon } from '../primitives/atoms';
+   6 | import { type Appointment } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function AppointmentsScreen({ openAppt }: { openAppt?: (a: Appointment) => void }) {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/appointments.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/appointments.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.643] Server  ERROR   ⨯ ./components/mini/screens/clients.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, Avatar, Icon } from '../primitives/atoms';
+   6 | import { type Client } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ClientsScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/clients.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/clients.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.645] Server  ERROR   ⨯ ./components/mini/screens/clients.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, Avatar, Icon } from '../primitives/atoms';
+   6 | import { type Client } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ClientsScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/clients.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/clients.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.648] Server  ERROR   ⨯ ./components/mini/screens/clients.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, Avatar, Icon } from '../primitives/atoms';
+   6 | import { type Client } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ClientsScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/clients.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/clients.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.649] Server  ERROR   ⨯ ./components/mini/screens/clients.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, Avatar, Icon } from '../primitives/atoms';
+   6 | import { type Client } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ClientsScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/clients.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/clients.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.651] Server  ERROR   ⨯ ./components/mini/screens/home.tsx:9:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   7 | } from '../primitives/atoms';
+   8 | import { type Appointment, type Service } from '@/lib/mini-demo';
+>  9 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  10 |
+  11 | export function HomeScreen({ go }: { go: (kind: string) => void }) {
+  12 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/home.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/home.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.655] Server  ERROR   ⨯ ./components/mini/screens/home.tsx:9:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   7 | } from '../primitives/atoms';
+   8 | import { type Appointment, type Service } from '@/lib/mini-demo';
+>  9 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  10 |
+  11 | export function HomeScreen({ go }: { go: (kind: string) => void }) {
+  12 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/home.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/home.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.659] Server  ERROR   ⨯ ./components/mini/screens/home.tsx:9:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   7 | } from '../primitives/atoms';
+   8 | import { type Appointment, type Service } from '@/lib/mini-demo';
+>  9 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  10 |
+  11 | export function HomeScreen({ go }: { go: (kind: string) => void }) {
+  12 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/home.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/home.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.662] Server  ERROR   ⨯ ./components/mini/screens/home.tsx:9:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   7 | } from '../primitives/atoms';
+   8 | import { type Appointment, type Service } from '@/lib/mini-demo';
+>  9 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  10 |
+  11 | export function HomeScreen({ go }: { go: (kind: string) => void }) {
+  12 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/home.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/home.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.664] Server  ERROR   ⨯ ./components/mini/screens/more.tsx:6:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+  4 | import { useTheme } from '../theme';
+  5 | import { Card, Avatar, ListRow, Divider, SectionTitle } from '../primitives/atoms';
+> 6 | import { useMiniData } from '@/hooks/use-mini-data';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  7 |
+  8 | interface MenuItem {
+  9 |   icon: string;
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/more.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/more.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.666] Server  ERROR   ⨯ ./components/mini/screens/more.tsx:6:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+  4 | import { useTheme } from '../theme';
+  5 | import { Card, Avatar, ListRow, Divider, SectionTitle } from '../primitives/atoms';
+> 6 | import { useMiniData } from '@/hooks/use-mini-data';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  7 |
+  8 | interface MenuItem {
+  9 |   icon: string;
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/more.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/more.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.667] Server  ERROR   ⨯ ./components/mini/screens/more.tsx:6:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+  4 | import { useTheme } from '../theme';
+  5 | import { Card, Avatar, ListRow, Divider, SectionTitle } from '../primitives/atoms';
+> 6 | import { useMiniData } from '@/hooks/use-mini-data';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  7 |
+  8 | interface MenuItem {
+  9 |   icon: string;
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/more.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/more.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.669] Server  ERROR   ⨯ ./components/mini/screens/more.tsx:6:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+  4 | import { useTheme } from '../theme';
+  5 | import { Card, Avatar, ListRow, Divider, SectionTitle } from '../primitives/atoms';
+> 6 | import { useMiniData } from '@/hooks/use-mini-data';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  7 |
+  8 | interface MenuItem {
+  9 |   icon: string;
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/more.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/more.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.671] Server  ERROR   ⨯ ./components/mini/screens/services.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, NeutralBtn } from '../primitives/atoms';
+   6 | import { type Service } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ServicesScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/services.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/services.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.672] Server  ERROR   ⨯ ./components/mini/screens/services.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, NeutralBtn } from '../primitives/atoms';
+   6 | import { type Service } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ServicesScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/services.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/services.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.672] Server  ERROR   ⨯ ./components/mini/screens/services.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, NeutralBtn } from '../primitives/atoms';
+   6 | import { type Service } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ServicesScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/services.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/services.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.674] Server  ERROR   ⨯ ./components/mini/screens/services.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, NeutralBtn } from '../primitives/atoms';
+   6 | import { type Service } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ServicesScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/services.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/services.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.681] Server  ERROR   ⨯ ./components/mini/screens/settings.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Avatar, Toggle, Icon, NeutralBtn, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | // ─── Profile ────────────────────────────────
+  11 | export function ProfileScreen({ back }: { back: () => void }) {
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/settings.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/settings.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.688] Server  ERROR   ⨯ ./components/mini/screens/settings.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Avatar, Toggle, Icon, NeutralBtn, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | // ─── Profile ────────────────────────────────
+  11 | export function ProfileScreen({ back }: { back: () => void }) {
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/settings.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/settings.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.694] Server  ERROR   ⨯ ./components/mini/screens/settings.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Avatar, Toggle, Icon, NeutralBtn, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | // ─── Profile ────────────────────────────────
+  11 | export function ProfileScreen({ back }: { back: () => void }) {
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/settings.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/settings.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.700] Server  ERROR   ⨯ ./components/mini/screens/settings.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Avatar, Toggle, Icon, NeutralBtn, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | // ─── Profile ────────────────────────────────
+  11 | export function ProfileScreen({ back }: { back: () => void }) {
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/settings.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/settings.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.752] Server  ERROR   ⨯ ./components/mini/screens/analytics.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Pill, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | export function AnalyticsScreen({ back }: { back: () => void }) {
+  11 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/analytics.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/analytics.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.755] Server  ERROR   ⨯ ./components/mini/screens/analytics.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Pill, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | export function AnalyticsScreen({ back }: { back: () => void }) {
+  11 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/analytics.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/analytics.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.756] Server  ERROR   ⨯ ./components/mini/screens/analytics.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Pill, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | export function AnalyticsScreen({ back }: { back: () => void }) {
+  11 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/analytics.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/analytics.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.759] Server  ERROR   ⨯ ./components/mini/screens/analytics.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Pill, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | export function AnalyticsScreen({ back }: { back: () => void }) {
+  11 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/analytics.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/analytics.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.760] Server  ERROR   ⨯ ./components/mini/screens/appointments.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { FieldLabel, NavBtn, StatusDot, Icon } from '../primitives/atoms';
+   6 | import { type Appointment } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function AppointmentsScreen({ openAppt }: { openAppt?: (a: Appointment) => void }) {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/appointments.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/appointments.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.762] Server  ERROR   ⨯ ./components/mini/screens/appointments.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { FieldLabel, NavBtn, StatusDot, Icon } from '../primitives/atoms';
+   6 | import { type Appointment } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function AppointmentsScreen({ openAppt }: { openAppt?: (a: Appointment) => void }) {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/appointments.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/appointments.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.763] Server  ERROR   ⨯ ./components/mini/screens/appointments.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { FieldLabel, NavBtn, StatusDot, Icon } from '../primitives/atoms';
+   6 | import { type Appointment } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function AppointmentsScreen({ openAppt }: { openAppt?: (a: Appointment) => void }) {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/appointments.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/appointments.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.766] Server  ERROR   ⨯ ./components/mini/screens/appointments.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { FieldLabel, NavBtn, StatusDot, Icon } from '../primitives/atoms';
+   6 | import { type Appointment } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function AppointmentsScreen({ openAppt }: { openAppt?: (a: Appointment) => void }) {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/appointments.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/appointments.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.768] Server  ERROR   ⨯ ./components/mini/screens/clients.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, Avatar, Icon } from '../primitives/atoms';
+   6 | import { type Client } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ClientsScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/clients.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/clients.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.769] Server  ERROR   ⨯ ./components/mini/screens/clients.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, Avatar, Icon } from '../primitives/atoms';
+   6 | import { type Client } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ClientsScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/clients.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/clients.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.771] Server  ERROR   ⨯ ./components/mini/screens/clients.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, Avatar, Icon } from '../primitives/atoms';
+   6 | import { type Client } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ClientsScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/clients.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/clients.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.772] Server  ERROR   ⨯ ./components/mini/screens/clients.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, Avatar, Icon } from '../primitives/atoms';
+   6 | import { type Client } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ClientsScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/clients.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/clients.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.774] Server  ERROR   ⨯ ./components/mini/screens/home.tsx:9:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   7 | } from '../primitives/atoms';
+   8 | import { type Appointment, type Service } from '@/lib/mini-demo';
+>  9 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  10 |
+  11 | export function HomeScreen({ go }: { go: (kind: string) => void }) {
+  12 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/home.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/home.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.777] Server  ERROR   ⨯ ./components/mini/screens/home.tsx:9:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   7 | } from '../primitives/atoms';
+   8 | import { type Appointment, type Service } from '@/lib/mini-demo';
+>  9 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  10 |
+  11 | export function HomeScreen({ go }: { go: (kind: string) => void }) {
+  12 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/home.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/home.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.780] Server  ERROR   ⨯ ./components/mini/screens/home.tsx:9:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   7 | } from '../primitives/atoms';
+   8 | import { type Appointment, type Service } from '@/lib/mini-demo';
+>  9 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  10 |
+  11 | export function HomeScreen({ go }: { go: (kind: string) => void }) {
+  12 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/home.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/home.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.784] Server  ERROR   ⨯ ./components/mini/screens/home.tsx:9:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   7 | } from '../primitives/atoms';
+   8 | import { type Appointment, type Service } from '@/lib/mini-demo';
+>  9 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  10 |
+  11 | export function HomeScreen({ go }: { go: (kind: string) => void }) {
+  12 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/home.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/home.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.786] Server  ERROR   ⨯ ./components/mini/screens/more.tsx:6:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+  4 | import { useTheme } from '../theme';
+  5 | import { Card, Avatar, ListRow, Divider, SectionTitle } from '../primitives/atoms';
+> 6 | import { useMiniData } from '@/hooks/use-mini-data';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  7 |
+  8 | interface MenuItem {
+  9 |   icon: string;
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/more.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/more.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.787] Server  ERROR   ⨯ ./components/mini/screens/more.tsx:6:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+  4 | import { useTheme } from '../theme';
+  5 | import { Card, Avatar, ListRow, Divider, SectionTitle } from '../primitives/atoms';
+> 6 | import { useMiniData } from '@/hooks/use-mini-data';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  7 |
+  8 | interface MenuItem {
+  9 |   icon: string;
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/more.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/more.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.789] Server  ERROR   ⨯ ./components/mini/screens/more.tsx:6:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+  4 | import { useTheme } from '../theme';
+  5 | import { Card, Avatar, ListRow, Divider, SectionTitle } from '../primitives/atoms';
+> 6 | import { useMiniData } from '@/hooks/use-mini-data';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  7 |
+  8 | interface MenuItem {
+  9 |   icon: string;
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/more.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/more.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.790] Server  ERROR   ⨯ ./components/mini/screens/more.tsx:6:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+  4 | import { useTheme } from '../theme';
+  5 | import { Card, Avatar, ListRow, Divider, SectionTitle } from '../primitives/atoms';
+> 6 | import { useMiniData } from '@/hooks/use-mini-data';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  7 |
+  8 | interface MenuItem {
+  9 |   icon: string;
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/more.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/more.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.791] Server  ERROR   ⨯ ./components/mini/screens/services.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, NeutralBtn } from '../primitives/atoms';
+   6 | import { type Service } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ServicesScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/services.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/services.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.792] Server  ERROR   ⨯ ./components/mini/screens/services.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, NeutralBtn } from '../primitives/atoms';
+   6 | import { type Service } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ServicesScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/services.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/services.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.793] Server  ERROR   ⨯ ./components/mini/screens/services.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, NeutralBtn } from '../primitives/atoms';
+   6 | import { type Service } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ServicesScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/services.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/services.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.795] Server  ERROR   ⨯ ./components/mini/screens/services.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, NeutralBtn } from '../primitives/atoms';
+   6 | import { type Service } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ServicesScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/services.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/services.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.800] Server  ERROR   ⨯ ./components/mini/screens/settings.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Avatar, Toggle, Icon, NeutralBtn, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | // ─── Profile ────────────────────────────────
+  11 | export function ProfileScreen({ back }: { back: () => void }) {
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/settings.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/settings.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.805] Server  ERROR   ⨯ ./components/mini/screens/settings.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Avatar, Toggle, Icon, NeutralBtn, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | // ─── Profile ────────────────────────────────
+  11 | export function ProfileScreen({ back }: { back: () => void }) {
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/settings.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/settings.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.811] Server  ERROR   ⨯ ./components/mini/screens/settings.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Avatar, Toggle, Icon, NeutralBtn, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | // ─── Profile ────────────────────────────────
+  11 | export function ProfileScreen({ back }: { back: () => void }) {
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/settings.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/settings.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.815] Server  ERROR   ⨯ ./components/mini/screens/settings.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Avatar, Toggle, Icon, NeutralBtn, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | // ─── Profile ────────────────────────────────
+  11 | export function ProfileScreen({ back }: { back: () => void }) {
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/settings.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/settings.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.819] Server  ERROR   ⨯ ./components/mini/screens/analytics.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Pill, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | export function AnalyticsScreen({ back }: { back: () => void }) {
+  11 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/analytics.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/analytics.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.822] Server  ERROR   ⨯ ./components/mini/screens/analytics.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Pill, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | export function AnalyticsScreen({ back }: { back: () => void }) {
+  11 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/analytics.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/analytics.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.823] Server  ERROR   ⨯ ./components/mini/screens/analytics.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Pill, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | export function AnalyticsScreen({ back }: { back: () => void }) {
+  11 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/analytics.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/analytics.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.825] Server  ERROR   ⨯ ./components/mini/screens/analytics.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Pill, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | export function AnalyticsScreen({ back }: { back: () => void }) {
+  11 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/analytics.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/analytics.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.827] Server  ERROR   ⨯ ./components/mini/screens/appointments.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { FieldLabel, NavBtn, StatusDot, Icon } from '../primitives/atoms';
+   6 | import { type Appointment } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function AppointmentsScreen({ openAppt }: { openAppt?: (a: Appointment) => void }) {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/appointments.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/appointments.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.828] Server  ERROR   ⨯ ./components/mini/screens/appointments.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { FieldLabel, NavBtn, StatusDot, Icon } from '../primitives/atoms';
+   6 | import { type Appointment } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function AppointmentsScreen({ openAppt }: { openAppt?: (a: Appointment) => void }) {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/appointments.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/appointments.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.829] Server  ERROR   ⨯ ./components/mini/screens/appointments.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { FieldLabel, NavBtn, StatusDot, Icon } from '../primitives/atoms';
+   6 | import { type Appointment } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function AppointmentsScreen({ openAppt }: { openAppt?: (a: Appointment) => void }) {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/appointments.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/appointments.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.831] Server  ERROR   ⨯ ./components/mini/screens/appointments.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { FieldLabel, NavBtn, StatusDot, Icon } from '../primitives/atoms';
+   6 | import { type Appointment } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function AppointmentsScreen({ openAppt }: { openAppt?: (a: Appointment) => void }) {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/appointments.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/appointments.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.833] Server  ERROR   ⨯ ./components/mini/screens/clients.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, Avatar, Icon } from '../primitives/atoms';
+   6 | import { type Client } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ClientsScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/clients.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/clients.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.835] Server  ERROR   ⨯ ./components/mini/screens/clients.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, Avatar, Icon } from '../primitives/atoms';
+   6 | import { type Client } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ClientsScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/clients.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/clients.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.836] Server  ERROR   ⨯ ./components/mini/screens/clients.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, Avatar, Icon } from '../primitives/atoms';
+   6 | import { type Client } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ClientsScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/clients.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/clients.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.837] Server  ERROR   ⨯ ./components/mini/screens/clients.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, Avatar, Icon } from '../primitives/atoms';
+   6 | import { type Client } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ClientsScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/clients.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/clients.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.839] Server  ERROR   ⨯ ./components/mini/screens/home.tsx:9:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   7 | } from '../primitives/atoms';
+   8 | import { type Appointment, type Service } from '@/lib/mini-demo';
+>  9 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  10 |
+  11 | export function HomeScreen({ go }: { go: (kind: string) => void }) {
+  12 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/home.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/home.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.842] Server  ERROR   ⨯ ./components/mini/screens/home.tsx:9:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   7 | } from '../primitives/atoms';
+   8 | import { type Appointment, type Service } from '@/lib/mini-demo';
+>  9 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  10 |
+  11 | export function HomeScreen({ go }: { go: (kind: string) => void }) {
+  12 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/home.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/home.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.844] Server  ERROR   ⨯ ./components/mini/screens/home.tsx:9:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   7 | } from '../primitives/atoms';
+   8 | import { type Appointment, type Service } from '@/lib/mini-demo';
+>  9 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  10 |
+  11 | export function HomeScreen({ go }: { go: (kind: string) => void }) {
+  12 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/home.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/home.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.847] Server  ERROR   ⨯ ./components/mini/screens/home.tsx:9:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   7 | } from '../primitives/atoms';
+   8 | import { type Appointment, type Service } from '@/lib/mini-demo';
+>  9 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  10 |
+  11 | export function HomeScreen({ go }: { go: (kind: string) => void }) {
+  12 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/home.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/home.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.848] Server  ERROR   ⨯ ./components/mini/screens/more.tsx:6:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+  4 | import { useTheme } from '../theme';
+  5 | import { Card, Avatar, ListRow, Divider, SectionTitle } from '../primitives/atoms';
+> 6 | import { useMiniData } from '@/hooks/use-mini-data';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  7 |
+  8 | interface MenuItem {
+  9 |   icon: string;
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/more.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/more.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.849] Server  ERROR   ⨯ ./components/mini/screens/more.tsx:6:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+  4 | import { useTheme } from '../theme';
+  5 | import { Card, Avatar, ListRow, Divider, SectionTitle } from '../primitives/atoms';
+> 6 | import { useMiniData } from '@/hooks/use-mini-data';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  7 |
+  8 | interface MenuItem {
+  9 |   icon: string;
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/more.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/more.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.851] Server  ERROR   ⨯ ./components/mini/screens/more.tsx:6:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+  4 | import { useTheme } from '../theme';
+  5 | import { Card, Avatar, ListRow, Divider, SectionTitle } from '../primitives/atoms';
+> 6 | import { useMiniData } from '@/hooks/use-mini-data';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  7 |
+  8 | interface MenuItem {
+  9 |   icon: string;
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/more.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/more.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.852] Server  ERROR   ⨯ ./components/mini/screens/more.tsx:6:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+  4 | import { useTheme } from '../theme';
+  5 | import { Card, Avatar, ListRow, Divider, SectionTitle } from '../primitives/atoms';
+> 6 | import { useMiniData } from '@/hooks/use-mini-data';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  7 |
+  8 | interface MenuItem {
+  9 |   icon: string;
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/more.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/more.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.853] Server  ERROR   ⨯ ./components/mini/screens/services.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, NeutralBtn } from '../primitives/atoms';
+   6 | import { type Service } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ServicesScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/services.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/services.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.854] Server  ERROR   ⨯ ./components/mini/screens/services.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, NeutralBtn } from '../primitives/atoms';
+   6 | import { type Service } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ServicesScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/services.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/services.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.855] Server  ERROR   ⨯ ./components/mini/screens/services.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, NeutralBtn } from '../primitives/atoms';
+   6 | import { type Service } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ServicesScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/services.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/services.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.856] Server  ERROR   ⨯ ./components/mini/screens/services.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, NeutralBtn } from '../primitives/atoms';
+   6 | import { type Service } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ServicesScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/services.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/services.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.861] Server  ERROR   ⨯ ./components/mini/screens/settings.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Avatar, Toggle, Icon, NeutralBtn, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | // ─── Profile ────────────────────────────────
+  11 | export function ProfileScreen({ back }: { back: () => void }) {
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/settings.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/settings.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.865] Server  ERROR   ⨯ ./components/mini/screens/settings.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Avatar, Toggle, Icon, NeutralBtn, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | // ─── Profile ────────────────────────────────
+  11 | export function ProfileScreen({ back }: { back: () => void }) {
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/settings.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/settings.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.868] Server  ERROR   ⨯ ./components/mini/screens/settings.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Avatar, Toggle, Icon, NeutralBtn, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | // ─── Profile ────────────────────────────────
+  11 | export function ProfileScreen({ back }: { back: () => void }) {
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/settings.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/settings.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.873] Server  ERROR   ⨯ ./components/mini/screens/settings.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Avatar, Toggle, Icon, NeutralBtn, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | // ─── Profile ────────────────────────────────
+  11 | export function ProfileScreen({ back }: { back: () => void }) {
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/settings.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/settings.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+[01:46:07.885] Server  LOG     ✓ Compiled in 689ms
+[01:46:08.069] Browser ERROR   ./components/mini/screens/analytics.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Pill, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | export function AnalyticsScreen({ back }: { back: () => void }) {
+  11 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/analytics.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/analytics.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+[01:46:08.069] Browser ERROR   ./components/mini/screens/appointments.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { FieldLabel, NavBtn, StatusDot, Icon } from '../primitives/atoms';
+   6 | import { type Appointment } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function AppointmentsScreen({ openAppt }: { openAppt?: (a: Appointment) => void }) {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/appointments.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/appointments.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+[01:46:08.069] Browser ERROR   ./components/mini/screens/clients.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, Avatar, Icon } from '../primitives/atoms';
+   6 | import { type Client } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ClientsScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/clients.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/clients.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+[01:46:08.069] Browser ERROR   ./components/mini/screens/home.tsx:9:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   7 | } from '../primitives/atoms';
+   8 | import { type Appointment, type Service } from '@/lib/mini-demo';
+>  9 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  10 |
+  11 | export function HomeScreen({ go }: { go: (kind: string) => void }) {
+  12 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/home.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/home.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+[01:46:08.069] Browser ERROR   ./components/mini/screens/more.tsx:6:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+  4 | import { useTheme } from '../theme';
+  5 | import { Card, Avatar, ListRow, Divider, SectionTitle } from '../primitives/atoms';
+> 6 | import { useMiniData } from '@/hooks/use-mini-data';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  7 |
+  8 | interface MenuItem {
+  9 |   icon: string;
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/more.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/more.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+[01:46:08.069] Browser ERROR   ./components/mini/screens/services.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, NeutralBtn } from '../primitives/atoms';
+   6 | import { type Service } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ServicesScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/services.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/services.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+[01:46:08.069] Browser ERROR   ./components/mini/screens/settings.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Avatar, Toggle, Icon, NeutralBtn, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | // ─── Profile ────────────────────────────────
+  11 | export function ProfileScreen({ back }: { back: () => void }) {
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/settings.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/settings.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+[01:46:26.373] Browser ERROR   ./components/mini/screens/analytics.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Pill, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | export function AnalyticsScreen({ back }: { back: () => void }) {
+  11 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/analytics.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/analytics.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+[01:46:26.373] Browser ERROR   ./components/mini/screens/appointments.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { FieldLabel, NavBtn, StatusDot, Icon } from '../primitives/atoms';
+   6 | import { type Appointment } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function AppointmentsScreen({ openAppt }: { openAppt?: (a: Appointment) => void }) {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/appointments.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/appointments.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+[01:46:26.373] Browser ERROR   ./components/mini/screens/clients.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, Avatar, Icon } from '../primitives/atoms';
+   6 | import { type Client } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ClientsScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/clients.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/clients.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+[01:46:26.373] Browser ERROR   ./components/mini/screens/home.tsx:9:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   7 | } from '../primitives/atoms';
+   8 | import { type Appointment, type Service } from '@/lib/mini-demo';
+>  9 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  10 |
+  11 | export function HomeScreen({ go }: { go: (kind: string) => void }) {
+  12 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/home.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/home.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+[01:46:26.373] Browser ERROR   ./components/mini/screens/more.tsx:6:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+  4 | import { useTheme } from '../theme';
+  5 | import { Card, Avatar, ListRow, Divider, SectionTitle } from '../primitives/atoms';
+> 6 | import { useMiniData } from '@/hooks/use-mini-data';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  7 |
+  8 | interface MenuItem {
+  9 |   icon: string;
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/more.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/more.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+[01:46:26.373] Browser ERROR   ./components/mini/screens/services.tsx:7:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   5 | import { Card, Divider, NeutralBtn } from '../primitives/atoms';
+   6 | import { type Service } from '@/lib/mini-demo';
+>  7 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | export function ServicesScreen() {
+  10 |   const { T } = useTheme();
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/services.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/services.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+[01:46:26.373] Browser ERROR   ./components/mini/screens/settings.tsx:8:1
+Module not found: Can't resolve '@/hooks/use-mini-data'
+   6 |   Card, FieldLabel, SectionTitle, Divider, Avatar, Toggle, Icon, NeutralBtn, ScreenHeader,
+   7 | } from '../primitives/atoms';
+>  8 | import { useMiniData } from '@/hooks/use-mini-data';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   9 |
+  10 | // ─── Profile ────────────────────────────────
+  11 | export function ProfileScreen({ back }: { back: () => void }) {
+
+Import map: aliased to relative './hooks/use-mini-data' inside of [project]/
+
+Import traces:
+  Client Component Browser:
+    ./components/mini/screens/settings.tsx [Client Component Browser]
+    ./components/mini/mini-app-shell.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Client Component Browser]
+    ./app/miniapp/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/mini/screens/settings.tsx [Client Component SSR]
+    ./components/mini/mini-app-shell.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Client Component SSR]
+    ./app/miniapp/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+[01:46:57.383] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser ERROR   uncaughtError: Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+      <LoadingBoundary name="miniapp/" loading={null}>
+        <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/miniapp" tree={[...]} params={{}} cacheNode={{rsc:<Fragment>, ...}} ...>
+                <SegmentViewNode type="page" pagePath="miniapp/pa...">
+                  <SegmentTrieNode>
+                  <ClientPageRoot Component={function MiniAppPage} serverProvidedParams={{...}}>
+                    <MiniAppPage params={Promise} searchParams={Promise}>
+                      <MiniApp mode="light">
+                        <ThemeProvider initialMode="light">
+                          <MiniAppInner initialTab="home" initialSub={null}>
+                            <div
+                              style={{
++                               width: "100%"
+-                               width: "100%"
++                               maxWidth: 390
++                               height: "100dvh"
+-                               height: "100dvh"
++                               background: "#fafaf9"
++                               color: "#0a0a0a"
+-                               color: "rgb(250, 250, 250)"
++                               display: "flex"
+-                               display: "flex"
++                               flexDirection: "column"
++                               fontFamily: "'Inter', -apple-system, system-ui, sans-serif"
++                               overflow: "hidden"
++                               margin: "0 auto"
++                               transition: "background 0.2s, color 0.2s"
+-                               max-width: "390px"
+-                               background-color: "rgb(10, 10, 10)"
+-                               background-position-x: "0%"
+-                               background-position-y: "0%"
+-                               background-repeat: "repeat"
+-                               background-attachment: "scroll"
+-                               background-image: "none"
+-                               background-size: "auto"
+-                               background-origin: "padding-box"
+-                               background-clip: "border-box"
+-                               flex-direction: "column"
+-                               font-family: "\"Inter\", -apple-system, system-ui, sans-serif"
+-                               overflow-x: "hidden"
+-                               overflow-y: "hidden"
+-                               margin-top: "0px"
+-                               margin-right: "auto"
+-                               margin-bottom: "0px"
+-                               margin-left: "auto"
+-                               transition-property: "background, color"
+-                               transition-duration: "0.2s, 0.2s"
+-                               transition-timing-function: "ease, ease"
+-                               transition-delay: "0s, 0s"
+-                               transition-behavior: "normal, normal"
+                              }}
+                            >
+                              <TgHeader onToggleTheme={function ThemeProvider.useMemo[value]}>
+                                <div
+                                  style={{
++                                   flexShrink: 0
++                                   padding: "10px 16px"
++                                   display: "flex"
+-                                   display: "flex"
++                                   alignItems: "center"
++                                   justifyContent: "space-between"
++                                   background: "#fafaf9"
++                                   borderBottom: "1px solid rgba(10,10,10,0.06)"
+-                                   flex-shrink: "0"
+-                                   padding-top: "10px"
+-                                   padding-right: "16px"
+-                                   padding-bottom: "10px"
+-                                   padding-left: "16px"
+-                                   align-items: "center"
+-                                   justify-content: "space-between"
+-                                   background-color: "rgb(10, 10, 10)"
+-                                   background-position-x: "0%"
+-                                   background-position-y: "0%"
+-                                   background-repeat: "repeat"
+-                                   background-attachment: "scroll"
+-                                   background-image: "none"
+-                                   background-size: "auto"
+-                                   background-origin: "padding-box"
+-                                   background-clip: "border-box"
+-                                   border-bottom-width: "1px"
+-                                   border-bottom-style: "solid"
+-                                   border-bottom-color: "rgba(255, 255, 255, 0.06)"
+                                  }}
+                                >
+                                  <div style={{display:"flex", ...}}>
+                                    <div
+                                      style={{
++                                       width: 28
+-                                       width: "28px"
++                                       height: 28
+-                                       height: "28px"
++                                       borderRadius: 8
++                                       background: "#ffffff"
++                                       border: "1px solid rgba(10,10,10,0.06)"
++                                       display: "flex"
+-                                       display: "flex"
++                                       alignItems: "center"
++                                       justifyContent: "center"
++                                       fontSize: 11
++                                       color: "#0a0a0a"
+-                                       color: "rgb(250, 250, 250)"
++                                       fontWeight: 600
+-                                       border-top-left-radius: "8px"
+-                                       border-top-right-radius: "8px"
+-                                       border-bottom-right-radius: "8px"
+-                                       border-bottom-left-radius: "8px"
+-                                       background-color: "rgb(20, 20, 20)"
+-                                       background-position-x: "0%"
+-                                       background-position-y: "0%"
+-                                       background-repeat: "repeat"
+-                                       background-attachment: "scroll"
+-                                       background-image: "none"
+-                                       background-size: "auto"
+-                                       background-origin: "padding-box"
+-                                       background-clip: "border-box"
+-                                       border-top-width: "1px"
+-                                       border-top-style: "solid"
+-                                       border-top-color: "rgba(255, 255, 255, 0.06)"
+-                                       border-right-width: "1px"
+-                                       border-right-style: "solid"
+-                                       border-right-color: "rgba(255, 255, 255, 0.06)"
+-                                       border-bottom-width: "1px"
+-                                       border-bottom-style: "solid"
+-                                       border-bottom-color: "rgba(255, 255, 255, 0.06)"
+-                                       border-left-width: "1px"
+-                                       border-left-style: "solid"
+-                                       border-left-color: "rgba(255, 255, 255, 0.06)"
+-                                       border-image-outset: "0"
+-                                       border-image-repeat: "stretch"
+-                                       border-image-slice: "100%"
+-                                       border-image-source: "none"
+-                                       border-image-width: "1"
+-                                       align-items: "center"
+-                                       justify-content: "center"
+-                                       font-size: "11px"
+-                                       font-weight: "600"
+                                      }}
+                                    >
++                                     К
+                                    <div>
+                                      <div
+                                        style={{
++                                         fontSize: 13
++                                         fontWeight: 500
++                                         color: "#0a0a0a"
+-                                         color: "rgb(250, 250, 250)"
++                                         lineHeight: 1.1
+-                                         font-size: "13px"
+-                                         font-weight: "500"
+-                                         line-height: "1.1"
+                                        }}
+                                      >
++                                       КликБук
+                                      <div
+                                        style={{
++                                         fontSize: 10
++                                         color: "rgba(10,10,10,0.3)"
+-                                         color: "rgba(250, 250, 250, 0.3)"
++                                         marginTop: 1
+-                                         font-size: "10px"
+-                                         margin-top: "1px"
+                                        }}
+                                      >
++                                       mini app
+                                  <div style={{display:"flex", ...}}>
+                                    <button
+                                      onClick={function ThemeProvider.useMemo[value]}
+                                      aria-label="theme"
+                                      style={{
++                                       width: 32
+-                                       width: "32px"
++                                       height: 32
+-                                       height: "32px"
++                                       background: "transparent"
++                                       border: "none"
++                                       cursor: "pointer"
+-                                       cursor: "pointer"
++                                       color: "rgba(10,10,10,0.5)"
+-                                       color: "rgba(250, 250, 250, 0.5)"
++                                       padding: 0
++                                       display: "flex"
+-                                       display: "flex"
++                                       alignItems: "center"
++                                       justifyContent: "center"
+-                                       background-color: "transparent"
+-                                       background-position-x: "0%"
+-                                       background-position-y: "0%"
+-                                       background-repeat: "repeat"
+-                                       background-attachment: "scroll"
+-                                       background-image: "none"
+-                                       background-size: "auto"
+-                                       background-origin: "padding-box"
+-                                       background-clip: "border-box"
+-                                       border-top-width: "medium"
+-                                       border-top-style: "none"
+-                                       border-top-color: "currentcolor"
+-                                       border-right-width: "medium"
+-                                       border-right-style: "none"
+-                                       border-right-color: "currentcolor"
+-                                       border-bottom-width: "medium"
+-                                       border-bottom-style: "none"
+-                                       border-bottom-color: "currentcolor"
+-                                       border-left-width: "medium"
+-                                       border-left-style: "none"
+-                                       border-left-color: "currentcolor"
+-                                       border-image-outset: "0"
+-                                       border-image-repeat: "stretch"
+-                                       border-image-slice: "100%"
+-                                       border-image-source: "none"
+-                                       border-image-width: "1"
+-                                       padding-top: "0px"
+-                                       padding-right: "0px"
+-                                       padding-bottom: "0px"
+-                                       padding-left: "0px"
+-                                       align-items: "center"
+-                                       justify-content: "center"
+                                      }}
+                                    >
+                                      <Icon name="moon" size={16}>
+                                        <Moon size={16} strokeWidth={1.5} color="currentColor">
+                                          <svg
+                                            ref={null}
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            width={16}
+                                            height={16}
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth={1.5}
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
++                                           className="lucide lucide-moon"
+-                                           className="lucide lucide-sun"
+                                            aria-hidden="true"
+                                          >
++                                           <path
++                                             d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0..."
++                                           >
+-                                           <circle cx="12" cy="12" r="4">
+                                    ...
+                              ...
+                ...
+              ...
+
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:46:59.781] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:04.221] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser ERROR   uncaughtError: Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+      <LoadingBoundary name="miniapp/" loading={null}>
+        <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/miniapp" tree={[...]} params={{}} cacheNode={{rsc:<Fragment>, ...}} ...>
+                <SegmentViewNode type="page" pagePath="miniapp/pa...">
+                  <SegmentTrieNode>
+                  <ClientPageRoot Component={function MiniAppPage} serverProvidedParams={{...}}>
+                    <MiniAppPage params={Promise} searchParams={Promise}>
+                      <MiniApp mode="light">
+                        <ThemeProvider initialMode="light">
+                          <MiniAppInner initialTab="home" initialSub={null}>
+                            <div
+                              style={{
++                               width: "100%"
+-                               width: "100%"
++                               maxWidth: 390
++                               height: "100dvh"
+-                               height: "100dvh"
++                               background: "#fafaf9"
++                               color: "#0a0a0a"
+-                               color: "rgb(250, 250, 250)"
++                               display: "flex"
+-                               display: "flex"
++                               flexDirection: "column"
++                               fontFamily: "'Inter', -apple-system, system-ui, sans-serif"
++                               overflow: "hidden"
++                               margin: "0 auto"
++                               transition: "background 0.2s, color 0.2s"
+-                               max-width: "390px"
+-                               background-color: "rgb(10, 10, 10)"
+-                               background-position-x: "0%"
+-                               background-position-y: "0%"
+-                               background-repeat: "repeat"
+-                               background-attachment: "scroll"
+-                               background-image: "none"
+-                               background-size: "auto"
+-                               background-origin: "padding-box"
+-                               background-clip: "border-box"
+-                               flex-direction: "column"
+-                               font-family: "\"Inter\", -apple-system, system-ui, sans-serif"
+-                               overflow-x: "hidden"
+-                               overflow-y: "hidden"
+-                               margin-top: "0px"
+-                               margin-right: "auto"
+-                               margin-bottom: "0px"
+-                               margin-left: "auto"
+-                               transition-property: "background, color"
+-                               transition-duration: "0.2s, 0.2s"
+-                               transition-timing-function: "ease, ease"
+-                               transition-delay: "0s, 0s"
+-                               transition-behavior: "normal, normal"
+                              }}
+                            >
+                              <TgHeader onToggleTheme={function ThemeProvider.useMemo[value]}>
+                                <div
+                                  style={{
++                                   flexShrink: 0
++                                   padding: "10px 16px"
++                                   display: "flex"
+-                                   display: "flex"
++                                   alignItems: "center"
++                                   justifyContent: "space-between"
++                                   background: "#fafaf9"
++                                   borderBottom: "1px solid rgba(10,10,10,0.06)"
+-                                   flex-shrink: "0"
+-                                   padding-top: "10px"
+-                                   padding-right: "16px"
+-                                   padding-bottom: "10px"
+-                                   padding-left: "16px"
+-                                   align-items: "center"
+-                                   justify-content: "space-between"
+-                                   background-color: "rgb(10, 10, 10)"
+-                                   background-position-x: "0%"
+-                                   background-position-y: "0%"
+-                                   background-repeat: "repeat"
+-                                   background-attachment: "scroll"
+-                                   background-image: "none"
+-                                   background-size: "auto"
+-                                   background-origin: "padding-box"
+-                                   background-clip: "border-box"
+-                                   border-bottom-width: "1px"
+-                                   border-bottom-style: "solid"
+-                                   border-bottom-color: "rgba(255, 255, 255, 0.06)"
+                                  }}
+                                >
+                                  <div style={{display:"flex", ...}}>
+                                    <div
+                                      style={{
++                                       width: 28
+-                                       width: "28px"
++                                       height: 28
+-                                       height: "28px"
++                                       borderRadius: 8
++                                       background: "#ffffff"
++                                       border: "1px solid rgba(10,10,10,0.06)"
++                                       display: "flex"
+-                                       display: "flex"
++                                       alignItems: "center"
++                                       justifyContent: "center"
++                                       fontSize: 11
++                                       color: "#0a0a0a"
+-                                       color: "rgb(250, 250, 250)"
++                                       fontWeight: 600
+-                                       border-top-left-radius: "8px"
+-                                       border-top-right-radius: "8px"
+-                                       border-bottom-right-radius: "8px"
+-                                       border-bottom-left-radius: "8px"
+-                                       background-color: "rgb(20, 20, 20)"
+-                                       background-position-x: "0%"
+-                                       background-position-y: "0%"
+-                                       background-repeat: "repeat"
+-                                       background-attachment: "scroll"
+-                                       background-image: "none"
+-                                       background-size: "auto"
+-                                       background-origin: "padding-box"
+-                                       background-clip: "border-box"
+-                                       border-top-width: "1px"
+-                                       border-top-style: "solid"
+-                                       border-top-color: "rgba(255, 255, 255, 0.06)"
+-                                       border-right-width: "1px"
+-                                       border-right-style: "solid"
+-                                       border-right-color: "rgba(255, 255, 255, 0.06)"
+-                                       border-bottom-width: "1px"
+-                                       border-bottom-style: "solid"
+-                                       border-bottom-color: "rgba(255, 255, 255, 0.06)"
+-                                       border-left-width: "1px"
+-                                       border-left-style: "solid"
+-                                       border-left-color: "rgba(255, 255, 255, 0.06)"
+-                                       border-image-outset: "0"
+-                                       border-image-repeat: "stretch"
+-                                       border-image-slice: "100%"
+-                                       border-image-source: "none"
+-                                       border-image-width: "1"
+-                                       align-items: "center"
+-                                       justify-content: "center"
+-                                       font-size: "11px"
+-                                       font-weight: "600"
+                                      }}
+                                    >
++                                     К
+                                    <div>
+                                      <div
+                                        style={{
++                                         fontSize: 13
++                                         fontWeight: 500
++                                         color: "#0a0a0a"
+-                                         color: "rgb(250, 250, 250)"
++                                         lineHeight: 1.1
+-                                         font-size: "13px"
+-                                         font-weight: "500"
+-                                         line-height: "1.1"
+                                        }}
+                                      >
++                                       КликБук
+                                      <div
+                                        style={{
++                                         fontSize: 10
++                                         color: "rgba(10,10,10,0.3)"
+-                                         color: "rgba(250, 250, 250, 0.3)"
++                                         marginTop: 1
+-                                         font-size: "10px"
+-                                         margin-top: "1px"
+                                        }}
+                                      >
++                                       mini app
+                                  <div style={{display:"flex", ...}}>
+                                    <button
+                                      onClick={function ThemeProvider.useMemo[value]}
+                                      aria-label="theme"
+                                      style={{
++                                       width: 32
+-                                       width: "32px"
++                                       height: 32
+-                                       height: "32px"
++                                       background: "transparent"
++                                       border: "none"
++                                       cursor: "pointer"
+-                                       cursor: "pointer"
++                                       color: "rgba(10,10,10,0.5)"
+-                                       color: "rgba(250, 250, 250, 0.5)"
++                                       padding: 0
++                                       display: "flex"
+-                                       display: "flex"
++                                       alignItems: "center"
++                                       justifyContent: "center"
+-                                       background-color: "transparent"
+-                                       background-position-x: "0%"
+-                                       background-position-y: "0%"
+-                                       background-repeat: "repeat"
+-                                       background-attachment: "scroll"
+-                                       background-image: "none"
+-                                       background-size: "auto"
+-                                       background-origin: "padding-box"
+-                                       background-clip: "border-box"
+-                                       border-top-width: "medium"
+-                                       border-top-style: "none"
+-                                       border-top-color: "currentcolor"
+-                                       border-right-width: "medium"
+-                                       border-right-style: "none"
+-                                       border-right-color: "currentcolor"
+-                                       border-bottom-width: "medium"
+-                                       border-bottom-style: "none"
+-                                       border-bottom-color: "currentcolor"
+-                                       border-left-width: "medium"
+-                                       border-left-style: "none"
+-                                       border-left-color: "currentcolor"
+-                                       border-image-outset: "0"
+-                                       border-image-repeat: "stretch"
+-                                       border-image-slice: "100%"
+-                                       border-image-source: "none"
+-                                       border-image-width: "1"
+-                                       padding-top: "0px"
+-                                       padding-right: "0px"
+-                                       padding-bottom: "0px"
+-                                       padding-left: "0px"
+-                                       align-items: "center"
+-                                       justify-content: "center"
+                                      }}
+                                    >
+                                      <Icon name="moon" size={16}>
+                                        <Moon size={16} strokeWidth={1.5} color="currentColor">
+                                          <svg
+                                            ref={null}
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            width={16}
+                                            height={16}
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth={1.5}
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
++                                           className="lucide lucide-moon"
+-                                           className="lucide lucide-sun"
+                                            aria-hidden="true"
+                                          >
++                                           <path
++                                             d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0..."
++                                           >
+-                                           <circle cx="12" cy="12" r="4">
+                                    ...
+                              ...
+                ...
+              ...
+
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_ready 
+[01:47:06.617] Browser LOG     [Telegram.WebView] > postEvent web_app_expand 

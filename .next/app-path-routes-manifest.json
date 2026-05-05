@@ -53,6 +53,7 @@
   "/login/page": "/login",
   "/m/[slug]/page": "/m/[slug]",
   "/m/[slug]/review/page": "/m/[slug]/review",
+  "/miniapp/page": "/miniapp",
   "/page": "/",
   "/preview/page": "/preview",
   "/prewie/page": "/prewie",
