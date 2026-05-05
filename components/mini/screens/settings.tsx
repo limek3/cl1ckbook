@@ -285,13 +285,10 @@ function KVItem({ k, v, right }: { k: string; v: string; right?: boolean }) {
 // ─── Subscription ──────────────────────────
 export function SubscriptionScreen({ back }: { back: () => void }) {
   const { T } = useTheme();
-  const features = [
-    'Безлимит записей и клиентов',
-    'Неограниченные шаблоны и рассылки',
-    'Аналитика по периодам и каналам',
-    'Интеграции с TG, ВК, Google Calendar',
-    'Приоритетная поддержка',
-  ];
+  const { SUBSCRIPTION } = useMiniData();
+  const periodEnd = SUBSCRIPTION.currentPeriodEnd
+    ? new Date(SUBSCRIPTION.currentPeriodEnd).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
+    : '—';
   return (
     <div>
       <ScreenHeader title="Подписка" subtitle="Тариф и преимущества." onBack={back} />
@@ -300,16 +297,16 @@ export function SubscriptionScreen({ back }: { back: () => void }) {
           <div style={{ position: 'absolute', left: 0, top: 20, bottom: 20, width: 2, background: T.accent }} />
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <FieldLabel>Текущий тариф</FieldLabel>
-            <span style={{ fontSize: 11, color: T.accent }}>активен</span>
+            <span style={{ fontSize: 11, color: T.accent }}>{SUBSCRIPTION.status === 'active' ? 'активен' : SUBSCRIPTION.status}</span>
           </div>
-          <div style={{ fontSize: 36, fontWeight: 600, color: T.text, letterSpacing: '-0.03em', marginTop: 10 }}>Pro</div>
+          <div style={{ fontSize: 36, fontWeight: 600, color: T.text, letterSpacing: '-0.03em', marginTop: 10 }}>{SUBSCRIPTION.planLabel}</div>
           <div style={{ display: 'flex', gap: 12, marginTop: 6, fontSize: 12, color: T.text2 }}>
-            <span>До 5 июня 2026</span>
+            <span>До {periodEnd}</span>
             <span>·</span>
-            <span style={{ fontVariantNumeric: 'tabular-nums' }}>790 ₽ / мес</span>
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{SUBSCRIPTION.price}</span>
           </div>
           <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {features.map((f) => (
+            {SUBSCRIPTION.features.map((f) => (
               <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Icon name="check" size={14} color={T.accent} />
                 <span style={{ fontSize: 13, color: T.text }}>{f}</span>
@@ -320,9 +317,9 @@ export function SubscriptionScreen({ back }: { back: () => void }) {
         </Card>
 
         <SectionTitle title="Сравнить" subtitle="Другие тарифы." />
-        <PlanCard name="Базовый" price="0 ₽" features={['До 30 записей в месяц', '1 шаблон', 'Telegram-бот']} />
-        <PlanCard name="Pro" price="790 ₽ / мес" features={features} active />
-        <PlanCard name="Бизнес" price="1 990 ₽ / мес" features={['Всё из Pro', 'Несколько мастеров', 'Брендинг страницы', 'Webhook API']} />
+        <PlanCard name="Базовый" price="0 ₽" features={['До 30 записей в месяц', '1 шаблон', 'Telegram-бот']} active={SUBSCRIPTION.plan === 'free'} />
+        <PlanCard name="Pro" price="790 ₽ / мес" features={['Безлимит записей и клиентов', 'Неограниченные шаблоны и рассылки', 'Аналитика по периодам и каналам', 'Интеграции с TG, ВК, Google Calendar', 'Приоритетная поддержка']} active={SUBSCRIPTION.plan === 'pro'} />
+        <PlanCard name="Бизнес" price="1 990 ₽ / мес" features={['Всё из Pro', 'Несколько мастеров', 'Брендинг страницы', 'Webhook API']} active={SUBSCRIPTION.plan === 'business'} />
       </div>
     </div>
   );
@@ -351,20 +348,22 @@ function PlanCard({ name, price, features, active }: { name: string; price: stri
 
 // ─── Limits ────────────────────────────────
 export function LimitsScreen({ back, go }: { back: () => void; go?: (k: string) => void }) {
+  const { SUBSCRIPTION } = useMiniData();
+  const { limits, usage } = SUBSCRIPTION;
   return (
     <div>
       <ScreenHeader title="Лимиты" subtitle="Использование текущего тарифа." onBack={back} />
       <div style={{ padding: '0 16px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         <Card padded={false}>
-          <LimitRow label="Записей в месяц" used={38} total={1000} unit="" />
+          <LimitRow label="Записей в месяц" used={usage.bookings} total={limits.bookings} />
           <Divider />
-          <LimitRow label="Клиентов" used={142} total={1000} />
+          <LimitRow label="Клиентов" used={usage.clients} total={limits.clients} />
           <Divider />
-          <LimitRow label="Шаблонов" used={5} total={50} />
+          <LimitRow label="Услуг" used={usage.services} total={limits.services} />
           <Divider />
-          <LimitRow label="Рассылок в месяц" used={2} total={20} />
+          <LimitRow label="Шаблонов" used={usage.templates} total={limits.templates} />
           <Divider />
-          <LimitRow label="Хранилище" used={0.6} total={5} unit=" ГБ" />
+          <LimitRow label="Хранилище" used={usage.storage} total={limits.storage} unit=" ГБ" />
         </Card>
         <div style={{ padding: 16, border: `1px dashed currentColor`, borderRadius: 12, opacity: 0.6, fontSize: 12, lineHeight: 1.5 }}>
           Расширить лимиты можно обновлением тарифа.

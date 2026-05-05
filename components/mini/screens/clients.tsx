@@ -3,6 +3,7 @@
 import { Fragment, useMemo, useState } from 'react';
 import { useTheme } from '../theme';
 import { Card, Divider, Avatar, Icon } from '../primitives/atoms';
+import { ClientDetailSheet } from '../sheets/detail-sheets';
 import { type Client } from '@/lib/mini-demo';
 import { useMiniData } from '@/hooks/use-mini-data';
 
@@ -10,9 +11,10 @@ export function ClientsScreen() {
   const { T } = useTheme();
   const { CLIENTS } = useMiniData();
   const [q, setQ] = useState('');
+  const [active, setActive] = useState<Client | null>(null);
   const filtered = useMemo(() => CLIENTS.filter((c) =>
     c.name.toLowerCase().includes(q.toLowerCase()) || c.phone.includes(q)
-  ), [q]);
+  ), [q, CLIENTS]);
 
   return (
     <div style={{ padding: '20px 16px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -47,7 +49,7 @@ export function ClientsScreen() {
       <Card padded={false}>
         {filtered.map((c, i) => (
           <Fragment key={i}>
-            <ClientRow client={c} />
+            <ClientRow client={c} onClick={() => setActive(c)} />
             {i < filtered.length - 1 && <Divider />}
           </Fragment>
         ))}
@@ -55,14 +57,15 @@ export function ClientsScreen() {
           <div style={{ padding: 32, textAlign: 'center', color: T.text3, fontSize: 13 }}>Никого не найдено</div>
         )}
       </Card>
+      <ClientDetailSheet client={active} onClose={() => setActive(null)} />
     </div>
   );
 }
 
-function ClientRow({ client }: { client: Client }) {
+function ClientRow({ client, onClick }: { client: Client; onClick?: () => void }) {
   const { T } = useTheme();
   return (
-    <div style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+    <div onClick={onClick} style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}>
       <Avatar name={client.name} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 14, color: T.text, marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{client.name}</div>

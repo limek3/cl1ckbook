@@ -16,7 +16,11 @@ interface MenuItem {
 
 export function MoreScreen({ go }: { go: (kind: string) => void }) {
   const { T, mode } = useTheme();
-  const { MASTER } = useMiniData();
+  const { MASTER, SUBSCRIPTION } = useMiniData();
+  const periodEnd = SUBSCRIPTION.currentPeriodEnd
+    ? new Date(SUBSCRIPTION.currentPeriodEnd).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
+    : '';
+  const subSub = `${SUBSCRIPTION.planLabel}${periodEnd ? ' · до ' + periodEnd : ''}`;
 
   return (
     <div style={{ padding: '20px 16px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -52,7 +56,7 @@ export function MoreScreen({ go }: { go: (kind: string) => void }) {
       <MoreSection title="Деньги" go={go} items={[
         { icon: 'wallet',     label: 'Финансы', sub: 'Баланс и история',         go: 'finance' },
         { icon: 'credit-card',label: 'Платежи', sub: 'Способы приёма оплат',     go: 'payments' },
-        { icon: 'sparkles',   label: 'Подписка',sub: 'Pro · до 5 июня',          go: 'subscription', accent: true },
+        { icon: 'sparkles',   label: 'Подписка',sub: subSub,                      go: 'subscription', accent: true },
         { icon: 'gauge',      label: 'Лимиты',  sub: 'Использование тарифа',     go: 'limits' },
       ]} />
 

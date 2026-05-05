@@ -5,10 +5,12 @@ import { useTheme } from '../theme';
 import {
   Card, Divider, Icon, NeutralBtn, ScreenHeader, BottomSheet,
 } from '../primitives/atoms';
-import { TEMPLATES, type Template } from '@/lib/mini-demo';
+import { type Template } from '@/lib/mini-demo';
+import { useMiniData } from '@/hooks/use-mini-data';
 
 export function TemplatesScreen({ back }: { back: () => void }) {
   const { T } = useTheme();
+  const { TEMPLATES } = useMiniData();
   const [edit, setEdit] = useState<Template | null>(null);
 
   return (

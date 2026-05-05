@@ -1,20 +1,34 @@
 'use client';
 
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useTheme } from '../theme';
 import {
   Card, FieldLabel, SectionTitle, Divider, Toggle, NeutralBtn, ScreenHeader, BottomSheet,
 } from '../primitives/atoms';
-import { SCHEDULE_DEFAULT, type ScheduleDay } from '@/lib/mini-demo';
+import { type ScheduleDay } from '@/lib/mini-demo';
+import { useMiniData } from '@/hooks/use-mini-data';
 
 export function ScheduleScreen({ back }: { back: () => void }) {
   const { T } = useTheme();
+  const { SCHEDULE, updateSection } = useMiniData();
   const [scheduleMode, setScheduleMode] = useState<'free' | 'template'>('template');
-  const [days, setDays] = useState<ScheduleDay[]>(SCHEDULE_DEFAULT);
+  const [days, setDays] = useState<ScheduleDay[]>(SCHEDULE);
   const [openDay, setOpenDay] = useState<number | null>(null);
 
-  const setDay = (i: number, patch: Partial<ScheduleDay>) =>
-    setDays((ds) => ds.map((d, j) => (j === i ? { ...d, ...patch } : d)));
+  useEffect(() => { setDays(SCHEDULE); }, [SCHEDULE]);
+
+  const setDay = (i: number, patch: Partial<ScheduleDay>) => {
+    const next = days.map((d, j) => (j === i ? { ...d, ...patch } : d));
+    setDays(next);
+    // Persist to backend (workspaceData.availability)
+    updateSection('availability', next.map((d, idx) => ({
+      weekday: idx,
+      label: d.d,
+      enabled: d.on,
+      startTime: d.on ? d.from : null,
+      endTime: d.on ? d.to : null,
+    })));
+  };
 
   const opts = [
     { id: 'free' as const, label: 'Свободный' },

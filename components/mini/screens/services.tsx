@@ -1,14 +1,16 @@
 'use client';
 
-import { Fragment } from 'react';
+import { Fragment, useState } from 'react';
 import { useTheme } from '../theme';
 import { Card, Divider, NeutralBtn } from '../primitives/atoms';
+import { ServiceDetailSheet } from '../sheets/detail-sheets';
 import { type Service } from '@/lib/mini-demo';
 import { useMiniData } from '@/hooks/use-mini-data';
 
 export function ServicesScreen() {
   const { T } = useTheme();
   const { SERVICES } = useMiniData();
+  const [active, setActive] = useState<Service | null>(null);
   return (
     <div style={{ padding: '20px 16px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
@@ -21,19 +23,20 @@ export function ServicesScreen() {
       <Card padded={false}>
         {SERVICES.map((s, i) => (
           <Fragment key={s.n}>
-            <ServiceRowFull s={s} />
+            <ServiceRowFull s={s} onClick={() => setActive(s)} />
             {i < SERVICES.length - 1 && <Divider />}
           </Fragment>
         ))}
       </Card>
+      <ServiceDetailSheet service={active} onClose={() => setActive(null)} />
     </div>
   );
 }
 
-function ServiceRowFull({ s }: { s: Service }) {
+function ServiceRowFull({ s, onClick }: { s: Service; onClick: () => void }) {
   const { T } = useTheme();
   return (
-    <div style={{ padding: '18px 20px' }}>
+    <div onClick={onClick} style={{ padding: '18px 20px', cursor: 'pointer' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 10 }}>
         <span style={{ fontSize: 11, color: T.text3, fontVariantNumeric: 'tabular-nums', minWidth: 20 }}>#{s.n}</span>
         <span style={{ fontSize: 15, color: T.text, flex: 1, letterSpacing: '-0.01em' }}>{s.name}</span>

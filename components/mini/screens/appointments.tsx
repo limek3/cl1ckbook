@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useTheme } from '../theme';
 import { FieldLabel, NavBtn, StatusDot, Icon } from '../primitives/atoms';
+import { AppointmentDetailSheet } from '../sheets/detail-sheets';
 import { type Appointment } from '@/lib/mini-demo';
 import { useMiniData } from '@/hooks/use-mini-data';
 
@@ -10,6 +11,7 @@ export function AppointmentsScreen({ openAppt }: { openAppt?: (a: Appointment) =
   const { T } = useTheme();
   const { APPOINTMENTS } = useMiniData();
   const [day, setDay] = useState(0);
+  const [active, setActive] = useState<Appointment | null>(null);
 
   const dayLabel = day === 0 ? 'Сегодня'
     : day === 1 ? 'Завтра'
@@ -45,7 +47,7 @@ export function AppointmentsScreen({ openAppt }: { openAppt?: (a: Appointment) =
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {APPOINTMENTS.map((a, i) => (
-          <ApptCard key={i} appt={a} active={i === 0} onClick={() => openAppt && openAppt(a)} />
+          <ApptCard key={i} appt={a} active={i === 0} onClick={() => setActive(a)} />
         ))}
       </div>
 
@@ -55,6 +57,7 @@ export function AppointmentsScreen({ openAppt }: { openAppt?: (a: Appointment) =
       }}>
         Свободно после 19:00
       </div>
+      <AppointmentDetailSheet appt={active} onClose={() => setActive(null)} />
     </div>
   );
 }
