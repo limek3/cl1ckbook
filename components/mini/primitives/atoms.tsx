@@ -297,6 +297,7 @@ export function SearchBox({
       WebkitBackdropFilter: 'blur(16px) saturate(1.22)',
       padding: '12px 14px',
       display: 'flex', alignItems: 'center', gap: 10,
+      overflow: 'hidden',
       transition: 'border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease',
     }}>
       <div style={{
@@ -311,6 +312,7 @@ export function SearchBox({
         background: fieldBg,
         border: `1px solid ${fieldBorder}`,
         boxShadow: dark ? 'inset 0 1px 0 rgba(255,255,255,0.025)' : 'inset 0 1px 1px rgba(15,23,42,0.035)',
+        overflow: 'hidden',
       }}>
         <Icon name="search" size={16} color={T.text3} />
         <input
@@ -337,7 +339,7 @@ export function SearchBox({
             color: T.text,
             WebkitTextFillColor: T.text,
             caretColor: T.accent,
-            fontSize: 14,
+            fontSize: 16,
             fontFamily: 'inherit',
             colorScheme: mode,
           }}

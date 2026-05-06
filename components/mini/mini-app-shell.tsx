@@ -104,7 +104,7 @@ function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) 
     <div style={{
       ...miniGlass(mode, 'bottom'),
       borderTop: `1px solid ${glassBorder(mode)}`,
-      padding: '6px 4px calc(6px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
+      padding: '8px 4px calc(8px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
       display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 0,
       flexShrink: 0,
       position: 'relative',
@@ -236,7 +236,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
       const viewportHeight = Number(tg?.viewportStableHeight ?? tg?.viewportHeight ?? window.innerHeight);
       const isTelegramRuntime = Boolean(tg);
 
-      document.documentElement.style.setProperty('--miniapp-header-top-offset', isTelegramRuntime ? '10px' : '12px');
+      document.documentElement.style.setProperty('--miniapp-header-top-offset', isTelegramRuntime ? '38px' : '12px');
       if (Number.isFinite(topInset)) document.documentElement.style.setProperty('--miniapp-safe-top', `${Math.max(0, Math.round(topInset))}px`);
       if (Number.isFinite(bottomInset)) document.documentElement.style.setProperty('--miniapp-safe-bottom', `${Math.max(0, Math.round(bottomInset))}px`);
       if (Number.isFinite(viewportHeight) && viewportHeight > 0) {
@@ -360,13 +360,29 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
             border-radius: 10px;
           }
           .cb-miniapp input.cb-mini-transparent, .cb-miniapp textarea.cb-mini-transparent,
-          .cb-miniapp input.cb-mini-input-reset, .cb-miniapp textarea.cb-mini-input-reset {
+          .cb-miniapp input.cb-mini-input-reset, .cb-miniapp textarea.cb-mini-input-reset,
+          .cb-miniapp input.cb-mini-input-reset:focus, .cb-miniapp textarea.cb-mini-input-reset:focus,
+          .cb-miniapp input.cb-mini-input-reset:hover, .cb-miniapp textarea.cb-mini-input-reset:hover,
+          .cb-miniapp input.cb-mini-input-reset:active, .cb-miniapp textarea.cb-mini-input-reset:active {
             background: transparent !important;
             background-color: transparent !important;
+            background-image: none !important;
             box-shadow: none !important;
-            -webkit-box-shadow: none !important;
-            border-radius: 0;
+            -webkit-box-shadow: 0 0 0 1000px transparent inset !important;
+            border: 0 !important;
+            outline: none !important;
+            border-radius: 0 !important;
             background-clip: padding-box !important;
+            -webkit-text-fill-color: var(--mini-text, #fafafa) !important;
+            caret-color: var(--miniapp-accent, #127dfe) !important;
+          }
+          .cb-miniapp input.cb-mini-input-reset::-webkit-search-decoration,
+          .cb-miniapp input.cb-mini-input-reset::-webkit-search-cancel-button,
+          .cb-miniapp input.cb-mini-input-reset::-webkit-search-results-button,
+          .cb-miniapp input.cb-mini-input-reset::-webkit-search-results-decoration {
+            -webkit-appearance: none;
+            appearance: none;
+            display: none;
           }
           .cb-miniapp input:-webkit-autofill, .cb-miniapp textarea:-webkit-autofill {
             box-shadow: 0 0 0 999px var(--mini-input-bg, #0d0d0d) inset !important;
@@ -377,15 +393,6 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
             background: var(--mini-input-bg, #ffffff) !important;
             background-color: var(--mini-input-bg, #ffffff) !important;
             box-shadow: 0 0 0 1000px var(--mini-input-bg, #ffffff) inset !important;
-          }
-          .cb-miniapp input.cb-mini-transparent, .cb-miniapp textarea.cb-mini-transparent,
-          .cb-miniapp input.cb-mini-input-reset, .cb-miniapp textarea.cb-mini-input-reset {
-            background: transparent !important;
-            background-color: transparent !important;
-            box-shadow: none !important;
-            -webkit-box-shadow: none !important;
-            border-radius: 0 !important;
-            background-clip: padding-box !important;
           }
           .cb-miniapp ::placeholder { color: ${T.text3}; opacity: 1; }
           .cb-miniapp { --miniapp-accent: ${T.accent}; }

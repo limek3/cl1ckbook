@@ -334,6 +334,7 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
           display: 'flex', alignItems: 'center', gap: 6,
           boxShadow: mode === 'dark' ? 'inset 0 1px 0 rgba(255,255,255,0.025)' : 'inset 0 1px 1px rgba(15,23,42,0.035)',
           transition: 'border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease',
+          overflow: 'hidden',
         }}>
           <input
             className="cb-mini-transparent cb-mini-input-reset"
@@ -359,7 +360,7 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
               color: T.text,
               WebkitTextFillColor: T.text,
               caretColor: T.accent,
-              fontSize: 14,
+              fontSize: 16,
               fontFamily: 'inherit',
               colorScheme: mode,
             }}

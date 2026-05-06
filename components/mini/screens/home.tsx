@@ -83,16 +83,16 @@ export function HomeScreen({ go }: { go: (kind: string) => void }) {
   } as const;
 
   return (
-    <div style={{ padding: '20px 16px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ padding: '16px 16px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div>
-        <div style={{ fontSize: 22, fontWeight: 600, color: T.text, letterSpacing: '-0.02em' }}>Кабинет</div>
+        <div style={{ fontSize: 20, fontWeight: 600, color: T.text, letterSpacing: '-0.02em' }}>Кабинет</div>
         <div style={{ fontSize: 13, color: T.text2, marginTop: 2 }}>Записи, ссылка, метрики.</div>
       </div>
 
       <Card>
         <FieldLabel>Персональная ссылка</FieldLabel>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
-          <div style={{ fontSize: 30, fontWeight: 600, color: T.text, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, gap: 12 }}>
+          <div style={{ fontSize: 26, fontWeight: 600, color: T.text, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
             {MASTER.link || '/m/admin'}
           </div>
           <button onClick={copy} style={{
@@ -221,11 +221,11 @@ function MetricCard({ label, value, sub, valueSize = 26 }: { label: string; valu
   return (
     <div style={{
       background: T.card, border: `1px solid ${T.border}`, borderRadius: 14,
-      boxShadow: T.cardShadow, padding: '16px 16px 14px',
+      boxShadow: T.cardShadow, padding: '14px 14px 12px',
       display: 'flex', flexDirection: 'column', gap: 10,
     }}>
       <FieldLabel>{label}</FieldLabel>
-      <div style={{ fontSize: valueSize, fontWeight: 600, color: T.text, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+      <div style={{ fontSize: valueSize - 2, fontWeight: 600, color: T.text, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
         {value}
       </div>
       <div style={{ fontSize: 11, color: T.text2 }}>{sub}</div>
