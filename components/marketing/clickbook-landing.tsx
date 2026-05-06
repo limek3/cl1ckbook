@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -9,11 +9,13 @@ import {
   useTransform,
   useSpring,
   useInView,
-  AnimatePresence,
+  useScroll,
   animate,
 } from 'framer-motion';
+import useEmblaCarousel from 'embla-carousel-react';
 import {
   ArrowRight,
+  ArrowLeft,
   Bell,
   BarChart3,
   Building2,
@@ -33,8 +35,6 @@ import {
   GraduationCap,
   UserRound,
   Quote,
-  Zap,
-  ShieldCheck,
 } from 'lucide-react';
 import { LanguageToggle } from '@/components/shared/language-toggle';
 import { ThemeToggle } from '@/components/shared/theme-toggle';
@@ -43,9 +43,9 @@ import { cn } from '@/lib/utils';
 
 const ACCENT = '#127dfe';
 const ACCENT_ALT = '#7c3aed';
+const ACCENT_CYAN = '#0ea5e9';
 
-// ─── Stable particles (no hydration mismatch) ────────────────────────────────
-const PARTICLES = Array.from({ length: 24 }, (_, i) => ({
+const PARTICLES = Array.from({ length: 32 }, (_, i) => ({
   id: i,
   x: ((i * 41 + 11) % 92) + 4,
   y: ((i * 29 + 7) % 88) + 6,
@@ -66,6 +66,9 @@ const COPY = {
     ],
     login: 'Войти',
     ctaTop: 'Попробовать',
+    sliderHint: 'свайп',
+    prev: 'Назад',
+    next: 'Далее',
     hero: {
       badge: 'Онлайн-запись нового поколения',
       title1: 'Запись клиентов',
@@ -187,6 +190,9 @@ const COPY = {
     ],
     login: 'Sign in',
     ctaTop: 'Try free',
+    sliderHint: 'swipe',
+    prev: 'Prev',
+    next: 'Next',
     hero: {
       badge: 'Next-generation booking platform',
       title1: 'Client booking',
@@ -273,7 +279,7 @@ const COPY = {
       ],
       reviews: [
         {
-          text: 'Before, the schedule was in three spreadsheets and the admin\'s head. Now everything is in one place and clients book themselves.',
+          text: "Before, the schedule was in three spreadsheets and the admin's head. Now everything is in one place and clients book themselves.",
           name: 'Anna Lebedeva',
           role: 'Nail studio',
         },
@@ -283,7 +289,7 @@ const COPY = {
           role: 'Barbershop, 2 locations',
         },
         {
-          text: 'We launched a booking page in an evening. A week later we realized we can\'t work without analytics.',
+          text: "We launched a booking page in an evening. A week later we realized we can't work without analytics.",
           name: 'Marina Sokolova',
           role: 'Cosmetologist',
         },
@@ -307,6 +313,18 @@ const CARD_COLORS = [
   '#127dfe', '#7c3aed', '#0ea5e9', '#10b981',
   '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4',
 ];
+
+// ─── Scroll progress (top bar) ────────────────────────────────────────────────
+function ScrollProgress() {
+  const { scrollYProgress } = useScroll();
+  const scaleX = useSpring(scrollYProgress, { stiffness: 120, damping: 24, mass: 0.4 });
+  return (
+    <motion.div
+      style={{ scaleX }}
+      className="fixed left-0 right-0 top-0 z-[60] h-[3px] origin-left bg-gradient-to-r from-[#127dfe] via-[#7c3aed] to-[#0ea5e9] shadow-[0_0_18px_rgba(18,125,254,0.55)]"
+    />
+  );
+}
 
 // ─── Animated counter ─────────────────────────────────────────────────────────
 function Counter({ target, suffix = '', pre = '' }: { target: number; suffix?: string; pre?: string }) {
@@ -351,8 +369,8 @@ function MagBtn({
   const ref = useRef<HTMLAnchorElement>(null);
   const x = useMotionValue(0);
   const y = useMotionValue(0);
-  const sx = useSpring(x, { stiffness: 180, damping: 16 });
-  const sy = useSpring(y, { stiffness: 180, damping: 16 });
+  const sx = useSpring(x, { stiffness: 220, damping: 18 });
+  const sy = useSpring(y, { stiffness: 220, damping: 18 });
 
   const onMove = useCallback((e: React.MouseEvent) => {
     if (!ref.current) return;
@@ -375,14 +393,17 @@ function MagBtn({
       onMouseLeave={onLeave}
       whileTap={{ scale: 0.96 }}
       className={cn(
-        'group inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-3.5 text-[14px] font-semibold transition-all duration-200',
+        'group relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-2xl px-7 py-4 text-[14px] font-semibold transition-all duration-200',
         variant === 'primary'
-          ? 'bg-[#127dfe] text-white shadow-[0_16px_40px_-12px_rgba(18,125,254,0.6)] hover:shadow-[0_24px_48px_-12px_rgba(18,125,254,0.75)] hover:brightness-110'
+          ? 'bg-gradient-to-br from-[#127dfe] to-[#7c3aed] text-white shadow-[0_18px_50px_-12px_rgba(18,125,254,0.65)] hover:shadow-[0_28px_60px_-12px_rgba(124,58,237,0.7)]'
           : 'border border-current/20 bg-white/8 text-current backdrop-blur hover:bg-white/14',
         className,
       )}
     >
-      {children}
+      {variant === 'primary' && (
+        <span className="pointer-events-none absolute inset-y-0 -left-12 w-12 rotate-12 bg-gradient-to-r from-transparent via-white/35 to-transparent transition-all duration-700 group-hover:left-[110%]" />
+      )}
+      <span className="relative z-10 flex items-center gap-2">{children}</span>
     </motion.a>
   );
 }
@@ -392,16 +413,18 @@ function TiltCard({ children, className = '' }: { children: React.ReactNode; cla
   const ref = useRef<HTMLDivElement>(null);
   const rx = useMotionValue(0);
   const ry = useMotionValue(0);
-  const srx = useSpring(rx, { stiffness: 120, damping: 18 });
-  const sry = useSpring(ry, { stiffness: 120, damping: 18 });
+  const srx = useSpring(rx, { stiffness: 140, damping: 18 });
+  const sry = useSpring(ry, { stiffness: 140, damping: 18 });
 
   const onMove = (e: React.MouseEvent) => {
     if (!ref.current) return;
     const r = ref.current.getBoundingClientRect();
     const nx = (e.clientX - r.left) / r.width - 0.5;
     const ny = (e.clientY - r.top) / r.height - 0.5;
-    rx.set(-ny * 10);
-    ry.set(nx * 10);
+    rx.set(-ny * 9);
+    ry.set(nx * 9);
+    ref.current.style.setProperty('--mx', `${(nx + 0.5) * 100}%`);
+    ref.current.style.setProperty('--my', `${(ny + 0.5) * 100}%`);
   };
 
   const onLeave = () => {
@@ -425,16 +448,120 @@ function TiltCard({ children, className = '' }: { children: React.ReactNode; cla
 // ─── Eyebrow pill ─────────────────────────────────────────────────────────────
 function Eyebrow({ children, light = false }: { children: React.ReactNode; light?: boolean }) {
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-40px' }}
+      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
       className={cn(
         'inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]',
         light
-          ? 'border border-white/20 bg-white/10 text-white/80'
-          : 'border border-[#127dfe]/20 bg-[#127dfe]/8 text-[#127dfe] dark:border-[#127dfe]/30 dark:bg-[#127dfe]/12',
+          ? 'border border-white/20 bg-white/10 text-white/80 backdrop-blur'
+          : 'border border-[#127dfe]/20 bg-[#127dfe]/8 text-[#127dfe] backdrop-blur dark:border-[#127dfe]/30 dark:bg-[#127dfe]/12',
       )}
     >
-      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+      <motion.span
+        className="h-1.5 w-1.5 rounded-full bg-current"
+        animate={{ opacity: [0.4, 1, 0.4], scale: [0.8, 1.2, 0.8] }}
+        transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+      />
       {children}
+    </motion.div>
+  );
+}
+
+// ─── Slider shell (embla) ─────────────────────────────────────────────────────
+type SliderProps = {
+  children: React.ReactNode;
+  autoplay?: number;
+  loop?: boolean;
+  prevLabel?: string;
+  nextLabel?: string;
+  className?: string;
+};
+function Slider({ children, autoplay, loop = true, prevLabel, nextLabel, className = '' }: SliderProps) {
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    loop,
+    align: 'start',
+    skipSnaps: false,
+    containScroll: 'trimSnaps',
+    dragFree: false,
+  });
+  const [selected, setSelected] = useState(0);
+  const [snaps, setSnaps] = useState<number[]>([]);
+  const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    const onSelect = () => setSelected(emblaApi.selectedScrollSnap());
+    const onReInit = () => setSnaps(emblaApi.scrollSnapList());
+    emblaApi.on('select', onSelect);
+    emblaApi.on('reInit', onReInit);
+    setSnaps(emblaApi.scrollSnapList());
+    onSelect();
+    return () => {
+      emblaApi.off('select', onSelect);
+      emblaApi.off('reInit', onReInit);
+    };
+  }, [emblaApi]);
+
+  useEffect(() => {
+    if (!emblaApi || !autoplay || paused) return;
+    const id = setInterval(() => {
+      if (!emblaApi) return;
+      if (emblaApi.canScrollNext()) emblaApi.scrollNext();
+      else emblaApi.scrollTo(0);
+    }, autoplay);
+    return () => clearInterval(id);
+  }, [emblaApi, autoplay, paused]);
+
+  return (
+    <div
+      className={cn('relative', className)}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+    >
+      <div className="overflow-hidden" ref={emblaRef}>
+        <div className="flex -ml-4 touch-pan-y">{children}</div>
+      </div>
+
+      {/* Controls */}
+      <div className="mt-8 flex items-center justify-center gap-5">
+        <button
+          type="button"
+          aria-label={prevLabel || 'Prev'}
+          onClick={() => emblaApi?.scrollPrev()}
+          className="group flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white/80 text-black/60 backdrop-blur transition-all hover:scale-110 hover:border-[#127dfe]/40 hover:bg-[#127dfe] hover:text-white hover:shadow-[0_12px_28px_-10px_rgba(18,125,254,0.55)] dark:border-white/12 dark:bg-white/8 dark:text-white/70"
+        >
+          <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
+        </button>
+
+        <div className="flex items-center gap-2">
+          {snaps.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              aria-label={`Slide ${i + 1}`}
+              onClick={() => emblaApi?.scrollTo(i)}
+              className={cn(
+                'h-2 rounded-full transition-all duration-300',
+                selected === i
+                  ? 'w-8 bg-gradient-to-r from-[#127dfe] to-[#7c3aed] shadow-[0_0_12px_rgba(18,125,254,0.6)]'
+                  : 'w-2 bg-black/20 hover:bg-black/40 dark:bg-white/20 dark:hover:bg-white/40',
+              )}
+            />
+          ))}
+        </div>
+
+        <button
+          type="button"
+          aria-label={nextLabel || 'Next'}
+          onClick={() => emblaApi?.scrollNext()}
+          className="group flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white/80 text-black/60 backdrop-blur transition-all hover:scale-110 hover:border-[#127dfe]/40 hover:bg-[#127dfe] hover:text-white hover:shadow-[0_12px_28px_-10px_rgba(18,125,254,0.55)] dark:border-white/12 dark:bg-white/8 dark:text-white/70"
+        >
+          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+        </button>
+      </div>
     </div>
   );
 }
@@ -490,7 +617,7 @@ function SideNav({ locale }: { locale: string }) {
               className={cn(
                 'block rounded-full transition-all duration-300',
                 active === i
-                  ? 'h-7 w-2 bg-[#127dfe] shadow-[0_0_12px_rgba(18,125,254,0.7)]'
+                  ? 'h-7 w-2 bg-gradient-to-b from-[#127dfe] to-[#7c3aed] shadow-[0_0_12px_rgba(18,125,254,0.7)]'
                   : 'h-2 w-2 bg-black/20 group-hover:bg-black/40 dark:bg-white/20 dark:group-hover:bg-white/40',
               )}
             />
@@ -545,8 +672,6 @@ function LandingHeader({ t }: { t: typeof COPY.ru }) {
               (e.target as HTMLImageElement).style.display = 'none';
             }}
           />
-          <span className="hidden text-[20px] font-bold tracking-[-0.04em] text-foreground [.dark_&]:hidden">
-          </span>
         </Link>
 
         <nav className="hidden items-center gap-6 md:flex">
@@ -554,9 +679,11 @@ function LandingHeader({ t }: { t: typeof COPY.ru }) {
             <a
               key={href}
               href={href as string}
-              className="text-[13px] font-medium text-black/60 transition-colors hover:text-black dark:text-white/56 dark:hover:text-white"
+              className="relative text-[13px] font-medium text-black/60 transition-colors hover:text-black dark:text-white/56 dark:hover:text-white"
             >
-              {label}
+              <span className="after:absolute after:-bottom-1 after:left-0 after:h-px after:w-0 after:bg-gradient-to-r after:from-[#127dfe] after:to-[#7c3aed] after:transition-all after:duration-300 hover:after:w-full">
+                {label}
+              </span>
             </a>
           ))}
         </nav>
@@ -572,12 +699,15 @@ function LandingHeader({ t }: { t: typeof COPY.ru }) {
           </Link>
           <motion.a
             href="#cta"
-            whileHover={{ scale: 1.03 }}
+            whileHover={{ scale: 1.04 }}
             whileTap={{ scale: 0.97 }}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-[#127dfe] px-4 py-2 text-[13px] font-semibold text-white shadow-[0_8px_24px_-6px_rgba(18,125,254,0.5)] transition-all hover:shadow-[0_12px_32px_-6px_rgba(18,125,254,0.65)]"
+            className="group relative inline-flex items-center gap-1.5 overflow-hidden rounded-xl bg-gradient-to-r from-[#127dfe] to-[#7c3aed] px-4 py-2 text-[13px] font-semibold text-white shadow-[0_8px_24px_-6px_rgba(18,125,254,0.5)] transition-all hover:shadow-[0_14px_36px_-6px_rgba(124,58,237,0.65)]"
           >
-            {t.ctaTop}
-            <ArrowRight className="h-3.5 w-3.5" />
+            <span className="pointer-events-none absolute inset-y-0 -left-10 w-10 rotate-12 bg-gradient-to-r from-transparent via-white/35 to-transparent transition-all duration-700 group-hover:left-[110%]" />
+            <span className="relative z-10 flex items-center gap-1.5">
+              {t.ctaTop}
+              <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+            </span>
           </motion.a>
         </div>
       </div>
@@ -590,6 +720,15 @@ function HeroSlide({ t }: { t: typeof COPY.ru }) {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: '-100px' });
 
+  // Scroll-driven parallax for hero contents
+  const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] });
+  const yTitle = useTransform(scrollYProgress, [0, 1], [0, -120]);
+  const ySub = useTransform(scrollYProgress, [0, 1], [0, -60]);
+  const yChips = useTransform(scrollYProgress, [0, 1], [0, 60]);
+  const opacity = useTransform(scrollYProgress, [0, 0.7], [1, 0]);
+  const blob1Y = useTransform(scrollYProgress, [0, 1], [0, -180]);
+  const blob2Y = useTransform(scrollYProgress, [0, 1], [0, 200]);
+
   const words = [t.hero.title1, t.hero.title2, t.hero.title3];
 
   return (
@@ -598,25 +737,31 @@ function HeroSlide({ t }: { t: typeof COPY.ru }) {
       ref={ref}
       className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-white pt-16 dark:bg-[#06080f]"
     >
-      {/* Animated gradient blobs */}
+      {/* Animated gradient blobs (parallax + drift) */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <motion.div
-          animate={{ x: [0, 60, 0], y: [0, -40, 0], scale: [1, 1.15, 1] }}
+          style={{ y: blob1Y }}
+          animate={{ x: [0, 60, 0], scale: [1, 1.15, 1] }}
           transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
           className="absolute -left-40 -top-40 h-[600px] w-[600px] rounded-full opacity-30 blur-[100px] dark:opacity-20"
-          style={{ background: `radial-gradient(circle, ${ACCENT}, transparent 70%)` }}
-        />
+          aria-hidden
+        >
+          <div className="h-full w-full" style={{ background: `radial-gradient(circle, ${ACCENT}, transparent 70%)` }} />
+        </motion.div>
         <motion.div
-          animate={{ x: [0, -50, 0], y: [0, 50, 0], scale: [1, 1.1, 1] }}
+          style={{ y: blob2Y }}
+          animate={{ x: [0, -50, 0], scale: [1, 1.1, 1] }}
           transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut', delay: 3 }}
           className="absolute -right-40 bottom-0 h-[500px] w-[500px] rounded-full opacity-25 blur-[100px] dark:opacity-18"
-          style={{ background: `radial-gradient(circle, ${ACCENT_ALT}, transparent 70%)` }}
-        />
+          aria-hidden
+        >
+          <div className="h-full w-full" style={{ background: `radial-gradient(circle, ${ACCENT_ALT}, transparent 70%)` }} />
+        </motion.div>
         <motion.div
           animate={{ x: [0, 30, -20, 0], y: [0, -30, 20, 0] }}
           transition={{ duration: 25, repeat: Infinity, ease: 'easeInOut', delay: 6 }}
           className="absolute left-1/2 top-1/3 h-[400px] w-[400px] -translate-x-1/2 rounded-full opacity-15 blur-[120px]"
-          style={{ background: `radial-gradient(circle, #0ea5e9, transparent 70%)` }}
+          style={{ background: `radial-gradient(circle, ${ACCENT_CYAN}, transparent 70%)` }}
         />
       </div>
 
@@ -650,7 +795,7 @@ function HeroSlide({ t }: { t: typeof COPY.ru }) {
         ))}
       </div>
 
-      <div className="relative z-10 mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
+      <motion.div style={{ opacity }} className="relative z-10 mx-auto w-full max-w-[1280px] px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-4xl text-center">
           {/* Badge */}
           <motion.div
@@ -662,27 +807,29 @@ function HeroSlide({ t }: { t: typeof COPY.ru }) {
           </motion.div>
 
           {/* Headline */}
-          <div className="mt-7 overflow-hidden">
+          <motion.div style={{ y: yTitle }} className="mt-7 overflow-hidden">
             {words.map((word, i) => (
               <motion.div
                 key={i}
                 initial={{ opacity: 0, y: 60 }}
                 animate={inView ? { opacity: 1, y: 0 } : {}}
-                transition={{ duration: 0.8, delay: 0.1 + i * 0.12, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ duration: 0.85, delay: 0.1 + i * 0.12, ease: [0.22, 1, 0.36, 1] }}
                 className={cn(
-                  'block text-[48px] font-bold leading-[0.97] tracking-[-0.045em] sm:text-[66px] lg:text-[82px]',
+                  'block text-[48px] font-bold leading-[0.97] tracking-[-0.045em] sm:text-[66px] lg:text-[86px]',
                   i === 1
-                    ? 'bg-gradient-to-r from-[#127dfe] to-[#7c3aed] bg-clip-text text-transparent'
+                    ? 'bg-gradient-to-r from-[#127dfe] via-[#7c3aed] to-[#0ea5e9] bg-clip-text text-transparent [background-size:200%_auto]'
                     : 'text-black dark:text-white',
                 )}
+                style={i === 1 ? { animation: 'gradient-pan 6s linear infinite' } : undefined}
               >
                 {word}
               </motion.div>
             ))}
-          </div>
+          </motion.div>
 
           {/* Subtitle */}
           <motion.p
+            style={{ y: ySub }}
             initial={{ opacity: 0, y: 20 }}
             animate={inView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.7, delay: 0.48, ease: [0.22, 1, 0.36, 1] }}
@@ -696,7 +843,7 @@ function HeroSlide({ t }: { t: typeof COPY.ru }) {
             initial={{ opacity: 0, y: 20 }}
             animate={inView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.7, delay: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row"
+            className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row"
           >
             <MagBtn href="/login" variant="primary">
               {t.hero.cta1}
@@ -723,38 +870,11 @@ function HeroSlide({ t }: { t: typeof COPY.ru }) {
           </motion.div>
         </div>
 
-        {/* Floating chips */}
-        <div className="relative mx-auto mt-16 max-w-[680px]">
-          <div className="grid grid-cols-3 gap-3 sm:gap-4">
-            {t.hero.chips.map((chip, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 40, scale: 0.9 }}
-                animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
-                transition={{ duration: 0.7, delay: 0.8 + i * 0.12, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <TiltCard className="rounded-2xl border border-black/8 bg-white/90 p-4 shadow-[0_20px_50px_-20px_rgba(18,125,254,0.2)] backdrop-blur-sm dark:border-white/8 dark:bg-white/5">
-                  <motion.div
-                    animate={{ y: [0, -4, 0] }}
-                    transition={{ duration: 4 + i, repeat: Infinity, ease: 'easeInOut', delay: i * 0.8 }}
-                  >
-                    <div
-                      className="mb-2.5 h-8 w-8 rounded-xl"
-                      style={{ background: `${CARD_COLORS[i]}18` }}
-                    >
-                      <div className="flex h-full items-center justify-center">
-                        <span className="h-3 w-3 rounded-full" style={{ background: CARD_COLORS[i] }} />
-                      </div>
-                    </div>
-                    <div className="text-[13px] font-semibold text-black/82 dark:text-white/82">{chip.label}</div>
-                    <div className="mt-0.5 text-[11px] text-black/46 dark:text-white/40">{chip.sub}</div>
-                  </motion.div>
-                </TiltCard>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </div>
+        {/* Hero chip slider (mobile-first horizontal carousel) */}
+        <motion.div style={{ y: yChips }} className="relative mx-auto mt-14 max-w-[760px]">
+          <HeroChipSlider chips={t.hero.chips} inView={inView} />
+        </motion.div>
+      </motion.div>
 
       {/* Scroll hint */}
       <motion.a
@@ -772,7 +892,66 @@ function HeroSlide({ t }: { t: typeof COPY.ru }) {
           <ChevronDown className="h-5 w-5" />
         </motion.div>
       </motion.a>
+
+      {/* Local keyframes for gradient pan */}
+      <style jsx>{`
+        @keyframes gradient-pan {
+          0% { background-position: 0% 50%; }
+          100% { background-position: 200% 50%; }
+        }
+      `}</style>
     </section>
+  );
+}
+
+function HeroChipSlider({
+  chips,
+  inView,
+}: {
+  chips: ReadonlyArray<{ readonly label: string; readonly sub: string }>;
+  inView: boolean;
+}) {
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true, align: 'center', skipSnaps: false });
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    const id = setInterval(() => {
+      if (emblaApi.canScrollNext()) emblaApi.scrollNext();
+      else emblaApi.scrollTo(0);
+    }, 3500);
+    return () => clearInterval(id);
+  }, [emblaApi]);
+
+  return (
+    <div className="overflow-hidden" ref={emblaRef}>
+      <div className="flex -ml-3 sm:-ml-4">
+        {chips.map((chip, i) => (
+          <div
+            key={i}
+            className="flex-[0_0_70%] pl-3 sm:flex-[0_0_38%] sm:pl-4 md:flex-[0_0_33.333%]"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 30, scale: 0.92 }}
+              animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
+              transition={{ duration: 0.7, delay: 0.8 + i * 0.12, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <TiltCard className="rounded-2xl border border-black/8 bg-white/90 p-4 shadow-[0_20px_50px_-20px_rgba(18,125,254,0.25)] backdrop-blur-sm dark:border-white/10 dark:bg-white/5">
+                <motion.div
+                  animate={{ y: [0, -4, 0] }}
+                  transition={{ duration: 4 + i, repeat: Infinity, ease: 'easeInOut', delay: i * 0.8 }}
+                >
+                  <div className="mb-2.5 flex h-8 w-8 items-center justify-center rounded-xl" style={{ background: `${CARD_COLORS[i]}18` }}>
+                    <span className="h-3 w-3 rounded-full" style={{ background: CARD_COLORS[i], boxShadow: `0 0 12px ${CARD_COLORS[i]}` }} />
+                  </div>
+                  <div className="text-[13px] font-semibold text-black/82 dark:text-white/82">{chip.label}</div>
+                  <div className="mt-0.5 text-[11px] text-black/46 dark:text-white/40">{chip.sub}</div>
+                </motion.div>
+              </TiltCard>
+            </motion.div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -781,16 +960,19 @@ function WhySlide({ t }: { t: typeof COPY.ru }) {
   const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, { once: true, margin: '-80px' });
 
+  const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] });
+  const yLeft = useTransform(scrollYProgress, [0, 1], [60, -60]);
+  const yRight = useTransform(scrollYProgress, [0, 1], [-60, 60]);
+
   return (
     <section
       id="why"
       ref={ref}
       className="relative min-h-screen bg-[#f7f8fc] py-20 dark:bg-[#0a0d17] lg:py-28"
     >
-      {/* Background accent */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div
-          className="absolute left-1/4 top-1/2 h-[600px] w-[600px] -translate-y-1/2 rounded-full opacity-8 blur-[120px]"
+          className="absolute left-1/4 top-1/2 h-[600px] w-[600px] -translate-y-1/2 rounded-full opacity-10 blur-[120px]"
           style={{ background: `radial-gradient(circle, ${ACCENT}, transparent 70%)` }}
         />
       </div>
@@ -811,11 +993,12 @@ function WhySlide({ t }: { t: typeof COPY.ru }) {
         <div className="grid gap-5 lg:grid-cols-2">
           {/* Before */}
           <motion.div
+            style={{ y: yLeft }}
             initial={{ opacity: 0, x: -40 }}
             animate={inView ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.8, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
           >
-            <div className="relative h-full overflow-hidden rounded-3xl border border-rose-200/60 bg-gradient-to-br from-rose-50 via-white to-orange-50/60 p-8 dark:border-rose-900/40 dark:from-rose-950/50 dark:via-[#0f1018] dark:to-orange-950/30 lg:p-10">
+            <TiltCard className="relative h-full overflow-hidden rounded-3xl border border-rose-200/60 bg-gradient-to-br from-rose-50 via-white to-orange-50/60 p-8 shadow-[0_24px_60px_-24px_rgba(244,63,94,0.25)] transition-shadow duration-500 hover:shadow-[0_30px_70px_-20px_rgba(244,63,94,0.4)] dark:border-rose-900/40 dark:from-rose-950/50 dark:via-[#0f1018] dark:to-orange-950/30 lg:p-10">
               <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-rose-100 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-rose-600 dark:bg-rose-900/50 dark:text-rose-400">
                 <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
                 {t.why.before.tag}
@@ -827,25 +1010,26 @@ function WhySlide({ t }: { t: typeof COPY.ru }) {
                     initial={{ opacity: 0, x: -20 }}
                     animate={inView ? { opacity: 1, x: 0 } : {}}
                     transition={{ duration: 0.5, delay: 0.25 + i * 0.08 }}
-                    className="flex items-center gap-3 rounded-2xl border border-rose-100/80 bg-white/70 px-4 py-3.5 dark:border-rose-900/30 dark:bg-rose-950/30"
+                    whileHover={{ x: 4 }}
+                    className="flex items-center gap-3 rounded-2xl border border-rose-100/80 bg-white/70 px-4 py-3.5 transition-all hover:border-rose-200 hover:shadow-[0_8px_20px_-12px_rgba(244,63,94,0.35)] dark:border-rose-900/30 dark:bg-rose-950/30"
                   >
                     <TrendingDown className="h-4 w-4 flex-shrink-0 text-rose-500" />
                     <span className="text-[14px] text-black/72 dark:text-white/66">{item}</span>
                   </motion.div>
                 ))}
               </div>
-              {/* Decorative */}
               <div className="pointer-events-none absolute -bottom-10 -right-10 h-48 w-48 rounded-full bg-rose-200/30 blur-3xl dark:bg-rose-800/20" />
-            </div>
+            </TiltCard>
           </motion.div>
 
           {/* After */}
           <motion.div
+            style={{ y: yRight }}
             initial={{ opacity: 0, x: 40 }}
             animate={inView ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
           >
-            <div className="relative h-full overflow-hidden rounded-3xl border border-blue-200/60 bg-gradient-to-br from-blue-50 via-white to-violet-50/60 p-8 dark:border-blue-900/40 dark:from-blue-950/50 dark:via-[#0f1018] dark:to-violet-950/30 lg:p-10">
+            <TiltCard className="relative h-full overflow-hidden rounded-3xl border border-blue-200/60 bg-gradient-to-br from-blue-50 via-white to-violet-50/60 p-8 shadow-[0_24px_60px_-24px_rgba(18,125,254,0.3)] transition-shadow duration-500 hover:shadow-[0_30px_70px_-20px_rgba(18,125,254,0.5)] dark:border-blue-900/40 dark:from-blue-950/50 dark:via-[#0f1018] dark:to-violet-950/30 lg:p-10">
               <div
                 className="mb-6 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em]"
                 style={{ background: `${ACCENT}18`, color: ACCENT }}
@@ -860,11 +1044,12 @@ function WhySlide({ t }: { t: typeof COPY.ru }) {
                     initial={{ opacity: 0, x: 20 }}
                     animate={inView ? { opacity: 1, x: 0 } : {}}
                     transition={{ duration: 0.5, delay: 0.35 + i * 0.08 }}
-                    className="flex items-center gap-3 rounded-2xl border border-blue-100/80 bg-white/70 px-4 py-3.5 dark:border-blue-900/30 dark:bg-blue-950/25"
+                    whileHover={{ x: -4 }}
+                    className="flex items-center gap-3 rounded-2xl border border-blue-100/80 bg-white/70 px-4 py-3.5 transition-all hover:border-blue-200 hover:shadow-[0_8px_20px_-12px_rgba(18,125,254,0.35)] dark:border-blue-900/30 dark:bg-blue-950/25"
                   >
                     <div
                       className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full"
-                      style={{ background: ACCENT }}
+                      style={{ background: ACCENT, boxShadow: `0 0 12px ${ACCENT}80` }}
                     >
                       <Check className="h-3 w-3 text-white" />
                     </div>
@@ -872,12 +1057,11 @@ function WhySlide({ t }: { t: typeof COPY.ru }) {
                   </motion.div>
                 ))}
               </div>
-              {/* Glow */}
               <div
-                className="pointer-events-none absolute -bottom-10 -right-10 h-48 w-48 rounded-full blur-3xl opacity-30"
+                className="pointer-events-none absolute -bottom-10 -right-10 h-48 w-48 rounded-full opacity-30 blur-3xl"
                 style={{ background: `radial-gradient(circle, ${ACCENT}, transparent)` }}
               />
-            </div>
+            </TiltCard>
           </motion.div>
         </div>
       </div>
@@ -885,7 +1069,7 @@ function WhySlide({ t }: { t: typeof COPY.ru }) {
   );
 }
 
-// ─── SLIDE 3 · FEATURES ───────────────────────────────────────────────────────
+// ─── SLIDE 3 · FEATURES (slider) ──────────────────────────────────────────────
 function FeaturesSlide({ t }: { t: typeof COPY.ru }) {
   const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, { once: true, margin: '-60px' });
@@ -894,9 +1078,16 @@ function FeaturesSlide({ t }: { t: typeof COPY.ru }) {
     <section
       id="features"
       ref={ref}
-      className="min-h-screen bg-white py-20 dark:bg-[#06080f] lg:py-28"
+      className="relative min-h-screen overflow-hidden bg-white py-20 dark:bg-[#06080f] lg:py-28"
     >
-      <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
+      <div className="pointer-events-none absolute inset-0">
+        <div
+          className="absolute right-0 top-1/4 h-[460px] w-[460px] rounded-full opacity-10 blur-[120px]"
+          style={{ background: `radial-gradient(circle, ${ACCENT_ALT}, transparent 70%)` }}
+        />
+      </div>
+
+      <div className="relative mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
@@ -910,46 +1101,65 @@ function FeaturesSlide({ t }: { t: typeof COPY.ru }) {
           <p className="mt-4 text-[15px] leading-7 text-black/54 dark:text-white/46">{t.features.sub}</p>
         </motion.div>
 
-        <div className="grid gap-px overflow-hidden rounded-3xl border border-black/8 bg-black/8 dark:border-white/8 dark:bg-white/8 sm:grid-cols-2 lg:grid-cols-4">
+        <Slider autoplay={5000} prevLabel={t.prev} nextLabel={t.next}>
           {t.features.items.map((item, i) => {
             const Icon = FEATURE_ICONS[i];
             const color = CARD_COLORS[i];
             return (
-              <motion.div
+              <div
                 key={i}
-                initial={{ opacity: 0, y: 24 }}
-                animate={inView ? { opacity: 1, y: 0 } : {}}
-                transition={{ duration: 0.55, delay: i * 0.055, ease: [0.22, 1, 0.36, 1] }}
-                className="group relative bg-white p-6 transition-all duration-300 hover:z-10 hover:shadow-[0_0_0_2px_#127dfe,0_20px_60px_-20px_rgba(18,125,254,0.35)] dark:bg-[#06080f] dark:hover:shadow-[0_0_0_2px_#127dfe,0_20px_60px_-20px_rgba(18,125,254,0.3)]"
+                className="flex-[0_0_85%] pl-4 sm:flex-[0_0_50%] lg:flex-[0_0_33.333%] xl:flex-[0_0_25%]"
               >
                 <motion.div
-                  whileHover={{ scale: 1.12, rotate: 6 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                  className="flex h-12 w-12 items-center justify-center rounded-2xl"
-                  style={{ background: `${color}16` }}
+                  initial={{ opacity: 0, y: 24 }}
+                  animate={inView ? { opacity: 1, y: 0 } : {}}
+                  transition={{ duration: 0.6, delay: i * 0.05, ease: [0.22, 1, 0.36, 1] }}
+                  className="h-full"
                 >
-                  <Icon className="h-5 w-5" style={{ color }} />
+                  <TiltCard className="group relative h-full overflow-hidden rounded-3xl border border-black/8 bg-white p-7 transition-all duration-300 hover:-translate-y-1 hover:border-transparent hover:shadow-[0_28px_60px_-22px_rgba(18,125,254,0.4)] dark:border-white/8 dark:bg-white/[0.03]">
+                    {/* Hover glow follows cursor */}
+                    <div
+                      className="pointer-events-none absolute inset-0 rounded-3xl opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                      style={{ background: `radial-gradient(280px circle at var(--mx,50%) var(--my,50%), ${color}1f, transparent 70%)` }}
+                    />
+                    <motion.div
+                      whileHover={{ scale: 1.12, rotate: 6 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 18 }}
+                      className="relative z-10 flex h-12 w-12 items-center justify-center rounded-2xl"
+                      style={{ background: `${color}16` }}
+                    >
+                      <Icon className="h-5 w-5" style={{ color }} />
+                      <motion.div
+                        className="absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                        style={{ boxShadow: `0 0 24px ${color}80` }}
+                      />
+                    </motion.div>
+                    <h3 className="relative z-10 mt-5 text-[16px] font-semibold tracking-tight text-black dark:text-white">
+                      {item.title}
+                    </h3>
+                    <p className="relative z-10 mt-1.5 text-[13px] leading-relaxed text-black/52 dark:text-white/44">
+                      {item.desc}
+                    </p>
+                    <motion.div
+                      className="absolute bottom-0 left-0 h-0.5 rounded-full"
+                      style={{ background: `linear-gradient(90deg, ${color}, transparent)` }}
+                      initial={{ width: 0 }}
+                      whileInView={{ width: '70%' }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.9, delay: 0.3 + i * 0.04 }}
+                    />
+                  </TiltCard>
                 </motion.div>
-                <h3 className="mt-5 text-[15.5px] font-semibold tracking-tight text-black dark:text-white">
-                  {item.title}
-                </h3>
-                <p className="mt-1.5 text-[13px] leading-relaxed text-black/52 dark:text-white/44">{item.desc}</p>
-
-                {/* Hover glow */}
-                <div
-                  className="pointer-events-none absolute inset-0 rounded-none opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                  style={{ background: `radial-gradient(200px circle at var(--mx,50%) var(--my,50%), ${color}08, transparent 70%)` }}
-                />
-              </motion.div>
+              </div>
             );
           })}
-        </div>
+        </Slider>
       </div>
     </section>
   );
 }
 
-// ─── SLIDE 4 · WHO ────────────────────────────────────────────────────────────
+// ─── SLIDE 4 · WHO (slider) ───────────────────────────────────────────────────
 function WhoSlide({ t }: { t: typeof COPY.ru }) {
   const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, { once: true, margin: '-60px' });
@@ -958,9 +1168,16 @@ function WhoSlide({ t }: { t: typeof COPY.ru }) {
     <section
       id="who"
       ref={ref}
-      className="min-h-screen bg-[#f7f8fc] py-20 dark:bg-[#0a0d17] lg:py-28"
+      className="relative min-h-screen overflow-hidden bg-[#f7f8fc] py-20 dark:bg-[#0a0d17] lg:py-28"
     >
-      <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
+      <div className="pointer-events-none absolute inset-0">
+        <div
+          className="absolute left-0 top-1/3 h-[420px] w-[420px] rounded-full opacity-10 blur-[120px]"
+          style={{ background: `radial-gradient(circle, ${ACCENT_CYAN}, transparent 70%)` }}
+        />
+      </div>
+
+      <div className="relative mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
@@ -974,54 +1191,68 @@ function WhoSlide({ t }: { t: typeof COPY.ru }) {
           <p className="mt-4 text-[15px] text-black/52 dark:text-white/44">{t.who.sub}</p>
         </motion.div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Slider autoplay={5500} prevLabel={t.prev} nextLabel={t.next}>
           {t.who.items.map((item, i) => {
             const Icon = WHO_ICONS[i];
             const color = CARD_COLORS[i];
             return (
-              <motion.div
+              <div
                 key={i}
-                initial={{ opacity: 0, y: 32, scale: 0.96 }}
-                animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
-                transition={{ duration: 0.6, delay: i * 0.07, ease: [0.22, 1, 0.36, 1] }}
+                className="flex-[0_0_85%] pl-4 sm:flex-[0_0_50%] lg:flex-[0_0_33.333%]"
               >
-                <TiltCard className="group relative h-full cursor-default overflow-hidden rounded-3xl border border-black/8 bg-white p-7 transition-all duration-300 hover:border-transparent hover:shadow-[0_24px_64px_-20px_rgba(18,125,254,0.28)] dark:border-white/8 dark:bg-white/[0.03] dark:hover:shadow-[0_24px_64px_-20px_rgba(18,125,254,0.24)]">
-                  <div
-                    className="relative mb-5 flex h-14 w-14 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-105"
-                    style={{ background: `${color}16` }}
-                  >
-                    <Icon className="h-6 w-6" style={{ color }} />
-                    <motion.div
-                      className="absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                      style={{ boxShadow: `0 0 24px ${color}50` }}
+                <motion.div
+                  initial={{ opacity: 0, y: 32, scale: 0.96 }}
+                  animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
+                  transition={{ duration: 0.6, delay: i * 0.07, ease: [0.22, 1, 0.36, 1] }}
+                  className="h-full"
+                >
+                  <TiltCard className="group relative h-full cursor-default overflow-hidden rounded-3xl border border-black/8 bg-white p-7 transition-all duration-300 hover:-translate-y-1 hover:border-transparent hover:shadow-[0_30px_70px_-22px_rgba(18,125,254,0.32)] dark:border-white/8 dark:bg-white/[0.03] dark:hover:shadow-[0_30px_70px_-22px_rgba(124,58,237,0.32)]">
+                    <div
+                      className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                      style={{ background: `radial-gradient(320px circle at var(--mx,50%) var(--my,50%), ${color}1a, transparent 65%)` }}
                     />
-                  </div>
-                  <h3 className="text-[18px] font-bold tracking-tight text-black dark:text-white">{item.title}</h3>
-                  <p className="mt-2 text-[13.5px] leading-relaxed text-black/52 dark:text-white/44">{item.desc}</p>
-
-                  {/* Bottom accent line */}
-                  <motion.div
-                    className="absolute bottom-0 left-0 h-0.5 rounded-full"
-                    style={{ background: `linear-gradient(90deg, ${color}, transparent)` }}
-                    initial={{ width: 0 }}
-                    whileInView={{ width: '60%' }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.8, delay: 0.3 + i * 0.05 }}
-                  />
-                </TiltCard>
-              </motion.div>
+                    <div
+                      className="relative z-10 mb-5 flex h-14 w-14 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"
+                      style={{ background: `${color}16` }}
+                    >
+                      <Icon className="h-6 w-6" style={{ color }} />
+                      <motion.div
+                        className="absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                        style={{ boxShadow: `0 0 28px ${color}55` }}
+                      />
+                    </div>
+                    <h3 className="relative z-10 text-[18px] font-bold tracking-tight text-black dark:text-white">
+                      {item.title}
+                    </h3>
+                    <p className="relative z-10 mt-2 text-[13.5px] leading-relaxed text-black/52 dark:text-white/44">
+                      {item.desc}
+                    </p>
+                    <motion.div
+                      className="absolute bottom-0 left-0 h-0.5 rounded-full"
+                      style={{ background: `linear-gradient(90deg, ${color}, transparent)` }}
+                      initial={{ width: 0 }}
+                      whileInView={{ width: '60%' }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.8, delay: 0.3 + i * 0.05 }}
+                    />
+                  </TiltCard>
+                </motion.div>
+              </div>
             );
           })}
-        </div>
+        </Slider>
       </div>
     </section>
   );
 }
 
-// ─── SLIDE 5 · HOW ────────────────────────────────────────────────────────────
+// ─── SLIDE 5 · HOW (timeline + slider) ────────────────────────────────────────
 function HowSlide({ t }: { t: typeof COPY.ru }) {
   const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, { once: true, margin: '-60px' });
+
+  const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] });
+  const lineWidth = useTransform(scrollYProgress, [0.1, 0.5], ['0%', '100%']);
 
   return (
     <section
@@ -1029,7 +1260,6 @@ function HowSlide({ t }: { t: typeof COPY.ru }) {
       ref={ref}
       className="relative min-h-screen overflow-hidden bg-white py-20 dark:bg-[#06080f] lg:py-28"
     >
-      {/* Background */}
       <div className="pointer-events-none absolute inset-0">
         <div
           className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 opacity-20"
@@ -1042,7 +1272,7 @@ function HowSlide({ t }: { t: typeof COPY.ru }) {
           initial={{ opacity: 0, y: 30 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.7 }}
-          className="mb-16 text-center"
+          className="mb-12 text-center"
         >
           <Eyebrow>{t.how.eyebrow}</Eyebrow>
           <h2 className="mt-5 text-[36px] font-bold leading-[1.04] tracking-[-0.04em] text-black dark:text-white sm:text-[48px]">
@@ -1050,63 +1280,61 @@ function HowSlide({ t }: { t: typeof COPY.ru }) {
           </h2>
         </motion.div>
 
-        <div className="relative grid gap-6 lg:grid-cols-4">
-          {/* Connector line */}
-          <div className="absolute left-0 right-0 top-[56px] hidden lg:block">
-            <motion.div
-              className="mx-auto h-px"
-              style={{ background: `linear-gradient(90deg, transparent 0%, ${ACCENT}40 20%, ${ACCENT}60 50%, ${ACCENT}40 80%, transparent 100%)` }}
-              initial={{ scaleX: 0, originX: 0 }}
-              animate={inView ? { scaleX: 1 } : {}}
-              transition={{ duration: 1.4, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            />
-          </div>
-
-          {t.how.steps.map((step, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 40 }}
-              animate={inView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.65, delay: 0.15 + i * 0.12, ease: [0.22, 1, 0.36, 1] }}
-              className="group relative"
-            >
-              <div className="relative overflow-hidden rounded-3xl border border-black/8 bg-white p-7 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_28px_56px_-20px_rgba(18,125,254,0.3)] dark:border-white/8 dark:bg-white/[0.03]">
-                {/* Step number */}
-                <div className="relative mb-6">
-                  <motion.div
-                    className="relative flex h-[52px] w-[52px] items-center justify-center rounded-2xl text-[15px] font-bold text-white"
-                    style={{ background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT_ALT})` }}
-                    whileHover={{ scale: 1.08, rotate: -4 }}
-                    transition={{ type: 'spring', stiffness: 280, damping: 20 }}
-                  >
-                    {step.n}
-                    <motion.div
-                      className="absolute inset-0 rounded-2xl"
-                      style={{ boxShadow: `0 0 0 0 ${ACCENT}` }}
-                      animate={{ boxShadow: [`0 0 0 0px ${ACCENT}60`, `0 0 0 10px ${ACCENT}00`] }}
-                      transition={{ duration: 2, repeat: Infinity, delay: i * 0.5 }}
-                    />
-                  </motion.div>
-                </div>
-
-                <h3 className="text-[17px] font-bold tracking-tight text-black dark:text-white">{step.title}</h3>
-                <p className="mt-2.5 text-[13.5px] leading-relaxed text-black/52 dark:text-white/44">{step.desc}</p>
-
-                {/* Hover gradient */}
-                <div
-                  className="pointer-events-none absolute inset-0 rounded-3xl opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                  style={{ background: `linear-gradient(135deg, ${ACCENT}06, ${ACCENT_ALT}04)` }}
-                />
-              </div>
-            </motion.div>
-          ))}
+        {/* Scroll-driven progress timeline */}
+        <div className="relative mx-auto mb-10 hidden h-px max-w-3xl overflow-hidden rounded-full bg-black/10 dark:bg-white/10 sm:block">
+          <motion.div
+            style={{ width: lineWidth }}
+            className="h-full bg-gradient-to-r from-[#127dfe] via-[#7c3aed] to-[#0ea5e9] shadow-[0_0_18px_rgba(18,125,254,0.6)]"
+          />
         </div>
+
+        <Slider autoplay={5000} prevLabel={t.prev} nextLabel={t.next}>
+          {t.how.steps.map((step, i) => (
+            <div
+              key={i}
+              className="flex-[0_0_88%] pl-4 sm:flex-[0_0_50%] lg:flex-[0_0_33.333%] xl:flex-[0_0_25%]"
+            >
+              <motion.div
+                initial={{ opacity: 0, y: 40 }}
+                animate={inView ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 0.65, delay: 0.15 + i * 0.1, ease: [0.22, 1, 0.36, 1] }}
+                className="group relative h-full"
+              >
+                <TiltCard className="relative h-full overflow-hidden rounded-3xl border border-black/8 bg-white p-7 transition-all duration-300 hover:-translate-y-2 hover:border-transparent hover:shadow-[0_32px_60px_-22px_rgba(18,125,254,0.38)] dark:border-white/8 dark:bg-white/[0.03]">
+                  <div className="relative mb-6">
+                    <motion.div
+                      className="relative flex h-[58px] w-[58px] items-center justify-center rounded-2xl text-[16px] font-bold text-white"
+                      style={{ background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT_ALT})`, boxShadow: `0 16px 36px -12px ${ACCENT}88` }}
+                      whileHover={{ scale: 1.1, rotate: -5 }}
+                      transition={{ type: 'spring', stiffness: 280, damping: 20 }}
+                    >
+                      {step.n}
+                      <motion.div
+                        className="absolute inset-0 rounded-2xl"
+                        animate={{ boxShadow: [`0 0 0 0px ${ACCENT}80`, `0 0 0 14px ${ACCENT}00`] }}
+                        transition={{ duration: 2, repeat: Infinity, delay: i * 0.5 }}
+                      />
+                    </motion.div>
+                  </div>
+
+                  <h3 className="text-[17px] font-bold tracking-tight text-black dark:text-white">{step.title}</h3>
+                  <p className="mt-2.5 text-[13.5px] leading-relaxed text-black/52 dark:text-white/44">{step.desc}</p>
+
+                  <div
+                    className="pointer-events-none absolute inset-0 rounded-3xl opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                    style={{ background: `linear-gradient(135deg, ${ACCENT}10, ${ACCENT_ALT}06)` }}
+                  />
+                </TiltCard>
+              </motion.div>
+            </div>
+          ))}
+        </Slider>
       </div>
     </section>
   );
 }
 
-// ─── SLIDE 6 · PROOF ─────────────────────────────────────────────────────────
+// ─── SLIDE 6 · PROOF (stats + reviews slider) ─────────────────────────────────
 function ProofSlide({ t }: { t: typeof COPY.ru }) {
   const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, { once: true, margin: '-60px' });
@@ -1115,9 +1343,20 @@ function ProofSlide({ t }: { t: typeof COPY.ru }) {
     <section
       id="proof"
       ref={ref}
-      className="min-h-screen bg-[#f7f8fc] py-20 dark:bg-[#0a0d17] lg:py-28"
+      className="relative min-h-screen overflow-hidden bg-[#f7f8fc] py-20 dark:bg-[#0a0d17] lg:py-28"
     >
-      <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
+      <div className="pointer-events-none absolute inset-0">
+        <div
+          className="absolute right-0 top-0 h-[420px] w-[420px] rounded-full opacity-10 blur-[120px]"
+          style={{ background: `radial-gradient(circle, ${ACCENT}, transparent 70%)` }}
+        />
+        <div
+          className="absolute bottom-0 left-0 h-[380px] w-[380px] rounded-full opacity-10 blur-[120px]"
+          style={{ background: `radial-gradient(circle, ${ACCENT_ALT}, transparent 70%)` }}
+        />
+      </div>
+
+      <div className="relative mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
@@ -1131,83 +1370,102 @@ function ProofSlide({ t }: { t: typeof COPY.ru }) {
         </motion.div>
 
         {/* Stats */}
-        <div className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mb-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {t.proof.stats.map((stat, i) => (
             <motion.div
               key={i}
               initial={{ opacity: 0, y: 28, scale: 0.94 }}
               animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
               transition={{ duration: 0.6, delay: i * 0.08 }}
-              className="group overflow-hidden rounded-3xl border border-black/8 bg-white p-7 text-center transition-all duration-300 hover:shadow-[0_20px_50px_-16px_rgba(18,125,254,0.25)] dark:border-white/8 dark:bg-white/[0.03]"
             >
-              {stat.pre && (
-                <div className="mb-1 text-[12px] font-semibold uppercase tracking-[0.1em] text-black/38 dark:text-white/32">
-                  {stat.pre}
+              <TiltCard className="group h-full overflow-hidden rounded-3xl border border-black/8 bg-white p-7 text-center transition-all duration-300 hover:-translate-y-1 hover:border-transparent hover:shadow-[0_24px_60px_-20px_rgba(18,125,254,0.35)] dark:border-white/8 dark:bg-white/[0.03]">
+                {stat.pre && (
+                  <div className="mb-1 text-[12px] font-semibold uppercase tracking-[0.1em] text-black/38 dark:text-white/32">
+                    {stat.pre}
+                  </div>
+                )}
+                <div className="text-[48px] font-black leading-none tracking-[-0.05em] sm:text-[54px]">
+                  <span className="bg-gradient-to-br from-[#127dfe] via-[#7c3aed] to-[#0ea5e9] bg-clip-text text-transparent [background-size:200%_auto] group-hover:[animation:gradient-pan_3s_linear_infinite]">
+                    {inView && <Counter target={stat.val} suffix={stat.suffix} pre="" />}
+                  </span>
                 </div>
-              )}
-              <div className="text-[48px] font-black leading-none tracking-[-0.05em] sm:text-[52px]">
-                <span
-                  className="bg-gradient-to-br from-[#127dfe] to-[#7c3aed] bg-clip-text text-transparent"
-                >
-                  {inView && <Counter target={stat.val} suffix={stat.suffix} pre="" />}
-                </span>
-              </div>
-              <div className="mt-3 text-[12.5px] leading-snug text-black/48 dark:text-white/40">{stat.label}</div>
+                <div className="mt-3 text-[12.5px] leading-snug text-black/48 dark:text-white/40">{stat.label}</div>
+              </TiltCard>
             </motion.div>
           ))}
         </div>
 
-        {/* Reviews */}
-        <div className="grid gap-4 lg:grid-cols-3">
+        {/* Reviews slider */}
+        <Slider autoplay={6500} prevLabel={t.prev} nextLabel={t.next}>
           {t.proof.reviews.map((review, i) => (
-            <motion.div
+            <div
               key={i}
-              initial={{ opacity: 0, y: 32 }}
-              animate={inView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.65, delay: 0.3 + i * 0.1 }}
-              className="group relative overflow-hidden rounded-3xl border border-black/8 bg-white p-7 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_60px_-20px_rgba(18,125,254,0.22)] dark:border-white/8 dark:bg-white/[0.03]"
+              className="flex-[0_0_88%] pl-4 sm:flex-[0_0_60%] lg:flex-[0_0_40%]"
             >
-              {/* Quote icon with glow */}
-              <div className="mb-5">
-                <motion.div
-                  whileHover={{ scale: 1.1, rotate: -8 }}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl"
-                  style={{ background: `${ACCENT}14` }}
-                >
-                  <Quote className="h-4 w-4" style={{ color: ACCENT }} />
-                </motion.div>
-              </div>
+              <motion.div
+                initial={{ opacity: 0, y: 32 }}
+                animate={inView ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 0.65, delay: 0.3 + i * 0.1 }}
+                className="h-full"
+              >
+                <TiltCard className="group relative h-full overflow-hidden rounded-3xl border border-black/8 bg-white p-7 transition-all duration-300 hover:-translate-y-1 hover:border-transparent hover:shadow-[0_30px_70px_-22px_rgba(18,125,254,0.3)] dark:border-white/8 dark:bg-white/[0.03] lg:p-9">
+                  <div
+                    className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                    style={{ background: `radial-gradient(320px circle at var(--mx,50%) var(--my,50%), ${ACCENT}14, transparent 65%)` }}
+                  />
+                  <div className="relative z-10 mb-5">
+                    <motion.div
+                      whileHover={{ scale: 1.12, rotate: -8 }}
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-xl"
+                      style={{ background: `${ACCENT}14`, boxShadow: `0 0 24px ${ACCENT}30` }}
+                    >
+                      <Quote className="h-5 w-5" style={{ color: ACCENT }} />
+                    </motion.div>
+                  </div>
 
-              <p className="text-[14px] leading-7 text-black/66 dark:text-white/58">{review.text}</p>
+                  <p className="relative z-10 text-[14.5px] leading-7 text-black/72 dark:text-white/64">
+                    {review.text}
+                  </p>
 
-              <div className="mt-6 flex items-center gap-3">
-                <div
-                  className="flex h-10 w-10 items-center justify-center rounded-full text-[13px] font-bold text-white"
-                  style={{ background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT_ALT})` }}
-                >
-                  {review.name.slice(0, 1)}
-                </div>
-                <div>
-                  <div className="text-[13.5px] font-semibold text-black dark:text-white">{review.name}</div>
-                  <div className="text-[11.5px] text-black/46 dark:text-white/40">{review.role}</div>
-                </div>
-              </div>
+                  <div className="relative z-10 mt-6 flex items-center gap-3">
+                    <div
+                      className="flex h-11 w-11 items-center justify-center rounded-full text-[14px] font-bold text-white"
+                      style={{ background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT_ALT})`, boxShadow: `0 8px 20px -8px ${ACCENT}88` }}
+                    >
+                      {review.name.slice(0, 1)}
+                    </div>
+                    <div>
+                      <div className="text-[13.5px] font-semibold text-black dark:text-white">{review.name}</div>
+                      <div className="text-[11.5px] text-black/46 dark:text-white/40">{review.role}</div>
+                    </div>
+                  </div>
 
-              <div className="mt-4 flex gap-0.5">
-                {Array.from({ length: 5 }).map((_, si) => (
-                  <Star key={si} className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                ))}
-              </div>
-
-              {/* Hover gradient */}
-              <div
-                className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                style={{ background: `linear-gradient(135deg, ${ACCENT}04, transparent 60%)` }}
-              />
-            </motion.div>
+                  <div className="relative z-10 mt-4 flex gap-0.5">
+                    {Array.from({ length: 5 }).map((_, si) => (
+                      <motion.span
+                        key={si}
+                        initial={{ opacity: 0, scale: 0.4 }}
+                        whileInView={{ opacity: 1, scale: 1 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: 0.4 + si * 0.06, type: 'spring', stiffness: 280 }}
+                      >
+                        <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                      </motion.span>
+                    ))}
+                  </div>
+                </TiltCard>
+              </motion.div>
+            </div>
           ))}
-        </div>
+        </Slider>
       </div>
+
+      <style jsx>{`
+        @keyframes gradient-pan {
+          0% { background-position: 0% 50%; }
+          100% { background-position: 200% 50%; }
+        }
+      `}</style>
     </section>
   );
 }
@@ -1216,6 +1474,10 @@ function ProofSlide({ t }: { t: typeof COPY.ru }) {
 function CtaSlide({ t }: { t: typeof COPY.ru }) {
   const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, { once: true, margin: '-60px' });
+
+  const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] });
+  const glowY = useTransform(scrollYProgress, [0, 1], [80, -80]);
+  const glowScale = useTransform(scrollYProgress, [0, 0.5, 1], [0.9, 1.05, 0.95]);
 
   return (
     <section
@@ -1234,14 +1496,15 @@ function CtaSlide({ t }: { t: typeof COPY.ru }) {
         />
       ))}
 
-      {/* Big glow */}
+      {/* Big glow with parallax */}
       <motion.div
+        style={{ y: glowY, scale: glowScale }}
         className="pointer-events-none absolute inset-x-0 top-1/4 flex justify-center"
-        animate={{ scale: [1, 1.08, 1], opacity: [0.5, 0.75, 0.5] }}
-        transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
       >
-        <div
-          className="h-[500px] w-[800px] rounded-full blur-[100px]"
+        <motion.div
+          animate={{ opacity: [0.5, 0.85, 0.5] }}
+          transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+          className="h-[520px] w-[820px] rounded-full blur-[100px]"
           style={{ background: `radial-gradient(ellipse at center, ${ACCENT}60, ${ACCENT_ALT}30, transparent 70%)` }}
         />
       </motion.div>
@@ -1263,14 +1526,14 @@ function CtaSlide({ t }: { t: typeof COPY.ru }) {
         >
           <Eyebrow light>{t.cta.badge}</Eyebrow>
 
-          <h2 className="mx-auto mt-7 max-w-3xl text-[42px] font-black leading-[0.98] tracking-[-0.04em] text-white sm:text-[60px] lg:text-[72px]">
+          <h2 className="mx-auto mt-7 max-w-3xl text-[42px] font-black leading-[0.98] tracking-[-0.04em] text-white sm:text-[60px] lg:text-[76px]">
             {t.cta.title.split(' ').map((word, i) => (
               <motion.span
                 key={i}
                 initial={{ opacity: 0, y: 30 }}
                 animate={inView ? { opacity: 1, y: 0 } : {}}
                 transition={{ duration: 0.6, delay: 0.1 + i * 0.05 }}
-                className="inline-block mr-[0.18em]"
+                className="mr-[0.18em] inline-block"
               >
                 {word}
               </motion.span>
@@ -1292,24 +1555,24 @@ function CtaSlide({ t }: { t: typeof COPY.ru }) {
             transition={{ duration: 0.7, delay: 0.65 }}
             className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row"
           >
-            {/* Primary glow button */}
             <motion.a
               href="/login"
               whileHover={{ scale: 1.04, y: -2 }}
               whileTap={{ scale: 0.97 }}
-              className="group relative inline-flex items-center gap-2.5 overflow-hidden rounded-2xl bg-white px-8 py-4 text-[15px] font-bold text-black shadow-[0_24px_60px_-12px_rgba(255,255,255,0.35)] transition-all duration-300 hover:shadow-[0_32px_72px_-12px_rgba(255,255,255,0.5)]"
+              className="group relative inline-flex items-center gap-2.5 overflow-hidden rounded-2xl bg-white px-8 py-4 text-[15px] font-bold text-black shadow-[0_24px_60px_-12px_rgba(255,255,255,0.35)] transition-all duration-300 hover:shadow-[0_32px_72px_-12px_rgba(255,255,255,0.55)]"
             >
-              {/* Shimmer */}
-              <span className="absolute inset-y-0 -left-10 w-10 rotate-12 bg-gradient-to-r from-transparent via-black/8 to-transparent transition-all duration-700 group-hover:left-[110%]" />
-              {t.cta.btn1}
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              <span className="pointer-events-none absolute inset-y-0 -left-10 w-10 rotate-12 bg-gradient-to-r from-transparent via-black/8 to-transparent transition-all duration-700 group-hover:left-[110%]" />
+              <span className="relative z-10 flex items-center gap-2.5">
+                {t.cta.btn1}
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </span>
             </motion.a>
 
             <motion.a
               href="/demo/klikbuk-demo"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
-              className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white/8 px-8 py-4 text-[15px] font-semibold text-white backdrop-blur transition-all hover:bg-white/14"
+              className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white/8 px-8 py-4 text-[15px] font-semibold text-white backdrop-blur transition-all hover:border-white/30 hover:bg-white/14"
             >
               {t.cta.btn2}
             </motion.a>
@@ -1358,6 +1621,7 @@ export default function ClickbookLanding() {
 
   return (
     <div className="min-h-screen bg-white antialiased dark:bg-[#06080f]">
+      <ScrollProgress />
       <LandingHeader t={t} />
       <SideNav locale={locale} />
 

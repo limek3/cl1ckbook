@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(npx tsc *)",
-      "Bash(claude plugin *)"
+      "Bash(claude plugin *)",
+      "Bash(grep -v \"\\\\.md$\")",
+      "Bash(git checkout *)"
     ]
   }
 }
