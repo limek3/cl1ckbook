@@ -76,26 +76,26 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
 
 function miniGlass(mode: ThemeMode, edge: 'top' | 'bottom' = 'top'): CSSProperties {
   const dark = mode === 'dark';
-  const bottom = edge === 'bottom';
 
   return {
-    background: dark ? 'rgba(10,10,10,0.34)' : 'rgba(255,255,255,0.42)',
+    // Лёгкое стекло: почти без заливки, без теней.
+    // Контент под плашкой должен быть реально виден, а blur только размазывает его.
+    backgroundColor: dark ? 'rgba(8,8,8,0.18)' : 'rgba(255,255,255,0.24)',
     backgroundImage: dark
-      ? 'linear-gradient(to bottom, rgba(255,255,255,0.075), rgba(255,255,255,0.018))'
-      : 'linear-gradient(to bottom, rgba(255,255,255,0.78), rgba(255,255,255,0.28))',
-    backdropFilter: 'blur(30px) saturate(1.65)',
-    WebkitBackdropFilter: 'blur(30px) saturate(1.65)',
-    boxShadow: bottom
-      ? (dark ? '0 -10px 28px rgba(0,0,0,0.18)' : '0 -10px 26px rgba(15,23,42,0.075)')
-      : (dark ? '0 10px 28px rgba(0,0,0,0.16)' : '0 10px 26px rgba(15,23,42,0.07)'),
-    transform: 'translateZ(0)',
+      ? 'linear-gradient(to bottom, rgba(255,255,255,0.055), rgba(255,255,255,0.012))'
+      : 'linear-gradient(to bottom, rgba(255,255,255,0.42), rgba(255,255,255,0.12))',
+    backdropFilter: 'blur(26px) saturate(1.85)',
+    WebkitBackdropFilter: 'blur(26px) saturate(1.85)',
+    boxShadow: 'none',
+    transform: 'translate3d(0,0,0)',
     willChange: 'backdrop-filter',
+    isolation: 'isolate',
     overflow: 'hidden',
   };
 }
 
 function glassBorder(mode: ThemeMode) {
-  return mode === 'dark' ? 'rgba(255,255,255,0.055)' : 'rgba(255,255,255,0.48)';
+  return mode === 'dark' ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.28)';
 }
 
 interface SubRoute {
@@ -110,7 +110,7 @@ function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) 
     <div style={{
       ...miniGlass(mode, 'bottom'),
       borderTop: `1px solid ${glassBorder(mode)}`,
-      padding: '8px 4px calc(28px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
+      padding: '8px 4px calc(18px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
       display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 0,
       flexShrink: 0,
       position: 'absolute',
@@ -155,8 +155,8 @@ function TgHeader({ onToggleTheme, onNotifications, notificationCount = 0 }: { o
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{
-          width: 28, height: 28, borderRadius: 8, background: T.cardElev,
-          border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: 28, height: 28, borderRadius: 8, background: mode === 'dark' ? 'rgba(255,255,255,0.045)' : 'rgba(255,255,255,0.28)',
+          border: `1px solid ${glassBorder(mode)}`, display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 11, color: T.text, fontWeight: 600,
         }}>К</div>
         <div>
@@ -166,7 +166,7 @@ function TgHeader({ onToggleTheme, onNotifications, notificationCount = 0 }: { o
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <button onClick={() => { haptic('light'); onNotifications(); }} aria-label="notifications" style={{
-          width: 34, height: 34, background: T.cardElev, border: `1px solid ${T.border}`,
+          width: 34, height: 34, background: mode === 'dark' ? 'rgba(255,255,255,0.045)' : 'rgba(255,255,255,0.28)', border: `1px solid ${glassBorder(mode)}`,
           borderRadius: 12, cursor: 'pointer', color: T.text2, padding: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
         }}>
@@ -418,7 +418,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
               display: 'flex',
               flexDirection: 'column',
               position: 'relative',
-              paddingTop: 'calc(var(--miniapp-header-top-offset, 12px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 58px)',
+              paddingTop: 'calc(var(--miniapp-header-top-offset, 12px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 18px)',
             }}
           >
             {content}
@@ -432,9 +432,9 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
               overflowY: 'auto',
               overflowX: 'hidden',
               position: 'relative',
-              paddingTop: 'calc(var(--miniapp-header-top-offset, 12px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 58px)',
-              paddingBottom: 'calc(82px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
-              scrollPaddingTop: 'calc(var(--miniapp-header-top-offset, 12px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 58px)',
+              paddingTop: 'calc(var(--miniapp-header-top-offset, 12px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 18px)',
+              paddingBottom: 'calc(58px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
+              scrollPaddingTop: 'calc(var(--miniapp-header-top-offset, 12px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 18px)',
             }}
           >
             {content}
