@@ -76,16 +76,17 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
 
 function miniGlass(mode: ThemeMode, edge: 'top' | 'bottom' = 'top'): CSSProperties {
   const dark = mode === 'dark';
+  const verticalFade = edge === 'bottom' ? 'to top' : 'to bottom';
 
   return {
-    // Лёгкое стекло: почти без заливки, без теней.
-    // Контент под плашкой должен быть реально виден, а blur только размазывает его.
-    backgroundColor: dark ? 'rgba(8,8,8,0.18)' : 'rgba(255,255,255,0.24)',
+    // Сочный frosted glass: прозрачнее, без внешних теней, но с ярким blur/saturate.
+    // Контент под плашками остаётся видимым и красиво размывается.
+    backgroundColor: dark ? 'rgba(10,10,10,0.26)' : 'rgba(255,255,255,0.34)',
     backgroundImage: dark
-      ? 'linear-gradient(to bottom, rgba(255,255,255,0.055), rgba(255,255,255,0.012))'
-      : 'linear-gradient(to bottom, rgba(255,255,255,0.42), rgba(255,255,255,0.12))',
-    backdropFilter: 'blur(26px) saturate(1.85)',
-    WebkitBackdropFilter: 'blur(26px) saturate(1.85)',
+      ? `linear-gradient(${verticalFade}, rgba(255,255,255,0.115), rgba(255,255,255,0.025))`
+      : `linear-gradient(${verticalFade}, rgba(255,255,255,0.74), rgba(255,255,255,0.22))`,
+    backdropFilter: 'blur(34px) saturate(2.05) contrast(1.06)',
+    WebkitBackdropFilter: 'blur(34px) saturate(2.05) contrast(1.06)',
     boxShadow: 'none',
     transform: 'translate3d(0,0,0)',
     willChange: 'backdrop-filter',
@@ -95,7 +96,7 @@ function miniGlass(mode: ThemeMode, edge: 'top' | 'bottom' = 'top'): CSSProperti
 }
 
 function glassBorder(mode: ThemeMode) {
-  return mode === 'dark' ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.28)';
+  return mode === 'dark' ? 'rgba(255,255,255,0.135)' : 'rgba(255,255,255,0.58)';
 }
 
 interface SubRoute {
@@ -110,7 +111,9 @@ function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) 
     <div style={{
       ...miniGlass(mode, 'bottom'),
       borderTop: `1px solid ${glassBorder(mode)}`,
-      padding: '8px 4px calc(18px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
+      borderLeft: `1px solid ${glassBorder(mode)}`,
+      borderRight: `1px solid ${glassBorder(mode)}`,
+      padding: '9px 4px calc(20px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
       display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 0,
       flexShrink: 0,
       position: 'absolute',
@@ -147,6 +150,8 @@ function TgHeader({ onToggleTheme, onNotifications, notificationCount = 0 }: { o
       padding: 'calc(var(--miniapp-header-top-offset, 12px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px)))) 16px 9px',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       borderBottom: `1px solid ${glassBorder(mode)}`,
+      borderLeft: `1px solid ${glassBorder(mode)}`,
+      borderRight: `1px solid ${glassBorder(mode)}`,
       position: 'absolute',
       left: 0,
       right: 0,
@@ -155,7 +160,7 @@ function TgHeader({ onToggleTheme, onNotifications, notificationCount = 0 }: { o
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{
-          width: 28, height: 28, borderRadius: 8, background: mode === 'dark' ? 'rgba(255,255,255,0.045)' : 'rgba(255,255,255,0.28)',
+          width: 28, height: 28, borderRadius: 8, background: mode === 'dark' ? 'rgba(255,255,255,0.075)' : 'rgba(255,255,255,0.42)',
           border: `1px solid ${glassBorder(mode)}`, display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 11, color: T.text, fontWeight: 600,
         }}>К</div>
@@ -166,7 +171,7 @@ function TgHeader({ onToggleTheme, onNotifications, notificationCount = 0 }: { o
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <button onClick={() => { haptic('light'); onNotifications(); }} aria-label="notifications" style={{
-          width: 34, height: 34, background: mode === 'dark' ? 'rgba(255,255,255,0.045)' : 'rgba(255,255,255,0.28)', border: `1px solid ${glassBorder(mode)}`,
+          width: 34, height: 34, background: mode === 'dark' ? 'rgba(255,255,255,0.075)' : 'rgba(255,255,255,0.42)', border: `1px solid ${glassBorder(mode)}`,
           borderRadius: 12, cursor: 'pointer', color: T.text2, padding: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
         }}>
@@ -418,7 +423,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
               display: 'flex',
               flexDirection: 'column',
               position: 'relative',
-              paddingTop: 'calc(var(--miniapp-header-top-offset, 12px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 18px)',
+              paddingTop: 'calc(var(--miniapp-header-top-offset, 12px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 58px)',
             }}
           >
             {content}
@@ -432,9 +437,9 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
               overflowY: 'auto',
               overflowX: 'hidden',
               position: 'relative',
-              paddingTop: 'calc(var(--miniapp-header-top-offset, 12px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 18px)',
-              paddingBottom: 'calc(58px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
-              scrollPaddingTop: 'calc(var(--miniapp-header-top-offset, 12px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 18px)',
+              paddingTop: 'calc(var(--miniapp-header-top-offset, 12px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 58px)',
+              paddingBottom: 'calc(88px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
+              scrollPaddingTop: 'calc(var(--miniapp-header-top-offset, 12px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 58px)',
             }}
           >
             {content}
