@@ -1,21 +1,62 @@
 'use client';
 
-import { Fragment, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useTheme } from '../theme';
 import {
-  Card, FieldLabel, SectionTitle, Divider, StatusDot, Icon, ListRow,
+  Card, FieldLabel, SectionTitle, Divider, StatusDot, Icon,
 } from '../primitives/atoms';
 import { type Appointment, type Client, type Service } from '@/lib/mini-demo';
 import { useMiniData } from '@/hooks/use-mini-data';
+import { useChats } from '@/hooks/use-chats';
 import { ClientDetailSheet } from '../sheets/detail-sheets';
 import { useMiniToast } from '../bridge';
 
+function localIso(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function todayIso() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return localIso(d);
+}
+
+function apptMs(a: Appointment) {
+  const ms = new Date(`${a.date ?? todayIso()}T${a.time || '00:00'}:00`).getTime();
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+function dateTimeLabel(a?: Appointment | null) {
+  if (!a) return '—';
+  const date = a.date
+    ? new Date(`${a.date}T00:00:00`).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+    : '';
+  return `${date}${date ? ' · ' : ''}${a.time}`;
+}
+
 export function HomeScreen({ go }: { go: (kind: string) => void }) {
-  const { T, } = useTheme();
+  const { T } = useTheme();
   const { APPOINTMENTS, SERVICES, CLIENTS, MASTER } = useMiniData();
+  const { threads } = useChats();
   const { show } = useMiniToast();
   const [copied, setCopied] = useState(false);
   const [activeClient, setActiveClient] = useState<Client | null>(null);
+
+  const today = todayIso();
+  const now = Date.now();
+  const todayAppointments = APPOINTMENTS.filter((a) => a.date === today && a.rawStatus !== 'cancelled' && a.rawStatus !== 'no_show');
+  const upcoming = useMemo(
+    () => APPOINTMENTS
+      .filter((a) => a.rawStatus !== 'completed' && a.rawStatus !== 'cancelled' && a.rawStatus !== 'no_show')
+      .filter((a) => apptMs(a) >= now - 15 * 60 * 1000)
+      .sort((a, b) => apptMs(a) - apptMs(b)),
+    [APPOINTMENTS, now],
+  );
+  const next = upcoming[0] ?? null;
+  const queue = upcoming.slice(1, 4);
+  const topServices = [...SERVICES].sort((a, b) => (b.revenue ?? b.price * b.count) - (a.revenue ?? a.price * a.count)).slice(0, 3);
+  const unreadTotal = threads.reduce((sum, thread) => sum + thread.unread, 0);
+
   const copy = async () => {
     const link = `${typeof window !== 'undefined' ? window.location.origin : ''}${MASTER.link}`;
     try {
@@ -31,12 +72,9 @@ export function HomeScreen({ go }: { go: (kind: string) => void }) {
   };
 
   function openClient(appt: Appointment) {
-    const found = CLIENTS.find((c) => c.name === appt.name);
+    const found = CLIENTS.find((c) => c.phone && c.phone === appt.phone) ?? CLIENTS.find((c) => c.name === appt.name);
     setActiveClient(found ?? { name: appt.name, phone: appt.phone, visits: 0, total: 0 });
   }
-  const next = APPOINTMENTS[0];
-  const queue = APPOINTMENTS.slice(1, 4);
-  const topServices = SERVICES.slice(0, 3);
 
   const chevBtn = {
     background: 'transparent', border: 'none', color: T.text2,
@@ -71,9 +109,9 @@ export function HomeScreen({ go }: { go: (kind: string) => void }) {
       </Card>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <MetricCard label="Записей сегодня" value={String(APPOINTMENTS.length)} sub="всего" />
+        <MetricCard label="Записей сегодня" value={String(todayAppointments.length)} sub="активных" />
         <MetricCard label="Клиенты" value={String(CLIENTS.length)} sub="база" />
-        <MetricCard label="Услуги" value={String(SERVICES.length)} sub="активных" />
+        <MetricCard label="Услуги" value={String(SERVICES.filter((s) => s.visible !== false && s.status !== 'draft').length)} sub="активных" />
         <MetricCard
           label="Визиты"
           value={String(CLIENTS.reduce((a, c) => a + c.visits, 0))}
@@ -89,37 +127,39 @@ export function HomeScreen({ go }: { go: (kind: string) => void }) {
             onClick={() => next && openClient(next)}
             style={{ position: 'relative', padding: '20px 20px 18px', cursor: next ? 'pointer' : 'default' }}
           >
-            <div style={{ position: 'absolute', left: 0, top: 16, bottom: 16, width: 2, background: T.accent }} />
+            <div style={{ position: 'absolute', left: 0, top: 16, bottom: 16, width: 2, background: next ? T.accent : T.border }} />
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: T.accent }} />
-                <span style={{ fontSize: 12, color: T.text2 }}>В фокусе</span>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: next ? T.accent : T.text3 }} />
+                <span style={{ fontSize: 12, color: T.text2 }}>{next ? 'В фокусе' : 'Очередь пуста'}</span>
               </div>
-              <div style={{ fontSize: 11, color: T.text3, fontVariantNumeric: 'tabular-nums' }}>4 мая · 10:00</div>
+              <div style={{ fontSize: 11, color: T.text3, fontVariantNumeric: 'tabular-nums' }}>{dateTimeLabel(next)}</div>
             </div>
             <div style={{ fontSize: 22, fontWeight: 600, color: T.text, letterSpacing: '-0.02em', marginBottom: 4 }}>
-              {next?.name ?? '—'}
+              {next?.name ?? 'Записей пока нет'}
             </div>
-            <div style={{ fontSize: 13, color: T.text2 }}>{next?.service ?? 'Записей пока нет'}</div>
+            <div style={{ fontSize: 13, color: T.text2 }}>{next?.service ?? 'Новые бронирования появятся здесь автоматически'}</div>
           </div>
           <Divider />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
-            <KVItem k="Слот" v="4 мая · 10:00" />
-            <KVItem k="Статус" v="Запланирована" right />
+            <KVItem k="Слот" v={dateTimeLabel(next)} />
+            <KVItem k="Статус" v={next?.statusLabel ?? '—'} right />
           </div>
         </Card>
       </div>
 
       <div>
-        <SectionTitle title="Очередь" subtitle="Следующие записи на сегодня."
+        <SectionTitle title="Очередь" subtitle="Следующие активные записи."
           right={<button onClick={() => go('appts')} style={chevBtn}>Открыть <Icon name="chevron-right" size={12} /></button>} />
         <Card padded={false}>
-          {queue.map((a, i) => (
-            <Fragment key={i}>
+          {queue.length > 0 ? queue.map((a, i) => (
+            <Fragment key={a.id ?? `${a.date}-${a.time}-${i}`}>
               <QueueRow appt={a} onClick={() => openClient(a)} />
               {i < queue.length - 1 && <Divider />}
             </Fragment>
-          ))}
+          )) : (
+            <EmptyRow text="Очередь свободна" />
+          )}
         </Card>
       </div>
 
@@ -127,17 +167,19 @@ export function HomeScreen({ go }: { go: (kind: string) => void }) {
         <SectionTitle title="Топ-услуги" subtitle="Что чаще выбирают клиенты."
           right={<button onClick={() => go('services')} style={chevBtn}>Все <Icon name="chevron-right" size={12} /></button>} />
         <Card padded={false}>
-          {topServices.map((s, i) => (
-            <Fragment key={s.n}>
+          {topServices.length > 0 ? topServices.map((s, i) => (
+            <Fragment key={s.id ?? s.n}>
               <ServiceRowCompact s={s} />
               {i < topServices.length - 1 && <Divider />}
             </Fragment>
-          ))}
+          )) : (
+            <EmptyRow text="Добавьте первую услугу" />
+          )}
         </Card>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <ShortcutCard icon="message-square" label="Чаты" sub="3 непрочитанных" onClick={() => go('chats')} />
+        <ShortcutCard icon="message-square" label="Чаты" sub={unreadTotal > 0 ? `${unreadTotal} непрочитанных` : 'нет новых'} onClick={() => go('chats')} />
         <ShortcutCard icon="bar-chart-3" label="Аналитика" sub="за неделю" onClick={() => go('analytics')} />
       </div>
 
@@ -149,6 +191,11 @@ export function HomeScreen({ go }: { go: (kind: string) => void }) {
       />
     </div>
   );
+}
+
+function EmptyRow({ text }: { text: string }) {
+  const { T } = useTheme();
+  return <div style={{ padding: 22, textAlign: 'center', color: T.text3, fontSize: 13 }}>{text}</div>;
 }
 
 function ShortcutCard({ icon, label, sub, onClick }: { icon: string; label: string; sub: string; onClick: () => void }) {
@@ -204,8 +251,9 @@ function QueueRow({ appt, onClick }: { appt: Appointment; onClick?: () => void }
   const { T } = useTheme();
   return (
     <div onClick={onClick} style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14, cursor: onClick ? 'pointer' : 'default' }}>
-      <div style={{ fontSize: 14, fontWeight: 600, color: T.text, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em', minWidth: 44 }}>
-        {appt.time}
+      <div style={{ minWidth: 54 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: T.text, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>{appt.time}</div>
+        <div style={{ fontSize: 10, color: T.text3, marginTop: 2 }}>{appt.dateLabel}</div>
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 14, color: T.text, marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{appt.name}</div>
@@ -226,7 +274,7 @@ function ServiceRowCompact({ s }: { s: Service }) {
         <span style={{ fontSize: 14, color: T.text, fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>{s.price.toLocaleString('ru-RU')} ₽</span>
       </div>
       <div style={{ height: 2, background: T.skeleton, borderRadius: 2, overflow: 'hidden', marginBottom: 6 }}>
-        <div style={{ height: '100%', width: `${s.popularity * 100}%`, background: T.accent }} />
+        <div style={{ height: '100%', width: `${Math.min(Math.max(s.popularity, 0), 1) * 100}%`, background: T.accent }} />
       </div>
       <div style={{ fontSize: 11, color: T.text3 }}>{s.count} записей · {s.duration} мин</div>
     </div>

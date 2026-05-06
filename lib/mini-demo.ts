@@ -31,11 +31,16 @@ export const MASTER: MasterInfo = {
 
 export interface Service {
   n: number;
+  id?: string;
   name: string;
   price: number;
   duration: number;
   popularity: number;
   count: number;
+  revenue?: number;
+  category?: string;
+  status?: 'active' | 'seasonal' | 'draft';
+  visible?: boolean;
 }
 
 export const SERVICES: Service[] = [
@@ -50,12 +55,18 @@ export type ApptStatus = 'in-focus' | 'scheduled' | 'completed' | 'cancelled';
 
 export interface Appointment {
   id?: string;
+  date?: string;
+  dateLabel?: string;
   time: string;
   name: string;
   service: string;
   status: ApptStatus;
+  statusLabel?: string;
+  rawStatus?: 'new' | 'confirmed' | 'completed' | 'no_show' | 'cancelled' | string;
   phone: string;
   dur: number;
+  price?: number;
+  source?: string;
 }
 
 export const APPOINTMENTS: Appointment[] = [

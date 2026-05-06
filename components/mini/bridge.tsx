@@ -16,6 +16,20 @@ export function haptic(type: HapticType = 'light') {
   } catch {}
 }
 
+export function selectionHaptic() {
+  if (typeof window === 'undefined') return;
+  const tg = (window as any).Telegram?.WebApp;
+  const h = tg?.HapticFeedback;
+  try {
+    if (h?.selectionChanged) h.selectionChanged();
+    else haptic('light');
+  } catch {}
+}
+
+export function feedback(type: 'success' | 'warning' | 'error' | 'light' = 'light') {
+  haptic(type);
+}
+
 export function tgClose() {
   if (typeof window === 'undefined') return;
   const tg = (window as any).Telegram?.WebApp;

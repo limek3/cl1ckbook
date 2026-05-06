@@ -777,7 +777,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const updateBookingStatus = useCallback(
     async (bookingId: string, status: BookingStatus) => {
-      if (!workspaceId) return;
+      if (!workspaceId) throw new Error('workspace_required');
 
       const optimisticBookings = bookings.map((booking) => (booking.id === bookingId ? { ...booking, status } : booking));
       setStoredBookings(optimisticBookings);
@@ -814,6 +814,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }));
       } catch {
         await refreshWorkspace();
+        throw new Error('booking_status_update_failed');
       }
     },
     [bookings, refreshWorkspace, workspaceId],

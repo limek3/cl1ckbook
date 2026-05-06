@@ -2,7 +2,7 @@
 
 import { Fragment, useMemo, useState } from 'react';
 import { useTheme } from '../theme';
-import { Card, Divider, Avatar, Icon } from '../primitives/atoms';
+import { Card, Divider, Avatar, EmptyState, SearchBox } from '../primitives/atoms';
 import { ClientDetailSheet } from '../sheets/detail-sheets';
 import { type Client } from '@/lib/mini-demo';
 import { useMiniData } from '@/hooks/use-mini-data';
@@ -27,26 +27,7 @@ export function ClientsScreen({ go }: { go?: (kind: string) => void }) {
         </div>
       </div>
 
-      <div style={{
-        background: T.card, border: `1px solid ${T.border}`, borderRadius: 12,
-        boxShadow: T.cardShadow, padding: '12px 14px',
-        display: 'flex', alignItems: 'center', gap: 10,
-      }}>
-        <Icon name="search" size={16} color={T.text3} />
-        <input
-          value={q} onChange={(e) => setQ(e.target.value)}
-          placeholder="Поиск по имени или телефону"
-          style={{
-            flex: 1, background: 'transparent', border: 'none', outline: 'none',
-            color: T.text, fontSize: 14, fontFamily: 'inherit',
-          }}
-        />
-        {q && (
-          <button onClick={() => setQ('')} style={{ background: 'transparent', border: 'none', color: T.text3, cursor: 'pointer', padding: 0, display: 'flex' }}>
-            <Icon name="x" size={14} />
-          </button>
-        )}
-      </div>
+      <SearchBox value={q} onChange={setQ} placeholder="Поиск по имени или телефону" />
 
       <Card padded={false}>
         {filtered.map((c, i) => (
@@ -56,7 +37,13 @@ export function ClientsScreen({ go }: { go?: (kind: string) => void }) {
           </Fragment>
         ))}
         {filtered.length === 0 && (
-          <div style={{ padding: 32, textAlign: 'center', color: T.text3, fontSize: 13 }}>Никого не найдено</div>
+          <div style={{ padding: 16 }}>
+            <EmptyState
+              icon={q ? 'search-x' : 'users'}
+              title={q ? 'Никого не найдено' : 'Клиентов пока нет'}
+              text={q ? 'Проверь имя или номер телефона.' : 'Клиенты появятся после первых записей из формы, Telegram или ВК.'}
+            />
+          </div>
         )}
       </Card>
       <ClientDetailSheet

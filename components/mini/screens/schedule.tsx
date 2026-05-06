@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { useTheme } from '../theme';
 import {
-  Card, FieldLabel, SectionTitle, Divider, Toggle, NeutralBtn, ScreenHeader, BottomSheet,
+  ActionSheet, Card, FieldLabel, SectionTitle, Divider, Toggle, NeutralBtn, ScreenHeader, BottomSheet,
 } from '../primitives/atoms';
 import { type ScheduleDay } from '@/lib/mini-demo';
 import { useMiniData } from '@/hooks/use-mini-data';
@@ -16,13 +16,19 @@ export function ScheduleScreen({ back }: { back: () => void }) {
   const [scheduleMode, setScheduleMode] = useState<'free' | 'template'>('template');
   const [days, setDays] = useState<ScheduleDay[]>(SCHEDULE);
   const [openDay, setOpenDay] = useState<number | null>(null);
+  const [presetTarget, setPresetTarget] = useState<'workdays' | 'all' | 'custom' | null>(null);
 
   useEffect(() => { setDays(SCHEDULE); }, [SCHEDULE]);
 
   async function persist(next: ScheduleDay[]) {
     const ok = await updateSection('availability', next.map((d, idx) => ({
-      weekday: idx,
+      id: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'][idx],
+      weekdayIndex: idx,
       label: d.d,
+      status: d.on ? (idx === 5 ? 'short' : 'workday') : 'day-off',
+      slots: d.on ? [`${d.from} – ${d.to}`] : [],
+      breaks: [],
+      custom: false,
       enabled: d.on,
       startTime: d.on ? d.from : null,
       endTime: d.on ? d.to : null,
@@ -109,9 +115,9 @@ export function ScheduleScreen({ back }: { back: () => void }) {
         <div>
           <SectionTitle title="Шаблоны" subtitle="Быстро применить к неделе." />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-            <NeutralBtn onClick={() => applyPreset('workdays')}>Будни</NeutralBtn>
-            <NeutralBtn onClick={() => applyPreset('all')}>Все дни</NeutralBtn>
-            <NeutralBtn onClick={() => applyPreset('custom')}>Кастом</NeutralBtn>
+            <NeutralBtn onClick={() => setPresetTarget('workdays')}>Будни</NeutralBtn>
+            <NeutralBtn onClick={() => setPresetTarget('all')}>Все дни</NeutralBtn>
+            <NeutralBtn onClick={() => setPresetTarget('custom')}>Кастом</NeutralBtn>
           </div>
         </div>
 
@@ -134,6 +140,21 @@ export function ScheduleScreen({ back }: { back: () => void }) {
           if (await persist(next)) show('Сохранено', 'success');
           setOpenDay(null);
         }}
+      />
+      <ActionSheet
+        open={!!presetTarget}
+        onClose={() => setPresetTarget(null)}
+        title="Применить шаблон?"
+        subtitle="Текущее расписание недели будет заменено выбранным пресетом."
+        actions={[
+          {
+            id: 'apply-preset',
+            label: presetTarget === 'workdays' ? 'Применить «Будни»' : presetTarget === 'all' ? 'Применить «Все дни»' : 'Применить «Кастом»',
+            icon: 'calendar-check',
+            tone: 'primary',
+            onClick: () => { if (presetTarget) void applyPreset(presetTarget); setPresetTarget(null); },
+          },
+        ]}
       />
     </div>
   );

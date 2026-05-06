@@ -12,13 +12,15 @@ function ToastHost({ items }: { items: ToastItem[] }) {
       position: 'absolute', left: 0, right: 0, bottom: 96, zIndex: 200,
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, pointerEvents: 'none',
     }}>
+      <style>{`@keyframes mini-toast-in { from { transform: translateY(8px) scale(.98); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }`}</style>
       {items.map((it) => (
         <div key={it.id} style={{
           background: it.tone === 'error' ? T.danger : it.tone === 'success' ? T.success : T.cardElev,
           color: it.tone === 'info' ? T.text : '#fff',
           border: `1px solid ${T.border}`,
-          padding: '10px 16px', borderRadius: 12, fontSize: 13,
+          padding: '10px 16px', borderRadius: 14, fontSize: 13,
           maxWidth: '85%', boxShadow: T.cardShadow,
+          animation: 'mini-toast-in 0.18s cubic-bezier(.2,.8,.2,1) both',
         }}>{it.text}</div>
       ))}
     </div>
@@ -77,7 +79,7 @@ function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) 
             background: 'transparent', border: 'none', cursor: 'pointer',
             padding: '8px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
             color: isActive ? T.text : T.text3, fontFamily: 'inherit',
-            transition: 'transform 0.05s',
+            transition: 'transform 0.12s ease, color 0.15s ease',
           }}>
             <Icon name={t.icon} size={20} stroke={isActive ? 1.75 : 1.5} />
             <span style={{ fontSize: 10, fontWeight: isActive ? 500 : 400, letterSpacing: '0.01em' }}>{t.label}</span>
@@ -166,6 +168,20 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
 
   const goSub = useCallback((kind: string, payload?: Thread) => {
     haptic('light');
+    const tabAliases: Record<string, TabId> = {
+      home: 'home',
+      appts: 'appts',
+      appointments: 'appts',
+      services: 'services',
+      clients: 'clients',
+      more: 'more',
+    };
+    const nextTab = tabAliases[kind];
+    if (nextTab) {
+      setTab(nextTab);
+      setSub(null);
+      return;
+    }
     setSub({ kind, payload });
   }, []);
   const back = useCallback(() => setSub(null), []);

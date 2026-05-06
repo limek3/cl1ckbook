@@ -46,11 +46,11 @@ export function useMiniData(): MiniData {
     return () => { cancelled = true; };
   }, [app.workspaceId]);
 
-  const services = adaptServices(app.ownedProfile);
+  const services = adaptServices(app.ownedProfile, app.workspaceData, app.bookings);
   const templates = adaptTemplates(app.workspaceData);
 
   return {
-    MASTER: adaptMaster(app.ownedProfile),
+    MASTER: adaptMaster(app.ownedProfile, app.workspaceData),
     SERVICES: services,
     APPOINTMENTS: adaptAppointments(app.bookings),
     CLIENTS: adaptClients(app.bookings),

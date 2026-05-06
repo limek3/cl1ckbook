@@ -2,10 +2,69 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useApp } from '@/lib/app-context';
+import { createClient as createSupabaseBrowserClient } from '@/lib/supabase/client';
+import {
+  authorizeTelegramMiniAppSession,
+  getStoredTelegramAppSessionToken,
+  getTelegramAppSessionHeaders,
+  hasTelegramMiniAppRuntime,
+} from '@/lib/telegram-miniapp-auth-client';
 import { adaptThreads } from '@/lib/mini-adapter';
 import type { Thread, Message } from '@/lib/mini-demo';
 
 const POLL_MS = 15_000;
+
+
+async function getAuthHeaders(includeJson = false) {
+  const headers: Record<string, string> = includeJson ? { 'Content-Type': 'application/json' } : {};
+
+  try {
+    const supabase = createSupabaseBrowserClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+  } catch {}
+
+  Object.assign(headers, getTelegramAppSessionHeaders());
+  return headers;
+}
+
+function mergeHeaders(...sources: Array<HeadersInit | undefined>) {
+  const headers = new Headers();
+  for (const source of sources) {
+    if (!source) continue;
+    new Headers(source).forEach((value, key) => headers.set(key, value));
+  }
+  return headers;
+}
+
+async function ensureTelegramMiniAppSessionIfNeeded(options?: { force?: boolean; waitMs?: number }) {
+  if (!hasTelegramMiniAppRuntime()) return;
+  const hasStoredToken = Boolean(getStoredTelegramAppSessionToken());
+  if (hasStoredToken && !options?.force) return;
+  await authorizeTelegramMiniAppSession(options);
+}
+
+async function fetchWithTelegramMiniAppRetry(input: RequestInfo | URL, init?: RequestInit) {
+  const headers = await getAuthHeaders(false);
+  const response = await fetch(input, {
+    ...init,
+    credentials: init?.credentials ?? 'include',
+    cache: init?.cache ?? 'no-store',
+    headers: mergeHeaders(headers, init?.headers),
+  });
+
+  if (response.status !== 401) return response;
+
+  await ensureTelegramMiniAppSessionIfNeeded({ force: true, waitMs: 2600 });
+  if (Object.keys(getTelegramAppSessionHeaders()).length === 0) return response;
+
+  return fetch(input, {
+    ...init,
+    credentials: init?.credentials ?? 'include',
+    cache: init?.cache ?? 'no-store',
+    headers: mergeHeaders(init?.headers, await getAuthHeaders(false)),
+  });
+}
 
 function mergeIncoming(prev: Thread[], fresh: Thread[]): Thread[] {
   return fresh.map((freshThread) => {
@@ -29,7 +88,7 @@ export function useChats() {
   const fetchThreads = useCallback(async (silent = false) => {
     if (!workspaceId) return;
     try {
-      const res = await fetch('/api/chats', { credentials: 'include' });
+      const res = await fetchWithTelegramMiniAppRetry('/api/chats', { credentials: 'include' });
       if (!res.ok || !mountedRef.current) return;
       const data = (await res.json()) as { threads?: unknown[] };
       if (Array.isArray(data?.threads) && mountedRef.current) {
@@ -64,7 +123,7 @@ export function useChats() {
     const tid = String(id);
     setThreads((prev) => prev.map((t) => String(t.id) === tid ? { ...t, unread: 0 } : t));
     if (tid.startsWith('booking-thread-')) return;
-    fetch('/api/chats', {
+    fetchWithTelegramMiniAppRetry('/api/chats', {
       method: 'PATCH',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -89,7 +148,7 @@ export function useChats() {
     ));
 
     try {
-      await fetch('/api/chats', {
+      await fetchWithTelegramMiniAppRetry('/api/chats', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -104,7 +163,7 @@ export function useChats() {
     const tid = String(id);
     setThreads((prev) => prev.filter((t) => String(t.id) !== tid));
     try {
-      await fetch('/api/chats', {
+      await fetchWithTelegramMiniAppRetry('/api/chats', {
         method: 'DELETE',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

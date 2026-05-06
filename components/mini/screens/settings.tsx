@@ -6,12 +6,14 @@ import {
   Card, FieldLabel, SectionTitle, Divider, Avatar, Toggle, Icon, NeutralBtn, ScreenHeader,
 } from '../primitives/atoms';
 import { useMiniData } from '@/hooks/use-mini-data';
+import { useApp } from '@/lib/app-context';
 import { useMiniToast } from '../bridge';
 
 // ─── Profile ────────────────────────────────
 export function ProfileScreen({ back }: { back: () => void }) {
   const { T } = useTheme();
   const { MASTER, updateSection } = useMiniData();
+  const app = useApp();
   const { show } = useMiniToast();
   const [form, setForm] = useState({
     name: MASTER.name, service: MASTER.service, city: MASTER.city,
@@ -29,17 +31,45 @@ export function ProfileScreen({ back }: { back: () => void }) {
   const set = (k: keyof typeof form) => (v: string) => setForm((s) => ({ ...s, [k]: v }));
 
   async function save() {
-    const ok = await updateSection('profile', {
-      name: form.name,
-      profession: form.service,
-      city: form.city,
-      phone: form.phone,
-      bio: form.bio,
-      telegram: form.tg,
-      whatsapp: '',
-      socials: { tg: form.tg, vk: form.vk, ig: form.ig },
+    const profile = app.ownedProfile;
+    if (!profile) {
+      show('Профиль ещё загружается', 'error');
+      return;
+    }
+
+    const result = await app.saveProfile({
+      name: form.name.trim() || profile.name,
+      profession: form.service.trim() || profile.profession,
+      city: form.city.trim(),
+      bio: form.bio.trim(),
+      servicesText: profile.services.join('\n'),
+      phone: form.phone.trim(),
+      telegram: form.tg.trim().replace(/^@/, ''),
+      whatsapp: profile.whatsapp ?? '',
+      locationMode: profile.locationMode ?? 'online',
+      address: profile.address ?? '',
+      mapUrl: profile.mapUrl ?? '',
+      hidePhone: profile.hidePhone ?? false,
+      hideTelegram: profile.hideTelegram ?? false,
+      hideWhatsapp: profile.hideWhatsapp ?? false,
+      slug: profile.slug,
+      avatar: profile.avatar ?? '',
+      priceHint: profile.priceHint,
+      experienceLabel: profile.experienceLabel,
+      responseTime: profile.responseTime,
+      workGallery: profile.workGallery,
+      reviews: profile.reviews,
+      rating: profile.rating,
+      reviewCount: profile.reviewCount,
     });
-    show(ok ? 'Профиль сохранён' : 'Не удалось сохранить', ok ? 'success' : 'error');
+
+    if (!result.success) {
+      show(result.error || 'Не удалось сохранить', 'error');
+      return;
+    }
+
+    await updateSection('profileSocials', { vk: form.vk.trim(), ig: form.ig.trim() });
+    show('Профиль сохранён', 'success');
   }
 
   return (

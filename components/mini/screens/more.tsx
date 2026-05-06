@@ -1,9 +1,10 @@
 'use client';
 
-import { Fragment } from 'react';
+import { Fragment, useState } from 'react';
 import { useTheme } from '../theme';
-import { Card, Avatar, ListRow, Divider, SectionTitle } from '../primitives/atoms';
+import { ActionSheet, Card, Avatar, ListRow, Divider, SectionTitle } from '../primitives/atoms';
 import { useMiniData } from '@/hooks/use-mini-data';
+import { useChats } from '@/hooks/use-chats';
 import { useMiniToast } from '../bridge';
 
 interface MenuItem {
@@ -18,8 +19,10 @@ interface MenuItem {
 
 export function MoreScreen({ go }: { go: (kind: string) => void }) {
   const { T, mode } = useTheme();
-  const { MASTER, SUBSCRIPTION } = useMiniData();
+  const { MASTER, SUBSCRIPTION, TEMPLATES } = useMiniData();
+  const { threads } = useChats();
   const { show } = useMiniToast();
+  const [logoutOpen, setLogoutOpen] = useState(false);
 
   const openSupport = () => {
     if (typeof window !== 'undefined') {
@@ -31,8 +34,9 @@ export function MoreScreen({ go }: { go: (kind: string) => void }) {
       window.open('https://clickbook.app/docs', '_blank');
     }
   };
-  const logout = () => {
-    if (typeof window !== 'undefined' && !window.confirm('Выйти из аккаунта?')) return;
+  const logout = () => setLogoutOpen(true);
+  const confirmLogout = () => {
+    setLogoutOpen(false);
     show('Сессия завершена', 'success');
     if (typeof window !== 'undefined') {
       setTimeout(() => { window.location.href = '/auth/signout'; }, 600);
@@ -42,6 +46,9 @@ export function MoreScreen({ go }: { go: (kind: string) => void }) {
     ? new Date(SUBSCRIPTION.currentPeriodEnd).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
     : '';
   const subSub = `${SUBSCRIPTION.planLabel}${periodEnd ? ' · до ' + periodEnd : ''}`;
+  const unreadTotal = threads.reduce((sum, thread) => sum + thread.unread, 0);
+  const chatSub = unreadTotal > 0 ? `${unreadTotal} непрочитанных` : `${threads.length} переписок`;
+  const reviewsSub = `${MASTER.rating ? MASTER.rating.toFixed(1) : '—'}${MASTER.rating ? ' рейтинг' : ''}`;
 
   return (
     <div style={{ padding: '20px 16px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -61,11 +68,11 @@ export function MoreScreen({ go }: { go: (kind: string) => void }) {
       </Card>
 
       <MoreSection title="Работа" go={go} items={[
-        { icon: 'message-square', label: 'Чаты',               sub: '3 непрочитанных',               go: 'chats' },
+        { icon: 'message-square', label: 'Чаты',               sub: chatSub,                            go: 'chats' },
         { icon: 'bar-chart-3',    label: 'Аналитика',          sub: 'Выручка, конверсия, топы',      go: 'analytics' },
         { icon: 'calendar-clock', label: 'График работы',      sub: 'Дни и часы приёма',             go: 'schedule' },
-        { icon: 'file-text',      label: 'Шаблоны сообщений',  sub: '5 заготовок',                   go: 'templates' },
-        { icon: 'star',           label: 'Отзывы',             sub: '4.9 · 31 отзыв',                go: 'reviews' },
+        { icon: 'file-text',      label: 'Шаблоны сообщений',  sub: `${TEMPLATES.length} заготовок`,    go: 'templates' },
+        { icon: 'star',           label: 'Отзывы',             sub: reviewsSub,                         go: 'reviews' },
       ]} />
 
       <MoreSection title="Каналы и продвижение" go={go} items={[
@@ -97,6 +104,21 @@ export function MoreScreen({ go }: { go: (kind: string) => void }) {
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: T.success }} />
         <span style={{ fontSize: 11, color: T.text3 }}>Все системы работают. КликБук v2.4.1</span>
       </div>
+      <ActionSheet
+        open={logoutOpen}
+        onClose={() => setLogoutOpen(false)}
+        title="Выйти из аккаунта?"
+        subtitle="Сессия miniapp завершится, но данные профиля и записи останутся."
+        actions={[
+          {
+            id: 'logout',
+            label: 'Выйти',
+            icon: 'log-out',
+            tone: 'danger',
+            onClick: confirmLogout,
+          },
+        ]}
+      />
     </div>
   );
 }

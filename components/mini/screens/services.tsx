@@ -2,7 +2,7 @@
 
 import { Fragment, useState } from 'react';
 import { useTheme } from '../theme';
-import { Card, Divider, NeutralBtn } from '../primitives/atoms';
+import { Card, Divider, EmptyState, NeutralBtn } from '../primitives/atoms';
 import { ServiceDetailSheet } from '../sheets/detail-sheets';
 import { type Service } from '@/lib/mini-demo';
 import { useMiniData } from '@/hooks/use-mini-data';
@@ -15,38 +15,47 @@ export function ServicesScreen() {
   const [active, setActive] = useState<Service | null>(null);
 
   async function persistAll(list: Service[]) {
-    const ok = await updateSection('services', list.map((s) => ({
-      n: s.n,
+    const ok = await updateSection('services', list.map((s, index) => ({
+      id: s.id ?? `service-${index + 1}`,
+      sortOrder: index + 1,
+      n: index + 1,
       name: s.name,
       price: s.price,
       duration: s.duration,
       popularity: s.popularity,
+      bookings: s.count,
       count: s.count,
+      revenue: s.revenue ?? s.price * s.count,
+      category: s.category ?? 'Основное',
+      status: s.status ?? 'active',
+      visible: s.visible ?? true,
     })));
     if (!ok) show('Не удалось сохранить', 'error');
+    return ok;
   }
 
   async function saveOne(next: Service) {
-    const exists = SERVICES.some((s) => s.n === next.n);
-    const list = exists ? SERVICES.map((s) => (s.n === next.n ? next : s)) : [...SERVICES, next];
-    show('Сохранено', 'success');
-    await persistAll(list);
+    const exists = SERVICES.some((s) => (s.id && next.id ? s.id === next.id : s.n === next.n));
+    const list = exists
+      ? SERVICES.map((s) => ((s.id && next.id ? s.id === next.id : s.n === next.n) ? next : s))
+      : [...SERVICES, next];
+    if (await persistAll(list)) show('Сохранено', 'success');
   }
 
   async function removeOne(s: Service) {
-    const list = SERVICES.filter((x) => x.n !== s.n);
-    show('Удалено', 'success');
-    await persistAll(list);
+    const list = SERVICES.filter((x) => (s.id ? x.id !== s.id : x.n !== s.n));
+    if (await persistAll(list)) show('Удалено', 'success');
   }
 
   async function addNew() {
     const nextN = (SERVICES.reduce((m, s) => Math.max(m, s.n), 0) || 0) + 1;
     const draft: Service = {
-      n: nextN, name: 'Новая услуга', price: 1000, duration: 60, popularity: 0, count: 0,
+      n: nextN, id: `service-${Date.now()}`, name: 'Новая услуга', price: 1000, duration: 60, popularity: 0, count: 0, revenue: 0, category: 'Основное', status: 'active', visible: true,
     };
-    await persistAll([...SERVICES, draft]);
-    show('Услуга добавлена', 'success');
-    setActive(draft);
+    if (await persistAll([...SERVICES, draft])) {
+      show('Услуга добавлена', 'success');
+      setActive(draft);
+    }
   }
 
   return (
@@ -54,18 +63,27 @@ export function ServicesScreen() {
       <div>
         <div style={{ fontSize: 22, fontWeight: 600, color: T.text, letterSpacing: '-0.02em' }}>Услуги</div>
         <div style={{ fontSize: 13, color: T.text2, marginTop: 2 }}>
-          {SERVICES.length} активных · {SERVICES.reduce((s, x) => s + x.count, 0)} записей за месяц.
+          {SERVICES.filter((x) => x.visible !== false && x.status !== 'draft').length} активных · {SERVICES.reduce((s, x) => s + x.count, 0)} записей за месяц.
         </div>
       </div>
       <NeutralBtn icon="plus" full onClick={addNew}>Добавить услугу</NeutralBtn>
-      <Card padded={false}>
-        {SERVICES.map((s, i) => (
-          <Fragment key={s.n}>
-            <ServiceRowFull s={s} onClick={() => setActive(s)} />
-            {i < SERVICES.length - 1 && <Divider />}
-          </Fragment>
-        ))}
-      </Card>
+      {SERVICES.length > 0 ? (
+        <Card padded={false}>
+          {SERVICES.map((s, i) => (
+            <Fragment key={s.id ?? s.n}>
+              <ServiceRowFull s={s} onClick={() => setActive(s)} />
+              {i < SERVICES.length - 1 && <Divider />}
+            </Fragment>
+          ))}
+        </Card>
+      ) : (
+        <EmptyState
+          icon="list-plus"
+          title="Услуг пока нет"
+          text="Добавь первую услугу — она сразу попадёт в форму записи и аналитику."
+          action={<NeutralBtn icon="plus" onClick={addNew}>Добавить услугу</NeutralBtn>}
+        />
+      )}
       <ServiceDetailSheet
         service={active}
         onClose={() => setActive(null)}
