@@ -1,5 +1,0 @@
-1:"$Sreact.fragment"
-2:I[735417,["/_next/static/chunks/073f9a8cd1eb88e2.js","/_next/static/chunks/c7a9dcf83f6f0796.js"],"ViewportBoundary"]
-3:I[735417,["/_next/static/chunks/073f9a8cd1eb88e2.js","/_next/static/chunks/c7a9dcf83f6f0796.js"],"MetadataBoundary"]
-4:"$Sreact.suspense"
-0:{"buildId":"xP5KwnH62UvvKMGZM3w81","rsc":["$","$1","h",{"children":[null,["$","$L2",null,{"children":[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}],["$","meta","2",{"name":"theme-color","media":"(prefers-color-scheme: light)","content":"#f5f6f8"}],["$","meta","3",{"name":"theme-color","media":"(prefers-color-scheme: dark)","content":"#090909"}]]}],["$","div",null,{"hidden":true,"children":["$","$L3",null,{"children":["$","$4",null,{"name":"Next.Metadata","children":[["$","title","0",{"children":"КликБук — платформа для записи клиентов"}],["$","meta","1",{"name":"description","content":"Профиль мастера, страница записи, чаты и аналитика в одной платформе КликБук."}],["$","meta","2",{"name":"generator","content":"КликБук"}]]}]}]}],null]}],"loading":null,"isPartial":false}
