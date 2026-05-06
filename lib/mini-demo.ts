@@ -93,6 +93,12 @@ export interface Thread {
   unread: number;
   online?: boolean;
   messages?: Message[];
+  // extended fields for full functionality
+  phone?: string;
+  nextVisit?: string | null;
+  segment?: string;
+  isPriority?: boolean;
+  botConnected?: boolean;
 }
 
 export const THREADS: Thread[] = [

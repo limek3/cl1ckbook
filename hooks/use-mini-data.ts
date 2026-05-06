@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useApp } from '@/lib/app-context';
 import {
   adaptMaster, adaptServices, adaptAppointments, adaptClients,
-  adaptRevenueWeek, adaptThreads,
+  adaptRevenueWeek,
   adaptSchedule, adaptTemplates, adaptSubscription,
   type SubscriptionInfo,
 } from '@/lib/mini-adapter';
@@ -33,7 +33,6 @@ interface MiniData {
 export function useMiniData(): MiniData {
   const app = useApp();
   const [billing, setBilling] = useState<any>(null);
-  const [chatThreads, setChatThreads] = useState<Thread[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,11 +41,6 @@ export function useMiniData(): MiniData {
     fetch('/api/subscription', { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => { if (!cancelled) setBilling(data); })
-      .catch(() => {});
-
-    fetch('/api/chats', { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => { if (!cancelled && data?.threads) setChatThreads(adaptThreads(data.threads)); })
       .catch(() => {});
 
     return () => { cancelled = true; };
@@ -60,8 +54,8 @@ export function useMiniData(): MiniData {
     SERVICES: services,
     APPOINTMENTS: adaptAppointments(app.bookings),
     CLIENTS: adaptClients(app.bookings),
-    THREADS: chatThreads,
-    MESSAGES: chatThreads[0]?.messages ?? [],
+    THREADS: [],
+    MESSAGES: [],
     TEMPLATES: templates,
     SCHEDULE: adaptSchedule(app.workspaceData),
     REVENUE_WEEK: adaptRevenueWeek(app.bookings),

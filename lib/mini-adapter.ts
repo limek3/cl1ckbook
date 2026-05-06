@@ -242,6 +242,11 @@ export function adaptThreads(records: ChatThreadRecord[]): Thread[] {
     channel: adaptChatChannel(r.channel),
     unread: r.unreadCount,
     messages: adaptMessages(r.messages),
+    phone: r.clientPhone || undefined,
+    nextVisit: r.nextVisit ?? null,
+    segment: r.segment,
+    isPriority: r.isPriority,
+    botConnected: r.botConnected,
   }));
 }
 
