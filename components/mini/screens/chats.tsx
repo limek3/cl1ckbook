@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useEffect, useRef, useMemo, useState } from 'react';
 import { useTheme } from '../theme';
 import {
   Card, Divider, Avatar, ChannelTag, Icon, NavBtn, ScreenHeader,
@@ -100,11 +100,58 @@ function ThreadRow({ thread, onClick }: { thread: Thread; onClick: () => void })
 // ─── Chat thread ─────────────────────────────
 export function ChatThreadScreen({ thread, back }: { thread: Thread; back: () => void }) {
   const { T } = useTheme();
+  const { TEMPLATES } = useMiniData();
   const [draft, setDraft] = useState('');
-  const messages: Message[] = thread.messages ?? [];
+  const [localMessages, setLocalMessages] = useState<Message[]>(thread.messages ?? []);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Scroll to bottom whenever messages change
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [localMessages]);
+
+  // Sync if thread messages updated from outside
+  useEffect(() => {
+    setLocalMessages(thread.messages ?? []);
+  }, [thread.id]);
+
+  function sendDraft() {
+    const text = draft.trim();
+    if (!text) return;
+    const now = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    setLocalMessages((prev) => [...prev, { from: 'me', text, t: now }]);
+    setDraft('');
+    setShowTemplates(false);
+    // POST to API (fire-and-forget)
+    fetch('/api/chats', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'message', threadId: thread.id, body: text, author: 'master' }),
+    }).catch(() => {});
+  }
+
+  function applyTemplate(body: string) {
+    // Replace basic placeholders
+    const filled = body.replace(/\{имя\}/g, thread.name.split(' ')[0] ?? thread.name);
+    setDraft(filled);
+    setShowTemplates(false);
+    inputRef.current?.focus();
+  }
+
+  function handleKey(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendDraft();
+    }
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+
+      {/* ── Header ── */}
       <div style={{
         padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12,
         borderBottom: `1px solid ${T.border}`, background: T.bg, flexShrink: 0,
@@ -115,42 +162,136 @@ export function ChatThreadScreen({ thread, back }: { thread: Thread; back: () =>
           <div style={{ fontSize: 14, color: T.text, fontWeight: 500 }}>{thread.name}</div>
           <div style={{ fontSize: 11, color: T.text3, marginTop: 1 }}>через {thread.channel} · был(а) недавно</div>
         </div>
+        {/* Phone + info buttons */}
         <NavBtn icon="phone" />
+        <NavBtn icon="info" />
       </div>
 
+      {/* ── Messages ── */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ alignSelf: 'center', fontSize: 10, color: T.text3, padding: '4px 10px', background: T.card, borderRadius: 999, marginBottom: 8 }}>
           Сегодня
         </div>
-        {messages.length === 0 ? (
-          <div style={{ alignSelf: 'center', fontSize: 12, color: T.text3 }}>Нет сообщений</div>
+        {localMessages.length === 0 ? (
+          <div style={{ alignSelf: 'center', fontSize: 12, color: T.text3, marginTop: 40 }}>Нет сообщений</div>
         ) : (
-          messages.map((m, i) => <Bubble key={i} m={m} />)
+          localMessages.map((m, i) => <Bubble key={i} m={m} />)
         )}
+        {/* Scroll anchor */}
+        <div ref={bottomRef} />
       </div>
 
+      {/* ── Quick templates panel ── */}
+      {showTemplates && TEMPLATES.length > 0 && (
+        <div style={{
+          borderTop: `1px solid ${T.border}`, background: T.card,
+          padding: '10px 12px', display: 'flex', flexWrap: 'wrap', gap: 8,
+          maxHeight: 160, overflowY: 'auto', flexShrink: 0,
+        }}>
+          {TEMPLATES.map((tpl) => (
+            <button
+              key={tpl.id}
+              onClick={() => applyTemplate(tpl.body)}
+              style={{
+                padding: '6px 12px', borderRadius: 20, fontSize: 12, cursor: 'pointer',
+                background: T.bg, border: `1px solid ${T.border}`, color: T.text2,
+                fontFamily: 'inherit', whiteSpace: 'nowrap',
+              }}
+            >
+              {tpl.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ── Fallback quick replies when no custom templates ── */}
+      {showTemplates && TEMPLATES.length === 0 && (
+        <div style={{
+          borderTop: `1px solid ${T.border}`, background: T.card,
+          padding: '10px 12px', display: 'flex', flexWrap: 'wrap', gap: 8,
+          flexShrink: 0,
+        }}>
+          {[
+            { label: 'Подтверждение', body: `Здравствуйте, ${thread.name.split(' ')[0]}! Подтверждаю вашу запись. До встречи!` },
+            { label: 'Напоминание', body: `Напоминаю про визит завтра. Если планы изменились — напишите, перенесём.` },
+            { label: 'Благодарность', body: `Спасибо, что были у меня! Буду рада видеть вас снова 🙏` },
+            { label: 'Перенос', body: `К сожалению, мне нужно перенести нашу встречу. Когда вам удобно?` },
+          ].map((q) => (
+            <button
+              key={q.label}
+              onClick={() => { setDraft(q.body); setShowTemplates(false); inputRef.current?.focus(); }}
+              style={{
+                padding: '6px 12px', borderRadius: 20, fontSize: 12, cursor: 'pointer',
+                background: T.bg, border: `1px solid ${T.border}`, color: T.text2,
+                fontFamily: 'inherit', whiteSpace: 'nowrap',
+              }}
+            >
+              {q.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ── Input bar ── */}
       <div style={{
         padding: '10px 12px 14px', borderTop: `1px solid ${T.border}`,
         display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, background: T.bg,
       }}>
-        <button style={{
-          width: 38, height: 38, borderRadius: 12, background: 'transparent',
-          border: `1px solid ${T.border}`, color: T.text2, cursor: 'pointer', padding: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}><Icon name="paperclip" size={16} /></button>
+        {/* Templates toggle */}
+        <button
+          onClick={() => setShowTemplates((v) => !v)}
+          style={{
+            width: 38, height: 38, borderRadius: 12,
+            background: showTemplates ? T.accent : 'transparent',
+            border: `1px solid ${showTemplates ? T.accent : T.border}`,
+            color: showTemplates ? '#fff' : T.text2,
+            cursor: 'pointer', padding: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <Icon name="zap" size={16} />
+        </button>
+
+        {/* Text input */}
         <div style={{
           flex: 1, background: T.inputBg, border: `1px solid ${T.border}`,
           borderRadius: 12, padding: '10px 14px',
           display: 'flex', alignItems: 'center',
         }}>
-          <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Сообщение"
-            style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: T.text, fontSize: 14, fontFamily: 'inherit' }} />
+          <input
+            ref={inputRef}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={handleKey}
+            placeholder="Сообщение"
+            style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: T.text, fontSize: 14, fontFamily: 'inherit' }}
+          />
+          {draft.length > 0 && (
+            <button
+              onClick={() => setDraft('')}
+              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: T.text3, display: 'flex', marginLeft: 6 }}
+            >
+              <Icon name="x" size={14} />
+            </button>
+          )}
         </div>
-        <button style={{
-          width: 38, height: 38, borderRadius: 12, background: T.accent,
-          border: 'none', color: '#fff', cursor: 'pointer', padding: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}><Icon name="send" size={16} color="#fff" /></button>
+
+        {/* Send */}
+        <button
+          onClick={sendDraft}
+          disabled={!draft.trim()}
+          style={{
+            width: 38, height: 38, borderRadius: 12,
+            background: draft.trim() ? T.accent : T.border,
+            border: 'none', color: '#fff', cursor: draft.trim() ? 'pointer' : 'default',
+            padding: 0, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'background 0.15s',
+          }}
+        >
+          <Icon name="send" size={16} color="#fff" />
+        </button>
       </div>
     </div>
   );
@@ -171,9 +312,13 @@ function Bubble({ m }: { m: Message }) {
       }}>
         <div>{m.text}</div>
         <div style={{
-          fontSize: 9, opacity: 0.65, marginTop: 4, textAlign: 'right',
+          fontSize: 9, opacity: 0.65, marginTop: 4,
+          display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 3,
           fontVariantNumeric: 'tabular-nums',
-        }}>{m.t}</div>
+        }}>
+          <span>{m.t}</span>
+          {me && <Icon name="check-check" size={10} color={me ? 'rgba(255,255,255,0.8)' : T.text3} />}
+        </div>
       </div>
     </div>
   );
