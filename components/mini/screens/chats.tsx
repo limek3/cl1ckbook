@@ -180,7 +180,7 @@ function ThreadRow({ thread, onClick }: { thread: Thread; onClick: () => void })
 }
 
 export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread; back: () => void }) {
-  const { T } = useTheme();
+  const { T, mode } = useTheme();
   const { threads, markRead, sendMessage, deleteThread } = useChats();
   const { TEMPLATES: workspaceTemplates } = useMiniData();
 
@@ -297,8 +297,14 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
 
       <div style={{
         padding: '8px 12px calc(8px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
-        borderTop: `1px solid ${T.border}`,
-        display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, background: T.bg,
+        borderTop: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.095)' : 'rgba(10,10,10,0.075)'}`,
+        display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
+        background: mode === 'dark' ? 'rgba(10,10,10,0.70)' : 'rgba(255,255,255,0.82)',
+        backdropFilter: 'blur(24px) saturate(1.35)',
+        WebkitBackdropFilter: 'blur(24px) saturate(1.35)',
+        boxShadow: mode === 'dark' ? '0 -18px 44px rgba(0,0,0,0.42)' : '0 -14px 34px rgba(15,23,42,0.10)',
+        position: 'relative',
+        zIndex: 50,
       }}>
         <button
           ref={templateButtonRef}
@@ -320,16 +326,17 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
         <div style={{
           flex: 1,
           minWidth: 0,
-          background: T.bg === '#0a0a0a' ? 'rgba(255,255,255,0.06)' : T.bgSoft,
-          border: `1px solid ${T.border}`,
+          background: mode === 'dark' ? 'rgba(255,255,255,0.055)' : 'rgba(10,10,10,0.035)',
+          border: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.07)' : 'rgba(10,10,10,0.06)'}`,
           borderRadius: 14,
           minHeight: 42,
           padding: '0 12px',
           display: 'flex', alignItems: 'center', gap: 6,
-          transition: 'border-color 0.15s ease, background 0.15s ease',
+          boxShadow: mode === 'dark' ? 'inset 0 1px 0 rgba(255,255,255,0.025)' : 'inset 0 1px 1px rgba(15,23,42,0.035)',
+          transition: 'border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease',
         }}>
           <input
-            className="cb-mini-transparent"
+            className="cb-mini-transparent cb-mini-input-reset"
             ref={inputRef}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -346,6 +353,7 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
               border: 'none',
               outline: 'none',
               boxShadow: 'none',
+              WebkitBoxShadow: 'none',
               borderRadius: 0,
               padding: 0,
               color: T.text,
@@ -353,7 +361,7 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
               caretColor: T.accent,
               fontSize: 14,
               fontFamily: 'inherit',
-              colorScheme: T.bg === '#0a0a0a' ? 'dark' : 'light',
+              colorScheme: mode,
             }}
           />
           {draft.length > 0 && (
@@ -386,10 +394,12 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
           style={{
             position: 'absolute', left: 12, bottom: 'calc(66px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))', zIndex: 90,
             width: 'min(330px, calc(100% - 24px))',
-            background: T.sheetBg,
-            border: `1px solid ${T.border}`,
+            background: mode === 'dark' ? 'rgba(17,17,17,0.86)' : 'rgba(255,255,255,0.90)',
+            border: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.09)' : 'rgba(10,10,10,0.075)'}`,
             borderRadius: 22,
-            boxShadow: '0 18px 50px rgba(0,0,0,0.34)',
+            backdropFilter: 'blur(22px) saturate(1.32)',
+            WebkitBackdropFilter: 'blur(22px) saturate(1.32)',
+            boxShadow: mode === 'dark' ? '0 18px 50px rgba(0,0,0,0.42)' : '0 18px 42px rgba(15,23,42,0.14)',
             padding: 12,
             animation: 'mini-template-pop 0.18s cubic-bezier(.2,.8,.2,1) both',
           }}

@@ -782,8 +782,8 @@ function MiniShell({
   accent: (typeof ACCENT_OPTIONS)[number];
 }) {
   const shellStyle = {
-    paddingTop: 'calc(var(--tg-safe-top, 0px) + 10px)',
-    paddingBottom: 'calc(var(--tg-safe-bottom, 0px) + 96px)',
+    paddingTop: 'calc(var(--tg-safe-top, 0px) + 4px)',
+    paddingBottom: 'calc(var(--tg-safe-bottom, 0px) + 86px)',
     '--mini-accent': accent.value,
     '--mini-accent-soft': accent.soft,
   } as CSSProperties & Record<string, string>;
@@ -805,7 +805,7 @@ function MiniShell({
       className="cb-mini-app-root min-h-screen bg-[#090909] px-3 text-white"
     >
       <div className="mx-auto w-full max-w-[430px]">
-        <header className="mb-4 flex items-center justify-between gap-3">
+        <header className="sticky top-[calc(var(--tg-safe-top,0px)+4px)] z-40 mb-4 flex items-center justify-between gap-3 rounded-[22px] border border-white/[0.08] bg-[#101010]/68 px-2.5 py-2 shadow-[0_14px_36px_rgba(0,0,0,0.24)] backdrop-blur-[24px] backdrop-saturate-[1.35]">
           <div className="flex min-w-0 items-center gap-2.5">
             <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-[11px] border border-white/[0.08] bg-white/[0.055]">
               {profile?.avatar ? (
@@ -841,7 +841,7 @@ function MiniShell({
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-[430px] px-3 pb-[calc(var(--tg-safe-bottom,0px)+10px)]">
-        <div className="grid grid-cols-4 gap-1 rounded-[22px] border border-white/[0.08] bg-[#101010]/90 p-1.5 shadow-[0_18px_60px_rgba(0,0,0,0.45)] backdrop-blur-[24px]">
+        <div className="grid grid-cols-4 gap-1 rounded-[22px] border border-white/[0.10] bg-[#101010]/68 p-1.5 shadow-[0_-18px_54px_rgba(0,0,0,0.48)] backdrop-blur-[28px] backdrop-saturate-[1.35]">
           {navItems.map((item) => {
             const active =
               screen === item.id ||
@@ -1727,7 +1727,7 @@ function ChatsScreen() {
                 value={messageText}
                 onChange={(event) => setMessageText(event.target.value)}
                 placeholder="Сообщение клиенту..."
-                className="h-11 rounded-[15px] border border-white/[0.08] bg-[#141414] px-3 text-[14px] font-medium text-white outline-none placeholder:text-white/25"
+                className="h-11 rounded-[15px] border border-white/[0.08] bg-white/[0.055] px-3 text-[14px] font-medium text-white outline-none placeholder:text-white/25 focus:border-white/[0.16] focus:bg-white/[0.075]"
               />
               <button
                 type="button"

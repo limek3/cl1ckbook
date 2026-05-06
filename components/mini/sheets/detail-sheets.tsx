@@ -41,9 +41,15 @@ function SheetStat({ label, value, tone }: { label: string; value: string; tone?
 }
 
 function InputCard({ label, children }: { label: string; children: ReactNode }) {
-  const { T } = useTheme();
+  const { T, mode } = useTheme();
   return (
-    <div style={{ background: T.cardElev, border: `1px solid ${T.border}`, borderRadius: 14, padding: '12px 14px' }}>
+    <div style={{
+      background: mode === 'dark' ? 'rgba(255,255,255,0.045)' : 'rgba(10,10,10,0.035)',
+      border: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.065)' : 'rgba(10,10,10,0.055)'}`,
+      borderRadius: 14,
+      padding: '12px 14px',
+      boxShadow: mode === 'dark' ? 'inset 0 1px 0 rgba(255,255,255,0.025)' : 'inset 0 1px 1px rgba(15,23,42,0.035)',
+    }}>
       <FieldLabel style={{ fontSize: 9 }}>{label}</FieldLabel>
       <div style={{ marginTop: 8 }}>{children}</div>
     </div>
@@ -112,14 +118,16 @@ export function ClientDetailSheet({
 
         <InputCard label="Заметка по клиенту">
           <textarea
+            className="cb-mini-transparent cb-mini-input-reset"
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="Например: любимый цвет, аллергии, пожелания, удобное время..."
             rows={4}
             style={{
               width: '100%', padding: 0, fontSize: 13, lineHeight: 1.55,
-              background: 'transparent', border: 'none', outline: 'none', resize: 'none',
-              color: T.text, fontFamily: 'inherit',
+              background: 'transparent', backgroundColor: 'transparent', border: 'none', outline: 'none', resize: 'none',
+              boxShadow: 'none', WebkitBoxShadow: 'none',
+              color: T.text, WebkitTextFillColor: T.text, caretColor: T.accent, fontFamily: 'inherit',
             }}
           />
         </InputCard>

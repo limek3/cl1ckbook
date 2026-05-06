@@ -28,7 +28,6 @@ import {
   Scissors,
   Sparkles,
   Star,
-  TrendingDown,
   Users,
   Workflow,
   Stethoscope,
@@ -36,6 +35,8 @@ import {
   GraduationCap,
   UserRound,
   Quote,
+  Minus,
+  Plus,
 } from 'lucide-react';
 import { LanguageToggle } from '@/components/shared/language-toggle';
 import { ThemeToggle } from '@/components/shared/theme-toggle';
@@ -43,18 +44,6 @@ import { useLocale } from '@/lib/locale-context';
 import { cn } from '@/lib/utils';
 
 const ACCENT = '#127dfe';
-const ACCENT_ALT = '#7c3aed';
-const ACCENT_CYAN = '#0ea5e9';
-
-const PARTICLES = Array.from({ length: 32 }, (_, i) => ({
-  id: i,
-  x: ((i * 41 + 11) % 92) + 4,
-  y: ((i * 29 + 7) % 88) + 6,
-  r: 1.2 + (i % 4) * 0.8,
-  dur: 8 + (i % 5) * 2,
-  delay: (i * 0.7) % 7,
-  op: 0.12 + (i % 6) * 0.05,
-}));
 
 // ─── Copy ─────────────────────────────────────────────────────────────────────
 const COPY = {
@@ -67,7 +56,6 @@ const COPY = {
     ],
     login: 'Войти',
     ctaTop: 'Попробовать',
-    sliderHint: 'свайп',
     prev: 'Назад',
     next: 'Далее',
     hero: {
@@ -191,7 +179,6 @@ const COPY = {
     ],
     login: 'Sign in',
     ctaTop: 'Try free',
-    sliderHint: 'swipe',
     prev: 'Prev',
     next: 'Next',
     hero: {
@@ -310,24 +297,45 @@ const COPY = {
 
 const FEATURE_ICONS = [Globe, CalendarDays, Users, Bell, Building2, BarChart3, Sparkles, Workflow];
 const WHO_ICONS = [Scissors, Stethoscope, Dumbbell, GraduationCap, UserRound, Layers];
-const CARD_COLORS = [
-  '#127dfe', '#7c3aed', '#0ea5e9', '#10b981',
-  '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4',
-];
 
-// ─── Scroll progress (top bar) ────────────────────────────────────────────────
+// ─── Scroll progress (top thin bar) ───────────────────────────────────────────
 function ScrollProgress() {
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, { stiffness: 120, damping: 24, mass: 0.4 });
   return (
     <motion.div
       style={{ scaleX }}
-      className="fixed left-0 right-0 top-0 z-[60] h-[3px] origin-left bg-gradient-to-r from-[#127dfe] via-[#7c3aed] to-[#0ea5e9] shadow-[0_0_18px_rgba(18,125,254,0.55)]"
+      className="fixed left-0 right-0 top-0 z-[60] h-px origin-left bg-[#127dfe]"
     />
   );
 }
 
-// ─── Animated counter ─────────────────────────────────────────────────────────
+// ─── Reveal helper (fade up on view) ──────────────────────────────────────────
+function Reveal({
+  children,
+  delay = 0,
+  y = 24,
+  className = '',
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  y?: number;
+  className?: string;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-60px' }}
+      transition={{ duration: 0.7, delay, ease: [0.22, 1, 0.36, 1] }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+// ─── Counter ──────────────────────────────────────────────────────────────────
 function Counter({ target, suffix = '', pre = '' }: { target: number; suffix?: string; pre?: string }) {
   const ref = useRef<HTMLSpanElement>(null);
   const inView = useInView(ref, { once: true });
@@ -336,7 +344,7 @@ function Counter({ target, suffix = '', pre = '' }: { target: number; suffix?: s
     if (!inView || !ref.current) return;
     const node = ref.current;
     const ctrl = animate(0, target, {
-      duration: 2.4,
+      duration: 2.2,
       ease: [0.16, 1, 0.3, 1],
       onUpdate(v) {
         node.textContent =
@@ -355,7 +363,7 @@ function Counter({ target, suffix = '', pre = '' }: { target: number; suffix?: s
   );
 }
 
-// ─── Magnetic button ──────────────────────────────────────────────────────────
+// ─── Magnetic button (minimal) ────────────────────────────────────────────────
 function MagBtn({
   href,
   children,
@@ -376,8 +384,8 @@ function MagBtn({
   const onMove = useCallback((e: React.MouseEvent) => {
     if (!ref.current) return;
     const r = ref.current.getBoundingClientRect();
-    x.set((e.clientX - (r.left + r.width / 2)) * 0.32);
-    y.set((e.clientY - (r.top + r.height / 2)) * 0.32);
+    x.set((e.clientX - (r.left + r.width / 2)) * 0.28);
+    y.set((e.clientY - (r.top + r.height / 2)) * 0.28);
   }, [x, y]);
 
   const onLeave = useCallback(() => {
@@ -392,86 +400,46 @@ function MagBtn({
       style={{ x: sx, y: sy }}
       onMouseMove={onMove}
       onMouseLeave={onLeave}
-      whileTap={{ scale: 0.96 }}
+      whileTap={{ scale: 0.97 }}
       className={cn(
-        'group relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-2xl px-7 py-4 text-[14px] font-semibold transition-all duration-200',
+        'group relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-full px-7 py-3.5 text-[14px] font-semibold transition-colors duration-200',
         variant === 'primary'
-          ? 'bg-gradient-to-br from-[#127dfe] to-[#7c3aed] text-white shadow-[0_18px_50px_-12px_rgba(18,125,254,0.65)] hover:shadow-[0_28px_60px_-12px_rgba(124,58,237,0.7)]'
-          : 'border border-current/20 bg-white/8 text-current backdrop-blur hover:bg-white/14',
+          ? 'bg-black text-white hover:bg-[#127dfe] dark:bg-white dark:text-black dark:hover:bg-[#127dfe] dark:hover:text-white'
+          : 'border border-black/15 bg-transparent text-black hover:border-black/35 dark:border-white/15 dark:text-white dark:hover:border-white/35',
         className,
       )}
     >
-      {variant === 'primary' && (
-        <span className="pointer-events-none absolute inset-y-0 -left-12 w-12 rotate-12 bg-gradient-to-r from-transparent via-white/35 to-transparent transition-all duration-700 group-hover:left-[110%]" />
-      )}
+      <span className="pointer-events-none absolute inset-y-0 -left-12 w-12 rotate-12 bg-white/15 transition-all duration-700 group-hover:left-[110%]" />
       <span className="relative z-10 flex items-center gap-2">{children}</span>
     </motion.a>
   );
 }
 
-// ─── 3D tilt card ─────────────────────────────────────────────────────────────
-function TiltCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const rx = useMotionValue(0);
-  const ry = useMotionValue(0);
-  const srx = useSpring(rx, { stiffness: 140, damping: 18 });
-  const sry = useSpring(ry, { stiffness: 140, damping: 18 });
-
-  const onMove = (e: React.MouseEvent) => {
-    if (!ref.current) return;
-    const r = ref.current.getBoundingClientRect();
-    const nx = (e.clientX - r.left) / r.width - 0.5;
-    const ny = (e.clientY - r.top) / r.height - 0.5;
-    rx.set(-ny * 9);
-    ry.set(nx * 9);
-    ref.current.style.setProperty('--mx', `${(nx + 0.5) * 100}%`);
-    ref.current.style.setProperty('--my', `${(ny + 0.5) * 100}%`);
-  };
-
-  const onLeave = () => {
-    rx.set(0);
-    ry.set(0);
-  };
-
+// ─── Section label ("01 — Возможности") ───────────────────────────────────────
+function SectionLabel({ n, children }: { n: string; children: React.ReactNode }) {
   return (
-    <motion.div
-      ref={ref}
-      style={{ rotateX: srx, rotateY: sry, transformPerspective: 900 }}
-      onMouseMove={onMove}
-      onMouseLeave={onLeave}
-      className={className}
-    >
-      {children}
-    </motion.div>
+    <div className="inline-flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-black/45 dark:text-white/45">
+      <span className="tabular-nums text-black/30 dark:text-white/30">{n}</span>
+      <span className="h-px w-8 bg-black/20 dark:bg-white/20" />
+      <span>{children}</span>
+    </div>
   );
 }
 
-// ─── Eyebrow pill ─────────────────────────────────────────────────────────────
-function Eyebrow({ children, light = false }: { children: React.ReactNode; light?: boolean }) {
+// ─── Animated heading underline ───────────────────────────────────────────────
+function HeadingAccent() {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: '-40px' }}
-      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-      className={cn(
-        'inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]',
-        light
-          ? 'border border-white/20 bg-white/10 text-white/80 backdrop-blur'
-          : 'border border-[#127dfe]/20 bg-[#127dfe]/8 text-[#127dfe] backdrop-blur dark:border-[#127dfe]/30 dark:bg-[#127dfe]/12',
-      )}
-    >
-      <motion.span
-        className="h-1.5 w-1.5 rounded-full bg-current"
-        animate={{ opacity: [0.4, 1, 0.4], scale: [0.8, 1.2, 0.8] }}
-        transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
-      />
-      {children}
-    </motion.div>
+    <motion.span
+      initial={{ scaleX: 0, originX: 0 }}
+      whileInView={{ scaleX: 1 }}
+      viewport={{ once: true }}
+      transition={{ duration: 1, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      className="mt-5 block h-px w-16 bg-[#127dfe]"
+    />
   );
 }
 
-// ─── Slider shell (embla) ─────────────────────────────────────────────────────
+// ─── Slider shell (embla, minimal) ────────────────────────────────────────────
 type SliderProps = {
   children: React.ReactNode;
   autoplay?: number;
@@ -526,18 +494,8 @@ function Slider({ children, autoplay, loop = true, prevLabel, nextLabel, classNa
         <div className="flex -ml-4 touch-pan-y">{children}</div>
       </div>
 
-      {/* Controls */}
-      <div className="mt-8 flex items-center justify-center gap-5">
-        <button
-          type="button"
-          aria-label={prevLabel || 'Prev'}
-          onClick={() => emblaApi?.scrollPrev()}
-          className="group flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white/80 text-black/60 backdrop-blur transition-all hover:scale-110 hover:border-[#127dfe]/40 hover:bg-[#127dfe] hover:text-white hover:shadow-[0_12px_28px_-10px_rgba(18,125,254,0.55)] dark:border-white/12 dark:bg-white/8 dark:text-white/70"
-        >
-          <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
-        </button>
-
-        <div className="flex items-center gap-2">
+      <div className="mt-10 flex items-center justify-between gap-6">
+        <div className="flex items-center gap-1.5">
           {snaps.map((_, i) => (
             <button
               key={i}
@@ -545,29 +503,37 @@ function Slider({ children, autoplay, loop = true, prevLabel, nextLabel, classNa
               aria-label={`Slide ${i + 1}`}
               onClick={() => emblaApi?.scrollTo(i)}
               className={cn(
-                'h-2 rounded-full transition-all duration-300',
-                selected === i
-                  ? 'w-8 bg-gradient-to-r from-[#127dfe] to-[#7c3aed] shadow-[0_0_12px_rgba(18,125,254,0.6)]'
-                  : 'w-2 bg-black/20 hover:bg-black/40 dark:bg-white/20 dark:hover:bg-white/40',
+                'h-1 rounded-full transition-all duration-300',
+                selected === i ? 'w-10 bg-black dark:bg-white' : 'w-4 bg-black/15 hover:bg-black/30 dark:bg-white/15 dark:hover:bg-white/30',
               )}
             />
           ))}
         </div>
 
-        <button
-          type="button"
-          aria-label={nextLabel || 'Next'}
-          onClick={() => emblaApi?.scrollNext()}
-          className="group flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white/80 text-black/60 backdrop-blur transition-all hover:scale-110 hover:border-[#127dfe]/40 hover:bg-[#127dfe] hover:text-white hover:shadow-[0_12px_28px_-10px_rgba(18,125,254,0.55)] dark:border-white/12 dark:bg-white/8 dark:text-white/70"
-        >
-          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            aria-label={prevLabel || 'Prev'}
+            onClick={() => emblaApi?.scrollPrev()}
+            className="group flex h-10 w-10 items-center justify-center rounded-full border border-black/15 text-black/70 transition-all hover:border-black/40 hover:bg-black hover:text-white dark:border-white/15 dark:text-white/70 dark:hover:border-white/40 dark:hover:bg-white dark:hover:text-black"
+          >
+            <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
+          </button>
+          <button
+            type="button"
+            aria-label={nextLabel || 'Next'}
+            onClick={() => emblaApi?.scrollNext()}
+            className="group flex h-10 w-10 items-center justify-center rounded-full border border-black/15 text-black/70 transition-all hover:border-black/40 hover:bg-black hover:text-white dark:border-white/15 dark:text-white/70 dark:hover:border-white/40 dark:hover:bg-white dark:hover:text-black"
+          >
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-// ─── Slide nav dots ───────────────────────────────────────────────────────────
+// ─── Side nav dots ────────────────────────────────────────────────────────────
 const SLIDE_IDS = ['hero', 'why', 'features', 'who', 'how', 'proof', 'cta'] as const;
 const SLIDE_LABELS_RU = ['Старт', 'Зачем', 'Возможности', 'Для кого', 'Как', 'Отзывы', 'Запуск'];
 const SLIDE_LABELS_EN = ['Start', 'Why', 'Features', 'For whom', 'How', 'Reviews', 'Launch'];
@@ -595,31 +561,31 @@ function SideNav({ locale }: { locale: string }) {
   }, []);
 
   return (
-    <nav className="fixed right-4 top-1/2 z-50 hidden -translate-y-1/2 lg:flex">
-      <div className="flex flex-col items-end gap-3">
+    <nav className="fixed right-5 top-1/2 z-50 hidden -translate-y-1/2 lg:flex">
+      <div className="flex flex-col items-end gap-2.5">
         {SLIDE_IDS.map((id, i) => (
           <a
             key={id}
             href={`#${id}`}
-            className="group flex items-center gap-2"
+            className="group flex items-center gap-3"
             title={labels[i]}
           >
             <span
               className={cn(
-                'text-[10px] font-semibold tracking-wide transition-all duration-300',
+                'text-[10px] font-medium tracking-wide transition-all duration-300',
                 active === i
-                  ? 'text-[#127dfe] opacity-100'
-                  : 'text-black/30 opacity-0 group-hover:opacity-100 dark:text-white/30',
+                  ? 'text-black opacity-100 dark:text-white'
+                  : 'text-black/40 opacity-0 group-hover:opacity-100 dark:text-white/40',
               )}
             >
               {labels[i]}
             </span>
             <span
               className={cn(
-                'block rounded-full transition-all duration-300',
+                'block h-px transition-all duration-300',
                 active === i
-                  ? 'h-7 w-2 bg-gradient-to-b from-[#127dfe] to-[#7c3aed] shadow-[0_0_12px_rgba(18,125,254,0.7)]'
-                  : 'h-2 w-2 bg-black/20 group-hover:bg-black/40 dark:bg-white/20 dark:group-hover:bg-white/40',
+                  ? 'w-8 bg-black dark:bg-white'
+                  : 'w-4 bg-black/25 group-hover:w-6 group-hover:bg-black/50 dark:bg-white/25 dark:group-hover:bg-white/50',
               )}
             />
           </a>
@@ -642,17 +608,17 @@ function LandingHeader({ t }: { t: typeof COPY.ru }) {
 
   return (
     <motion.header
-      initial={{ y: -20, opacity: 0 }}
+      initial={{ y: -16, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
       className={cn(
         'fixed inset-x-0 top-0 z-40 transition-all duration-300',
         scrolled
-          ? 'border-b border-black/8 bg-white/80 shadow-[0_4px_24px_rgba(0,0,0,0.06)] backdrop-blur-xl dark:border-white/8 dark:bg-black/70'
+          ? 'border-b border-black/6 bg-white/85 backdrop-blur-xl dark:border-white/8 dark:bg-[#06080f]/85'
           : 'bg-transparent',
       )}
     >
-      <div className="mx-auto flex h-16 max-w-[1280px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-16 max-w-[1200px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <Link href="/landing" className="flex items-center">
           <Image
             src="/brand/clickbook-logo-dark-transparent.png"
@@ -675,16 +641,15 @@ function LandingHeader({ t }: { t: typeof COPY.ru }) {
           />
         </Link>
 
-        <nav className="hidden items-center gap-6 md:flex">
+        <nav className="hidden items-center gap-8 md:flex">
           {t.nav.map(([href, label]) => (
             <a
               key={href}
               href={href as string}
-              className="relative text-[13px] font-medium text-black/60 transition-colors hover:text-black dark:text-white/56 dark:hover:text-white"
+              className="group relative text-[13px] font-medium text-black/60 transition-colors hover:text-black dark:text-white/60 dark:hover:text-white"
             >
-              <span className="after:absolute after:-bottom-1 after:left-0 after:h-px after:w-0 after:bg-gradient-to-r after:from-[#127dfe] after:to-[#7c3aed] after:transition-all after:duration-300 hover:after:w-full">
-                {label}
-              </span>
+              {label}
+              <span className="absolute -bottom-1 left-0 h-px w-0 bg-current transition-all duration-300 group-hover:w-full" />
             </a>
           ))}
         </nav>
@@ -694,17 +659,17 @@ function LandingHeader({ t }: { t: typeof COPY.ru }) {
           <ThemeToggle compact minimal />
           <Link
             href="/login"
-            className="hidden text-[13px] font-medium text-black/60 transition hover:text-black dark:text-white/56 dark:hover:text-white sm:inline"
+            className="hidden text-[13px] font-medium text-black/60 transition hover:text-black dark:text-white/60 dark:hover:text-white sm:inline"
           >
             {t.login}
           </Link>
           <motion.a
             href="#cta"
-            whileHover={{ scale: 1.04 }}
+            whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.97 }}
-            className="group relative inline-flex items-center gap-1.5 overflow-hidden rounded-xl bg-gradient-to-r from-[#127dfe] to-[#7c3aed] px-4 py-2 text-[13px] font-semibold text-white shadow-[0_8px_24px_-6px_rgba(18,125,254,0.5)] transition-all hover:shadow-[0_14px_36px_-6px_rgba(124,58,237,0.65)]"
+            className="group relative inline-flex items-center gap-1.5 overflow-hidden rounded-full bg-black px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[#127dfe] dark:bg-white dark:text-black dark:hover:bg-[#127dfe] dark:hover:text-white"
           >
-            <span className="pointer-events-none absolute inset-y-0 -left-10 w-10 rotate-12 bg-gradient-to-r from-transparent via-white/35 to-transparent transition-all duration-700 group-hover:left-[110%]" />
+            <span className="pointer-events-none absolute inset-y-0 -left-10 w-10 rotate-12 bg-white/20 transition-all duration-700 group-hover:left-[110%]" />
             <span className="relative z-10 flex items-center gap-1.5">
               {t.ctaTop}
               <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
@@ -716,42 +681,7 @@ function LandingHeader({ t }: { t: typeof COPY.ru }) {
   );
 }
 
-// ─── Aurora background (mesh gradient + grain) ────────────────────────────────
-function AuroraBg() {
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      {/* Aurora blobs */}
-      <motion.div
-        animate={{ x: [0, 80, -40, 0], y: [0, -40, 60, 0], scale: [1, 1.18, 0.92, 1] }}
-        transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut' }}
-        className="absolute -left-32 -top-32 h-[640px] w-[640px] rounded-full opacity-40 blur-[110px] dark:opacity-25"
-        style={{ background: `radial-gradient(circle, ${ACCENT} 0%, transparent 70%)` }}
-      />
-      <motion.div
-        animate={{ x: [0, -60, 30, 0], y: [0, 50, -30, 0], scale: [1, 0.9, 1.15, 1] }}
-        transition={{ duration: 26, repeat: Infinity, ease: 'easeInOut', delay: 3 }}
-        className="absolute -right-32 top-10 h-[560px] w-[560px] rounded-full opacity-35 blur-[110px] dark:opacity-22"
-        style={{ background: `radial-gradient(circle, ${ACCENT_ALT} 0%, transparent 70%)` }}
-      />
-      <motion.div
-        animate={{ x: [0, 40, -50, 0], y: [0, -60, 40, 0] }}
-        transition={{ duration: 24, repeat: Infinity, ease: 'easeInOut', delay: 6 }}
-        className="absolute bottom-0 left-1/3 h-[480px] w-[480px] rounded-full opacity-25 blur-[120px]"
-        style={{ background: `radial-gradient(circle, ${ACCENT_CYAN} 0%, transparent 70%)` }}
-      />
-      {/* Subtle grain (svg noise) */}
-      <div
-        className="absolute inset-0 opacity-[0.04] mix-blend-overlay dark:opacity-[0.06]"
-        style={{
-          backgroundImage:
-            "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E\")",
-        }}
-      />
-    </div>
-  );
-}
-
-// ─── Live dashboard mockup (cycling notifications, slots, chart, stat) ────────
+// ─── Live mockup (minimal: no rainbow, single accent) ─────────────────────────
 type ChipsTuple = ReadonlyArray<{ readonly label: string; readonly sub: string }>;
 
 function DashboardMockup({ chips, inView }: { chips: ChipsTuple; inView: boolean }) {
@@ -766,26 +696,23 @@ function DashboardMockup({ chips, inView }: { chips: ChipsTuple; inView: boolean
     const r = ref.current.getBoundingClientRect();
     const nx = (e.clientX - r.left) / r.width - 0.5;
     const ny = (e.clientY - r.top) / r.height - 0.5;
-    rx.set(-ny * 8);
-    ry.set(nx * 8);
+    rx.set(-ny * 6);
+    ry.set(nx * 6);
   };
   const onLeave = () => { rx.set(0); ry.set(0); };
 
-  // Cycling notification
   const [notiIdx, setNotiIdx] = useState(0);
   useEffect(() => {
-    const id = setInterval(() => setNotiIdx((i) => (i + 1) % chips.length), 3200);
+    const id = setInterval(() => setNotiIdx((i) => (i + 1) % chips.length), 3400);
     return () => clearInterval(id);
   }, [chips.length]);
 
-  // Booking rows derived from chips (deterministic display data)
   const slots = [
-    { name: chips[0].sub.split(' · ')[0] || 'Дарья', service: chips[0].sub.split(' · ')[1] || 'Маникюр', time: '12:30', color: '#127dfe' },
-    { name: chips[2].sub.split(' · ')[0] || 'Анна', service: 'Стрижка', time: chips[2].sub.split(' · ')[1] || '16:00', color: '#7c3aed' },
-    { name: 'Михаил', service: 'Массаж', time: '18:00', color: '#10b981' },
+    { name: chips[0].sub.split(' · ')[0] || 'Дарья', service: chips[0].sub.split(' · ')[1] || 'Маникюр', time: '12:30' },
+    { name: chips[2].sub.split(' · ')[0] || 'Анна', service: 'Стрижка', time: chips[2].sub.split(' · ')[1] || '16:00' },
+    { name: 'Михаил', service: 'Массаж', time: '18:00' },
   ];
 
-  // Mini chart data (8 points, smooth wave)
   const chartPoints = [22, 38, 31, 52, 44, 70, 62, 88];
   const chartW = 240;
   const chartH = 56;
@@ -798,17 +725,17 @@ function DashboardMockup({ chips, inView }: { chips: ChipsTuple; inView: boolean
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 60, scale: 0.94 }}
+      initial={{ opacity: 0, y: 50, scale: 0.96 }}
       animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
-      transition={{ duration: 1.1, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
-      className="relative mx-auto w-full max-w-[480px] lg:max-w-none"
+      transition={{ duration: 1, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      className="relative mx-auto w-full max-w-[460px] lg:max-w-none"
     >
-      {/* Halo glow behind */}
+      {/* Subtle ambient halo */}
       <motion.div
-        animate={{ opacity: [0.4, 0.7, 0.4], scale: [0.95, 1.05, 0.95] }}
+        animate={{ opacity: [0.3, 0.5, 0.3] }}
         transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-        className="pointer-events-none absolute -inset-10 rounded-[40px] blur-[60px]"
-        style={{ background: `radial-gradient(ellipse at center, ${ACCENT}55, ${ACCENT_ALT}30, transparent 70%)` }}
+        className="pointer-events-none absolute -inset-8 rounded-[40px] blur-[60px]"
+        style={{ background: `radial-gradient(ellipse at center, ${ACCENT}22, transparent 70%)` }}
       />
 
       <motion.div
@@ -816,227 +743,162 @@ function DashboardMockup({ chips, inView }: { chips: ChipsTuple; inView: boolean
         onMouseMove={onMove}
         onMouseLeave={onLeave}
         style={{ rotateX: srx, rotateY: sry, transformPerspective: 1100 }}
-        className="relative"
+        className="relative overflow-hidden rounded-3xl border border-black/8 bg-white p-5 shadow-[0_30px_80px_-30px_rgba(0,0,0,0.18)] dark:border-white/10 dark:bg-[#0b0e1a]"
       >
-        {/* Conic gradient border wrapper */}
-        <div className="relative rounded-[28px] p-[1.5px]" style={{ background: `conic-gradient(from 120deg, ${ACCENT}, ${ACCENT_ALT}, ${ACCENT_CYAN}, ${ACCENT})` }}>
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 12, repeat: Infinity, ease: 'linear' }}
-            className="pointer-events-none absolute inset-0 rounded-[28px] opacity-60"
-            style={{ background: `conic-gradient(from 0deg, transparent 0%, ${ACCENT}40 25%, transparent 50%, ${ACCENT_ALT}40 75%, transparent 100%)` }}
-          />
-          <div className="relative overflow-hidden rounded-[27px] bg-white/95 p-5 backdrop-blur-xl dark:bg-[#0b0e1a]/95">
-            {/* Header bar */}
-            <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-rose-400/80" />
-                <span className="h-2.5 w-2.5 rounded-full bg-amber-400/80" />
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/80" />
-              </div>
-              <div className="flex items-center gap-2 rounded-full border border-black/8 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-black/55 dark:border-white/10 dark:bg-white/5 dark:text-white/55">
-                <CalendarDays className="h-3 w-3" />
-                clickbook · сегодня
-              </div>
-              <motion.div
-                animate={{ scale: [1, 1.15, 1] }}
-                transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
-                className="relative"
-              >
-                <Bell className="h-4 w-4 text-[#127dfe]" />
-                <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-[#0b0e1a]" />
-              </motion.div>
-            </div>
-
-            {/* Floating notification (cycles) */}
-            <div className="relative mb-4 h-[58px]">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={notiIdx}
-                  initial={{ opacity: 0, y: -16, scale: 0.96 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 16, scale: 0.96 }}
-                  transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-                  className="absolute inset-0 flex items-center gap-3 rounded-2xl border border-[#127dfe]/15 bg-gradient-to-r from-[#127dfe]/8 via-[#7c3aed]/8 to-transparent p-3 shadow-[0_12px_30px_-12px_rgba(18,125,254,0.35)] backdrop-blur"
-                >
-                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl" style={{ background: `linear-gradient(135deg, ${CARD_COLORS[notiIdx]}, ${CARD_COLORS[(notiIdx + 1) % CARD_COLORS.length]})` }}>
-                    <Sparkles className="h-4 w-4 text-white" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[12.5px] font-semibold text-black/85 dark:text-white/85">{chips[notiIdx].label}</div>
-                    <div className="truncate text-[11px] text-black/50 dark:text-white/45">{chips[notiIdx].sub}</div>
-                  </div>
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: '100%' }}
-                    transition={{ duration: 3, ease: 'linear' }}
-                    className="absolute bottom-0 left-0 h-[2px] rounded-full bg-gradient-to-r from-[#127dfe] to-[#7c3aed]"
-                  />
-                </motion.div>
-              </AnimatePresence>
-            </div>
-
-            {/* Booking slots */}
-            <div className="mb-5 space-y-2">
-              {slots.map((s, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={inView ? { opacity: 1, x: 0 } : {}}
-                  transition={{ duration: 0.5, delay: 0.6 + i * 0.12 }}
-                  className="group flex items-center gap-3 rounded-xl border border-black/6 bg-black/[0.015] px-3 py-2.5 transition-all hover:border-[#127dfe]/30 hover:bg-[#127dfe]/[0.04] dark:border-white/8 dark:bg-white/[0.025] dark:hover:bg-[#127dfe]/[0.08]"
-                >
-                  <div
-                    className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-white"
-                    style={{ background: `linear-gradient(135deg, ${s.color}, ${s.color}cc)`, boxShadow: `0 6px 16px -6px ${s.color}88` }}
-                  >
-                    {s.name.charAt(0)}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[12.5px] font-semibold text-black/85 dark:text-white/85">{s.name}</div>
-                    <div className="truncate text-[10.5px] text-black/45 dark:text-white/40">{s.service}</div>
-                  </div>
-                  <div className="rounded-md bg-[#127dfe]/10 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[#127dfe]">{s.time}</div>
-                  <motion.span
-                    animate={{ opacity: [0.4, 1, 0.4] }}
-                    transition={{ duration: 2, repeat: Infinity, delay: i * 0.4 }}
-                    className="h-1.5 w-1.5 rounded-full bg-emerald-500"
-                  />
-                </motion.div>
-              ))}
-            </div>
-
-            {/* Mini chart */}
-            <div className="mb-4 rounded-2xl border border-black/6 bg-gradient-to-br from-[#127dfe]/[0.04] to-transparent p-3 dark:border-white/8">
-              <div className="mb-2 flex items-center justify-between">
-                <div className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-black/45 dark:text-white/40">Записи · 7 дней</div>
-                <div className="text-[10.5px] font-bold text-emerald-500">▲ 24%</div>
-              </div>
-              <svg viewBox={`0 0 ${chartW} ${chartH}`} className="h-12 w-full" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="chartLine" x1="0" x2="1" y1="0" y2="0">
-                    <stop offset="0%" stopColor={ACCENT} />
-                    <stop offset="50%" stopColor={ACCENT_ALT} />
-                    <stop offset="100%" stopColor={ACCENT_CYAN} />
-                  </linearGradient>
-                  <linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stopColor={ACCENT} stopOpacity="0.3" />
-                    <stop offset="100%" stopColor={ACCENT} stopOpacity="0" />
-                  </linearGradient>
-                </defs>
-                <motion.path
-                  d={areaD}
-                  fill="url(#chartFill)"
-                  initial={{ opacity: 0 }}
-                  animate={inView ? { opacity: 1 } : {}}
-                  transition={{ duration: 1.2, delay: 1.1 }}
-                />
-                <motion.path
-                  d={pathD}
-                  fill="none"
-                  stroke="url(#chartLine)"
-                  strokeWidth={2.2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  initial={{ pathLength: 0 }}
-                  animate={inView ? { pathLength: 1 } : {}}
-                  transition={{ duration: 1.6, delay: 0.9, ease: [0.22, 1, 0.36, 1] }}
-                />
-                {chartPoints.map((v, i) => (
-                  <motion.circle
-                    key={i}
-                    cx={i * stepX}
-                    cy={chartH - (v / maxY) * chartH * 0.92}
-                    r={2.2}
-                    fill={ACCENT}
-                    initial={{ opacity: 0, scale: 0 }}
-                    animate={inView ? { opacity: 1, scale: 1 } : {}}
-                    transition={{ duration: 0.4, delay: 1.5 + i * 0.05 }}
-                  />
-                ))}
-              </svg>
-            </div>
-
-            {/* Bottom stat */}
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={inView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.6, delay: 1.4 }}
-              className="flex items-center justify-between rounded-2xl bg-gradient-to-r from-[#127dfe] via-[#7c3aed] to-[#0ea5e9] p-3 text-white shadow-[0_16px_40px_-14px_rgba(18,125,254,0.6)] [background-size:200%_auto]"
-              style={{ animation: 'gradient-pan 6s linear infinite' }}
-            >
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.1em] opacity-80">{chips[1].sub}</div>
-                <div className="text-[24px] font-black leading-none tracking-[-0.03em]">{chips[1].label}</div>
-              </div>
-              <BarChart3 className="h-7 w-7 opacity-90" />
-            </motion.div>
+        {/* Header bar */}
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-black/15 dark:bg-white/20" />
+            <span className="h-2 w-2 rounded-full bg-black/15 dark:bg-white/20" />
+            <span className="h-2 w-2 rounded-full bg-black/15 dark:bg-white/20" />
           </div>
+          <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.14em] text-black/45 dark:text-white/45">
+            <CalendarDays className="h-3 w-3" />
+            clickbook
+          </div>
+          <motion.div
+            animate={{ scale: [1, 1.12, 1] }}
+            transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+            className="relative"
+          >
+            <Bell className="h-3.5 w-3.5 text-black/55 dark:text-white/55" />
+            <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-[#127dfe]" />
+          </motion.div>
         </div>
 
-        {/* Floating side chips */}
-        <motion.div
-          initial={{ opacity: 0, x: -30, y: 20 }}
-          animate={inView ? { opacity: 1, x: 0, y: 0 } : {}}
-          transition={{ duration: 0.7, delay: 1.6 }}
-          className="absolute -left-6 top-20 hidden lg:block"
-        >
-          <motion.div
-            animate={{ y: [0, -8, 0] }}
-            transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-            className="flex items-center gap-2 rounded-2xl border border-black/8 bg-white/95 px-3 py-2 shadow-[0_18px_40px_-12px_rgba(18,125,254,0.35)] backdrop-blur dark:border-white/10 dark:bg-[#0b0e1a]/95"
-          >
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/15">
-              <Check className="h-3.5 w-3.5 text-emerald-500" />
-            </div>
-            <div>
-              <div className="text-[10.5px] font-bold text-black/80 dark:text-white/80">−78%</div>
-              <div className="text-[9.5px] text-black/45 dark:text-white/40">no-show</div>
-            </div>
-          </motion.div>
-        </motion.div>
+        {/* Cycling notification */}
+        <div className="relative mb-4 h-[58px]">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={notiIdx}
+              initial={{ opacity: 0, y: -12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 12 }}
+              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+              className="absolute inset-0 flex items-center gap-3 rounded-2xl border border-black/8 bg-white p-3 dark:border-white/10 dark:bg-white/[0.03]"
+            >
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[#127dfe]/10 text-[#127dfe]">
+                <Sparkles className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[12.5px] font-semibold text-black/85 dark:text-white/85">{chips[notiIdx].label}</div>
+                <div className="truncate text-[11px] text-black/50 dark:text-white/45">{chips[notiIdx].sub}</div>
+              </div>
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: '100%' }}
+                transition={{ duration: 3.2, ease: 'linear' }}
+                className="absolute bottom-0 left-0 h-px bg-[#127dfe]"
+              />
+            </motion.div>
+          </AnimatePresence>
+        </div>
 
+        {/* Booking slots */}
+        <div className="mb-5 space-y-2">
+          {slots.map((s, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, x: -16 }}
+              animate={inView ? { opacity: 1, x: 0 } : {}}
+              transition={{ duration: 0.5, delay: 0.6 + i * 0.12 }}
+              className="group flex items-center gap-3 rounded-xl border border-black/6 bg-black/[0.012] px-3 py-2.5 transition-all hover:border-[#127dfe]/30 hover:bg-[#127dfe]/[0.04] dark:border-white/8 dark:bg-white/[0.02] dark:hover:bg-[#127dfe]/[0.08]"
+            >
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-black/[0.04] text-[12px] font-semibold text-black/70 dark:bg-white/[0.06] dark:text-white/70">
+                {s.name.charAt(0)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[12.5px] font-semibold text-black/85 dark:text-white/85">{s.name}</div>
+                <div className="truncate text-[10.5px] text-black/45 dark:text-white/40">{s.service}</div>
+              </div>
+              <div className="rounded-md bg-black/[0.04] px-2 py-0.5 text-[11px] font-semibold tabular-nums text-black/70 dark:bg-white/[0.06] dark:text-white/70">{s.time}</div>
+              <motion.span
+                animate={{ opacity: [0.4, 1, 0.4] }}
+                transition={{ duration: 2, repeat: Infinity, delay: i * 0.4 }}
+                className="h-1.5 w-1.5 rounded-full bg-[#127dfe]"
+              />
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Mini chart */}
+        <div className="mb-4 rounded-2xl border border-black/6 p-3 dark:border-white/8">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="text-[10.5px] font-medium uppercase tracking-[0.12em] text-black/45 dark:text-white/40">Записи · 7 дней</div>
+            <div className="text-[10.5px] font-bold tabular-nums text-[#127dfe]">+24%</div>
+          </div>
+          <svg viewBox={`0 0 ${chartW} ${chartH}`} className="h-12 w-full" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor={ACCENT} stopOpacity="0.22" />
+                <stop offset="100%" stopColor={ACCENT} stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <motion.path
+              d={areaD}
+              fill="url(#chartFill)"
+              initial={{ opacity: 0 }}
+              animate={inView ? { opacity: 1 } : {}}
+              transition={{ duration: 1, delay: 1.1 }}
+            />
+            <motion.path
+              d={pathD}
+              fill="none"
+              stroke={ACCENT}
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              initial={{ pathLength: 0 }}
+              animate={inView ? { pathLength: 1 } : {}}
+              transition={{ duration: 1.6, delay: 0.9, ease: [0.22, 1, 0.36, 1] }}
+            />
+            {chartPoints.map((v, i) => (
+              <motion.circle
+                key={i}
+                cx={i * stepX}
+                cy={chartH - (v / maxY) * chartH * 0.92}
+                r={1.8}
+                fill={ACCENT}
+                initial={{ opacity: 0 }}
+                animate={inView ? { opacity: 1 } : {}}
+                transition={{ duration: 0.4, delay: 1.5 + i * 0.04 }}
+              />
+            ))}
+          </svg>
+        </div>
+
+        {/* Bottom stat */}
         <motion.div
-          initial={{ opacity: 0, x: 30, y: -20 }}
-          animate={inView ? { opacity: 1, x: 0, y: 0 } : {}}
-          transition={{ duration: 0.7, delay: 1.8 }}
-          className="absolute -right-6 bottom-24 hidden lg:block"
+          initial={{ opacity: 0, y: 12 }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6, delay: 1.4 }}
+          className="flex items-center justify-between rounded-2xl bg-black p-3 text-white dark:bg-white dark:text-black"
         >
-          <motion.div
-            animate={{ y: [0, 8, 0] }}
-            transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
-            className="flex items-center gap-2 rounded-2xl border border-black/8 bg-white/95 px-3 py-2 shadow-[0_18px_40px_-12px_rgba(124,58,237,0.35)] backdrop-blur dark:border-white/10 dark:bg-[#0b0e1a]/95"
-          >
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#7c3aed]/15">
-              <Users className="h-3.5 w-3.5 text-[#7c3aed]" />
-            </div>
-            <div>
-              <div className="text-[10.5px] font-bold text-black/80 dark:text-white/80">2 500+</div>
-              <div className="text-[9.5px] text-black/45 dark:text-white/40">бизнесов</div>
-            </div>
-          </motion.div>
+          <div>
+            <div className="text-[10.5px] font-medium uppercase tracking-[0.14em] opacity-70">{chips[1].sub}</div>
+            <div className="text-[22px] font-bold leading-none tracking-[-0.02em]">{chips[1].label}</div>
+          </div>
+          <BarChart3 className="h-6 w-6 opacity-90" />
         </motion.div>
       </motion.div>
     </motion.div>
   );
 }
 
-// ─── Marquee strip (infinite scroll) ──────────────────────────────────────────
+// ─── Marquee ──────────────────────────────────────────────────────────────────
 function MarqueeStrip({ items }: { items: string[] }) {
   const list = [...items, ...items, ...items];
   return (
     <div className="relative w-full overflow-hidden py-3" style={{ maskImage: 'linear-gradient(90deg, transparent, black 12%, black 88%, transparent)' }}>
       <motion.div
         animate={{ x: ['0%', '-33.333%'] }}
-        transition={{ duration: 28, repeat: Infinity, ease: 'linear' }}
-        className="flex w-max items-center gap-10 whitespace-nowrap text-[12.5px] font-semibold uppercase tracking-[0.18em] text-black/35 dark:text-white/30"
+        transition={{ duration: 32, repeat: Infinity, ease: 'linear' }}
+        className="flex w-max items-center gap-12 whitespace-nowrap text-[11.5px] font-medium uppercase tracking-[0.2em] text-black/40 dark:text-white/35"
       >
         {list.map((item, i) => (
-          <span key={i} className="flex items-center gap-10">
-            <span className="flex items-center gap-2">
-              <span className="h-1 w-1 rounded-full bg-current" />
-              {item}
-            </span>
+          <span key={i} className="flex items-center gap-3">
+            <span className="h-1 w-1 rounded-full bg-current" />
+            {item}
           </span>
         ))}
       </motion.div>
@@ -1044,26 +906,23 @@ function MarqueeStrip({ items }: { items: string[] }) {
   );
 }
 
-// ─── SLIDE 1 · HERO (split layout + live mockup) ──────────────────────────────
+// ─── HERO ─────────────────────────────────────────────────────────────────────
 function HeroSlide({ t }: { t: typeof COPY.ru }) {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: '-100px' });
 
-  // Scroll-driven parallax
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] });
-  const yLeft = useTransform(scrollYProgress, [0, 1], [0, -100]);
-  const yRight = useTransform(scrollYProgress, [0, 1], [0, -160]);
+  const yLeft = useTransform(scrollYProgress, [0, 1], [0, -80]);
+  const yRight = useTransform(scrollYProgress, [0, 1], [0, -130]);
   const opacity = useTransform(scrollYProgress, [0, 0.7], [1, 0]);
 
-  // Cursor parallax for hero blobs
+  // Cursor parallax for accent
   const cx = useMotionValue(0);
   const cy = useMotionValue(0);
-  const sx = useSpring(cx, { stiffness: 60, damping: 18 });
-  const sy = useSpring(cy, { stiffness: 60, damping: 18 });
-  const blobX = useTransform(sx, (v) => v * 30);
-  const blobY = useTransform(sy, (v) => v * 30);
-  const blob2X = useTransform(sx, (v) => v * -40);
-  const blob2Y = useTransform(sy, (v) => v * -40);
+  const sx = useSpring(cx, { stiffness: 50, damping: 20 });
+  const sy = useSpring(cy, { stiffness: 50, damping: 20 });
+  const blobX = useTransform(sx, (v) => v * 26);
+  const blobY = useTransform(sy, (v) => v * 26);
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
@@ -1077,15 +936,7 @@ function HeroSlide({ t }: { t: typeof COPY.ru }) {
   }, [cx, cy]);
 
   const words = [t.hero.title1, t.hero.title2, t.hero.title3];
-
-  const marqueeItems = [
-    ...t.hero.trust,
-    'no-show −78%',
-    '2 500+',
-    '24/7',
-    'Telegram · VK · Web',
-    ...t.hero.trust,
-  ];
+  const marqueeItems = [...t.hero.trust, 'Telegram · VK · Web', '−78% no-show', '2 500+', '24/7', ...t.hero.trust];
 
   return (
     <section
@@ -1093,108 +944,85 @@ function HeroSlide({ t }: { t: typeof COPY.ru }) {
       ref={ref}
       className="relative flex min-h-screen flex-col overflow-hidden bg-white pt-16 dark:bg-[#06080f]"
     >
-      <AuroraBg />
-
-      {/* Cursor-following accent blobs (subtle) */}
+      {/* Subtle ambient blob (single, follows cursor) */}
       <motion.div
         style={{ x: blobX, y: blobY }}
-        className="pointer-events-none absolute left-[-20%] top-[10%] h-[420px] w-[420px] rounded-full opacity-30 blur-[120px] dark:opacity-20"
+        className="pointer-events-none absolute right-[-10%] top-[5%] h-[520px] w-[520px] rounded-full opacity-25 blur-[120px] dark:opacity-18"
       >
         <div className="h-full w-full" style={{ background: `radial-gradient(circle, ${ACCENT}, transparent 70%)` }} />
       </motion.div>
-      <motion.div
-        style={{ x: blob2X, y: blob2Y }}
-        className="pointer-events-none absolute right-[-15%] top-[40%] h-[360px] w-[360px] rounded-full opacity-30 blur-[120px] dark:opacity-20"
-      >
-        <div className="h-full w-full" style={{ background: `radial-gradient(circle, ${ACCENT_ALT}, transparent 70%)` }} />
-      </motion.div>
 
-      {/* Soft dot grid */}
+      {/* Soft dot grid (very subtle) */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.1] dark:opacity-[0.06]"
+        className="pointer-events-none absolute inset-0 opacity-[0.06] dark:opacity-[0.04]"
         style={{
           backgroundImage: `radial-gradient(circle, currentColor 1px, transparent 1px)`,
-          color: '#0a0a14',
-          backgroundSize: '36px 36px',
+          color: 'currentColor',
+          backgroundSize: '40px 40px',
           maskImage: 'radial-gradient(ellipse at center, black 35%, transparent 78%)',
         }}
       />
 
       <motion.div
         style={{ opacity }}
-        className="relative z-10 mx-auto flex w-full max-w-[1280px] flex-1 flex-col items-center px-4 pt-8 sm:px-6 lg:flex-row lg:items-center lg:gap-10 lg:px-8 lg:pt-0"
+        className="relative z-10 mx-auto flex w-full max-w-[1200px] flex-1 flex-col items-center px-4 pt-8 sm:px-6 lg:flex-row lg:items-center lg:gap-12 lg:px-8 lg:pt-0"
       >
-        {/* LEFT: Text */}
-        <motion.div style={{ y: yLeft }} className="w-full text-center lg:w-[58%] lg:text-left">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={inView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <Eyebrow>{t.hero.badge}</Eyebrow>
-          </motion.div>
+        {/* LEFT */}
+        <motion.div style={{ y: yLeft }} className="w-full text-center lg:w-[56%] lg:text-left">
+          <Reveal>
+            <SectionLabel n="00">{t.hero.badge}</SectionLabel>
+          </Reveal>
 
-          <h1 className="mt-6 overflow-hidden">
+          <h1 className="mt-7">
             {words.map((word, i) => (
-              <motion.span
-                key={i}
-                initial={{ opacity: 0, y: 80 }}
-                animate={inView ? { opacity: 1, y: 0 } : {}}
-                transition={{ duration: 0.85, delay: 0.1 + i * 0.12, ease: [0.22, 1, 0.36, 1] }}
-                className={cn(
-                  'block text-[44px] font-bold leading-[0.97] tracking-[-0.045em] sm:text-[60px] lg:text-[76px]',
-                  i === 1
-                    ? 'bg-gradient-to-r from-[#127dfe] via-[#7c3aed] to-[#0ea5e9] bg-clip-text text-transparent [background-size:200%_auto]'
-                    : 'text-black dark:text-white',
-                )}
-                style={i === 1 ? { animation: 'gradient-pan 6s linear infinite' } : undefined}
-              >
-                {word}
-              </motion.span>
+              <span key={i} className="block overflow-hidden">
+                <motion.span
+                  initial={{ y: 90 }}
+                  animate={inView ? { y: 0 } : {}}
+                  transition={{ duration: 0.9, delay: 0.15 + i * 0.1, ease: [0.22, 1, 0.36, 1] }}
+                  className={cn(
+                    'block text-[44px] font-bold leading-[0.98] tracking-[-0.045em] text-black dark:text-white sm:text-[60px] lg:text-[78px]',
+                    i === 1 && 'text-[#127dfe]',
+                  )}
+                >
+                  {word}
+                </motion.span>
+              </span>
             ))}
           </h1>
 
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={inView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.7, delay: 0.55, ease: [0.22, 1, 0.36, 1] }}
-            className="mx-auto mt-6 max-w-xl text-[16px] leading-7 text-black/58 dark:text-white/52 sm:text-[17px] lg:mx-0"
-          >
-            {t.hero.sub}
-          </motion.p>
+          <Reveal delay={0.55}>
+            <p className="mx-auto mt-7 max-w-xl text-[16px] leading-7 text-black/55 dark:text-white/50 sm:text-[17px] lg:mx-0">
+              {t.hero.sub}
+            </p>
+          </Reveal>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={inView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.7, delay: 0.7, ease: [0.22, 1, 0.36, 1] }}
-            className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start"
-          >
-            <MagBtn href="/login" variant="primary">
-              {t.hero.cta1}
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            </MagBtn>
-            <MagBtn href="#features" variant="ghost">
-              {t.hero.cta2}
-            </MagBtn>
-          </motion.div>
+          <Reveal delay={0.7}>
+            <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start">
+              <MagBtn href="/login" variant="primary">
+                {t.hero.cta1}
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </MagBtn>
+              <MagBtn href="#features" variant="ghost">
+                {t.hero.cta2}
+              </MagBtn>
+            </div>
+          </Reveal>
 
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={inView ? { opacity: 1 } : {}}
-            transition={{ duration: 0.7, delay: 0.86 }}
-            className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[12.5px] text-black/48 dark:text-white/40 lg:justify-start"
-          >
-            {t.hero.trust.map((item) => (
-              <span key={item} className="flex items-center gap-1.5">
-                <Check className="h-3.5 w-3.5 text-emerald-500" />
-                {item}
-              </span>
-            ))}
-          </motion.div>
+          <Reveal delay={0.85}>
+            <div className="mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[12.5px] text-black/45 dark:text-white/40 lg:justify-start">
+              {t.hero.trust.map((item) => (
+                <span key={item} className="flex items-center gap-1.5">
+                  <Check className="h-3.5 w-3.5 text-[#127dfe]" />
+                  {item}
+                </span>
+              ))}
+            </div>
+          </Reveal>
         </motion.div>
 
-        {/* RIGHT: Mockup */}
-        <motion.div style={{ y: yRight }} className="mt-14 w-full lg:mt-0 lg:w-[42%]">
+        {/* RIGHT */}
+        <motion.div style={{ y: yRight }} className="mt-14 w-full lg:mt-0 lg:w-[44%]">
           <DashboardMockup chips={t.hero.chips} inView={inView} />
         </motion.div>
       </motion.div>
@@ -1204,7 +1032,7 @@ function HeroSlide({ t }: { t: typeof COPY.ru }) {
         initial={{ opacity: 0 }}
         animate={inView ? { opacity: 1 } : {}}
         transition={{ duration: 0.7, delay: 1.2 }}
-        className="relative z-10 mt-10 border-y border-black/6 bg-white/40 backdrop-blur-sm dark:border-white/6 dark:bg-white/[0.02]"
+        className="relative z-10 mt-12 border-y border-black/6 bg-white/40 backdrop-blur-sm dark:border-white/8 dark:bg-white/[0.02]"
       >
         <MarqueeStrip items={marqueeItems} />
       </motion.div>
@@ -1215,134 +1043,107 @@ function HeroSlide({ t }: { t: typeof COPY.ru }) {
         initial={{ opacity: 0 }}
         animate={inView ? { opacity: 1 } : {}}
         transition={{ delay: 1.6 }}
-        className="relative z-10 mx-auto -mt-6 mb-6 hidden lg:block"
+        className="relative z-10 mx-auto -mt-3 mb-6 hidden lg:block"
       >
         <motion.div
           animate={{ y: [0, 6, 0] }}
           transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-          className="flex flex-col items-center gap-1.5 text-black/32 dark:text-white/28"
+          className="flex flex-col items-center gap-1.5 text-black/30 dark:text-white/25"
         >
           <ChevronDown className="h-5 w-5" />
         </motion.div>
       </motion.a>
-
-      <style jsx global>{`
-        @keyframes gradient-pan {
-          0% { background-position: 0% 50%; }
-          100% { background-position: 200% 50%; }
-        }
-      `}</style>
     </section>
   );
 }
 
-// ─── SLIDE 2 · WHY ────────────────────────────────────────────────────────────
+// ─── WHY (minimal split) ──────────────────────────────────────────────────────
 function WhySlide({ t }: { t: typeof COPY.ru }) {
   const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, { once: true, margin: '-80px' });
-
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] });
-  const yLeft = useTransform(scrollYProgress, [0, 1], [60, -60]);
-  const yRight = useTransform(scrollYProgress, [0, 1], [-60, 60]);
+  const yL = useTransform(scrollYProgress, [0, 1], [40, -40]);
+  const yR = useTransform(scrollYProgress, [0, 1], [-40, 40]);
 
   return (
-    <section
-      id="why"
-      ref={ref}
-      className="relative min-h-screen bg-[#f7f8fc] py-20 dark:bg-[#0a0d17] lg:py-28"
-    >
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div
-          className="absolute left-1/4 top-1/2 h-[600px] w-[600px] -translate-y-1/2 rounded-full opacity-10 blur-[120px]"
-          style={{ background: `radial-gradient(circle, ${ACCENT}, transparent 70%)` }}
-        />
-      </div>
-
-      <div className="relative mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-          className="mb-14 text-center"
-        >
-          <Eyebrow>{t.why.eyebrow}</Eyebrow>
-          <h2 className="mt-5 text-[36px] font-bold leading-[1.04] tracking-[-0.04em] text-black dark:text-white sm:text-[48px] lg:text-[58px]">
-            {t.why.title}
-          </h2>
-        </motion.div>
+    <section id="why" ref={ref} className="relative overflow-hidden border-t border-black/6 bg-white py-24 dark:border-white/8 dark:bg-[#06080f] lg:py-32">
+      <div className="mx-auto max-w-[1200px] px-4 sm:px-6 lg:px-8">
+        <div className="mb-16 max-w-2xl">
+          <Reveal>
+            <SectionLabel n="01">{t.why.eyebrow}</SectionLabel>
+          </Reveal>
+          <Reveal delay={0.1}>
+            <h2 className="mt-5 text-[36px] font-bold leading-[1.04] tracking-[-0.04em] text-black dark:text-white sm:text-[44px] lg:text-[52px]">
+              {t.why.title}
+            </h2>
+          </Reveal>
+          <HeadingAccent />
+        </div>
 
         <div className="grid gap-5 lg:grid-cols-2">
           {/* Before */}
           <motion.div
-            style={{ y: yLeft }}
-            initial={{ opacity: 0, x: -40 }}
+            style={{ y: yL }}
+            initial={{ opacity: 0, x: -24 }}
             animate={inView ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.8, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
           >
-            <TiltCard className="relative h-full overflow-hidden rounded-3xl border border-rose-200/60 bg-gradient-to-br from-rose-50 via-white to-orange-50/60 p-8 shadow-[0_24px_60px_-24px_rgba(244,63,94,0.25)] transition-shadow duration-500 hover:shadow-[0_30px_70px_-20px_rgba(244,63,94,0.4)] dark:border-rose-900/40 dark:from-rose-950/50 dark:via-[#0f1018] dark:to-orange-950/30 lg:p-10">
-              <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-rose-100 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-rose-600 dark:bg-rose-900/50 dark:text-rose-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+            <div className="relative h-full rounded-3xl border border-black/8 bg-black/[0.02] p-8 transition-colors duration-500 hover:border-black/15 dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-white/20 lg:p-10">
+              <div className="mb-6 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-black/45 dark:text-white/45">
+                <span className="h-px w-6 bg-black/30 dark:bg-white/30" />
                 {t.why.before.tag}
               </div>
-              <div className="space-y-3">
+              <ul className="space-y-3">
                 {t.why.before.items.map((item, i) => (
-                  <motion.div
+                  <motion.li
                     key={i}
-                    initial={{ opacity: 0, x: -20 }}
+                    initial={{ opacity: 0, x: -16 }}
                     animate={inView ? { opacity: 1, x: 0 } : {}}
                     transition={{ duration: 0.5, delay: 0.25 + i * 0.08 }}
-                    whileHover={{ x: 4 }}
-                    className="flex items-center gap-3 rounded-2xl border border-rose-100/80 bg-white/70 px-4 py-3.5 transition-all hover:border-rose-200 hover:shadow-[0_8px_20px_-12px_rgba(244,63,94,0.35)] dark:border-rose-900/30 dark:bg-rose-950/30"
+                    className="group flex items-start gap-3 text-[15px] leading-7 text-black/65 dark:text-white/55"
                   >
-                    <TrendingDown className="h-4 w-4 flex-shrink-0 text-rose-500" />
-                    <span className="text-[14px] text-black/72 dark:text-white/66">{item}</span>
-                  </motion.div>
+                    <Minus className="mt-1.5 h-3.5 w-3.5 flex-shrink-0 text-black/30 dark:text-white/30" />
+                    <span>{item}</span>
+                  </motion.li>
                 ))}
-              </div>
-              <div className="pointer-events-none absolute -bottom-10 -right-10 h-48 w-48 rounded-full bg-rose-200/30 blur-3xl dark:bg-rose-800/20" />
-            </TiltCard>
+              </ul>
+            </div>
           </motion.div>
 
           {/* After */}
           <motion.div
-            style={{ y: yRight }}
-            initial={{ opacity: 0, x: 40 }}
+            style={{ y: yR }}
+            initial={{ opacity: 0, x: 24 }}
             animate={inView ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
           >
-            <TiltCard className="relative h-full overflow-hidden rounded-3xl border border-blue-200/60 bg-gradient-to-br from-blue-50 via-white to-violet-50/60 p-8 shadow-[0_24px_60px_-24px_rgba(18,125,254,0.3)] transition-shadow duration-500 hover:shadow-[0_30px_70px_-20px_rgba(18,125,254,0.5)] dark:border-blue-900/40 dark:from-blue-950/50 dark:via-[#0f1018] dark:to-violet-950/30 lg:p-10">
-              <div
-                className="mb-6 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em]"
-                style={{ background: `${ACCENT}18`, color: ACCENT }}
-              >
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: ACCENT }} />
+            <div className="relative h-full overflow-hidden rounded-3xl border border-[#127dfe]/20 bg-[#127dfe]/[0.04] p-8 transition-colors duration-500 hover:border-[#127dfe]/40 dark:border-[#127dfe]/25 dark:bg-[#127dfe]/[0.06] lg:p-10">
+              <div className="mb-6 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#127dfe]">
+                <span className="h-px w-6 bg-[#127dfe]" />
                 {t.why.after.tag}
               </div>
-              <div className="space-y-3">
+              <ul className="space-y-3">
                 {t.why.after.items.map((item, i) => (
-                  <motion.div
+                  <motion.li
                     key={i}
-                    initial={{ opacity: 0, x: 20 }}
+                    initial={{ opacity: 0, x: 16 }}
                     animate={inView ? { opacity: 1, x: 0 } : {}}
                     transition={{ duration: 0.5, delay: 0.35 + i * 0.08 }}
-                    whileHover={{ x: -4 }}
-                    className="flex items-center gap-3 rounded-2xl border border-blue-100/80 bg-white/70 px-4 py-3.5 transition-all hover:border-blue-200 hover:shadow-[0_8px_20px_-12px_rgba(18,125,254,0.35)] dark:border-blue-900/30 dark:bg-blue-950/25"
+                    whileHover={{ x: 4 }}
+                    className="group flex items-start gap-3 text-[15px] leading-7 text-black/80 dark:text-white/80"
                   >
-                    <div
-                      className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full"
-                      style={{ background: ACCENT, boxShadow: `0 0 12px ${ACCENT}80` }}
-                    >
-                      <Check className="h-3 w-3 text-white" />
-                    </div>
-                    <span className="text-[14px] text-black/72 dark:text-white/66">{item}</span>
-                  </motion.div>
+                    <Plus className="mt-1.5 h-3.5 w-3.5 flex-shrink-0 text-[#127dfe]" />
+                    <span>{item}</span>
+                  </motion.li>
                 ))}
-              </div>
-              <div
-                className="pointer-events-none absolute -bottom-10 -right-10 h-48 w-48 rounded-full opacity-30 blur-3xl"
-                style={{ background: `radial-gradient(circle, ${ACCENT}, transparent)` }}
+              </ul>
+              <motion.div
+                animate={{ opacity: [0.3, 0.5, 0.3] }}
+                transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+                className="pointer-events-none absolute -bottom-20 -right-20 h-60 w-60 rounded-full blur-[80px]"
+                style={{ background: `radial-gradient(circle, ${ACCENT}, transparent 70%)` }}
               />
-            </TiltCard>
+            </div>
           </motion.div>
         </div>
       </div>
@@ -1350,263 +1151,177 @@ function WhySlide({ t }: { t: typeof COPY.ru }) {
   );
 }
 
-// ─── SLIDE 3 · FEATURES (slider) ──────────────────────────────────────────────
+// ─── FEATURES (slider, minimal cards) ─────────────────────────────────────────
 function FeaturesSlide({ t }: { t: typeof COPY.ru }) {
   const ref = useRef<HTMLElement>(null);
-  const inView = useInView(ref, { once: true, margin: '-60px' });
 
   return (
-    <section
-      id="features"
-      ref={ref}
-      className="relative min-h-screen overflow-hidden bg-white py-20 dark:bg-[#06080f] lg:py-28"
-    >
-      <div className="pointer-events-none absolute inset-0">
-        <div
-          className="absolute right-0 top-1/4 h-[460px] w-[460px] rounded-full opacity-10 blur-[120px]"
-          style={{ background: `radial-gradient(circle, ${ACCENT_ALT}, transparent 70%)` }}
-        />
-      </div>
-
-      <div className="relative mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-          className="mb-14 max-w-2xl"
-        >
-          <Eyebrow>{t.features.eyebrow}</Eyebrow>
-          <h2 className="mt-5 text-[36px] font-bold leading-[1.04] tracking-[-0.04em] text-black dark:text-white sm:text-[48px]">
-            {t.features.title}
-          </h2>
-          <p className="mt-4 text-[15px] leading-7 text-black/54 dark:text-white/46">{t.features.sub}</p>
-        </motion.div>
-
-        <Slider autoplay={5000} prevLabel={t.prev} nextLabel={t.next}>
-          {t.features.items.map((item, i) => {
-            const Icon = FEATURE_ICONS[i];
-            const color = CARD_COLORS[i];
-            return (
-              <div
-                key={i}
-                className="flex-[0_0_85%] pl-4 sm:flex-[0_0_50%] lg:flex-[0_0_33.333%] xl:flex-[0_0_25%]"
-              >
-                <motion.div
-                  initial={{ opacity: 0, y: 24 }}
-                  animate={inView ? { opacity: 1, y: 0 } : {}}
-                  transition={{ duration: 0.6, delay: i * 0.05, ease: [0.22, 1, 0.36, 1] }}
-                  className="h-full"
-                >
-                  <TiltCard className="group relative h-full overflow-hidden rounded-3xl border border-black/8 bg-white p-7 transition-all duration-300 hover:-translate-y-1 hover:border-transparent hover:shadow-[0_28px_60px_-22px_rgba(18,125,254,0.4)] dark:border-white/8 dark:bg-white/[0.03]">
-                    {/* Hover glow follows cursor */}
-                    <div
-                      className="pointer-events-none absolute inset-0 rounded-3xl opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                      style={{ background: `radial-gradient(280px circle at var(--mx,50%) var(--my,50%), ${color}1f, transparent 70%)` }}
-                    />
-                    <motion.div
-                      whileHover={{ scale: 1.12, rotate: 6 }}
-                      transition={{ type: 'spring', stiffness: 300, damping: 18 }}
-                      className="relative z-10 flex h-12 w-12 items-center justify-center rounded-2xl"
-                      style={{ background: `${color}16` }}
-                    >
-                      <Icon className="h-5 w-5" style={{ color }} />
-                      <motion.div
-                        className="absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                        style={{ boxShadow: `0 0 24px ${color}80` }}
-                      />
-                    </motion.div>
-                    <h3 className="relative z-10 mt-5 text-[16px] font-semibold tracking-tight text-black dark:text-white">
-                      {item.title}
-                    </h3>
-                    <p className="relative z-10 mt-1.5 text-[13px] leading-relaxed text-black/52 dark:text-white/44">
-                      {item.desc}
-                    </p>
-                    <motion.div
-                      className="absolute bottom-0 left-0 h-0.5 rounded-full"
-                      style={{ background: `linear-gradient(90deg, ${color}, transparent)` }}
-                      initial={{ width: 0 }}
-                      whileInView={{ width: '70%' }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 0.9, delay: 0.3 + i * 0.04 }}
-                    />
-                  </TiltCard>
-                </motion.div>
-              </div>
-            );
-          })}
-        </Slider>
-      </div>
-    </section>
-  );
-}
-
-// ─── SLIDE 4 · WHO (slider) ───────────────────────────────────────────────────
-function WhoSlide({ t }: { t: typeof COPY.ru }) {
-  const ref = useRef<HTMLElement>(null);
-  const inView = useInView(ref, { once: true, margin: '-60px' });
-
-  return (
-    <section
-      id="who"
-      ref={ref}
-      className="relative min-h-screen overflow-hidden bg-[#f7f8fc] py-20 dark:bg-[#0a0d17] lg:py-28"
-    >
-      <div className="pointer-events-none absolute inset-0">
-        <div
-          className="absolute left-0 top-1/3 h-[420px] w-[420px] rounded-full opacity-10 blur-[120px]"
-          style={{ background: `radial-gradient(circle, ${ACCENT_CYAN}, transparent 70%)` }}
-        />
-      </div>
-
-      <div className="relative mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.7 }}
-          className="mb-14 text-center"
-        >
-          <Eyebrow>{t.who.eyebrow}</Eyebrow>
-          <h2 className="mt-5 text-[36px] font-bold leading-[1.04] tracking-[-0.04em] text-black dark:text-white sm:text-[48px]">
-            {t.who.title}
-          </h2>
-          <p className="mt-4 text-[15px] text-black/52 dark:text-white/44">{t.who.sub}</p>
-        </motion.div>
-
-        <Slider autoplay={5500} prevLabel={t.prev} nextLabel={t.next}>
-          {t.who.items.map((item, i) => {
-            const Icon = WHO_ICONS[i];
-            const color = CARD_COLORS[i];
-            return (
-              <div
-                key={i}
-                className="flex-[0_0_85%] pl-4 sm:flex-[0_0_50%] lg:flex-[0_0_33.333%]"
-              >
-                <motion.div
-                  initial={{ opacity: 0, y: 32, scale: 0.96 }}
-                  animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
-                  transition={{ duration: 0.6, delay: i * 0.07, ease: [0.22, 1, 0.36, 1] }}
-                  className="h-full"
-                >
-                  <TiltCard className="group relative h-full cursor-default overflow-hidden rounded-3xl border border-black/8 bg-white p-7 transition-all duration-300 hover:-translate-y-1 hover:border-transparent hover:shadow-[0_30px_70px_-22px_rgba(18,125,254,0.32)] dark:border-white/8 dark:bg-white/[0.03] dark:hover:shadow-[0_30px_70px_-22px_rgba(124,58,237,0.32)]">
-                    <div
-                      className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                      style={{ background: `radial-gradient(320px circle at var(--mx,50%) var(--my,50%), ${color}1a, transparent 65%)` }}
-                    />
-                    <div
-                      className="relative z-10 mb-5 flex h-14 w-14 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"
-                      style={{ background: `${color}16` }}
-                    >
-                      <Icon className="h-6 w-6" style={{ color }} />
-                      <motion.div
-                        className="absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                        style={{ boxShadow: `0 0 28px ${color}55` }}
-                      />
-                    </div>
-                    <h3 className="relative z-10 text-[18px] font-bold tracking-tight text-black dark:text-white">
-                      {item.title}
-                    </h3>
-                    <p className="relative z-10 mt-2 text-[13.5px] leading-relaxed text-black/52 dark:text-white/44">
-                      {item.desc}
-                    </p>
-                    <motion.div
-                      className="absolute bottom-0 left-0 h-0.5 rounded-full"
-                      style={{ background: `linear-gradient(90deg, ${color}, transparent)` }}
-                      initial={{ width: 0 }}
-                      whileInView={{ width: '60%' }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 0.8, delay: 0.3 + i * 0.05 }}
-                    />
-                  </TiltCard>
-                </motion.div>
-              </div>
-            );
-          })}
-        </Slider>
-      </div>
-    </section>
-  );
-}
-
-// ─── SLIDE 5 · HOW (timeline + slider) ────────────────────────────────────────
-function HowSlide({ t }: { t: typeof COPY.ru }) {
-  const ref = useRef<HTMLElement>(null);
-  const inView = useInView(ref, { once: true, margin: '-60px' });
-
-  const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] });
-  const lineWidth = useTransform(scrollYProgress, [0.1, 0.5], ['0%', '100%']);
-
-  return (
-    <section
-      id="how"
-      ref={ref}
-      className="relative min-h-screen overflow-hidden bg-white py-20 dark:bg-[#06080f] lg:py-28"
-    >
-      <div className="pointer-events-none absolute inset-0">
-        <div
-          className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 opacity-20"
-          style={{ background: `linear-gradient(90deg, transparent, ${ACCENT}, transparent)` }}
-        />
-      </div>
-
-      <div className="relative mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.7 }}
-          className="mb-12 text-center"
-        >
-          <Eyebrow>{t.how.eyebrow}</Eyebrow>
-          <h2 className="mt-5 text-[36px] font-bold leading-[1.04] tracking-[-0.04em] text-black dark:text-white sm:text-[48px]">
-            {t.how.title}
-          </h2>
-        </motion.div>
-
-        {/* Scroll-driven progress timeline */}
-        <div className="relative mx-auto mb-10 hidden h-px max-w-3xl overflow-hidden rounded-full bg-black/10 dark:bg-white/10 sm:block">
-          <motion.div
-            style={{ width: lineWidth }}
-            className="h-full bg-gradient-to-r from-[#127dfe] via-[#7c3aed] to-[#0ea5e9] shadow-[0_0_18px_rgba(18,125,254,0.6)]"
-          />
+    <section id="features" ref={ref} className="relative overflow-hidden border-t border-black/6 bg-[#fafafa] py-24 dark:border-white/8 dark:bg-[#08090f] lg:py-32">
+      <div className="mx-auto max-w-[1200px] px-4 sm:px-6 lg:px-8">
+        <div className="mb-16 max-w-2xl">
+          <Reveal>
+            <SectionLabel n="02">{t.features.eyebrow}</SectionLabel>
+          </Reveal>
+          <Reveal delay={0.1}>
+            <h2 className="mt-5 text-[36px] font-bold leading-[1.04] tracking-[-0.04em] text-black dark:text-white sm:text-[44px] lg:text-[52px]">
+              {t.features.title}
+            </h2>
+          </Reveal>
+          <HeadingAccent />
+          <Reveal delay={0.3}>
+            <p className="mt-5 text-[15px] leading-7 text-black/55 dark:text-white/45">{t.features.sub}</p>
+          </Reveal>
         </div>
 
-        <Slider autoplay={5000} prevLabel={t.prev} nextLabel={t.next}>
+        <Slider autoplay={5500} prevLabel={t.prev} nextLabel={t.next}>
+          {t.features.items.map((item, i) => {
+            const Icon = FEATURE_ICONS[i];
+            return (
+              <div key={i} className="flex-[0_0_85%] pl-4 sm:flex-[0_0_50%] lg:flex-[0_0_33.333%] xl:flex-[0_0_25%]">
+                <Reveal delay={i * 0.04}>
+                  <FeatureCard Icon={Icon} title={item.title} desc={item.desc} index={i} />
+                </Reveal>
+              </div>
+            );
+          })}
+        </Slider>
+      </div>
+    </section>
+  );
+}
+
+function FeatureCard({ Icon, title, desc, index }: { Icon: typeof Globe; title: string; desc: string; index: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const onMove = (e: React.MouseEvent) => {
+    if (!ref.current) return;
+    const r = ref.current.getBoundingClientRect();
+    ref.current.style.setProperty('--mx', `${((e.clientX - r.left) / r.width) * 100}%`);
+    ref.current.style.setProperty('--my', `${((e.clientY - r.top) / r.height) * 100}%`);
+  };
+  return (
+    <div
+      ref={ref}
+      onMouseMove={onMove}
+      className="group relative h-full overflow-hidden rounded-3xl border border-black/8 bg-white p-7 transition-all duration-500 hover:-translate-y-1 hover:border-black/20 hover:shadow-[0_24px_60px_-30px_rgba(0,0,0,0.25)] dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-white/25"
+    >
+      <div
+        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+        style={{ background: `radial-gradient(280px circle at var(--mx,50%) var(--my,50%), ${ACCENT}10, transparent 65%)` }}
+      />
+      <div className="relative z-10 flex items-center justify-between">
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-black/[0.04] text-black/70 transition-all duration-300 group-hover:bg-[#127dfe] group-hover:text-white dark:bg-white/[0.06] dark:text-white/70">
+          <Icon className="h-[18px] w-[18px]" />
+        </div>
+        <span className="text-[10.5px] font-medium uppercase tracking-[0.16em] tabular-nums text-black/30 dark:text-white/30">
+          {String(index + 1).padStart(2, '0')}
+        </span>
+      </div>
+      <h3 className="relative z-10 mt-7 text-[18px] font-semibold tracking-tight text-black dark:text-white">{title}</h3>
+      <p className="relative z-10 mt-2 text-[13.5px] leading-relaxed text-black/55 dark:text-white/45">{desc}</p>
+      <ArrowRight className="relative z-10 mt-6 h-4 w-4 text-black/25 transition-all duration-300 group-hover:translate-x-1 group-hover:text-[#127dfe] dark:text-white/25" />
+    </div>
+  );
+}
+
+// ─── WHO (slider, minimal) ────────────────────────────────────────────────────
+function WhoSlide({ t }: { t: typeof COPY.ru }) {
+  const ref = useRef<HTMLElement>(null);
+  return (
+    <section id="who" ref={ref} className="relative overflow-hidden border-t border-black/6 bg-white py-24 dark:border-white/8 dark:bg-[#06080f] lg:py-32">
+      <div className="mx-auto max-w-[1200px] px-4 sm:px-6 lg:px-8">
+        <div className="mb-16 max-w-2xl">
+          <Reveal>
+            <SectionLabel n="03">{t.who.eyebrow}</SectionLabel>
+          </Reveal>
+          <Reveal delay={0.1}>
+            <h2 className="mt-5 text-[36px] font-bold leading-[1.04] tracking-[-0.04em] text-black dark:text-white sm:text-[44px] lg:text-[52px]">
+              {t.who.title}
+            </h2>
+          </Reveal>
+          <HeadingAccent />
+          <Reveal delay={0.3}>
+            <p className="mt-5 text-[15px] leading-7 text-black/55 dark:text-white/45">{t.who.sub}</p>
+          </Reveal>
+        </div>
+
+        <Slider autoplay={6000} prevLabel={t.prev} nextLabel={t.next}>
+          {t.who.items.map((item, i) => {
+            const Icon = WHO_ICONS[i];
+            return (
+              <div key={i} className="flex-[0_0_85%] pl-4 sm:flex-[0_0_50%] lg:flex-[0_0_33.333%]">
+                <Reveal delay={i * 0.05}>
+                  <WhoCard Icon={Icon} title={item.title} desc={item.desc} index={i} />
+                </Reveal>
+              </div>
+            );
+          })}
+        </Slider>
+      </div>
+    </section>
+  );
+}
+
+function WhoCard({ Icon, title, desc, index }: { Icon: typeof Scissors; title: string; desc: string; index: number }) {
+  return (
+    <div className="group relative h-full overflow-hidden rounded-3xl border border-black/8 bg-white p-8 transition-all duration-500 hover:-translate-y-1 hover:border-black/20 hover:shadow-[0_24px_60px_-30px_rgba(0,0,0,0.22)] dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-white/25">
+      {/* Subtle accent corner */}
+      <motion.div
+        className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full opacity-0 blur-3xl transition-opacity duration-500 group-hover:opacity-100"
+        style={{ background: `radial-gradient(circle, ${ACCENT}40, transparent 70%)` }}
+      />
+      <div className="flex items-start justify-between">
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-black/[0.04] text-black/70 transition-all duration-300 group-hover:bg-[#127dfe] group-hover:text-white dark:bg-white/[0.06] dark:text-white/70">
+          <Icon className="h-5 w-5" />
+        </div>
+        <span className="text-[10.5px] font-medium uppercase tracking-[0.16em] tabular-nums text-black/30 dark:text-white/30">
+          {String(index + 1).padStart(2, '0')}
+        </span>
+      </div>
+      <h3 className="relative z-10 mt-7 text-[20px] font-bold tracking-tight text-black dark:text-white">{title}</h3>
+      <p className="relative z-10 mt-2.5 text-[14px] leading-relaxed text-black/55 dark:text-white/45">{desc}</p>
+      <motion.div
+        className="absolute bottom-0 left-0 h-px bg-[#127dfe]"
+        initial={{ width: 0 }}
+        whileInView={{ width: '40%' }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.9, delay: 0.2 + index * 0.05 }}
+      />
+    </div>
+  );
+}
+
+// ─── HOW (slider with progress + numbered timeline) ───────────────────────────
+function HowSlide({ t }: { t: typeof COPY.ru }) {
+  const ref = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] });
+  const lineWidth = useTransform(scrollYProgress, [0.15, 0.55], ['0%', '100%']);
+
+  return (
+    <section id="how" ref={ref} className="relative overflow-hidden border-t border-black/6 bg-[#fafafa] py-24 dark:border-white/8 dark:bg-[#08090f] lg:py-32">
+      <div className="mx-auto max-w-[1200px] px-4 sm:px-6 lg:px-8">
+        <div className="mb-12 max-w-2xl">
+          <Reveal>
+            <SectionLabel n="04">{t.how.eyebrow}</SectionLabel>
+          </Reveal>
+          <Reveal delay={0.1}>
+            <h2 className="mt-5 text-[36px] font-bold leading-[1.04] tracking-[-0.04em] text-black dark:text-white sm:text-[44px] lg:text-[52px]">
+              {t.how.title}
+            </h2>
+          </Reveal>
+          <HeadingAccent />
+        </div>
+
+        {/* Scroll-driven progress timeline */}
+        <div className="relative mb-12 hidden h-px overflow-hidden rounded-full bg-black/10 dark:bg-white/10 sm:block">
+          <motion.div style={{ width: lineWidth }} className="h-full bg-[#127dfe]" />
+        </div>
+
+        <Slider autoplay={5500} prevLabel={t.prev} nextLabel={t.next}>
           {t.how.steps.map((step, i) => (
-            <div
-              key={i}
-              className="flex-[0_0_88%] pl-4 sm:flex-[0_0_50%] lg:flex-[0_0_33.333%] xl:flex-[0_0_25%]"
-            >
-              <motion.div
-                initial={{ opacity: 0, y: 40 }}
-                animate={inView ? { opacity: 1, y: 0 } : {}}
-                transition={{ duration: 0.65, delay: 0.15 + i * 0.1, ease: [0.22, 1, 0.36, 1] }}
-                className="group relative h-full"
-              >
-                <TiltCard className="relative h-full overflow-hidden rounded-3xl border border-black/8 bg-white p-7 transition-all duration-300 hover:-translate-y-2 hover:border-transparent hover:shadow-[0_32px_60px_-22px_rgba(18,125,254,0.38)] dark:border-white/8 dark:bg-white/[0.03]">
-                  <div className="relative mb-6">
-                    <motion.div
-                      className="relative flex h-[58px] w-[58px] items-center justify-center rounded-2xl text-[16px] font-bold text-white"
-                      style={{ background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT_ALT})`, boxShadow: `0 16px 36px -12px ${ACCENT}88` }}
-                      whileHover={{ scale: 1.1, rotate: -5 }}
-                      transition={{ type: 'spring', stiffness: 280, damping: 20 }}
-                    >
-                      {step.n}
-                      <motion.div
-                        className="absolute inset-0 rounded-2xl"
-                        animate={{ boxShadow: [`0 0 0 0px ${ACCENT}80`, `0 0 0 14px ${ACCENT}00`] }}
-                        transition={{ duration: 2, repeat: Infinity, delay: i * 0.5 }}
-                      />
-                    </motion.div>
-                  </div>
-
-                  <h3 className="text-[17px] font-bold tracking-tight text-black dark:text-white">{step.title}</h3>
-                  <p className="mt-2.5 text-[13.5px] leading-relaxed text-black/52 dark:text-white/44">{step.desc}</p>
-
-                  <div
-                    className="pointer-events-none absolute inset-0 rounded-3xl opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                    style={{ background: `linear-gradient(135deg, ${ACCENT}10, ${ACCENT_ALT}06)` }}
-                  />
-                </TiltCard>
-              </motion.div>
+            <div key={i} className="flex-[0_0_88%] pl-4 sm:flex-[0_0_50%] lg:flex-[0_0_33.333%] xl:flex-[0_0_25%]">
+              <Reveal delay={i * 0.06}>
+                <StepCard n={step.n} title={step.title} desc={step.desc} />
+              </Reveal>
             </div>
           ))}
         </Slider>
@@ -1615,234 +1330,192 @@ function HowSlide({ t }: { t: typeof COPY.ru }) {
   );
 }
 
-// ─── SLIDE 6 · PROOF (stats + reviews slider) ─────────────────────────────────
+function StepCard({ n, title, desc }: { n: string; title: string; desc: string }) {
+  return (
+    <div className="group relative h-full overflow-hidden rounded-3xl border border-black/8 bg-white p-7 transition-all duration-500 hover:-translate-y-2 hover:border-black/20 hover:shadow-[0_28px_60px_-30px_rgba(0,0,0,0.28)] dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-white/25">
+      <div className="flex items-start justify-between">
+        <div className="text-[40px] font-bold leading-none tracking-[-0.04em] text-black/12 transition-colors duration-300 group-hover:text-[#127dfe] dark:text-white/12">
+          {n}
+        </div>
+        <motion.div
+          animate={{ scale: [1, 1.15, 1] }}
+          transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+          className="h-2 w-2 rounded-full bg-[#127dfe]"
+        />
+      </div>
+      <h3 className="mt-8 text-[18px] font-semibold tracking-tight text-black dark:text-white">{title}</h3>
+      <p className="mt-2 text-[13.5px] leading-relaxed text-black/55 dark:text-white/45">{desc}</p>
+      <div className="mt-6 flex items-center gap-2 text-[12px] font-medium text-black/40 transition-colors duration-300 group-hover:text-[#127dfe] dark:text-white/40">
+        <span className="h-px w-6 bg-current transition-all duration-300 group-hover:w-10" />
+        <ArrowRight className="h-3.5 w-3.5" />
+      </div>
+    </div>
+  );
+}
+
+// ─── PROOF (stats + reviews slider) ───────────────────────────────────────────
 function ProofSlide({ t }: { t: typeof COPY.ru }) {
   const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, { once: true, margin: '-60px' });
 
   return (
-    <section
-      id="proof"
-      ref={ref}
-      className="relative min-h-screen overflow-hidden bg-[#f7f8fc] py-20 dark:bg-[#0a0d17] lg:py-28"
-    >
-      <div className="pointer-events-none absolute inset-0">
-        <div
-          className="absolute right-0 top-0 h-[420px] w-[420px] rounded-full opacity-10 blur-[120px]"
-          style={{ background: `radial-gradient(circle, ${ACCENT}, transparent 70%)` }}
-        />
-        <div
-          className="absolute bottom-0 left-0 h-[380px] w-[380px] rounded-full opacity-10 blur-[120px]"
-          style={{ background: `radial-gradient(circle, ${ACCENT_ALT}, transparent 70%)` }}
-        />
-      </div>
+    <section id="proof" ref={ref} className="relative overflow-hidden border-t border-black/6 bg-white py-24 dark:border-white/8 dark:bg-[#06080f] lg:py-32">
+      <div className="mx-auto max-w-[1200px] px-4 sm:px-6 lg:px-8">
+        <div className="mb-16 max-w-2xl">
+          <Reveal>
+            <SectionLabel n="05">{t.proof.eyebrow}</SectionLabel>
+          </Reveal>
+          <Reveal delay={0.1}>
+            <h2 className="mt-5 text-[36px] font-bold leading-[1.04] tracking-[-0.04em] text-black dark:text-white sm:text-[44px] lg:text-[52px]">
+              {t.proof.title}
+            </h2>
+          </Reveal>
+          <HeadingAccent />
+        </div>
 
-      <div className="relative mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.7 }}
-          className="mb-14 text-center"
-        >
-          <Eyebrow>{t.proof.eyebrow}</Eyebrow>
-          <h2 className="mt-5 text-[36px] font-bold leading-[1.04] tracking-[-0.04em] text-black dark:text-white sm:text-[48px]">
-            {t.proof.title}
-          </h2>
-        </motion.div>
-
-        {/* Stats */}
-        <div className="mb-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Stats grid */}
+        <div className="mb-20 grid divide-y divide-black/8 border-y border-black/8 dark:divide-white/10 dark:border-white/10 sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-4">
           {t.proof.stats.map((stat, i) => (
             <motion.div
               key={i}
-              initial={{ opacity: 0, y: 28, scale: 0.94 }}
-              animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
+              initial={{ opacity: 0, y: 20 }}
+              animate={inView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.6, delay: i * 0.08 }}
+              className="group relative px-6 py-10 transition-colors hover:bg-black/[0.015] dark:hover:bg-white/[0.025]"
             >
-              <TiltCard className="group h-full overflow-hidden rounded-3xl border border-black/8 bg-white p-7 text-center transition-all duration-300 hover:-translate-y-1 hover:border-transparent hover:shadow-[0_24px_60px_-20px_rgba(18,125,254,0.35)] dark:border-white/8 dark:bg-white/[0.03]">
-                {stat.pre && (
-                  <div className="mb-1 text-[12px] font-semibold uppercase tracking-[0.1em] text-black/38 dark:text-white/32">
-                    {stat.pre}
-                  </div>
-                )}
-                <div className="text-[48px] font-black leading-none tracking-[-0.05em] sm:text-[54px]">
-                  <span className="bg-gradient-to-br from-[#127dfe] via-[#7c3aed] to-[#0ea5e9] bg-clip-text text-transparent [background-size:200%_auto] group-hover:[animation:gradient-pan_3s_linear_infinite]">
-                    {inView && <Counter target={stat.val} suffix={stat.suffix} pre="" />}
-                  </span>
+              {stat.pre && (
+                <div className="mb-2 text-[10.5px] font-medium uppercase tracking-[0.16em] text-black/40 dark:text-white/35">
+                  {stat.pre}
                 </div>
-                <div className="mt-3 text-[12.5px] leading-snug text-black/48 dark:text-white/40">{stat.label}</div>
-              </TiltCard>
+              )}
+              <div className="text-[44px] font-bold leading-none tracking-[-0.045em] text-black tabular-nums dark:text-white sm:text-[52px]">
+                {inView && <Counter target={stat.val} suffix={stat.suffix} pre="" />}
+              </div>
+              <div className="mt-3 text-[12.5px] leading-snug text-black/50 dark:text-white/40">{stat.label}</div>
+              <motion.div
+                className="absolute bottom-0 left-0 h-px bg-[#127dfe]"
+                initial={{ width: 0 }}
+                whileInView={{ width: '40%' }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.8, delay: 0.3 + i * 0.08 }}
+              />
             </motion.div>
           ))}
         </div>
 
         {/* Reviews slider */}
-        <Slider autoplay={6500} prevLabel={t.prev} nextLabel={t.next}>
+        <Slider autoplay={7000} prevLabel={t.prev} nextLabel={t.next}>
           {t.proof.reviews.map((review, i) => (
-            <div
-              key={i}
-              className="flex-[0_0_88%] pl-4 sm:flex-[0_0_60%] lg:flex-[0_0_40%]"
-            >
-              <motion.div
-                initial={{ opacity: 0, y: 32 }}
-                animate={inView ? { opacity: 1, y: 0 } : {}}
-                transition={{ duration: 0.65, delay: 0.3 + i * 0.1 }}
-                className="h-full"
-              >
-                <TiltCard className="group relative h-full overflow-hidden rounded-3xl border border-black/8 bg-white p-7 transition-all duration-300 hover:-translate-y-1 hover:border-transparent hover:shadow-[0_30px_70px_-22px_rgba(18,125,254,0.3)] dark:border-white/8 dark:bg-white/[0.03] lg:p-9">
-                  <div
-                    className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                    style={{ background: `radial-gradient(320px circle at var(--mx,50%) var(--my,50%), ${ACCENT}14, transparent 65%)` }}
-                  />
-                  <div className="relative z-10 mb-5">
-                    <motion.div
-                      whileHover={{ scale: 1.12, rotate: -8 }}
-                      className="inline-flex h-11 w-11 items-center justify-center rounded-xl"
-                      style={{ background: `${ACCENT}14`, boxShadow: `0 0 24px ${ACCENT}30` }}
-                    >
-                      <Quote className="h-5 w-5" style={{ color: ACCENT }} />
-                    </motion.div>
-                  </div>
-
-                  <p className="relative z-10 text-[14.5px] leading-7 text-black/72 dark:text-white/64">
-                    {review.text}
-                  </p>
-
-                  <div className="relative z-10 mt-6 flex items-center gap-3">
-                    <div
-                      className="flex h-11 w-11 items-center justify-center rounded-full text-[14px] font-bold text-white"
-                      style={{ background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT_ALT})`, boxShadow: `0 8px 20px -8px ${ACCENT}88` }}
-                    >
-                      {review.name.slice(0, 1)}
-                    </div>
-                    <div>
-                      <div className="text-[13.5px] font-semibold text-black dark:text-white">{review.name}</div>
-                      <div className="text-[11.5px] text-black/46 dark:text-white/40">{review.role}</div>
-                    </div>
-                  </div>
-
-                  <div className="relative z-10 mt-4 flex gap-0.5">
-                    {Array.from({ length: 5 }).map((_, si) => (
-                      <motion.span
-                        key={si}
-                        initial={{ opacity: 0, scale: 0.4 }}
-                        whileInView={{ opacity: 1, scale: 1 }}
-                        viewport={{ once: true }}
-                        transition={{ delay: 0.4 + si * 0.06, type: 'spring', stiffness: 280 }}
-                      >
-                        <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                      </motion.span>
-                    ))}
-                  </div>
-                </TiltCard>
-              </motion.div>
+            <div key={i} className="flex-[0_0_88%] pl-4 sm:flex-[0_0_60%] lg:flex-[0_0_45%]">
+              <Reveal delay={i * 0.07}>
+                <ReviewCard text={review.text} name={review.name} role={review.role} />
+              </Reveal>
             </div>
           ))}
         </Slider>
       </div>
-
-      <style jsx global>{`
-        @keyframes gradient-pan {
-          0% { background-position: 0% 50%; }
-          100% { background-position: 200% 50%; }
-        }
-      `}</style>
     </section>
   );
 }
 
-// ─── SLIDE 7 · CTA ────────────────────────────────────────────────────────────
+function ReviewCard({ text, name, role }: { text: string; name: string; role: string }) {
+  return (
+    <div className="group relative h-full overflow-hidden rounded-3xl border border-black/8 bg-white p-8 transition-all duration-500 hover:-translate-y-1 hover:border-black/20 hover:shadow-[0_28px_70px_-30px_rgba(0,0,0,0.22)] dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-white/25 lg:p-10">
+      <Quote className="h-6 w-6 text-black/15 transition-colors duration-300 group-hover:text-[#127dfe] dark:text-white/15" />
+      <p className="mt-6 text-[16px] leading-7 text-black/75 dark:text-white/65 lg:text-[17px]">{text}</p>
+      <div className="mt-8 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-black/[0.03] text-[14px] font-semibold text-black/75 dark:border-white/12 dark:bg-white/[0.04] dark:text-white/75">
+            {name.slice(0, 1)}
+          </div>
+          <div>
+            <div className="text-[14px] font-semibold text-black dark:text-white">{name}</div>
+            <div className="text-[12px] text-black/45 dark:text-white/40">{role}</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-0.5">
+          {Array.from({ length: 5 }).map((_, si) => (
+            <motion.span
+              key={si}
+              initial={{ opacity: 0, scale: 0.4 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.3 + si * 0.05, type: 'spring', stiffness: 280 }}
+            >
+              <Star className="h-3.5 w-3.5 fill-[#127dfe] text-[#127dfe]" />
+            </motion.span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── CTA (minimal, single accent, big space) ──────────────────────────────────
 function CtaSlide({ t }: { t: typeof COPY.ru }) {
   const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, { once: true, margin: '-60px' });
-
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] });
   const glowY = useTransform(scrollYProgress, [0, 1], [80, -80]);
-  const glowScale = useTransform(scrollYProgress, [0, 0.5, 1], [0.9, 1.05, 0.95]);
+  const glowOp = useTransform(scrollYProgress, [0, 0.5, 1], [0.4, 0.8, 0.5]);
 
   return (
-    <section
-      id="cta"
-      ref={ref}
-      className="relative min-h-screen overflow-hidden bg-[#060914] py-20 lg:py-28"
-    >
-      {/* Stars/particles */}
-      {PARTICLES.map((p) => (
-        <motion.div
-          key={p.id}
-          className="absolute rounded-full bg-white"
-          style={{ left: `${p.x}%`, top: `${p.y}%`, width: p.r, height: p.r, opacity: p.op * 0.7 }}
-          animate={{ opacity: [p.op * 0.4, p.op * 1.4, p.op * 0.4] }}
-          transition={{ duration: p.dur, delay: p.delay, repeat: Infinity }}
-        />
-      ))}
-
-      {/* Big glow with parallax */}
+    <section id="cta" ref={ref} className="relative overflow-hidden bg-[#06080f] py-32 lg:py-40">
+      {/* Single subtle accent glow */}
       <motion.div
-        style={{ y: glowY, scale: glowScale }}
-        className="pointer-events-none absolute inset-x-0 top-1/4 flex justify-center"
+        style={{ y: glowY, opacity: glowOp }}
+        className="pointer-events-none absolute inset-x-0 top-1/3 flex justify-center"
       >
-        <motion.div
-          animate={{ opacity: [0.5, 0.85, 0.5] }}
-          transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-          className="h-[520px] w-[820px] rounded-full blur-[100px]"
-          style={{ background: `radial-gradient(ellipse at center, ${ACCENT}60, ${ACCENT_ALT}30, transparent 70%)` }}
-        />
+        <div className="h-[420px] w-[700px] rounded-full blur-[120px]" style={{ background: `radial-gradient(ellipse at center, ${ACCENT}88, transparent 70%)` }} />
       </motion.div>
 
-      {/* Grid */}
+      {/* Subtle grid */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.04]"
+        className="pointer-events-none absolute inset-0 opacity-[0.03]"
         style={{
           backgroundImage: `linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)`,
-          backgroundSize: '52px 52px',
+          backgroundSize: '64px 64px',
+          maskImage: 'radial-gradient(ellipse at center, black 30%, transparent 75%)',
         }}
       />
 
-      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-80px)] max-w-[1280px] flex-col items-center justify-center px-4 text-center sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 40, scale: 0.96 }}
-          animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
-          transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <Eyebrow light>{t.cta.badge}</Eyebrow>
+      <div className="relative z-10 mx-auto flex max-w-[1200px] flex-col items-center px-4 text-center sm:px-6 lg:px-8">
+        <Reveal>
+          <div className="inline-flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/55">
+            <span className="tabular-nums text-white/30">06</span>
+            <span className="h-px w-8 bg-white/20" />
+            <span>{t.cta.badge}</span>
+          </div>
+        </Reveal>
 
-          <h2 className="mx-auto mt-7 max-w-3xl text-[42px] font-black leading-[0.98] tracking-[-0.04em] text-white sm:text-[60px] lg:text-[76px]">
-            {t.cta.title.split(' ').map((word, i) => (
+        <h2 className="mx-auto mt-7 max-w-3xl">
+          {t.cta.title.split(' ').map((word, i) => (
+            <span key={i} className="inline-block overflow-hidden">
               <motion.span
-                key={i}
-                initial={{ opacity: 0, y: 30 }}
-                animate={inView ? { opacity: 1, y: 0 } : {}}
-                transition={{ duration: 0.6, delay: 0.1 + i * 0.05 }}
-                className="mr-[0.18em] inline-block"
+                initial={{ y: 100 }}
+                animate={inView ? { y: 0 } : {}}
+                transition={{ duration: 0.85, delay: 0.15 + i * 0.06, ease: [0.22, 1, 0.36, 1] }}
+                className="mr-[0.18em] inline-block text-[44px] font-bold leading-[0.98] tracking-[-0.04em] text-white sm:text-[60px] lg:text-[78px]"
               >
                 {word}
               </motion.span>
-            ))}
-          </h2>
+            </span>
+          ))}
+        </h2>
 
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={inView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.7, delay: 0.5 }}
-            className="mx-auto mt-6 max-w-lg text-[16px] leading-7 text-white/58"
-          >
-            {t.cta.sub}
-          </motion.p>
+        <Reveal delay={0.5}>
+          <p className="mx-auto mt-7 max-w-lg text-[16px] leading-7 text-white/55">{t.cta.sub}</p>
+        </Reveal>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={inView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.7, delay: 0.65 }}
-            className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row"
-          >
+        <Reveal delay={0.65}>
+          <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <motion.a
               href="/login"
-              whileHover={{ scale: 1.04, y: -2 }}
+              whileHover={{ scale: 1.03, y: -2 }}
               whileTap={{ scale: 0.97 }}
-              className="group relative inline-flex items-center gap-2.5 overflow-hidden rounded-2xl bg-white px-8 py-4 text-[15px] font-bold text-black shadow-[0_24px_60px_-12px_rgba(255,255,255,0.35)] transition-all duration-300 hover:shadow-[0_32px_72px_-12px_rgba(255,255,255,0.55)]"
+              className="group relative inline-flex items-center gap-2.5 overflow-hidden rounded-full bg-white px-8 py-4 text-[15px] font-bold text-black transition-shadow duration-300 hover:shadow-[0_20px_50px_-12px_rgba(255,255,255,0.4)]"
             >
-              <span className="pointer-events-none absolute inset-y-0 -left-10 w-10 rotate-12 bg-gradient-to-r from-transparent via-black/8 to-transparent transition-all duration-700 group-hover:left-[110%]" />
+              <span className="pointer-events-none absolute inset-y-0 -left-10 w-10 rotate-12 bg-black/8 transition-all duration-700 group-hover:left-[110%]" />
               <span className="relative z-10 flex items-center gap-2.5">
                 {t.cta.btn1}
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
@@ -1853,31 +1526,28 @@ function CtaSlide({ t }: { t: typeof COPY.ru }) {
               href="/demo/klikbuk-demo"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
-              className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white/8 px-8 py-4 text-[15px] font-semibold text-white backdrop-blur transition-all hover:border-white/30 hover:bg-white/14"
+              className="inline-flex items-center gap-2 rounded-full border border-white/20 px-8 py-4 text-[15px] font-semibold text-white transition-colors hover:border-white/40"
             >
               {t.cta.btn2}
             </motion.a>
-          </motion.div>
+          </div>
+        </Reveal>
 
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={inView ? { opacity: 1 } : {}}
-            transition={{ delay: 0.85 }}
-            className="mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[12.5px] text-white/48"
-          >
+        <Reveal delay={0.85}>
+          <div className="mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[12.5px] text-white/45">
             {t.cta.trust.map((item) => (
               <span key={item} className="flex items-center gap-1.5">
-                <Check className="h-3.5 w-3.5 text-emerald-400" />
+                <Check className="h-3.5 w-3.5 text-[#127dfe]" />
                 {item}
               </span>
             ))}
-          </motion.div>
-        </motion.div>
+          </div>
+        </Reveal>
       </div>
 
       {/* Footer */}
-      <div className="relative z-10 border-t border-white/8 px-4 py-6 text-center sm:px-6 lg:px-8">
-        <div className="mx-auto flex max-w-[1280px] flex-col items-center justify-between gap-4 sm:flex-row">
+      <div className="relative z-10 mt-24 border-t border-white/8 px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-[1200px] flex-col items-center justify-between gap-4 sm:flex-row">
           <Image
             src="/brand/clickbook-logo-light-transparent.png"
             alt="КликБук"
@@ -1888,7 +1558,7 @@ function CtaSlide({ t }: { t: typeof COPY.ru }) {
               (e.target as HTMLImageElement).style.display = 'none';
             }}
           />
-          <div className="text-[11.5px] text-white/32">{t.footer}</div>
+          <div className="text-[11.5px] text-white/30">{t.footer}</div>
         </div>
       </div>
     </section>

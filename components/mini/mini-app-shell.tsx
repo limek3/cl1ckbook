@@ -74,6 +74,24 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: 'more',     label: 'Ещё',      icon: 'more-horizontal' },
 ];
 
+function miniGlass(mode: ThemeMode, edge: 'top' | 'bottom' = 'top'): CSSProperties {
+  const dark = mode === 'dark';
+  const shadow = edge === 'bottom'
+    ? (dark ? '0 -18px 44px rgba(0,0,0,0.42)' : '0 -14px 34px rgba(15,23,42,0.10)')
+    : (dark ? '0 14px 36px rgba(0,0,0,0.20)' : '0 10px 28px rgba(15,23,42,0.08)');
+
+  return {
+    background: dark ? 'rgba(10,10,10,0.68)' : 'rgba(255,255,255,0.76)',
+    backdropFilter: 'blur(24px) saturate(1.35)',
+    WebkitBackdropFilter: 'blur(24px) saturate(1.35)',
+    boxShadow: shadow,
+  };
+}
+
+function glassBorder(mode: ThemeMode) {
+  return mode === 'dark' ? 'rgba(255,255,255,0.095)' : 'rgba(10,10,10,0.075)';
+}
+
 interface SubRoute {
   kind: string;
   payload?: Thread;
@@ -81,14 +99,16 @@ interface SubRoute {
 
 // ─── Bottom Nav ──────────────────────────────
 function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) => void }) {
-  const { T } = useTheme();
+  const { T, mode } = useTheme();
   return (
     <div style={{
-      borderTop: `1px solid ${T.border}`,
-      background: T.bg,
+      ...miniGlass(mode, 'bottom'),
+      borderTop: `1px solid ${glassBorder(mode)}`,
       padding: '6px 4px calc(6px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
       display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 0,
       flexShrink: 0,
+      position: 'relative',
+      zIndex: 50,
     }}>
       {TABS.map((t) => {
         const isActive = active === t.id;
@@ -113,11 +133,13 @@ function TgHeader({ onToggleTheme, onNotifications, notificationCount = 0 }: { o
   const { T, mode } = useTheme();
   return (
     <div style={{
+      ...miniGlass(mode, 'top'),
       flexShrink: 0,
-      padding: 'calc(var(--miniapp-header-top-offset, 18px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px)))) 16px 10px',
+      padding: 'calc(var(--miniapp-header-top-offset, 12px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px)))) 16px 9px',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      background: T.bg,
-      borderBottom: `1px solid ${T.border}`,
+      borderBottom: `1px solid ${glassBorder(mode)}`,
+      position: 'relative',
+      zIndex: 60,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{
@@ -162,7 +184,7 @@ function TgHeader({ onToggleTheme, onNotifications, notificationCount = 0 }: { o
 
 // ─── Inner shell ─────────────────────────────
 function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?: TabId; initialSub?: SubRoute | null }) {
-  const { T, toggle } = useTheme();
+  const { T, mode, toggle } = useTheme();
   const [tab, setTab] = useState<TabId>(initialTab);
   const [sub, setSub] = useState<SubRoute | null>(initialSub);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -214,7 +236,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
       const viewportHeight = Number(tg?.viewportStableHeight ?? tg?.viewportHeight ?? window.innerHeight);
       const isTelegramRuntime = Boolean(tg);
 
-      document.documentElement.style.setProperty('--miniapp-header-top-offset', isTelegramRuntime ? '36px' : '18px');
+      document.documentElement.style.setProperty('--miniapp-header-top-offset', isTelegramRuntime ? '10px' : '12px');
       if (Number.isFinite(topInset)) document.documentElement.style.setProperty('--miniapp-safe-top', `${Math.max(0, Math.round(topInset))}px`);
       if (Number.isFinite(bottomInset)) document.documentElement.style.setProperty('--miniapp-safe-bottom', `${Math.max(0, Math.round(bottomInset))}px`);
       if (Number.isFinite(viewportHeight) && viewportHeight > 0) {
@@ -306,7 +328,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
 
   return (
     <ToastCtx.Provider value={toastApi}>
-      <div className="cb-miniapp cb-mini-app-root" data-mini-theme={T.bg === '#0a0a0a' ? 'dark' : 'light'} data-mini-mode={T.bg === '#0a0a0a' ? 'dark' : 'light'} style={{
+      <div className="cb-miniapp cb-mini-app-root" data-mini-theme={mode} data-mini-mode={mode} style={{
         '--mini-bg': T.bg,
         '--mini-card': T.card,
         '--mini-input-bg': T.inputBg,
@@ -315,10 +337,12 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
         '--mini-accent': T.accent,
         '--miniapp-accent': T.accent,
         width: '100%', maxWidth: 390, height: 'var(--miniapp-viewport-height, 100dvh)', minHeight: '100svh',
-        background: T.bg, color: T.text, colorScheme: T.bg === '#0a0a0a' ? 'dark' : 'light',
+        background: T.bg, color: T.text, colorScheme: mode,
         display: 'flex', flexDirection: 'column',
         fontFamily: "'Inter', -apple-system, system-ui, sans-serif",
         overflow: 'hidden',
+        paddingTop: 0,
+        paddingBottom: 0,
         margin: '0 auto',
         transition: 'background 0.34s cubic-bezier(.2,.8,.2,1), color 0.34s cubic-bezier(.2,.8,.2,1)',
         position: 'relative',
@@ -335,11 +359,14 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
             -webkit-text-fill-color: var(--mini-text, #fafafa) !important;
             border-radius: 10px;
           }
-          .cb-miniapp input.cb-mini-transparent, .cb-miniapp textarea.cb-mini-transparent {
+          .cb-miniapp input.cb-mini-transparent, .cb-miniapp textarea.cb-mini-transparent,
+          .cb-miniapp input.cb-mini-input-reset, .cb-miniapp textarea.cb-mini-input-reset {
             background: transparent !important;
             background-color: transparent !important;
             box-shadow: none !important;
+            -webkit-box-shadow: none !important;
             border-radius: 0;
+            background-clip: padding-box !important;
           }
           .cb-miniapp input:-webkit-autofill, .cb-miniapp textarea:-webkit-autofill {
             box-shadow: 0 0 0 999px var(--mini-input-bg, #0d0d0d) inset !important;
@@ -351,11 +378,14 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
             background-color: var(--mini-input-bg, #ffffff) !important;
             box-shadow: 0 0 0 1000px var(--mini-input-bg, #ffffff) inset !important;
           }
-          .cb-miniapp input.cb-mini-transparent, .cb-miniapp textarea.cb-mini-transparent {
+          .cb-miniapp input.cb-mini-transparent, .cb-miniapp textarea.cb-mini-transparent,
+          .cb-miniapp input.cb-mini-input-reset, .cb-miniapp textarea.cb-mini-input-reset {
             background: transparent !important;
             background-color: transparent !important;
             box-shadow: none !important;
+            -webkit-box-shadow: none !important;
             border-radius: 0 !important;
+            background-clip: padding-box !important;
           }
           .cb-miniapp ::placeholder { color: ${T.text3}; opacity: 1; }
           .cb-miniapp { --miniapp-accent: ${T.accent}; }

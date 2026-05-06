@@ -70,7 +70,7 @@ export const TOKENS: Record<ThemeMode, ThemeTokens> = {
     danger: '#dc2626',
     success: '#16a34a',
     warn: '#d97706',
-    inputBg: '#ffffff',
+    inputBg: '#f3f2ef',
     cardShadow: '0 1px 2px rgba(0,0,0,0.04)',
     overlayBg: 'rgba(10,10,10,0.4)',
     sheetBg: '#ffffff',

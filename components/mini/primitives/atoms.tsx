@@ -282,13 +282,22 @@ export function SearchBox({
   value, onChange, placeholder,
 }: { value: string; onChange: (value: string) => void; placeholder: string }) {
   const { T, mode } = useTheme();
-  const searchFieldBg = mode === 'dark' ? 'rgba(255,255,255,0.06)' : T.bgSoft;
+  const dark = mode === 'dark';
+  const shellBg = dark ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.58)';
+  const fieldBg = dark ? 'rgba(255,255,255,0.055)' : 'rgba(10,10,10,0.035)';
+  const fieldBorder = dark ? 'rgba(255,255,255,0.06)' : 'rgba(10,10,10,0.055)';
+
   return (
     <div style={{
-      background: T.card, border: `1px solid ${T.border}`, borderRadius: 14,
-      boxShadow: T.cardShadow, padding: '12px 14px',
+      background: shellBg,
+      border: `1px solid ${dark ? 'rgba(255,255,255,0.075)' : 'rgba(10,10,10,0.06)'}`,
+      borderRadius: 16,
+      boxShadow: dark ? 'inset 0 1px 0 rgba(255,255,255,0.035)' : '0 8px 24px rgba(15,23,42,0.04)',
+      backdropFilter: 'blur(16px) saturate(1.22)',
+      WebkitBackdropFilter: 'blur(16px) saturate(1.22)',
+      padding: '12px 14px',
       display: 'flex', alignItems: 'center', gap: 10,
-      transition: 'border-color 0.15s ease, background 0.15s ease',
+      transition: 'border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease',
     }}>
       <div style={{
         flex: 1,
@@ -299,8 +308,9 @@ export function SearchBox({
         padding: '0 12px',
         minHeight: 44,
         borderRadius: 12,
-        background: searchFieldBg,
-        border: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.04)' : T.border}`,
+        background: fieldBg,
+        border: `1px solid ${fieldBorder}`,
+        boxShadow: dark ? 'inset 0 1px 0 rgba(255,255,255,0.025)' : 'inset 0 1px 1px rgba(15,23,42,0.035)',
       }}>
         <Icon name="search" size={16} color={T.text3} />
         <input
@@ -310,7 +320,7 @@ export function SearchBox({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="cb-mini-transparent"
+          className="cb-mini-transparent cb-mini-input-reset"
           style={{
             flex: 1,
             minWidth: 0,
@@ -321,6 +331,7 @@ export function SearchBox({
             border: 'none',
             outline: 'none',
             boxShadow: 'none',
+            WebkitBoxShadow: 'none',
             borderRadius: 0,
             padding: 0,
             color: T.text,
@@ -328,7 +339,7 @@ export function SearchBox({
             caretColor: T.accent,
             fontSize: 14,
             fontFamily: 'inherit',
-            colorScheme: T.bg === '#0a0a0a' ? 'dark' : 'light',
+            colorScheme: mode,
           }}
         />
         {value && (
@@ -352,18 +363,24 @@ export function FormField({
   type?: string;
   inputMode?: InputHTMLAttributes<HTMLInputElement>['inputMode'];
 }) {
-  const { T } = useTheme();
+  const { T, mode } = useTheme();
   const common: CSSProperties = {
-    width: '100%', marginTop: 8, padding: '6px 8px', background: T.inputBg, backgroundColor: T.inputBg, border: 'none', outline: 'none',
-    boxShadow: `0 0 0 1000px ${T.inputBg} inset`, borderRadius: 10, color: T.text, WebkitTextFillColor: T.text, caretColor: T.accent, fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5, WebkitAppearance: 'none', appearance: 'none', colorScheme: T.bg === '#0a0a0a' ? 'dark' : 'light',
+    width: '100%', marginTop: 8, padding: '8px 10px',
+    background: mode === 'dark' ? 'rgba(255,255,255,0.045)' : 'rgba(10,10,10,0.035)',
+    backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.045)' : 'rgba(10,10,10,0.035)',
+    border: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.055)' : 'rgba(10,10,10,0.055)'}`,
+    outline: 'none',
+    boxShadow: 'none',
+    WebkitBoxShadow: 'none',
+    borderRadius: 10, color: T.text, WebkitTextFillColor: T.text, caretColor: T.accent, fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5, WebkitAppearance: 'none', appearance: 'none', colorScheme: mode,
   };
   return (
     <div style={{ background: T.cardElev, border: `1px solid ${T.border}`, borderRadius: 14, padding: '12px 14px' }}>
       <FieldLabel style={{ fontSize: 9 }}>{label}</FieldLabel>
       {multiline ? (
-        <textarea className="cb-mini-input" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} rows={4} style={{ ...common, resize: 'vertical' }} />
+        <textarea className="cb-mini-input cb-mini-input-reset" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} rows={4} style={{ ...common, resize: 'vertical' }} />
       ) : (
-        <input className="cb-mini-input" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} type={type} inputMode={inputMode} style={common} />
+        <input className="cb-mini-input cb-mini-input-reset" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} type={type} inputMode={inputMode} style={common} />
       )}
     </div>
   );
@@ -381,7 +398,8 @@ interface BottomSheetProps {
 }
 
 export function BottomSheet({ open, onClose, children, title, subtitle, right, footer, maxHeight = '88%' }: BottomSheetProps) {
-  const { T } = useTheme();
+  const { T, mode } = useTheme();
+  const sheetGlassBg = mode === 'dark' ? 'rgba(17,17,17,0.86)' : 'rgba(255,255,255,0.90)';
   if (!open) return null;
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 100, display: 'flex', alignItems: 'flex-end', animation: 'mini-fade-in 0.16s ease both' }}>
@@ -402,11 +420,13 @@ export function BottomSheet({ open, onClose, children, title, subtitle, right, f
         style={{
           position: 'relative',
           width: '100%',
-          background: T.sheetBg,
+          background: sheetGlassBg,
+          backdropFilter: 'blur(24px) saturate(1.32)',
+          WebkitBackdropFilter: 'blur(24px) saturate(1.32)',
           borderTopLeftRadius: 24,
           borderTopRightRadius: 24,
           borderTop: `1px solid ${T.border}`,
-          boxShadow: '0 -12px 40px rgba(0,0,0,0.22)',
+          boxShadow: mode === 'dark' ? '0 -18px 54px rgba(0,0,0,0.46)' : '0 -18px 42px rgba(15,23,42,0.14)',
           maxHeight,
           overflow: 'hidden',
           display: 'flex',
@@ -444,7 +464,7 @@ export function BottomSheet({ open, onClose, children, title, subtitle, right, f
           {children}
         </div>
         {footer && (
-          <div style={{ flexShrink: 0, padding: '14px 20px calc(14px + env(safe-area-inset-bottom, 0px))', borderTop: `1px solid ${T.border}`, background: T.sheetBg }}>
+          <div style={{ flexShrink: 0, padding: '14px 20px calc(14px + env(safe-area-inset-bottom, 0px))', borderTop: `1px solid ${T.border}`, background: sheetGlassBg, backdropFilter: 'blur(18px) saturate(1.25)', WebkitBackdropFilter: 'blur(18px) saturate(1.25)' }}>
             {footer}
           </div>
         )}
