@@ -783,7 +783,7 @@ function MiniShell({
 }) {
   const shellStyle = {
     paddingTop: 'calc(var(--tg-safe-top, 0px) + 20px)',
-    paddingBottom: 'calc(var(--tg-safe-bottom, 0px) + 86px)',
+    paddingBottom: 'calc(var(--tg-safe-bottom, 0px) + 100px)',
     '--mini-accent': accent.value,
     '--mini-accent-soft': accent.soft,
   } as CSSProperties & Record<string, string>;
