@@ -1,13 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTheme } from '../theme';
 import { BottomSheet, FieldLabel, Divider, Avatar, Icon, NeutralBtn, Toggle } from '../primitives/atoms';
 import type { Appointment, Client, Service, Template, ScheduleDay } from '@/lib/mini-demo';
 
 // ─── Client detail ─────────────────────────────────
-export function ClientDetailSheet({ client, onClose }: { client: Client | null; onClose: () => void }) {
+export function ClientDetailSheet({
+  client, onClose, onChat, onBook,
+}: {
+  client: Client | null;
+  onClose: () => void;
+  onChat?: (c: Client) => void;
+  onBook?: (c: Client) => void;
+}) {
   const { T } = useTheme();
+  const [note, setNote] = useState('');
   if (!client) return <BottomSheet open={false} onClose={onClose}><div /></BottomSheet>;
   return (
     <BottomSheet open={!!client} onClose={onClose}>
@@ -15,7 +23,14 @@ export function ClientDetailSheet({ client, onClose }: { client: Client | null; 
         <Avatar name={client.name} size={52} radius={26} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 17, fontWeight: 600, color: T.text, letterSpacing: '-0.02em' }}>{client.name}</div>
-          <div style={{ fontSize: 12, color: T.text2, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{client.phone || '—'}</div>
+          {client.phone ? (
+            <a
+              href={`tel:${client.phone}`}
+              style={{ fontSize: 12, color: T.accent, fontVariantNumeric: 'tabular-nums', marginTop: 2, display: 'block', textDecoration: 'none' }}
+            >{client.phone}</a>
+          ) : (
+            <div style={{ fontSize: 12, color: T.text2, marginTop: 2 }}>—</div>
+          )}
         </div>
       </div>
 
@@ -28,6 +43,8 @@ export function ClientDetailSheet({ client, onClose }: { client: Client | null; 
       <div style={{ padding: '12px 20px 0' }}>
         <FieldLabel>Заметка</FieldLabel>
         <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
           placeholder="Аллергии, пожелания, контекст..."
           rows={3}
           style={{
@@ -39,8 +56,8 @@ export function ClientDetailSheet({ client, onClose }: { client: Client | null; 
       </div>
 
       <div style={{ padding: '14px 20px 4px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <NeutralBtn icon="message-circle" full>В чат</NeutralBtn>
-        <NeutralBtn icon="calendar-plus" full>Записать</NeutralBtn>
+        <NeutralBtn icon="message-circle" full onClick={() => onChat?.(client)}>В чат</NeutralBtn>
+        <NeutralBtn icon="calendar-plus" full onClick={() => onBook?.(client)}>Записать</NeutralBtn>
       </div>
     </BottomSheet>
   );
@@ -91,16 +108,42 @@ export function AppointmentDetailSheet({
 }
 
 // ─── Service detail ────────────────────────────────
-export function ServiceDetailSheet({ service, onClose }: { service: Service | null; onClose: () => void }) {
+export function ServiceDetailSheet({
+  service, onClose, onSave, onDelete,
+}: {
+  service: Service | null;
+  onClose: () => void;
+  onSave?: (next: Service) => void;
+  onDelete?: (s: Service) => void;
+}) {
   const { T } = useTheme();
   const [active, setActive] = useState(true);
+  const [name, setName] = useState(service?.name ?? '');
+  const [price, setPrice] = useState(service?.price ?? 0);
+  const [duration, setDuration] = useState(service?.duration ?? 0);
+  useEffect(() => {
+    if (!service) return;
+    setName(service.name);
+    setPrice(service.price);
+    setDuration(service.duration);
+  }, [service?.n]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!service) return <BottomSheet open={false} onClose={onClose}><div /></BottomSheet>;
+  const save = () => {
+    onSave?.({ ...service, name: name.trim() || service.name, price, duration });
+    onClose();
+  };
+  const remove = () => {
+    if (typeof window !== 'undefined' && !window.confirm(`Удалить услугу «${service.name}»?`)) return;
+    onDelete?.(service);
+    onClose();
+  };
   return (
     <BottomSheet open={!!service} onClose={onClose}>
       <div style={{ padding: '0 20px 8px' }}>
         <div style={{ fontSize: 11, color: T.text3 }}>#{service.n}</div>
         <input
-          defaultValue={service.name}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
           style={{
             width: '100%', marginTop: 4, padding: 0, fontSize: 22, fontWeight: 600,
             background: 'transparent', border: 'none', outline: 'none',
@@ -110,8 +153,8 @@ export function ServiceDetailSheet({ service, onClose }: { service: Service | nu
       </div>
 
       <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <NumField label="Цена, ₽" value={service.price} />
-        <NumField label="Мин." value={service.duration} />
+        <NumField label="Цена, ₽" value={price} onChange={setPrice} />
+        <NumField label="Мин." value={duration} onChange={setDuration} />
       </div>
 
       <div style={{ padding: '8px 20px 0' }}>
@@ -138,18 +181,31 @@ export function ServiceDetailSheet({ service, onClose }: { service: Service | nu
       </div>
 
       <div style={{ padding: '0 20px 0', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <NeutralBtn full>Сохранить</NeutralBtn>
-        <NeutralBtn icon="trash-2" full>Удалить</NeutralBtn>
+        <NeutralBtn full onClick={save}>Сохранить</NeutralBtn>
+        <NeutralBtn icon="trash-2" full onClick={remove}>Удалить</NeutralBtn>
       </div>
     </BottomSheet>
   );
 }
 
 // ─── Template detail ───────────────────────────────
-export function TemplateDetailSheet({ template, onClose }: { template: Template | null; onClose: () => void }) {
+export function TemplateDetailSheet({
+  template, onClose, onSave,
+}: {
+  template: Template | null;
+  onClose: () => void;
+  onSave?: (next: Template) => void;
+}) {
   const { T } = useTheme();
+  const [body, setBody] = useState('');
+  useEffect(() => {
+    if (template) setBody(template.body);
+  }, [template?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!template) return <BottomSheet open={false} onClose={onClose}><div /></BottomSheet>;
-  const [body, setBody] = useState(template.body);
+  const save = () => {
+    onSave?.({ ...template, body });
+    onClose();
+  };
   return (
     <BottomSheet open={!!template} onClose={onClose} title={template.name}>
       <div style={{ padding: '0 20px 0' }}>
@@ -175,7 +231,7 @@ export function TemplateDetailSheet({ template, onClose }: { template: Template 
         ))}
       </div>
       <div style={{ padding: '14px 20px 0' }}>
-        <NeutralBtn icon="check" full>Сохранить</NeutralBtn>
+        <NeutralBtn icon="check" full onClick={save}>Сохранить</NeutralBtn>
       </div>
     </BottomSheet>
   );
@@ -238,13 +294,14 @@ function Cell({ label, value, small }: { label: string; value: string; small?: b
   );
 }
 
-function NumField({ label, value }: { label: string; value: number }) {
+function NumField({ label, value, onChange }: { label: string; value: number; onChange?: (n: number) => void }) {
   const { T } = useTheme();
   return (
     <div style={{ background: T.cardElev, border: `1px solid ${T.border}`, borderRadius: 12, padding: '12px 14px' }}>
       <FieldLabel style={{ fontSize: 9 }}>{label}</FieldLabel>
       <input
-        defaultValue={value}
+        value={value}
+        onChange={(e) => onChange?.(parseInt(e.target.value || '0', 10) || 0)}
         type="number"
         style={{
           width: '100%', marginTop: 6, padding: 0, fontSize: 18, fontWeight: 600,

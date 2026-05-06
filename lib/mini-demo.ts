@@ -49,6 +49,7 @@ export const SERVICES: Service[] = [
 export type ApptStatus = 'in-focus' | 'scheduled' | 'completed' | 'cancelled';
 
 export interface Appointment {
+  id?: string;
   time: string;
   name: string;
   service: string;

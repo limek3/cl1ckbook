@@ -1,8 +1,29 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ThemeProvider, useTheme, type ThemeMode } from './theme';
 import { Icon } from './primitives/atoms';
+import { ToastCtx, haptic, tgClose, type ToastItem, type MiniToastCtxValue } from './bridge';
+
+function ToastHost({ items }: { items: ToastItem[] }) {
+  const { T } = useTheme();
+  return (
+    <div style={{
+      position: 'absolute', left: 0, right: 0, bottom: 96, zIndex: 200,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, pointerEvents: 'none',
+    }}>
+      {items.map((it) => (
+        <div key={it.id} style={{
+          background: it.tone === 'error' ? T.danger : it.tone === 'success' ? T.success : T.cardElev,
+          color: it.tone === 'info' ? T.text : '#fff',
+          border: `1px solid ${T.border}`,
+          padding: '10px 16px', borderRadius: 12, fontSize: 13,
+          maxWidth: '85%', boxShadow: T.cardShadow,
+        }}>{it.text}</div>
+      ))}
+    </div>
+  );
+}
 
 import { HomeScreen } from './screens/home';
 import { AppointmentsScreen } from './screens/appointments';
@@ -52,7 +73,7 @@ function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) 
       {TABS.map((t) => {
         const isActive = active === t.id;
         return (
-          <button key={t.id} onClick={() => onChange(t.id)} style={{
+          <button key={t.id} onClick={() => { haptic('light'); onChange(t.id); }} style={{
             background: 'transparent', border: 'none', cursor: 'pointer',
             padding: '8px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
             color: isActive ? T.text : T.text3, fontFamily: 'inherit',
@@ -94,7 +115,7 @@ function TgHeader({ onToggleTheme }: { onToggleTheme: () => void }) {
           width: 32, height: 32, background: 'transparent', border: 'none', cursor: 'pointer',
           color: T.text2, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}><Icon name={mode === 'dark' ? 'sun' : 'moon'} size={16} /></button>
-        <button style={{
+        <button onClick={tgClose} style={{
           background: 'transparent', border: 'none', color: T.text2, cursor: 'pointer',
           padding: '6px 8px', fontSize: 13, fontFamily: 'inherit',
         }}>Закрыть</button>
@@ -105,12 +126,49 @@ function TgHeader({ onToggleTheme }: { onToggleTheme: () => void }) {
 
 // ─── Inner shell ─────────────────────────────
 function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?: TabId; initialSub?: SubRoute | null }) {
-  const { T, toggle, mode } = useTheme();
+  const { T, toggle } = useTheme();
   const [tab, setTab] = useState<TabId>(initialTab);
   const [sub, setSub] = useState<SubRoute | null>(initialSub);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
 
-  const goSub = (kind: string, payload?: Thread) => setSub({ kind, payload });
-  const back = () => setSub(null);
+  const toastApi = useMemo<MiniToastCtxValue>(() => ({
+    show: (text, tone = 'info') => {
+      const id = Date.now() + Math.random();
+      setToasts((prev) => [...prev, { id, text, tone }]);
+      window.setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 2400);
+      haptic(tone === 'error' ? 'error' : tone === 'success' ? 'success' : 'light');
+    },
+  }), []);
+
+  // Telegram WebApp init: ready/expand once
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const tg = (window as any).Telegram?.WebApp;
+    if (!tg) return;
+    try { tg.ready?.(); tg.expand?.(); } catch {}
+  }, []);
+
+  // Back button
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const tg = (window as any).Telegram?.WebApp;
+    const back = tg?.BackButton;
+    if (!back) return;
+    if (sub) {
+      try { back.show(); } catch {}
+    } else {
+      try { back.hide(); } catch {}
+    }
+    const handler = () => setSub(null);
+    try { back.onClick(handler); } catch {}
+    return () => { try { back.offClick(handler); } catch {} };
+  }, [sub]);
+
+  const goSub = useCallback((kind: string, payload?: Thread) => {
+    haptic('light');
+    setSub({ kind, payload });
+  }, []);
+  const back = useCallback(() => setSub(null), []);
 
   // Render screen content
   let content: ReactNode = null;
@@ -138,7 +196,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
     if (tab === 'home') content = <HomeScreen go={goSub} />;
     else if (tab === 'appts') content = <AppointmentsScreen />;
     else if (tab === 'services') content = <ServicesScreen />;
-    else if (tab === 'clients') content = <ClientsScreen />;
+    else if (tab === 'clients') content = <ClientsScreen go={goSub} />;
     else if (tab === 'more') content = <MoreScreen go={goSub} />;
   }
 
@@ -146,23 +204,27 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
   const isFullHeight = sub && sub.kind === 'thread';
 
   return (
-    <div style={{
-      width: '100%', maxWidth: 390, height: '100dvh',
-      background: T.bg, color: T.text,
-      display: 'flex', flexDirection: 'column',
-      fontFamily: "'Inter', -apple-system, system-ui, sans-serif",
-      overflow: 'hidden',
-      margin: '0 auto',
-      transition: 'background 0.2s, color 0.2s',
-    }}>
-      <TgHeader onToggleTheme={toggle} />
-      {isFullHeight ? (
-        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>{content}</div>
-      ) : (
-        <div className="scroll-area" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', position: 'relative' }}>{content}</div>
-      )}
-      {!isFullHeight && <BottomNav active={tab} onChange={(id) => { setTab(id); setSub(null); }} />}
-    </div>
+    <ToastCtx.Provider value={toastApi}>
+      <div style={{
+        width: '100%', maxWidth: 390, height: '100dvh',
+        background: T.bg, color: T.text,
+        display: 'flex', flexDirection: 'column',
+        fontFamily: "'Inter', -apple-system, system-ui, sans-serif",
+        overflow: 'hidden',
+        margin: '0 auto',
+        transition: 'background 0.2s, color 0.2s',
+        position: 'relative',
+      }}>
+        <TgHeader onToggleTheme={toggle} />
+        {isFullHeight ? (
+          <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>{content}</div>
+        ) : (
+          <div className="scroll-area" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', position: 'relative' }}>{content}</div>
+        )}
+        {!isFullHeight && <BottomNav active={tab} onChange={(id) => { setTab(id); setSub(null); }} />}
+        <ToastHost items={toasts} />
+      </div>
+    </ToastCtx.Provider>
   );
 }
 

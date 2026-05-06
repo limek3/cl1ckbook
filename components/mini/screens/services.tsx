@@ -6,11 +6,49 @@ import { Card, Divider, NeutralBtn } from '../primitives/atoms';
 import { ServiceDetailSheet } from '../sheets/detail-sheets';
 import { type Service } from '@/lib/mini-demo';
 import { useMiniData } from '@/hooks/use-mini-data';
+import { useMiniToast } from '../bridge';
 
 export function ServicesScreen() {
   const { T } = useTheme();
-  const { SERVICES } = useMiniData();
+  const { SERVICES, updateSection } = useMiniData();
+  const { show } = useMiniToast();
   const [active, setActive] = useState<Service | null>(null);
+
+  async function persistAll(list: Service[]) {
+    const ok = await updateSection('services', list.map((s) => ({
+      n: s.n,
+      name: s.name,
+      price: s.price,
+      duration: s.duration,
+      popularity: s.popularity,
+      count: s.count,
+    })));
+    if (!ok) show('Не удалось сохранить', 'error');
+  }
+
+  async function saveOne(next: Service) {
+    const exists = SERVICES.some((s) => s.n === next.n);
+    const list = exists ? SERVICES.map((s) => (s.n === next.n ? next : s)) : [...SERVICES, next];
+    show('Сохранено', 'success');
+    await persistAll(list);
+  }
+
+  async function removeOne(s: Service) {
+    const list = SERVICES.filter((x) => x.n !== s.n);
+    show('Удалено', 'success');
+    await persistAll(list);
+  }
+
+  async function addNew() {
+    const nextN = (SERVICES.reduce((m, s) => Math.max(m, s.n), 0) || 0) + 1;
+    const draft: Service = {
+      n: nextN, name: 'Новая услуга', price: 1000, duration: 60, popularity: 0, count: 0,
+    };
+    await persistAll([...SERVICES, draft]);
+    show('Услуга добавлена', 'success');
+    setActive(draft);
+  }
+
   return (
     <div style={{ padding: '20px 16px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
@@ -19,7 +57,7 @@ export function ServicesScreen() {
           {SERVICES.length} активных · {SERVICES.reduce((s, x) => s + x.count, 0)} записей за месяц.
         </div>
       </div>
-      <NeutralBtn icon="plus" full>Добавить услугу</NeutralBtn>
+      <NeutralBtn icon="plus" full onClick={addNew}>Добавить услугу</NeutralBtn>
       <Card padded={false}>
         {SERVICES.map((s, i) => (
           <Fragment key={s.n}>
@@ -28,7 +66,12 @@ export function ServicesScreen() {
           </Fragment>
         ))}
       </Card>
-      <ServiceDetailSheet service={active} onClose={() => setActive(null)} />
+      <ServiceDetailSheet
+        service={active}
+        onClose={() => setActive(null)}
+        onSave={saveOne}
+        onDelete={removeOne}
+      />
     </div>
   );
 }

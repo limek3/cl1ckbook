@@ -6,12 +6,25 @@ import { FieldLabel, NavBtn, StatusDot, Icon } from '../primitives/atoms';
 import { AppointmentDetailSheet } from '../sheets/detail-sheets';
 import { type Appointment } from '@/lib/mini-demo';
 import { useMiniData } from '@/hooks/use-mini-data';
+import { useMiniToast } from '../bridge';
 
 export function AppointmentsScreen({ openAppt }: { openAppt?: (a: Appointment) => void }) {
   const { T } = useTheme();
-  const { APPOINTMENTS } = useMiniData();
+  const { APPOINTMENTS, updateBookingStatus } = useMiniData();
+  const { show } = useMiniToast();
   const [day, setDay] = useState(0);
   const [active, setActive] = useState<Appointment | null>(null);
+
+  async function changeStatus(a: Appointment, status: 'confirmed' | 'completed' | 'cancelled', label: string) {
+    if (!a.id) { show('Запись без идентификатора', 'error'); return; }
+    try {
+      await updateBookingStatus(a.id, status);
+      show(label, 'success');
+      setActive(null);
+    } catch {
+      show('Не удалось обновить', 'error');
+    }
+  }
 
   const dayLabel = day === 0 ? 'Сегодня'
     : day === 1 ? 'Завтра'
@@ -57,7 +70,13 @@ export function AppointmentsScreen({ openAppt }: { openAppt?: (a: Appointment) =
       }}>
         Свободно после 19:00
       </div>
-      <AppointmentDetailSheet appt={active} onClose={() => setActive(null)} />
+      <AppointmentDetailSheet
+        appt={active}
+        onClose={() => setActive(null)}
+        onConfirm={active ? () => changeStatus(active, 'confirmed', 'Запись подтверждена') : undefined}
+        onComplete={active ? () => changeStatus(active, 'completed', 'Запись завершена') : undefined}
+        onCancel={active ? () => changeStatus(active, 'cancelled', 'Запись отменена') : undefined}
+      />
     </div>
   );
 }

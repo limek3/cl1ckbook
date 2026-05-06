@@ -4,18 +4,31 @@ import { Fragment, useState } from 'react';
 import { useTheme } from '../theme';
 import {
   Card, FieldLabel, SectionTitle, Divider, Avatar, Toggle, Pill, Icon, NeutralBtn,
-  ListRow, ScreenHeader,
+  ListRow, ScreenHeader, BottomSheet,
 } from '../primitives/atoms';
 import {
   FINANCE_OPS, INTEGRATIONS, SOURCES, CAMPAIGNS, REVIEWS,
   type FinanceOp, type Integration, type Campaign, type Review,
 } from '@/lib/mini-demo';
+import { useMiniToast } from '../bridge';
 
 // ─── Finance ───────────────────────────────────
 export function FinanceScreen({ back }: { back: () => void }) {
   const { T } = useTheme();
+  const { show } = useMiniToast();
   const [period, setPeriod] = useState<'week' | 'month' | 'all'>('week');
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [amount, setAmount] = useState('');
   const balance = 24800;
+
+  async function withdraw() {
+    const n = parseInt(amount.replace(/\s/g, ''), 10);
+    if (!n || n <= 0) { show('Введите сумму', 'error'); return; }
+    if (n > balance) { show('Сумма больше баланса', 'error'); return; }
+    setWithdrawOpen(false);
+    setAmount('');
+    show(`Заявка на ${n.toLocaleString('ru-RU')} ₽ создана`, 'success');
+  }
   return (
     <div>
       <ScreenHeader title="Финансы" subtitle="Баланс, история, выплаты." onBack={back} />
@@ -27,8 +40,8 @@ export function FinanceScreen({ back }: { back: () => void }) {
           </div>
           <div style={{ fontSize: 12, color: T.text2, marginTop: 8 }}>+ 4 200 ₽ в обработке</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 16 }}>
-            <NeutralBtn icon="arrow-up-right" full>Вывести</NeutralBtn>
-            <NeutralBtn icon="arrow-down-left" full>Пополнить</NeutralBtn>
+            <NeutralBtn icon="arrow-up-right" full onClick={() => setWithdrawOpen(true)}>Вывести</NeutralBtn>
+            <NeutralBtn icon="arrow-down-left" full onClick={() => show('Пополнение через эквайринг', 'info')}>Пополнить</NeutralBtn>
           </div>
         </Card>
 
@@ -52,9 +65,38 @@ export function FinanceScreen({ back }: { back: () => void }) {
         <Card padded={false}>
           <ListRow icon="credit-card" label="Карта •• 4421" sub="Тинькофф · по умолчанию" right={<Icon name="check" size={14} color={T.accent} />} />
           <Divider />
-          <ListRow icon="plus" label="Добавить способ" onClick={() => {}} />
+          <ListRow icon="plus" label="Добавить способ" onClick={() => show('Добавление через настройки платежей', 'info')} />
         </Card>
       </div>
+
+      <BottomSheet open={withdrawOpen} onClose={() => setWithdrawOpen(false)} title="Вывод средств">
+        <div style={{ padding: '8px 20px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ fontSize: 12, color: T.text2 }}>Доступно: {balance.toLocaleString('ru-RU')} ₽ · карта •• 4421</div>
+          <div style={{
+            background: T.cardElev, border: `1px solid ${T.border}`, borderRadius: 12, padding: '12px 14px',
+          }}>
+            <FieldLabel style={{ fontSize: 9 }}>Сумма, ₽</FieldLabel>
+            <input
+              autoFocus
+              inputMode="numeric"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value.replace(/[^\d ]/g, ''))}
+              placeholder="0"
+              style={{
+                width: '100%', marginTop: 6, padding: 0, fontSize: 22, fontWeight: 600,
+                background: 'transparent', border: 'none', outline: 'none',
+                color: T.text, fontVariantNumeric: 'tabular-nums', fontFamily: 'inherit',
+              }}
+            />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+            <NeutralBtn onClick={() => setAmount(String(Math.floor(balance / 2)))}>50%</NeutralBtn>
+            <NeutralBtn onClick={() => setAmount(String(balance))}>Всё</NeutralBtn>
+            <NeutralBtn onClick={() => setAmount('')}>Сброс</NeutralBtn>
+          </div>
+          <NeutralBtn icon="check" full onClick={withdraw}>Подтвердить</NeutralBtn>
+        </div>
+      </BottomSheet>
     </div>
   );
 }
@@ -86,6 +128,7 @@ function FinanceOpRow({ op }: { op: FinanceOp }) {
 
 // ─── Payments ─────────────────────────────────
 export function PaymentsScreen({ back }: { back: () => void }) {
+  const { show } = useMiniToast();
   const [v, setV] = useState({ cash: true, card: true, sbp: true, link: false });
   const t = (k: keyof typeof v) => setV((s) => ({ ...s, [k]: !s[k] }));
   return (
@@ -105,11 +148,11 @@ export function PaymentsScreen({ back }: { back: () => void }) {
 
         <SectionTitle title="Подключённые эквайринги" />
         <Card padded={false}>
-          <ListRow icon="landmark" label="Тинькофф Касса" sub="ID: 1002457831" onClick={() => {}} />
+          <ListRow icon="landmark" label="Тинькофф Касса" sub="ID: 1002457831" onClick={() => show('Эквайринг активен', 'info')} />
           <Divider />
-          <ListRow icon="landmark" label="ЮKassa" sub="не подключено" onClick={() => {}} />
+          <ListRow icon="landmark" label="ЮKassa" sub="не подключено" onClick={() => show('Подключение ЮKassa: скоро', 'info')} />
           <Divider />
-          <ListRow icon="plus" label="Добавить эквайринг" onClick={() => {}} />
+          <ListRow icon="plus" label="Добавить эквайринг" onClick={() => show('Свяжитесь с поддержкой', 'info')} />
         </Card>
       </div>
     </div>
@@ -171,8 +214,18 @@ export function IntegrationsScreen({ back }: { back: () => void }) {
 // ─── Sources ─────────────────────────────────
 export function SourcesScreen({ back }: { back: () => void }) {
   const { T } = useTheme();
+  const { show } = useMiniToast();
   const max = Math.max(...SOURCES.map((s) => s.records));
   const total = SOURCES.reduce((a, s) => a + s.records, 0);
+
+  function createUtm() {
+    const url = `https://app.example/m/admin?utm_source=mini&utm_medium=tg&utm_campaign=${Date.now()}`;
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(url).then(() => show('UTM-ссылка скопирована', 'success'), () => show('Не удалось скопировать', 'error'));
+    } else {
+      show('Скопируйте ссылку вручную', 'info');
+    }
+  }
   return (
     <div>
       <ScreenHeader title="Каналы записи" subtitle="Источники трафика и конверсия." onBack={back} />
@@ -201,7 +254,7 @@ export function SourcesScreen({ back }: { back: () => void }) {
           ))}
         </Card>
 
-        <NeutralBtn icon="link" full>Создать UTM-ссылку</NeutralBtn>
+        <NeutralBtn icon="link" full onClick={createUtm}>Создать UTM-ссылку</NeutralBtn>
       </div>
     </div>
   );
@@ -209,11 +262,12 @@ export function SourcesScreen({ back }: { back: () => void }) {
 
 // ─── Marketing ───────────────────────────────
 export function MarketingScreen({ back }: { back: () => void }) {
+  const { show } = useMiniToast();
   return (
     <div>
       <ScreenHeader title="Маркетинг" subtitle="Рассылки и акции клиентам." onBack={back} />
       <div style={{ padding: '0 16px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <NeutralBtn icon="plus" full>Создать рассылку</NeutralBtn>
+        <NeutralBtn icon="plus" full onClick={() => show('Конструктор рассылок скоро', 'info')}>Создать рассылку</NeutralBtn>
 
         <SectionTitle title="Активные кампании" />
         {CAMPAIGNS.filter((c) => c.status === 'active').map((c, i) => (
@@ -234,7 +288,7 @@ export function MarketingScreen({ back }: { back: () => void }) {
             'Сезонное предложение',
           ].map((name, i, arr) => (
             <Fragment key={name}>
-              <ListRow label={name} onClick={() => {}} />
+              <ListRow label={name} onClick={() => show(`Шаблон «${name}» открыт`, 'info')} />
               {i < arr.length - 1 && <Divider />}
             </Fragment>
           ))}
@@ -277,6 +331,7 @@ function CampStat({ label, value }: { label: string; value: number }) {
 // ─── Reviews ─────────────────────────────────
 export function ReviewsScreen({ back }: { back: () => void }) {
   const { T } = useTheme();
+  const { show } = useMiniToast();
   const dist = [
     { stars: 5, count: 24 },
     { stars: 4, count: 5 },
@@ -316,12 +371,12 @@ export function ReviewsScreen({ back }: { back: () => void }) {
           </div>
         </Card>
 
-        <NeutralBtn icon="send" full>Запросить отзыв</NeutralBtn>
+        <NeutralBtn icon="send" full onClick={() => show('Ссылка на отзыв отправлена', 'success')}>Запросить отзыв</NeutralBtn>
 
         <Card padded={false}>
           {REVIEWS.map((r, i) => (
             <Fragment key={i}>
-              <ReviewRow r={r} />
+              <ReviewRow r={r} onReply={() => show(`Отвечаю на отзыв «${r.name}»`, 'info')} />
               {i < REVIEWS.length - 1 && <Divider />}
             </Fragment>
           ))}
@@ -331,7 +386,7 @@ export function ReviewsScreen({ back }: { back: () => void }) {
   );
 }
 
-function ReviewRow({ r }: { r: Review }) {
+function ReviewRow({ r, onReply }: { r: Review; onReply?: () => void }) {
   const { T } = useTheme();
   return (
     <div style={{ padding: '16px 20px' }}>
@@ -348,7 +403,7 @@ function ReviewRow({ r }: { r: Review }) {
         <span style={{ fontSize: 11, color: T.text3 }}>{r.date}</span>
       </div>
       <div style={{ fontSize: 13, color: T.text2, lineHeight: 1.5 }}>{r.text}</div>
-      <button style={{
+      <button onClick={onReply} style={{
         background: 'transparent', border: 'none', color: T.text2,
         fontSize: 12, padding: '8px 0 0', cursor: 'pointer', fontFamily: 'inherit',
         display: 'flex', alignItems: 'center', gap: 6,

@@ -8,13 +8,27 @@ import {
 import { type Appointment, type Client, type Service } from '@/lib/mini-demo';
 import { useMiniData } from '@/hooks/use-mini-data';
 import { ClientDetailSheet } from '../sheets/detail-sheets';
+import { useMiniToast } from '../bridge';
 
 export function HomeScreen({ go }: { go: (kind: string) => void }) {
-  const { T } = useTheme();
-  const { APPOINTMENTS, SERVICES, CLIENTS } = useMiniData();
+  const { T, } = useTheme();
+  const { APPOINTMENTS, SERVICES, CLIENTS, MASTER } = useMiniData();
+  const { show } = useMiniToast();
   const [copied, setCopied] = useState(false);
   const [activeClient, setActiveClient] = useState<Client | null>(null);
-  const copy = () => { setCopied(true); setTimeout(() => setCopied(false), 1400); };
+  const copy = async () => {
+    const link = `${typeof window !== 'undefined' ? window.location.origin : ''}${MASTER.link}`;
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(link);
+      }
+      setCopied(true);
+      show('Ссылка скопирована', 'success');
+      setTimeout(() => setCopied(false), 1400);
+    } catch {
+      show('Не удалось скопировать', 'error');
+    }
+  };
 
   function openClient(appt: Appointment) {
     const found = CLIENTS.find((c) => c.name === appt.name);
@@ -40,8 +54,8 @@ export function HomeScreen({ go }: { go: (kind: string) => void }) {
       <Card>
         <FieldLabel>Персональная ссылка</FieldLabel>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
-          <div style={{ fontSize: 30, fontWeight: 600, color: T.text, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
-            /m/admin
+          <div style={{ fontSize: 30, fontWeight: 600, color: T.text, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
+            {MASTER.link || '/m/admin'}
           </div>
           <button onClick={copy} style={{
             background: 'transparent', border: `1px solid ${T.borderStrong}`, borderRadius: 10,
@@ -57,10 +71,14 @@ export function HomeScreen({ go }: { go: (kind: string) => void }) {
       </Card>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <MetricCard label="Конверсия" value="100%" sub="конверсия" />
-        <MetricCard label="Новые клиенты" value="7" sub="за 30 дней" />
-        <MetricCard label="Источник" value="Web" sub="клиенты" valueSize={20} />
-        <MetricCard label="Визиты" value="7" sub="всего" />
+        <MetricCard label="Записей сегодня" value={String(APPOINTMENTS.length)} sub="всего" />
+        <MetricCard label="Клиенты" value={String(CLIENTS.length)} sub="база" />
+        <MetricCard label="Услуги" value={String(SERVICES.length)} sub="активных" />
+        <MetricCard
+          label="Визиты"
+          value={String(CLIENTS.reduce((a, c) => a + c.visits, 0))}
+          sub="суммарно"
+        />
       </div>
 
       <div>
@@ -123,7 +141,12 @@ export function HomeScreen({ go }: { go: (kind: string) => void }) {
         <ShortcutCard icon="bar-chart-3" label="Аналитика" sub="за неделю" onClick={() => go('analytics')} />
       </div>
 
-      <ClientDetailSheet client={activeClient} onClose={() => setActiveClient(null)} />
+      <ClientDetailSheet
+        client={activeClient}
+        onClose={() => setActiveClient(null)}
+        onChat={() => { setActiveClient(null); go('chats'); }}
+        onBook={() => { setActiveClient(null); show('Создание записи скоро', 'info'); }}
+      />
     </div>
   );
 }

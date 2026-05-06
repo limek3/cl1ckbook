@@ -1,25 +1,56 @@
 'use client';
 
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { useTheme } from '../theme';
 import {
   Card, FieldLabel, SectionTitle, Divider, Avatar, Toggle, Icon, NeutralBtn, ScreenHeader,
 } from '../primitives/atoms';
 import { useMiniData } from '@/hooks/use-mini-data';
+import { useMiniToast } from '../bridge';
 
 // ─── Profile ────────────────────────────────
 export function ProfileScreen({ back }: { back: () => void }) {
   const { T } = useTheme();
-  const { MASTER } = useMiniData();
+  const { MASTER, updateSection } = useMiniData();
+  const { show } = useMiniToast();
+  const [form, setForm] = useState({
+    name: MASTER.name, service: MASTER.service, city: MASTER.city,
+    phone: MASTER.phone, bio: MASTER.bio,
+    tg: MASTER.socials.tg, vk: MASTER.socials.vk, ig: MASTER.socials.ig,
+  });
+  useEffect(() => {
+    setForm({
+      name: MASTER.name, service: MASTER.service, city: MASTER.city,
+      phone: MASTER.phone, bio: MASTER.bio,
+      tg: MASTER.socials.tg, vk: MASTER.socials.vk, ig: MASTER.socials.ig,
+    });
+  }, [MASTER.name, MASTER.service, MASTER.city, MASTER.phone, MASTER.bio, MASTER.socials.tg, MASTER.socials.vk, MASTER.socials.ig]);
+
+  const set = (k: keyof typeof form) => (v: string) => setForm((s) => ({ ...s, [k]: v }));
+
+  async function save() {
+    const ok = await updateSection('profile', {
+      name: form.name,
+      profession: form.service,
+      city: form.city,
+      phone: form.phone,
+      bio: form.bio,
+      telegram: form.tg,
+      whatsapp: '',
+      socials: { tg: form.tg, vk: form.vk, ig: form.ig },
+    });
+    show(ok ? 'Профиль сохранён' : 'Не удалось сохранить', ok ? 'success' : 'error');
+  }
+
   return (
     <div>
       <ScreenHeader title="Профиль" subtitle="Что видят клиенты на странице записи." onBack={back} />
       <div style={{ padding: '0 16px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         <Card>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <Avatar name={MASTER.name} size={64} radius={16} />
+            <Avatar name={form.name || MASTER.name} size={64} radius={16} />
             <div style={{ flex: 1 }}>
-              <NeutralBtn icon="upload" full>Заменить аватар</NeutralBtn>
+              <NeutralBtn icon="upload" full onClick={() => show('Загрузка аватара скоро будет доступна', 'info')}>Заменить аватар</NeutralBtn>
               <div style={{ fontSize: 11, color: T.text3, marginTop: 8 }}>Рекомендуем 400×400, JPG / PNG</div>
             </div>
           </div>
@@ -31,28 +62,28 @@ export function ProfileScreen({ back }: { back: () => void }) {
           </div>
         </Card>
 
-        <Field label="Имя" value={MASTER.name} />
-        <Field label="Профессия" value={MASTER.service} />
-        <Field label="Город" value={MASTER.city} />
-        <Field label="Телефон" value={MASTER.phone} />
-        <Field label="Био" value={MASTER.bio} multiline />
+        <Field label="Имя" value={form.name} onChange={set('name')} />
+        <Field label="Профессия" value={form.service} onChange={set('service')} />
+        <Field label="Город" value={form.city} onChange={set('city')} />
+        <Field label="Телефон" value={form.phone} onChange={set('phone')} />
+        <Field label="Био" value={form.bio} onChange={set('bio')} multiline />
 
         <SectionTitle title="Социальные сети" subtitle="Покажем на публичной странице." />
         <Card padded={false}>
-          <SocialRow icon="send" channel="Telegram" value={MASTER.socials.tg} />
+          <SocialRow icon="send" channel="Telegram" value={form.tg} onChange={set('tg')} />
           <Divider />
-          <SocialRow icon="message-square" channel="ВКонтакте" value={MASTER.socials.vk} />
+          <SocialRow icon="message-square" channel="ВКонтакте" value={form.vk} onChange={set('vk')} />
           <Divider />
-          <SocialRow icon="instagram" channel="Instagram" value={MASTER.socials.ig} />
+          <SocialRow icon="instagram" channel="Instagram" value={form.ig} onChange={set('ig')} />
         </Card>
 
-        <NeutralBtn icon="check" full style={{ marginTop: 8, padding: '14px 16px' }}>Сохранить</NeutralBtn>
+        <NeutralBtn icon="check" full onClick={save} style={{ marginTop: 8, padding: '14px 16px' }}>Сохранить</NeutralBtn>
       </div>
     </div>
   );
 }
 
-function Field({ label, value, multiline }: { label: string; value: string; multiline?: boolean }) {
+function Field({ label, value, multiline, onChange }: { label: string; value: string; multiline?: boolean; onChange?: (v: string) => void }) {
   const { T } = useTheme();
   return (
     <div style={{
@@ -61,26 +92,33 @@ function Field({ label, value, multiline }: { label: string; value: string; mult
     }}>
       <FieldLabel style={{ fontSize: 9 }}>{label}</FieldLabel>
       {multiline ? (
-        <textarea defaultValue={value} rows={3}
+        <textarea value={value} onChange={(e) => onChange?.(e.target.value)} rows={3}
           style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', color: T.text, fontSize: 14, fontFamily: 'inherit', resize: 'none', marginTop: 6, lineHeight: 1.5, padding: 0 }} />
       ) : (
-        <input defaultValue={value}
+        <input value={value} onChange={(e) => onChange?.(e.target.value)}
           style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', color: T.text, fontSize: 14, fontFamily: 'inherit', marginTop: 6, padding: 0 }} />
       )}
     </div>
   );
 }
 
-function SocialRow({ icon, channel, value }: { icon: string; channel: string; value: string }) {
+function SocialRow({ icon, channel, value, onChange }: { icon: string; channel: string; value: string; onChange?: (v: string) => void }) {
   const { T } = useTheme();
   return (
     <div style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
       <Icon name={icon} size={16} color={T.text2} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, color: T.text }}>{channel}</div>
-        <div style={{ fontSize: 11, color: T.text3, marginTop: 2 }}>{value || 'не указано'}</div>
+        <input
+          value={value}
+          onChange={(e) => onChange?.(e.target.value)}
+          placeholder="не указано"
+          style={{
+            width: '100%', marginTop: 2, padding: 0, background: 'transparent',
+            border: 'none', outline: 'none', color: T.text3, fontSize: 11, fontFamily: 'inherit',
+          }}
+        />
       </div>
-      <Icon name="chevron-right" size={14} color={T.text3} />
     </div>
   );
 }
@@ -205,15 +243,35 @@ interface NotifState {
 
 export function NotificationsScreen({ back }: { back: () => void }) {
   const { T } = useTheme();
+  const { updateSection } = useMiniData();
+  const { show } = useMiniToast();
   const [v, setV] = useState<NotifState>({
     appts: true, remind: true, msgs: true, reviews: true, marketing: false,
     push: true, email: false, tg: true,
   });
   const t = (k: keyof NotifState) => setV((s) => ({ ...s, [k]: !s[k] }));
 
+  async function save() {
+    const ok = await updateSection('notifications', v);
+    show(ok ? 'Сохранено' : 'Не удалось сохранить', ok ? 'success' : 'error');
+  }
+
   return (
     <div>
-      <ScreenHeader title="Уведомления" subtitle="Что и куда присылать." onBack={back} />
+      <ScreenHeader
+        title="Уведомления"
+        subtitle="Что и куда присылать."
+        onBack={back}
+        right={
+          <button
+            onClick={save}
+            style={{
+              background: 'transparent', border: 'none', color: T.accent,
+              fontSize: 14, fontFamily: 'inherit', cursor: 'pointer', padding: '6px 8px',
+            }}
+          >Сохранить</button>
+        }
+      />
       <div style={{ padding: '0 16px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div>
           <SectionTitle title="Что присылать" />

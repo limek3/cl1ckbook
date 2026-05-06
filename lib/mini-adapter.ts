@@ -173,6 +173,7 @@ export function adaptAppointments(bookings: Booking[]): Appointment[] {
   );
 
   return sorted.map((b, i) => ({
+    id: b.id,
     time: b.time,
     name: b.clientName,
     service: b.service,

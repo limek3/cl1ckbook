@@ -4,6 +4,7 @@ import { Fragment } from 'react';
 import { useTheme } from '../theme';
 import { Card, Avatar, ListRow, Divider, SectionTitle } from '../primitives/atoms';
 import { useMiniData } from '@/hooks/use-mini-data';
+import { useMiniToast } from '../bridge';
 
 interface MenuItem {
   icon: string;
@@ -12,11 +13,31 @@ interface MenuItem {
   go?: string;
   danger?: boolean;
   accent?: boolean;
+  onAction?: () => void;
 }
 
 export function MoreScreen({ go }: { go: (kind: string) => void }) {
   const { T, mode } = useTheme();
   const { MASTER, SUBSCRIPTION } = useMiniData();
+  const { show } = useMiniToast();
+
+  const openSupport = () => {
+    if (typeof window !== 'undefined') {
+      window.open('https://t.me/clickbook_support', '_blank');
+    }
+  };
+  const openDocs = () => {
+    if (typeof window !== 'undefined') {
+      window.open('https://clickbook.app/docs', '_blank');
+    }
+  };
+  const logout = () => {
+    if (typeof window !== 'undefined' && !window.confirm('Выйти из аккаунта?')) return;
+    show('Сессия завершена', 'success');
+    if (typeof window !== 'undefined') {
+      setTimeout(() => { window.location.href = '/auth/signout'; }, 600);
+    }
+  };
   const periodEnd = SUBSCRIPTION.currentPeriodEnd
     ? new Date(SUBSCRIPTION.currentPeriodEnd).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
     : '';
@@ -67,9 +88,9 @@ export function MoreScreen({ go }: { go: (kind: string) => void }) {
       ]} />
 
       <MoreSection go={go} items={[
-        { icon: 'book-open',       label: 'Инструкции' },
-        { icon: 'message-circle',  label: 'Связь с поддержкой' },
-        { icon: 'log-out',         label: 'Выйти', danger: true },
+        { icon: 'book-open',       label: 'Инструкции',          onAction: openDocs },
+        { icon: 'message-circle',  label: 'Связь с поддержкой',  onAction: openSupport },
+        { icon: 'log-out',         label: 'Выйти', danger: true, onAction: logout },
       ]} />
 
       <div style={{ padding: '16px 4px', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -93,7 +114,7 @@ function MoreSection({ title, items, go }: { title?: string; items: MenuItem[]; 
               sub={it.sub}
               danger={it.danger}
               accent={it.accent}
-              onClick={it.go ? () => go(it.go!) : undefined}
+              onClick={it.go ? () => go(it.go!) : (it.onAction ?? undefined)}
             />
             {i < items.length - 1 && <Divider />}
           </Fragment>

@@ -6,10 +6,12 @@ import { Card, Divider, Avatar, Icon } from '../primitives/atoms';
 import { ClientDetailSheet } from '../sheets/detail-sheets';
 import { type Client } from '@/lib/mini-demo';
 import { useMiniData } from '@/hooks/use-mini-data';
+import { useMiniToast } from '../bridge';
 
-export function ClientsScreen() {
+export function ClientsScreen({ go }: { go?: (kind: string) => void }) {
   const { T } = useTheme();
   const { CLIENTS } = useMiniData();
+  const { show } = useMiniToast();
   const [q, setQ] = useState('');
   const [active, setActive] = useState<Client | null>(null);
   const filtered = useMemo(() => CLIENTS.filter((c) =>
@@ -57,7 +59,12 @@ export function ClientsScreen() {
           <div style={{ padding: 32, textAlign: 'center', color: T.text3, fontSize: 13 }}>Никого не найдено</div>
         )}
       </Card>
-      <ClientDetailSheet client={active} onClose={() => setActive(null)} />
+      <ClientDetailSheet
+        client={active}
+        onClose={() => setActive(null)}
+        onChat={() => { setActive(null); go?.('chats'); }}
+        onBook={() => { setActive(null); show('Создание записи скоро', 'info'); }}
+      />
     </div>
   );
 }

@@ -7,28 +7,58 @@ import {
 } from '../primitives/atoms';
 import { type ScheduleDay } from '@/lib/mini-demo';
 import { useMiniData } from '@/hooks/use-mini-data';
+import { useMiniToast } from '../bridge';
 
 export function ScheduleScreen({ back }: { back: () => void }) {
   const { T } = useTheme();
   const { SCHEDULE, updateSection } = useMiniData();
+  const { show } = useMiniToast();
   const [scheduleMode, setScheduleMode] = useState<'free' | 'template'>('template');
   const [days, setDays] = useState<ScheduleDay[]>(SCHEDULE);
   const [openDay, setOpenDay] = useState<number | null>(null);
 
   useEffect(() => { setDays(SCHEDULE); }, [SCHEDULE]);
 
-  const setDay = (i: number, patch: Partial<ScheduleDay>) => {
-    const next = days.map((d, j) => (j === i ? { ...d, ...patch } : d));
-    setDays(next);
-    // Persist to backend (workspaceData.availability)
-    updateSection('availability', next.map((d, idx) => ({
+  async function persist(next: ScheduleDay[]) {
+    const ok = await updateSection('availability', next.map((d, idx) => ({
       weekday: idx,
       label: d.d,
       enabled: d.on,
       startTime: d.on ? d.from : null,
       endTime: d.on ? d.to : null,
     })));
+    if (!ok) show('Не удалось сохранить', 'error');
+    return ok;
+  }
+
+  const setDay = (i: number, patch: Partial<ScheduleDay>) => {
+    const next = days.map((d, j) => (j === i ? { ...d, ...patch } : d));
+    setDays(next);
+    persist(next);
   };
+
+  async function applyPreset(kind: 'workdays' | 'all' | 'custom') {
+    let next: ScheduleDay[];
+    if (kind === 'workdays') {
+      next = days.map((d, i) => ({
+        ...d,
+        on: i < 5,
+        from: i < 5 ? '10:00' : '—',
+        to: i < 5 ? '20:00' : '—',
+      }));
+    } else if (kind === 'all') {
+      next = days.map((d) => ({ ...d, on: true, from: '10:00', to: '20:00' }));
+    } else {
+      next = days.map((d, i) => ({
+        ...d,
+        on: i !== 6,
+        from: i === 6 ? '—' : i === 5 ? '11:00' : '10:00',
+        to: i === 6 ? '—' : i === 5 ? '17:00' : i === 4 ? '18:00' : '20:00',
+      }));
+    }
+    setDays(next);
+    if (await persist(next)) show('Расписание применено', 'success');
+  }
 
   const opts = [
     { id: 'free' as const, label: 'Свободный' },
@@ -79,9 +109,9 @@ export function ScheduleScreen({ back }: { back: () => void }) {
         <div>
           <SectionTitle title="Шаблоны" subtitle="Быстро применить к неделе." />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-            <NeutralBtn>Будни</NeutralBtn>
-            <NeutralBtn>Все дни</NeutralBtn>
-            <NeutralBtn>Кастом</NeutralBtn>
+            <NeutralBtn onClick={() => applyPreset('workdays')}>Будни</NeutralBtn>
+            <NeutralBtn onClick={() => applyPreset('all')}>Все дни</NeutralBtn>
+            <NeutralBtn onClick={() => applyPreset('custom')}>Кастом</NeutralBtn>
           </div>
         </div>
 
@@ -93,31 +123,64 @@ export function ScheduleScreen({ back }: { back: () => void }) {
         </div>
       </div>
 
-      <BottomSheet open={openDay !== null} onClose={() => setOpenDay(null)} title={openDay !== null ? days[openDay]?.d : ''}>
-        {openDay !== null && days[openDay] && (
-          <div style={{ padding: '8px 20px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <TimeField label="Начало" value={days[openDay].from} />
-              <TimeField label="Конец" value={days[openDay].to} />
-            </div>
-            <div>
-              <FieldLabel>Перерывы</FieldLabel>
-              <Card padded={false} style={{ marginTop: 10 }}>
-                <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span style={{ fontSize: 13, color: T.text, flex: 1 }}>Обед</span>
-                  <span style={{ fontSize: 13, color: T.text2, fontVariantNumeric: 'tabular-nums' }}>13:00 – 14:00</span>
-                </div>
-              </Card>
-              <NeutralBtn icon="plus" full style={{ marginTop: 10 }}>Добавить перерыв</NeutralBtn>
-            </div>
-          </div>
-        )}
-      </BottomSheet>
+      <DayEditSheet
+        day={openDay !== null ? days[openDay] : null}
+        idx={openDay}
+        onClose={() => setOpenDay(null)}
+        onSave={async (idx, from, to) => {
+          if (idx === null) return;
+          const next = days.map((d, j) => (j === idx ? { ...d, from, to, on: true } : d));
+          setDays(next);
+          if (await persist(next)) show('Сохранено', 'success');
+          setOpenDay(null);
+        }}
+      />
     </div>
   );
 }
 
-function TimeField({ label, value }: { label: string; value: string }) {
+function DayEditSheet({
+  day, idx, onClose, onSave,
+}: {
+  day: ScheduleDay | null;
+  idx: number | null;
+  onClose: () => void;
+  onSave: (idx: number | null, from: string, to: string) => void;
+}) {
+  const { T } = useTheme();
+  const [from, setFrom] = useState('10:00');
+  const [to, setTo] = useState('20:00');
+  useEffect(() => {
+    if (!day) return;
+    setFrom(day.from === '—' ? '10:00' : day.from);
+    setTo(day.to === '—' ? '20:00' : day.to);
+  }, [idx]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <BottomSheet open={day !== null} onClose={onClose} title={day ? `${day.d} — рабочий день` : ''}>
+      {day && (
+        <div style={{ padding: '8px 20px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <TimeField label="Начало" value={from} onChange={setFrom} />
+            <TimeField label="Конец" value={to} onChange={setTo} />
+          </div>
+          <div>
+            <FieldLabel>Перерывы</FieldLabel>
+            <Card padded={false} style={{ marginTop: 10 }}>
+              <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: 13, color: T.text, flex: 1 }}>Обед</span>
+                <span style={{ fontSize: 13, color: T.text2, fontVariantNumeric: 'tabular-nums' }}>13:00 – 14:00</span>
+              </div>
+            </Card>
+            <NeutralBtn icon="plus" full style={{ marginTop: 10 }}>Добавить перерыв</NeutralBtn>
+          </div>
+          <NeutralBtn icon="check" full onClick={() => onSave(idx, from, to)}>Сохранить</NeutralBtn>
+        </div>
+      )}
+    </BottomSheet>
+  );
+}
+
+function TimeField({ label, value, onChange }: { label: string; value: string; onChange?: (v: string) => void }) {
   const { T } = useTheme();
   return (
     <div style={{
@@ -125,7 +188,16 @@ function TimeField({ label, value }: { label: string; value: string }) {
       padding: '12px 14px',
     }}>
       <FieldLabel style={{ fontSize: 9 }}>{label}</FieldLabel>
-      <div style={{ fontSize: 18, color: T.text, marginTop: 6, fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{value}</div>
+      <input
+        type="time"
+        value={value}
+        onChange={(e) => onChange?.(e.target.value)}
+        style={{
+          width: '100%', marginTop: 6, padding: 0, fontSize: 18, fontWeight: 600,
+          background: 'transparent', border: 'none', outline: 'none',
+          color: T.text, fontVariantNumeric: 'tabular-nums', fontFamily: 'inherit',
+        }}
+      />
     </div>
   );
 }
