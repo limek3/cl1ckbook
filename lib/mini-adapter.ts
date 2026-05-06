@@ -10,6 +10,7 @@ import type {
   MasterInfo, Service, Appointment, Client, Thread, Message, ApptStatus,
   Template, ScheduleDay,
 } from '@/lib/mini-demo';
+import type { ChatThreadRecord, ChatMessageRecord } from '@/lib/chat-types';
 
 // ─── Subscription ────────────────────────────────
 export interface SubscriptionInfo {
@@ -206,7 +207,44 @@ export function adaptClients(bookings: Booking[]): Client[] {
   return Array.from(map.values()).sort((a, b) => b.total - a.total);
 }
 
-// ─── Threads/Messages — пока пустые (можно расширить на /api/chats) ─
+// ─── Threads/Messages — адаптеры из /api/chats ───────
+function adaptChatTime(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const diffDays = Math.floor((now.getTime() - date.getTime()) / 86_400_000);
+  if (diffDays === 0) return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  if (diffDays === 1) return 'вчера';
+  if (diffDays < 30) return `${diffDays} дн`;
+  return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+}
+
+function adaptChatChannel(ch: string): Thread['channel'] {
+  if (ch === 'Telegram') return 'TG';
+  if (ch === 'VK') return 'ВК';
+  if (ch === 'Instagram') return 'IG';
+  return 'Web';
+}
+
+export function adaptMessages(records: ChatMessageRecord[]): Message[] {
+  return records.map((m) => ({
+    from: m.author === 'client' ? 'them' : 'me',
+    text: m.body,
+    t: new Date(m.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+  }));
+}
+
+export function adaptThreads(records: ChatThreadRecord[]): Thread[] {
+  return records.map((r) => ({
+    id: r.id,
+    name: r.clientName,
+    last: r.lastMessagePreview ?? '',
+    time: adaptChatTime(r.lastMessageAt),
+    channel: adaptChatChannel(r.channel),
+    unread: r.unreadCount,
+    messages: adaptMessages(r.messages),
+  }));
+}
+
 export const ADAPTED_THREADS: Thread[] = [];
 export const ADAPTED_MESSAGES: Message[] = [];
 

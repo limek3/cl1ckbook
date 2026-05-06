@@ -85,13 +85,14 @@ export const CLIENTS: Client[] = [
 ];
 
 export interface Thread {
-  id: number;
+  id: string | number;
   name: string;
   last: string;
   time: string;
-  channel: 'TG' | 'ВК' | 'Web';
+  channel: 'TG' | 'ВК' | 'Web' | 'IG';
   unread: number;
   online?: boolean;
+  messages?: Message[];
 }
 
 export const THREADS: Thread[] = [

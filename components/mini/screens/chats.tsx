@@ -5,32 +5,41 @@ import { useTheme } from '../theme';
 import {
   Card, Divider, Avatar, ChannelTag, Icon, NavBtn, ScreenHeader,
 } from '../primitives/atoms';
-import { THREADS, MESSAGES, type Thread, type Message } from '@/lib/mini-demo';
+import type { Thread, Message } from '@/lib/mini-demo';
 import { useMiniData } from '@/hooks/use-mini-data';
 
 // ─── Chats list ──────────────────────────────
 export function ChatsScreen({ openThread, back }: { openThread: (t: Thread) => void; back: () => void }) {
   const { T } = useTheme();
+  const { THREADS, isLoading } = useMiniData();
   const [q, setQ] = useState('');
   const filtered = useMemo(
     () => THREADS.filter((t) => t.name.toLowerCase().includes(q.toLowerCase())),
-    [q],
+    [q, THREADS],
   );
   const unreadTotal = THREADS.reduce((a, t) => a + t.unread, 0);
 
   return (
     <div>
-      <ScreenHeader title="Чаты" subtitle={`${THREADS.length} переписок · ${unreadTotal} непрочитанных`} onBack={back} />
+      <ScreenHeader title="Чаты" subtitle={isLoading ? 'Загрузка...' : `${THREADS.length} переписок · ${unreadTotal} непрочитанных`} onBack={back} />
       <div style={{ padding: '0 16px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         <SearchInput value={q} onChange={setQ} placeholder="Поиск по чатам" />
-        <Card padded={false}>
-          {filtered.map((t, i) => (
-            <Fragment key={t.id}>
-              <ThreadRow thread={t} onClick={() => openThread(t)} />
-              {i < filtered.length - 1 && <Divider />}
-            </Fragment>
-          ))}
-        </Card>
+        {isLoading ? (
+          <div style={{ textAlign: 'center', padding: '32px 0', color: '#999', fontSize: 13 }}>Загрузка чатов…</div>
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '32px 0', color: '#999', fontSize: 13 }}>
+            {q ? 'Ничего не найдено' : 'Нет переписок'}
+          </div>
+        ) : (
+          <Card padded={false}>
+            {filtered.map((t, i) => (
+              <Fragment key={t.id}>
+                <ThreadRow thread={t} onClick={() => openThread(t)} />
+                {i < filtered.length - 1 && <Divider />}
+              </Fragment>
+            ))}
+          </Card>
+        )}
       </div>
     </div>
   );
@@ -92,6 +101,7 @@ function ThreadRow({ thread, onClick }: { thread: Thread; onClick: () => void })
 export function ChatThreadScreen({ thread, back }: { thread: Thread; back: () => void }) {
   const { T } = useTheme();
   const [draft, setDraft] = useState('');
+  const messages: Message[] = thread.messages ?? [];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -112,7 +122,11 @@ export function ChatThreadScreen({ thread, back }: { thread: Thread; back: () =>
         <div style={{ alignSelf: 'center', fontSize: 10, color: T.text3, padding: '4px 10px', background: T.card, borderRadius: 999, marginBottom: 8 }}>
           Сегодня
         </div>
-        {MESSAGES.map((m, i) => <Bubble key={i} m={m} />)}
+        {messages.length === 0 ? (
+          <div style={{ alignSelf: 'center', fontSize: 12, color: T.text3 }}>Нет сообщений</div>
+        ) : (
+          messages.map((m, i) => <Bubble key={i} m={m} />)
+        )}
       </div>
 
       <div style={{
