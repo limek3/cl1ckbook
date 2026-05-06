@@ -76,20 +76,26 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
 
 function miniGlass(mode: ThemeMode, edge: 'top' | 'bottom' = 'top'): CSSProperties {
   const dark = mode === 'dark';
-  const shadow = edge === 'bottom'
-    ? (dark ? '0 -18px 44px rgba(0,0,0,0.42)' : '0 -14px 34px rgba(15,23,42,0.10)')
-    : (dark ? '0 14px 36px rgba(0,0,0,0.20)' : '0 10px 28px rgba(15,23,42,0.08)');
+  const bottom = edge === 'bottom';
 
   return {
-    background: dark ? 'rgba(10,10,10,0.68)' : 'rgba(255,255,255,0.76)',
-    backdropFilter: 'blur(24px) saturate(1.35)',
-    WebkitBackdropFilter: 'blur(24px) saturate(1.35)',
-    boxShadow: shadow,
+    background: dark ? 'rgba(10,10,10,0.34)' : 'rgba(255,255,255,0.42)',
+    backgroundImage: dark
+      ? 'linear-gradient(to bottom, rgba(255,255,255,0.075), rgba(255,255,255,0.018))'
+      : 'linear-gradient(to bottom, rgba(255,255,255,0.78), rgba(255,255,255,0.28))',
+    backdropFilter: 'blur(30px) saturate(1.65)',
+    WebkitBackdropFilter: 'blur(30px) saturate(1.65)',
+    boxShadow: bottom
+      ? (dark ? '0 -10px 28px rgba(0,0,0,0.18)' : '0 -10px 26px rgba(15,23,42,0.075)')
+      : (dark ? '0 10px 28px rgba(0,0,0,0.16)' : '0 10px 26px rgba(15,23,42,0.07)'),
+    transform: 'translateZ(0)',
+    willChange: 'backdrop-filter',
+    overflow: 'hidden',
   };
 }
 
 function glassBorder(mode: ThemeMode) {
-  return mode === 'dark' ? 'rgba(255,255,255,0.095)' : 'rgba(10,10,10,0.075)';
+  return mode === 'dark' ? 'rgba(255,255,255,0.055)' : 'rgba(255,255,255,0.48)';
 }
 
 interface SubRoute {
@@ -104,11 +110,14 @@ function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) 
     <div style={{
       ...miniGlass(mode, 'bottom'),
       borderTop: `1px solid ${glassBorder(mode)}`,
-      padding: '8px 4px calc(24px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
+      padding: '8px 4px calc(28px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
       display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 0,
       flexShrink: 0,
-      position: 'relative',
-      zIndex: 50,
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: 80,
     }}>
       {TABS.map((t) => {
         const isActive = active === t.id;
@@ -138,8 +147,11 @@ function TgHeader({ onToggleTheme, onNotifications, notificationCount = 0 }: { o
       padding: 'calc(var(--miniapp-header-top-offset, 12px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px)))) 16px 9px',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       borderBottom: `1px solid ${glassBorder(mode)}`,
-      position: 'relative',
-      zIndex: 60,
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      top: 0,
+      zIndex: 80,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{
@@ -399,9 +411,34 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
         `}</style>
         <TgHeader onToggleTheme={toggle} onNotifications={() => setSub({ kind: 'notifications' })} notificationCount={notificationCount} />
         {isFullHeight ? (
-          <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>{content}</div>
+          <div
+            style={{
+              flex: 1,
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              position: 'relative',
+              paddingTop: 'calc(var(--miniapp-header-top-offset, 12px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 58px)',
+            }}
+          >
+            {content}
+          </div>
         ) : (
-          <div ref={scrollRef} className="scroll-area" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', position: 'relative' }}>{content}</div>
+          <div
+            ref={scrollRef}
+            className="scroll-area"
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              position: 'relative',
+              paddingTop: 'calc(var(--miniapp-header-top-offset, 12px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 58px)',
+              paddingBottom: 'calc(82px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
+              scrollPaddingTop: 'calc(var(--miniapp-header-top-offset, 12px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 58px)',
+            }}
+          >
+            {content}
+          </div>
         )}
         {!isFullHeight && <BottomNav active={tab} onChange={(id) => { setTab(id); setSub(null); }} />}
         <ToastHost items={toasts} />
