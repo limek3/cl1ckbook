@@ -30,7 +30,7 @@ const FALLBACK_TEMPLATES = [
   { id: 'reschedule', name: 'Перенос', body: 'Здравствуйте, {{имя}}. Нам нужно перенести встречу. Когда вам удобно?' },
 ];
 
-export function ChatsScreen({ openThread, back }: { openThread: (t: Thread) => void; back: () => void }) {
+export function ChatsScreen({ openThread, back }: { openThread: (t: Thread) => void; back?: () => void }) {
   const { threads, loading } = useChats();
   const [q, setQ] = useState('');
 

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ThemeProvider, useTheme, type ThemeMode } from './theme';
 import { Icon } from './primitives/atoms';
+import { useChats } from '@/hooks/use-chats';
+import { useMiniData } from '@/hooks/use-mini-data';
 import { ToastCtx, haptic, tgClose, type ToastItem, type MiniToastCtxValue } from './bridge';
 
 function ToastHost({ items }: { items: ToastItem[] }) {
@@ -46,12 +48,12 @@ import {
 import type { Thread } from '@/lib/mini-demo';
 
 // ─── Tab definitions ─────────────────────────
-type TabId = 'home' | 'appts' | 'services' | 'clients' | 'more';
+type TabId = 'home' | 'appts' | 'chats' | 'clients' | 'more';
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: 'home',     label: 'Главная',  icon: 'home' },
   { id: 'appts',    label: 'Записи',   icon: 'calendar' },
-  { id: 'services', label: 'Услуги',   icon: 'list' },
+  { id: 'chats',    label: 'Чаты',     icon: 'message-square' },
   { id: 'clients',  label: 'Клиенты',  icon: 'users' },
   { id: 'more',     label: 'Ещё',      icon: 'more-horizontal' },
 ];
@@ -68,7 +70,7 @@ function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) 
     <div style={{
       borderTop: `1px solid ${T.border}`,
       background: T.bg,
-      padding: '8px 4px 22px',
+      padding: '8px 4px calc(22px + env(safe-area-inset-bottom, 0px) + var(--miniapp-safe-bottom, 0px))',
       display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 0,
       flexShrink: 0,
     }}>
@@ -91,12 +93,12 @@ function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) 
 }
 
 // ─── Telegram-style header ───────────────────
-function TgHeader({ onToggleTheme }: { onToggleTheme: () => void }) {
+function TgHeader({ onToggleTheme, onNotifications, notificationCount = 0 }: { onToggleTheme: () => void; onNotifications: () => void; notificationCount?: number }) {
   const { T, mode } = useTheme();
   return (
     <div style={{
       flexShrink: 0,
-      padding: '10px 16px',
+      padding: 'calc(10px + env(safe-area-inset-top, 0px) + var(--miniapp-safe-top, 0px)) 16px 10px',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       background: T.bg,
       borderBottom: `1px solid ${T.border}`,
@@ -113,6 +115,22 @@ function TgHeader({ onToggleTheme }: { onToggleTheme: () => void }) {
         </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <button onClick={() => { haptic('light'); onNotifications(); }} aria-label="notifications" style={{
+          width: 34, height: 34, background: T.cardElev, border: `1px solid ${T.border}`,
+          borderRadius: 12, cursor: 'pointer', color: T.text2, padding: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+        }}>
+          <Icon name="bell" size={16} />
+          {notificationCount > 0 && (
+            <span style={{
+              position: 'absolute', top: -3, right: -3, minWidth: 17, height: 17,
+              padding: '0 4px', borderRadius: 999, background: T.danger, color: '#fff',
+              border: `2px solid ${T.bg}`, fontSize: 9, fontWeight: 700,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontVariantNumeric: 'tabular-nums',
+            }}>{notificationCount > 9 ? '9+' : notificationCount}</span>
+          )}
+        </button>
         <button onClick={onToggleTheme} aria-label="theme" style={{
           width: 32, height: 32, background: 'transparent', border: 'none', cursor: 'pointer',
           color: T.text2, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -132,6 +150,9 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
   const [tab, setTab] = useState<TabId>(initialTab);
   const [sub, setSub] = useState<SubRoute | null>(initialSub);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const { threads } = useChats();
+  const { APPOINTMENTS } = useMiniData();
+  const notificationCount = Math.min(99, threads.reduce((sum, thread) => sum + thread.unread, 0) + APPOINTMENTS.filter((a) => a.rawStatus === 'new').length);
 
   const toastApi = useMemo<MiniToastCtxValue>(() => ({
     show: (text, tone = 'info') => {
@@ -148,6 +169,10 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
     const tg = (window as any).Telegram?.WebApp;
     if (!tg) return;
     try { tg.ready?.(); tg.expand?.(); } catch {}
+    const topInset = Number(tg.contentSafeAreaInset?.top ?? tg.safeAreaInset?.top ?? 0);
+    const bottomInset = Number(tg.contentSafeAreaInset?.bottom ?? tg.safeAreaInset?.bottom ?? 0);
+    if (Number.isFinite(topInset)) document.documentElement.style.setProperty('--miniapp-safe-top', `${Math.max(0, topInset)}px`);
+    if (Number.isFinite(bottomInset)) document.documentElement.style.setProperty('--miniapp-safe-bottom', `${Math.max(0, bottomInset)}px`);
   }, []);
 
   // Back button
@@ -172,7 +197,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
       home: 'home',
       appts: 'appts',
       appointments: 'appts',
-      services: 'services',
+      chats: 'chats',
       clients: 'clients',
       more: 'more',
     };
@@ -191,6 +216,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
   if (sub) {
     switch (sub.kind) {
       case 'chats':         content = <ChatsScreen openThread={(t) => setSub({ kind: 'thread', payload: t })} back={back} />; break;
+      case 'services':      content = <ServicesScreen back={back} />; break;
       case 'thread':        content = sub.payload ? <ChatThreadScreen thread={sub.payload} back={() => setSub({ kind: 'chats' })} /> : null; break;
       case 'analytics':     content = <AnalyticsScreen back={back} />; break;
       case 'schedule':      content = <ScheduleScreen back={back} />; break;
@@ -211,7 +237,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
   } else {
     if (tab === 'home') content = <HomeScreen go={goSub} />;
     else if (tab === 'appts') content = <AppointmentsScreen />;
-    else if (tab === 'services') content = <ServicesScreen />;
+    else if (tab === 'chats') content = <ChatsScreen openThread={(t) => setSub({ kind: 'thread', payload: t })} />;
     else if (tab === 'clients') content = <ClientsScreen go={goSub} />;
     else if (tab === 'more') content = <MoreScreen go={goSub} />;
   }
@@ -231,7 +257,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
         transition: 'background 0.2s, color 0.2s',
         position: 'relative',
       }}>
-        <TgHeader onToggleTheme={toggle} />
+        <TgHeader onToggleTheme={toggle} onNotifications={() => setSub({ kind: 'notifications' })} notificationCount={notificationCount} />
         {isFullHeight ? (
           <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>{content}</div>
         ) : (

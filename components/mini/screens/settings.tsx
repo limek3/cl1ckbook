@@ -8,6 +8,8 @@ import {
 import { useMiniData } from '@/hooks/use-mini-data';
 import { useApp } from '@/lib/app-context';
 import { useMiniToast } from '../bridge';
+import { accentPalette, type AccentTone } from '@/lib/appearance-palette';
+import { defaultAppearanceSettings, normalizeAppearanceSettings, type AppearanceSettings, type CardMode, type MotionMode, type RadiusMode } from '@/lib/appearance';
 
 // ─── Profile ────────────────────────────────
 export function ProfileScreen({ back }: { back: () => void }) {
@@ -155,59 +157,147 @@ function SocialRow({ icon, channel, value, onChange }: { icon: string; channel: 
 
 // ─── Appearance ────────────────────────────
 export function AppearanceScreen({ back }: { back: () => void }) {
-  const { T, mode, set } = useTheme();
-  const [accent, setAccent] = useState('blue');
-  const [radius, setRadius] = useState('medium');
+  const {
+    T, mode, set: setMode, accentTone, setAccentTone, radius, setRadius,
+  } = useTheme();
+  const { MASTER, updateSection } = useMiniData();
+  const app = useApp();
+  const { show } = useMiniToast();
+  const [motion, setMotion] = useState<MotionMode>('smooth');
+  const [cardStyle, setCardStyle] = useState<CardMode>('soft');
+  const [saving, setSaving] = useState(false);
 
-  const accents = [
-    { id: 'blue',   color: '#127dfe' },
-    { id: 'green',  color: '#16a34a' },
-    { id: 'purple', color: '#8b5cf6' },
-    { id: 'pink',   color: '#ec4899' },
-    { id: 'orange', color: '#f97316' },
+  useEffect(() => {
+    const remote = normalizeAppearanceSettings((app.workspaceData.appearance as Partial<AppearanceSettings> | undefined) ?? defaultAppearanceSettings);
+    setAccentTone(remote.accentTone);
+    setRadius(remote.radius);
+    setMotion(remote.motion);
+    setCardStyle(remote.cardStyle);
+  }, [app.workspaceData.appearance, setAccentTone, setRadius]);
+
+  const accents: { id: AccentTone; label: string }[] = [
+    { id: 'cobalt', label: 'Синий' },
+    { id: 'emerald', label: 'Зелёный' },
+    { id: 'violet', label: 'Фиолетовый' },
+    { id: 'rose', label: 'Розовый' },
+    { id: 'amber', label: 'Янтарный' },
+    { id: 'teal', label: 'Бирюзовый' },
   ];
+
+  const radii: { id: RadiusMode; label: string; r: number; sub: string }[] = [
+    { id: 'tight', label: 'Строго', r: 8, sub: 'Компактнее' },
+    { id: 'medium', label: 'Средне', r: 14, sub: 'Баланс' },
+    { id: 'soft', label: 'Мягко', r: 22, sub: 'Больше воздуха' },
+  ];
+
+  const motions: { id: MotionMode; label: string; sub: string }[] = [
+    { id: 'off', label: 'Без анимаций', sub: 'Максимально спокойно' },
+    { id: 'fast', label: 'Быстрые', sub: 'Короткий feedback' },
+    { id: 'smooth', label: 'Плавные', sub: 'По умолчанию' },
+  ];
+
+  const cards: { id: CardMode; label: string; sub: string }[] = [
+    { id: 'flat', label: 'Плоские', sub: 'Минимум теней' },
+    { id: 'soft', label: 'Мягкие', sub: 'Текущий стиль' },
+    { id: 'glass', label: 'Glass', sub: 'Лёгкая глубина' },
+  ];
+
+  async function save() {
+    setSaving(true);
+    const current = normalizeAppearanceSettings((app.workspaceData.appearance as Partial<AppearanceSettings> | undefined) ?? defaultAppearanceSettings);
+    const next: AppearanceSettings = {
+      ...current,
+      accentTone,
+      publicAccent: accentTone,
+      radius,
+      motion,
+      cardStyle,
+    };
+
+    const ok = await updateSection('appearance', {
+      ...next,
+      miniThemeMode: mode,
+    });
+
+    setSaving(false);
+    if (!ok) {
+      show('Не удалось сохранить внешний вид', 'error');
+      return;
+    }
+    show('Внешний вид сохранён', 'success');
+  }
+
+  const accent = accentPalette[accentTone] ?? accentPalette.cobalt;
+  const previewRadius = radius === 'tight' ? 10 : radius === 'soft' ? 22 : 16;
+  const previewShadow = cardStyle === 'flat' ? 'none' : cardStyle === 'glass' ? '0 14px 34px rgba(0,0,0,0.18)' : T.cardShadow;
 
   return (
     <div>
-      <ScreenHeader title="Внешний вид" subtitle="Тема, акценты, скругления." onBack={back} />
+      <ScreenHeader title="Внешний вид" subtitle="Тема, акценты, скругления и движение miniapp." onBack={back} />
       <div style={{ padding: '0 16px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
         <div>
-          <FieldLabel>Превью</FieldLabel>
-          <Card style={{ marginTop: 10 }}>
+          <FieldLabel>Живое превью</FieldLabel>
+          <Card style={{ marginTop: 10, borderRadius: previewRadius, boxShadow: previewShadow }}>
             <FieldLabel>Персональная ссылка</FieldLabel>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
-              <div style={{ fontSize: 26, fontWeight: 600, color: T.text, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>/m/admin</div>
-              <div style={{ width: 36, height: 36, borderRadius: 10, border: `1px solid ${T.borderStrong}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.text2 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, gap: 12 }}>
+              <div style={{ fontSize: 25, fontWeight: 600, color: T.text, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{MASTER.link}</div>
+              <button
+                onClick={() => {
+                  if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                    navigator.clipboard.writeText(`${typeof window !== 'undefined' ? window.location.origin : ''}${MASTER.link}`)
+                      .then(() => show('Ссылка скопирована', 'success'))
+                      .catch(() => show('Не удалось скопировать', 'error'));
+                  }
+                }}
+                style={{
+                  width: 36, height: 36, borderRadius: 12, border: `1px solid ${T.borderStrong}`,
+                  background: T.cardElev, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: T.text2, cursor: 'pointer', flexShrink: 0,
+                }}
+              >
                 <Icon name="copy" size={14} />
-              </div>
+              </button>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 14 }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: T.accent }} />
-              <span style={{ fontSize: 12, color: T.text2 }}>Запланирована</span>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: accent.solid }} />
+              <span style={{ fontSize: 12, color: T.text2 }}>Акцент применён сразу · {mode === 'dark' ? 'тёмная' : 'светлая'} тема</span>
             </div>
           </Card>
         </div>
 
         <div>
-          <SectionTitle title="Тема" />
+          <SectionTitle title="Тема приложения" subtitle="Меняется сразу и запоминается на устройстве." />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <ThemeCard active={mode === 'dark'} onClick={() => set('dark')} themeMode="dark" label="Тёмная" />
-            <ThemeCard active={mode === 'light'} onClick={() => set('light')} themeMode="light" label="Светлая" />
+            <ThemeCard active={mode === 'dark'} onClick={() => setMode('dark')} themeMode="dark" label="Тёмная" />
+            <ThemeCard active={mode === 'light'} onClick={() => setMode('light')} themeMode="light" label="Светлая" />
           </div>
         </div>
 
         <div>
-          <SectionTitle title="Акцент" subtitle="Используется только в индикаторах." />
+          <SectionTitle title="Акцент" subtitle="Кнопки, бейджи, графики и active states." />
           <Card>
-            <div style={{ display: 'flex', gap: 14, justifyContent: 'space-between' }}>
-              {accents.map((a) => (
-                <button key={a.id} onClick={() => setAccent(a.id)} style={{
-                  width: 40, height: 40, borderRadius: '50%',
-                  background: a.color, border: 'none', cursor: 'pointer', padding: 0,
-                  position: 'relative',
-                  boxShadow: accent === a.id ? `0 0 0 2px ${T.bg}, 0 0 0 4px ${a.color}` : 'none',
-                }} />
-              ))}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+              {accents.map((a) => {
+                const meta = accentPalette[a.id];
+                const active = accentTone === a.id;
+                return (
+                  <button key={a.id} onClick={() => setAccentTone(a.id)} style={{
+                    background: active ? meta.soft : T.cardElev,
+                    border: `1px solid ${active ? meta.solid : T.border}`,
+                    borderRadius: 14,
+                    padding: '12px 8px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 8,
+                    fontFamily: 'inherit',
+                  }}>
+                    <span style={{ width: 28, height: 28, borderRadius: '50%', background: meta.gradient, boxShadow: active ? `0 0 0 3px ${meta.soft}` : 'none' }} />
+                    <span style={{ fontSize: 11, color: active ? T.text : T.text2 }}>{a.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </Card>
         </div>
@@ -215,25 +305,94 @@ export function AppearanceScreen({ back }: { back: () => void }) {
         <div>
           <SectionTitle title="Скругления" />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-            {[
-              { id: 'sharp', label: 'Острые', r: 4 },
-              { id: 'medium', label: 'Средние', r: 12 },
-              { id: 'soft', label: 'Мягкие', r: 20 },
-            ].map((o) => (
+            {radii.map((o) => (
               <button key={o.id} onClick={() => setRadius(o.id)} style={{
                 background: T.card, border: `1px solid ${radius === o.id ? T.borderStrong : T.border}`,
-                borderRadius: 12, padding: 14, cursor: 'pointer', fontFamily: 'inherit',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+                borderRadius: 14, padding: 14, cursor: 'pointer', fontFamily: 'inherit',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 9,
                 boxShadow: T.cardShadow,
               }}>
-                <div style={{ width: 36, height: 24, background: T.cardElev, border: `1px solid ${T.border}`, borderRadius: o.r }} />
-                <span style={{ fontSize: 11, color: radius === o.id ? T.text : T.text2 }}>{o.label}</span>
+                <div style={{ width: 42, height: 26, background: T.cardElev, border: `1px solid ${T.border}`, borderRadius: o.r }} />
+                <span style={{ fontSize: 12, color: radius === o.id ? T.text : T.text2 }}>{o.label}</span>
+                <span style={{ fontSize: 10, color: T.text3 }}>{o.sub}</span>
               </button>
             ))}
           </div>
         </div>
+
+        <div>
+          <SectionTitle title="Микродвижение" subtitle="Для пользователей, которым важна скорость или спокойствие." />
+          <Card padded={false}>
+            {motions.map((item, index) => (
+              <div key={item.id}>
+                <SelectableRow
+                  label={item.label}
+                  sub={item.sub}
+                  active={motion === item.id}
+                  onClick={() => setMotion(item.id)}
+                />
+                {index < motions.length - 1 && <Divider />}
+              </div>
+            ))}
+          </Card>
+        </div>
+
+        <div>
+          <SectionTitle title="Карточки" />
+          <Card padded={false}>
+            {cards.map((item, index) => (
+              <div key={item.id}>
+                <SelectableRow
+                  label={item.label}
+                  sub={item.sub}
+                  active={cardStyle === item.id}
+                  onClick={() => setCardStyle(item.id)}
+                />
+                {index < cards.length - 1 && <Divider />}
+              </div>
+            ))}
+          </Card>
+        </div>
+
+        <NeutralBtn icon="check" full onClick={save} style={{ padding: '14px 16px' }}>
+          {saving ? 'Сохраняем…' : 'Сохранить внешний вид'}
+        </NeutralBtn>
       </div>
     </div>
+  );
+}
+
+function SelectableRow({ label, sub, active, onClick }: { label: string; sub?: string; active: boolean; onClick: () => void }) {
+  const { T } = useTheme();
+  return (
+    <button onClick={onClick} style={{
+      width: '100%',
+      background: 'transparent',
+      border: 'none',
+      padding: '14px 20px',
+      cursor: 'pointer',
+      fontFamily: 'inherit',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 14,
+      textAlign: 'left',
+      color: T.text,
+    }}>
+      <div style={{
+        width: 20, height: 20, borderRadius: 999,
+        border: `1px solid ${active ? T.accent : T.borderStrong}`,
+        background: active ? T.accent : 'transparent',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: '#fff',
+        flexShrink: 0,
+      }}>
+        {active && <Icon name="check" size={12} color="#fff" />}
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 14, color: T.text }}>{label}</div>
+        {sub && <div style={{ fontSize: 11, color: T.text3, marginTop: 2 }}>{sub}</div>}
+      </div>
+    </button>
   );
 }
 

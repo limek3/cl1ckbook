@@ -2,13 +2,13 @@
 
 import { Fragment, useState } from 'react';
 import { useTheme } from '../theme';
-import { Card, Divider, EmptyState, NeutralBtn } from '../primitives/atoms';
+import { Card, Divider, EmptyState, NeutralBtn, ScreenHeader } from '../primitives/atoms';
 import { ServiceDetailSheet } from '../sheets/detail-sheets';
 import { type Service } from '@/lib/mini-demo';
 import { useMiniData } from '@/hooks/use-mini-data';
 import { useMiniToast } from '../bridge';
 
-export function ServicesScreen() {
+export function ServicesScreen({ back }: { back?: () => void }) {
   const { T } = useTheme();
   const { SERVICES, updateSection } = useMiniData();
   const { show } = useMiniToast();
@@ -58,15 +58,21 @@ export function ServicesScreen() {
     }
   }
 
+  const subtitle = `${SERVICES.filter((x) => x.visible !== false && x.status !== 'draft').length} активных · ${SERVICES.reduce((s, x) => s + x.count, 0)} записей за месяц.`;
+
   return (
-    <div style={{ padding: '20px 16px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div>
-        <div style={{ fontSize: 22, fontWeight: 600, color: T.text, letterSpacing: '-0.02em' }}>Услуги</div>
-        <div style={{ fontSize: 13, color: T.text2, marginTop: 2 }}>
-          {SERVICES.filter((x) => x.visible !== false && x.status !== 'draft').length} активных · {SERVICES.reduce((s, x) => s + x.count, 0)} записей за месяц.
-        </div>
-      </div>
-      <NeutralBtn icon="plus" full onClick={addNew}>Добавить услугу</NeutralBtn>
+    <div>
+      {back ? (
+        <ScreenHeader title="Услуги" subtitle={subtitle} onBack={back} />
+      ) : null}
+      <div style={{ padding: back ? '0 16px 24px' : '20px 16px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {!back && (
+          <div>
+            <div style={{ fontSize: 22, fontWeight: 600, color: T.text, letterSpacing: '-0.02em' }}>Услуги</div>
+            <div style={{ fontSize: 13, color: T.text2, marginTop: 2 }}>{subtitle}</div>
+          </div>
+        )}
+        <NeutralBtn icon="plus" full onClick={addNew}>Добавить услугу</NeutralBtn>
       {SERVICES.length > 0 ? (
         <Card padded={false}>
           {SERVICES.map((s, i) => (
@@ -84,6 +90,7 @@ export function ServicesScreen() {
           action={<NeutralBtn icon="plus" onClick={addNew}>Добавить услугу</NeutralBtn>}
         />
       )}
+      </div>
       <ServiceDetailSheet
         service={active}
         onClose={() => setActive(null)}

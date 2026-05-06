@@ -1,6 +1,8 @@
 'use client';
 
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { accentPalette, type AccentTone } from '@/lib/appearance-palette';
+import type { RadiusMode } from '@/lib/appearance';
 
 export interface ThemeTokens {
   bg: string;
@@ -77,28 +79,92 @@ export const TOKENS: Record<ThemeMode, ThemeTokens> = {
   },
 };
 
+interface StoredMiniAppearance {
+  mode?: ThemeMode;
+  accentTone?: AccentTone;
+  radius?: RadiusMode;
+}
+
+const MINI_APPEARANCE_KEY = 'clickbook-miniapp-appearance';
+
+function readStoredAppearance(): StoredMiniAppearance {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(MINI_APPEARANCE_KEY);
+    return raw ? JSON.parse(raw) as StoredMiniAppearance : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeStoredAppearance(value: StoredMiniAppearance) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(MINI_APPEARANCE_KEY, JSON.stringify(value));
+  } catch {}
+}
+
 interface ThemeCtxValue {
   T: ThemeTokens;
   mode: ThemeMode;
+  accentTone: AccentTone;
+  radius: RadiusMode;
   toggle: () => void;
   set: (m: ThemeMode) => void;
+  setAccentTone: (tone: AccentTone) => void;
+  setRadius: (radius: RadiusMode) => void;
+  setMiniAppearance: (value: Partial<StoredMiniAppearance>) => void;
 }
 
 const ThemeCtx = createContext<ThemeCtxValue>({
   T: TOKENS.dark,
   mode: 'dark',
+  accentTone: 'cobalt',
+  radius: 'medium',
   toggle: () => {},
   set: () => {},
+  setAccentTone: () => {},
+  setRadius: () => {},
+  setMiniAppearance: () => {},
 });
 
 export function ThemeProvider({ initialMode = 'dark', children }: { initialMode?: ThemeMode; children: ReactNode }) {
-  const [mode, setMode] = useState<ThemeMode>(initialMode);
-  const T = TOKENS[mode];
+  const stored = readStoredAppearance();
+  const [mode, setMode] = useState<ThemeMode>(stored.mode ?? initialMode);
+  const [accentTone, setAccentToneState] = useState<AccentTone>(stored.accentTone ?? 'cobalt');
+  const [radius, setRadiusState] = useState<RadiusMode>(stored.radius ?? 'medium');
+
+  const T = useMemo(() => {
+    const accent = accentPalette[accentTone] ?? accentPalette.cobalt;
+    return {
+      ...TOKENS[mode],
+      accent: accent.solid,
+      accentSoft: accent.soft,
+    };
+  }, [accentTone, mode]);
+
+  useEffect(() => {
+    writeStoredAppearance({ mode, accentTone, radius });
+  }, [mode, accentTone, radius]);
+
+  const setMiniAppearance = (value: Partial<StoredMiniAppearance>) => {
+    if (value.mode) setMode(value.mode);
+    if (value.accentTone) setAccentToneState(value.accentTone);
+    if (value.radius) setRadiusState(value.radius);
+  };
+
   const value = useMemo<ThemeCtxValue>(() => ({
-    T, mode,
+    T,
+    mode,
+    accentTone,
+    radius,
     toggle: () => setMode((m) => (m === 'dark' ? 'light' : 'dark')),
     set: setMode,
-  }), [mode, T]);
+    setAccentTone: setAccentToneState,
+    setRadius: setRadiusState,
+    setMiniAppearance,
+  }), [mode, T, accentTone, radius]);
+
   return <ThemeCtx.Provider value={value}>{children}</ThemeCtx.Provider>;
 }
 

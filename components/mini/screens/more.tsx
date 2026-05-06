@@ -68,6 +68,7 @@ export function MoreScreen({ go }: { go: (kind: string) => void }) {
       </Card>
 
       <MoreSection title="Работа" go={go} items={[
+        { icon: 'list',           label: 'Услуги',             sub: 'Прайс, длительность, видимость', go: 'services' },
         { icon: 'message-square', label: 'Чаты',               sub: chatSub,                            go: 'chats' },
         { icon: 'bar-chart-3',    label: 'Аналитика',          sub: 'Выручка, конверсия, топы',      go: 'analytics' },
         { icon: 'calendar-clock', label: 'График работы',      sub: 'Дни и часы приёма',             go: 'schedule' },
