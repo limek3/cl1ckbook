@@ -3,7 +3,7 @@
 import { type KeyboardEvent, type ReactNode, Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '../theme';
 import {
-  ActionSheet, Avatar, BottomSheet, Card, ChannelTag, Divider, EmptyState, Icon, NavBtn, NeutralBtn, ScreenHeader, SearchBox,
+  ActionSheet, Avatar, Card, ChannelTag, Divider, EmptyState, Icon, NavBtn, ScreenHeader, SearchBox,
 } from '../primitives/atoms';
 import { haptic, selectionHaptic } from '../bridge';
 import type { Message, Thread } from '@/lib/mini-demo';
@@ -126,6 +126,19 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length]);
 
+  useEffect(() => {
+    if (!showTemplates) return;
+    const closeOnOutside = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (templatePopoverRef.current?.contains(target)) return;
+      if (templateButtonRef.current?.contains(target)) return;
+      setShowTemplates(false);
+    };
+    document.addEventListener('pointerdown', closeOnOutside, true);
+    return () => document.removeEventListener('pointerdown', closeOnOutside, true);
+  }, [showTemplates]);
+
   function applyTemplate(body: string) {
     selectionHaptic();
     setDraft(fillTemplate(body, thread));
@@ -208,7 +221,8 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
         display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, background: T.bg,
       }}>
         <button
-          onClick={() => { haptic('light'); setShowTemplates(true); }}
+          ref={templateButtonRef}
+          onClick={() => { haptic('light'); setShowTemplates((value) => !value); }}
           title="Быстрые ответы"
           style={{
             width: 36, height: 36, borderRadius: 11, flexShrink: 0,
@@ -230,12 +244,13 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
           transition: 'border-color 0.15s ease',
         }}>
           <input
+            className="cb-mini-input"
             ref={inputRef}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={handleKey}
             placeholder="Сообщение"
-            style={{ flex: 1, background: 'transparent', backgroundColor: 'transparent', WebkitAppearance: 'none', appearance: 'none', border: 'none', outline: 'none', color: T.text, fontSize: 14, fontFamily: 'inherit', colorScheme: T.bg === '#0a0a0a' ? 'dark' : 'light' }}
+            style={{ flex: 1, minWidth: 0, background: 'transparent', backgroundColor: 'transparent', WebkitAppearance: 'none', appearance: 'none', border: 'none', outline: 'none', boxShadow: 'none', color: T.text, WebkitTextFillColor: T.text, caretColor: T.accent, fontSize: 14, fontFamily: 'inherit', colorScheme: T.bg === '#0a0a0a' ? 'dark' : 'light' }}
           />
           {draft.length > 0 && (
             <button onClick={() => { selectionHaptic(); setDraft(''); }} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: T.text3, display: 'flex' }}>
@@ -260,25 +275,49 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
         </button>
       </div>
 
-      <BottomSheet open={showTemplates} onClose={() => setShowTemplates(false)} title="Быстрые ответы" subtitle="Выбери шаблон — текст подставится в поле сообщения.">
-        <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {templates.length > 0 ? templates.map((tpl) => (
-            <button
-              key={tpl.id}
-              onClick={() => applyTemplate(tpl.body)}
-              style={{
-                padding: '12px 14px', borderRadius: 14, fontSize: 13, cursor: 'pointer',
-                background: T.cardElev, border: `1px solid ${T.border}`, color: T.text,
-                fontFamily: 'inherit', textAlign: 'left', lineHeight: 1.35,
-              }}
-            >
-              <span style={{ display: 'block', fontWeight: 500 }}>{tpl.name}</span>
-              <span style={{ display: 'block', fontSize: 11, color: T.text3, marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tpl.body}</span>
+      {showTemplates && (
+        <div
+          ref={templatePopoverRef}
+          style={{
+            position: 'absolute', left: 12, bottom: 70, zIndex: 90,
+            width: 'min(330px, calc(100% - 24px))',
+            background: T.sheetBg,
+            border: `1px solid ${T.border}`,
+            borderRadius: 22,
+            boxShadow: '0 18px 50px rgba(0,0,0,0.34)',
+            padding: 12,
+            animation: 'mini-template-pop 0.18s cubic-bezier(.2,.8,.2,1) both',
+          }}
+        >
+          <style>{`@keyframes mini-template-pop { from { transform: translateY(10px) scale(.96); opacity: 0; transform-origin: 24px 100%; } to { transform: translateY(0) scale(1); opacity: 1; transform-origin: 24px 100%; } }`}</style>
+          <div style={{ position: 'absolute', left: 22, bottom: -7, width: 14, height: 14, transform: 'rotate(45deg)', background: T.sheetBg, borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
+            <div>
+              <div style={{ fontSize: 14, color: T.text, fontWeight: 600 }}>Быстрые ответы</div>
+              <div style={{ fontSize: 11, color: T.text3, marginTop: 2 }}>Тапни шаблон — подставлю в поле</div>
+            </div>
+            <button onClick={() => setShowTemplates(false)} style={{ width: 30, height: 30, borderRadius: 10, border: `1px solid ${T.border}`, background: T.cardElev, color: T.text2, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
+              <Icon name="x" size={15} />
             </button>
-          )) : <EmptyState icon="file-text" title="Шаблонов нет" text="Добавь шаблоны сообщений в разделе «Ещё»." />}
-          <NeutralBtn full onClick={() => setShowTemplates(false)}>Закрыть</NeutralBtn>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 320, overflowY: 'auto' }}>
+            {templates.length > 0 ? templates.map((tpl) => (
+              <button
+                key={tpl.id}
+                onClick={() => applyTemplate(tpl.body)}
+                style={{
+                  padding: '11px 12px', borderRadius: 14, fontSize: 13, cursor: 'pointer',
+                  background: T.cardElev, border: `1px solid ${T.border}`, color: T.text,
+                  fontFamily: 'inherit', textAlign: 'left', lineHeight: 1.35,
+                }}
+              >
+                <span style={{ display: 'block', fontWeight: 600 }}>{tpl.name}</span>
+                <span style={{ display: 'block', fontSize: 11, color: T.text3, marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tpl.body}</span>
+              </button>
+            )) : <EmptyState icon="file-text" title="Шаблонов нет" text="Добавь шаблоны сообщений в разделе «Ещё»." />}
+          </div>
         </div>
-      </BottomSheet>
+      )}
 
       <ActionSheet
         open={showDeleteConfirm}

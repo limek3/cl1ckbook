@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { accentPalette, type AccentTone } from '@/lib/appearance-palette';
+import { accentPalette, accentToneValues, type AccentTone } from '@/lib/appearance-palette';
 import type { RadiusMode } from '@/lib/appearance';
 
 export interface ThemeTokens {
@@ -87,11 +87,28 @@ interface StoredMiniAppearance {
 
 const MINI_APPEARANCE_KEY = 'clickbook-miniapp-appearance';
 
+function isThemeMode(value: unknown): value is ThemeMode {
+  return value === 'dark' || value === 'light';
+}
+
+function isAccentTone(value: unknown): value is AccentTone {
+  return typeof value === 'string' && (accentToneValues as readonly string[]).includes(value);
+}
+
+function isRadiusMode(value: unknown): value is RadiusMode {
+  return value === 'tight' || value === 'medium' || value === 'soft';
+}
+
 function readStoredAppearance(): StoredMiniAppearance {
   if (typeof window === 'undefined') return {};
   try {
     const raw = window.localStorage.getItem(MINI_APPEARANCE_KEY);
-    return raw ? JSON.parse(raw) as StoredMiniAppearance : {};
+    const parsed = raw ? JSON.parse(raw) as Record<string, unknown> : {};
+    return {
+      mode: isThemeMode(parsed.mode) ? parsed.mode : undefined,
+      accentTone: isAccentTone(parsed.accentTone) ? parsed.accentTone : undefined,
+      radius: isRadiusMode(parsed.radius) ? parsed.radius : undefined,
+    };
   } catch {
     return {};
   }
@@ -148,17 +165,8 @@ export function ThemeProvider({ initialMode = 'dark', children }: { initialMode?
   }, [mode, accentTone, radius]);
 
   const transitionTheme = useCallback((update: () => void) => {
-    if (typeof document === 'undefined') {
-      update();
-      return;
-    }
-    const prefersReducedMotion = typeof window !== 'undefined'
-      && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    const startViewTransition = (document as Document & { startViewTransition?: (cb: () => void) => void }).startViewTransition;
-    if (!prefersReducedMotion && typeof startViewTransition === 'function') {
-      startViewTransition(() => update());
-      return;
-    }
+    // Telegram WebView can crash on the experimental View Transition API.
+    // Keep the transition purely CSS-driven and synchronous for stability.
     update();
   }, []);
 

@@ -60,6 +60,27 @@ import { useLocale } from '@/lib/locale-context';
 import { cn } from '@/lib/utils';
 import { buildBookingEventNotifications, type NotificationEvent } from '@/lib/notification-events';
 
+const WORKSPACE_EVENT_READ_KEY = 'clickbook-workspace-event-read-ids';
+
+function readWorkspaceEventIds(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(WORKSPACE_EVENT_READ_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeWorkspaceEventIds(ids: string[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(WORKSPACE_EVENT_READ_KEY, JSON.stringify(Array.from(new Set(ids)).slice(-300)));
+  } catch {}
+}
+
+
 import { Button } from '@/components/ui/button';
 import { BrandLogo } from '@/components/brand/brand-logo';
 import { WorkspaceAssistant } from '@/components/shared/workspace-assistant';
@@ -357,7 +378,7 @@ function NavRow({
       {item.badge && !isBotBadge ? (
         <span
           className={cn(
-            'rounded-full px-1.5 py-0.5 text-[8px] font-semibold leading-none',
+            'inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1.5 text-[9px] font-semibold leading-none',
             active
               ? 'bg-white/18 text-current dark:bg-black/15'
               : 'bg-black/[0.055] text-slate-500 dark:bg-white/[0.075] dark:text-white/45',
@@ -1566,7 +1587,7 @@ function MobileBottomItem({
         <Icon className="size-[16px]" />
 
         {item.badge && item.badge.toLowerCase() !== 'bot' ? (
-          <span className="absolute -right-2 -top-2 rounded-full border border-current/10 bg-primary/15 px-1 text-[8px] leading-3 text-primary">
+          <span className="absolute -right-2.5 -top-2.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full border border-current/10 bg-primary/15 px-1 text-[9px] leading-none text-primary">
             {item.badge}
           </span>
         ) : null}
@@ -1798,7 +1819,11 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [navQuery, setNavQuery] = useState('');
   const [eventPanelOpen, setEventPanelOpen] = useState(false);
-  const [readEventIds, setReadEventIds] = useState<string[]>([]);
+  const [readEventIds, setReadEventIds] = useState<string[]>(() => readWorkspaceEventIds());
+
+  useEffect(() => {
+    writeWorkspaceEventIds(readEventIds);
+  }, [readEventIds]);
 
   const demoMode = isDashboardDemoEnabled(searchParams);
   const selectedWorkspaceMode: 'live' | 'demo' = demoMode ? 'demo' : 'live';
@@ -2041,7 +2066,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
         href: withDashboardDemoParam('/dashboard/notifications', demoMode),
         label: labels.items.notifications,
         icon: Bell,
-        badge: workspaceUnreadEvents > 0 ? String(Math.min(workspaceUnreadEvents, 9)) : undefined,
+        badge: workspaceUnreadEvents > 0 ? workspaceUnreadEvents > 99 ? '99+' : String(workspaceUnreadEvents) : undefined,
       },
       {
         href: withDashboardDemoParam('/dashboard/marketing', demoMode),
@@ -2167,7 +2192,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
         href: withDashboardDemoParam('/dashboard/notifications', demoMode),
         label: labels.items.notifications,
         icon: Bell,
-        badge: workspaceUnreadEvents > 0 ? String(Math.min(workspaceUnreadEvents, 9)) : undefined,
+        badge: workspaceUnreadEvents > 0 ? workspaceUnreadEvents > 99 ? '99+' : String(workspaceUnreadEvents) : undefined,
       },
       {
         href: withDashboardDemoParam('/dashboard/marketing', demoMode),
@@ -2395,8 +2420,8 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
             >
               <Bell className="size-3.5" />
               {workspaceUnreadEvents > 0 && (
-                <span className="absolute -right-1 -top-1 flex min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold leading-[16px] text-white ring-2 ring-[#f4f4f2] dark:ring-[#090909]">
-                  {workspaceUnreadEvents > 9 ? '9+' : workspaceUnreadEvents}
+                <span className="absolute -right-2 -top-2 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold leading-none text-white ring-2 ring-[#f4f4f2] dark:ring-[#090909]">
+                  {workspaceUnreadEvents > 99 ? '99+' : workspaceUnreadEvents}
                 </span>
               )}
             </button>
@@ -2430,8 +2455,8 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
           >
             <Bell className="size-4" />
             {workspaceUnreadEvents > 0 && (
-              <span className="absolute -right-1 -top-1 flex min-w-[17px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold leading-[17px] text-white ring-2 ring-[#f4f4f2] dark:ring-[#090909]">
-                {workspaceUnreadEvents > 9 ? '9+' : workspaceUnreadEvents}
+              <span className="absolute -right-2 -top-2 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold leading-none text-white ring-2 ring-[#f4f4f2] dark:ring-[#090909]">
+                {workspaceUnreadEvents > 99 ? '99+' : workspaceUnreadEvents}
               </span>
             )}
           </button>
@@ -2506,8 +2531,15 @@ function WorkspaceEventsPanel({
   const emptyTitle = locale === 'ru' ? 'Сейчас всё спокойно' : 'All quiet now';
   const emptyText = locale === 'ru' ? 'Новые события клиентов появятся здесь.' : 'Client events will appear here.';
   return (
-    <div className="fixed inset-x-3 top-[64px] z-[60] mx-auto max-w-[420px] xl:inset-x-auto xl:right-4 xl:top-[64px] xl:w-[380px]">
-      <div className="overflow-hidden rounded-[24px] border border-black/[0.08] bg-[#fbfbfa]/96 shadow-2xl shadow-black/10 backdrop-blur-xl dark:border-white/[0.09] dark:bg-[#101010]/96 dark:shadow-black/40">
+    <>
+      <button
+        type="button"
+        aria-label={locale === 'ru' ? 'Закрыть события' : 'Close events'}
+        className="fixed inset-0 z-[55] cursor-default bg-transparent"
+        onClick={onClose}
+      />
+      <div className="fixed inset-x-3 top-[64px] z-[60] mx-auto max-w-[420px] xl:inset-x-auto xl:right-4 xl:top-[64px] xl:w-[380px]">
+        <div className="overflow-hidden rounded-[24px] border border-black/[0.08] bg-[#fbfbfa]/96 shadow-2xl shadow-black/10 backdrop-blur-xl dark:border-white/[0.09] dark:bg-[#101010]/96 dark:shadow-black/40">
         <div className="flex items-start justify-between gap-3 border-b border-black/[0.06] px-4 py-3 dark:border-white/[0.07]">
           <div className="min-w-0">
             <div className="text-[15px] font-semibold tracking-[-0.03em]">{title}</div>
@@ -2540,9 +2572,10 @@ function WorkspaceEventsPanel({
               ))}
             </div>
           )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 

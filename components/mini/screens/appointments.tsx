@@ -36,7 +36,7 @@ function money(value: number) {
   return `${Math.round(value).toLocaleString('ru-RU')} ₽`;
 }
 
-export function AppointmentsScreen({ openAppt }: { openAppt?: (a: Appointment) => void }) {
+export function AppointmentsScreen({ openAppt, go }: { openAppt?: (a: Appointment) => void; go?: (kind: string) => void }) {
   const { T } = useTheme();
   const { APPOINTMENTS, updateBookingStatus } = useMiniData();
   const { show } = useMiniToast();
@@ -124,6 +124,7 @@ export function AppointmentsScreen({ openAppt }: { openAppt?: (a: Appointment) =
         onConfirm={active && active.rawStatus !== 'confirmed' ? () => changeStatus(active, 'confirmed', 'Запись подтверждена') : undefined}
         onComplete={active ? () => changeStatus(active, 'completed', 'Запись завершена') : undefined}
         onCancel={active ? () => setCancelTarget(active) : undefined}
+        onChat={active ? () => { setActive(null); go?.('chats'); } : undefined}
       />
       <ActionSheet
         open={!!cancelTarget}

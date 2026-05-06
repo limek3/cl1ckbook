@@ -133,13 +133,14 @@ export function ClientDetailSheet({
 }
 
 export function AppointmentDetailSheet({
-  appt, onClose, onConfirm, onComplete, onCancel,
+  appt, onClose, onConfirm, onComplete, onCancel, onChat,
 }: {
   appt: Appointment | null;
   onClose: () => void;
   onConfirm?: () => void;
   onComplete?: () => void;
   onCancel?: () => void;
+  onChat?: (appt: Appointment) => void;
 }) {
   const { T } = useTheme();
   if (!appt) return <BottomSheet open={false} onClose={onClose}><div /></BottomSheet>;
@@ -166,8 +167,10 @@ export function AppointmentDetailSheet({
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <NeutralBtn icon="message-circle" full onClick={() => onChat?.(appt)}>Написать</NeutralBtn>
           <NeutralBtn icon="phone" full onClick={() => phone && typeof window !== 'undefined' ? (window.location.href = `tel:${phone}`) : null}>Позвонить</NeutralBtn>
           <NeutralBtn icon="copy" full onClick={() => phone ? copyText(phone).catch(() => null) : null}>Скопировать</NeutralBtn>
+          <NeutralBtn icon="calendar-clock" full onClick={() => onChat?.(appt)}>Перенести</NeutralBtn>
         </div>
 
         {canManage && (

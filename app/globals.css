@@ -11290,3 +11290,54 @@ html[data-tg-miniapp='true'] body {
   box-shadow: 0 0 0 999px #141414 inset !important;
   -webkit-text-fill-color: #ffffff !important;
 }
+/* ClickBook miniapp input/theme hardening */
+.cb-mini-app-root,
+.cb-miniapp {
+  background: var(--mini-bg, #0a0a0a);
+  color: var(--mini-text, #fafafa);
+  color-scheme: dark;
+  transition: background-color 260ms ease, color 260ms ease, border-color 260ms ease;
+}
+
+.cb-mini-app-root[data-mini-theme='light'],
+.cb-miniapp[data-mini-mode='light'] {
+  color-scheme: light;
+}
+
+.cb-mini-app-root input,
+.cb-mini-app-root textarea,
+.cb-mini-app-root select,
+.cb-miniapp input,
+.cb-miniapp textarea,
+.cb-miniapp select,
+.cb-mini-input {
+  background: transparent !important;
+  background-color: transparent !important;
+  border-color: transparent;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  color: var(--mini-text, #fafafa) !important;
+  -webkit-text-fill-color: var(--mini-text, #fafafa) !important;
+  caret-color: var(--mini-accent, #127dfe) !important;
+  outline: none !important;
+}
+
+.cb-mini-app-root input::placeholder,
+.cb-mini-app-root textarea::placeholder,
+.cb-miniapp input::placeholder,
+.cb-miniapp textarea::placeholder,
+.cb-mini-input::placeholder {
+  color: var(--mini-text-muted, rgba(250,250,250,0.3)) !important;
+  -webkit-text-fill-color: var(--mini-text-muted, rgba(250,250,250,0.3)) !important;
+  opacity: 1 !important;
+}
+
+.cb-mini-app-root input:-webkit-autofill,
+.cb-mini-app-root textarea:-webkit-autofill,
+.cb-miniapp input:-webkit-autofill,
+.cb-miniapp textarea:-webkit-autofill,
+.cb-mini-input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 999px var(--mini-input-bg, #0d0d0d) inset !important;
+  box-shadow: 0 0 0 999px var(--mini-input-bg, #0d0d0d) inset !important;
+  -webkit-text-fill-color: var(--mini-text, #fafafa) !important;
+}

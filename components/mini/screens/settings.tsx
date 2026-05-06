@@ -13,6 +13,30 @@ import { buildMiniEventNotifications, type NotificationEvent } from '@/lib/notif
 import { accentPalette, type AccentTone } from '@/lib/appearance-palette';
 import { defaultAppearanceSettings, normalizeAppearanceSettings, type AppearanceSettings, type CardMode, type MotionMode, type RadiusMode } from '@/lib/appearance';
 
+const MINI_NOTIFICATION_READ_KEY = 'clickbook-mini-notification-read-ids';
+const MINI_NOTIFICATION_READ_EVENT = 'clickbook-mini-notification-read-change';
+
+function readMiniNotificationIds(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(MINI_NOTIFICATION_READ_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeMiniNotificationIds(ids: string[]) {
+  if (typeof window === 'undefined') return;
+  const next = Array.from(new Set(ids)).slice(-200);
+  try {
+    window.localStorage.setItem(MINI_NOTIFICATION_READ_KEY, JSON.stringify(next));
+    window.dispatchEvent(new CustomEvent(MINI_NOTIFICATION_READ_EVENT));
+  } catch {}
+}
+
+
 // ─── Profile ────────────────────────────────
 export function ProfileScreen({ back }: { back: () => void }) {
   const { T } = useTheme();
@@ -441,8 +465,16 @@ export function NotificationsScreen({ back }: { back: () => void }) {
     appts: true, remind: true, msgs: true, reviews: true, marketing: false,
     push: true, email: false, tg: true,
   });
-  const [readIds, setReadIds] = useState<string[]>([]);
+  const [readIds, setReadIds] = useState<string[]>(() => readMiniNotificationIds());
   const t = (k: keyof NotifState) => setV((s) => ({ ...s, [k]: !s[k] }));
+
+  useEffect(() => {
+    writeMiniNotificationIds(readIds);
+  }, [readIds]);
+
+  const markRead = (ids: string[]) => {
+    setReadIds((prev) => Array.from(new Set([...prev, ...ids])));
+  };
 
   const events = useMemo(() => (
     buildMiniEventNotifications(APPOINTMENTS, threads).map((event) => ({
@@ -458,7 +490,7 @@ export function NotificationsScreen({ back }: { back: () => void }) {
   }
 
   function markAllRead() {
-    setReadIds((prev) => Array.from(new Set([...prev, ...events.map((event) => event.id)])));
+    markRead(events.map((event) => event.id));
     show('Все события отмечены прочитанными', 'success');
   }
 
@@ -485,7 +517,7 @@ export function NotificationsScreen({ back }: { back: () => void }) {
             <Card padded={false}>
               {events.slice(0, 12).map((event, index) => (
                 <div key={event.id}>
-                  <NotificationEventRow event={event} onClick={() => setReadIds((prev) => Array.from(new Set([...prev, event.id])))} />
+                  <NotificationEventRow event={event} onClick={() => markRead([event.id])} />
                   {index < Math.min(events.length, 12) - 1 && <Divider />}
                 </div>
               ))}

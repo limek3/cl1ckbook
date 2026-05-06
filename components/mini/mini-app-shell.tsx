@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { ThemeProvider, useTheme, type ThemeMode } from './theme';
 import { Icon } from './primitives/atoms';
 import { useChats } from '@/hooks/use-chats';
@@ -47,6 +47,21 @@ import {
 } from './screens/money';
 
 import type { Thread } from '@/lib/mini-demo';
+
+const MINI_NOTIFICATION_READ_KEY = 'clickbook-mini-notification-read-ids';
+const MINI_NOTIFICATION_READ_EVENT = 'clickbook-mini-notification-read-change';
+
+function readMiniNotificationIds(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(MINI_NOTIFICATION_READ_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
 
 // ─── Tab definitions ─────────────────────────
 type TabId = 'home' | 'appts' | 'chats' | 'clients' | 'more';
@@ -151,9 +166,16 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
   const [tab, setTab] = useState<TabId>(initialTab);
   const [sub, setSub] = useState<SubRoute | null>(initialSub);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const { threads } = useChats();
   const { APPOINTMENTS } = useMiniData();
-  const notificationEvents = useMemo(() => buildMiniEventNotifications(APPOINTMENTS, threads), [APPOINTMENTS, threads]);
+  const notificationEvents = useMemo(() => (
+    buildMiniEventNotifications(APPOINTMENTS, threads).map((event) => ({
+      ...event,
+      unread: event.unread && !readNotificationIds.includes(event.id),
+    }))
+  ), [APPOINTMENTS, threads, readNotificationIds]);
   const notificationCount = Math.min(99, unreadEventCount(notificationEvents));
 
   const toastApi = useMemo<MiniToastCtxValue>(() => ({
@@ -164,6 +186,21 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
       haptic(tone === 'error' ? 'error' : tone === 'success' ? 'success' : 'light');
     },
   }), []);
+
+  useEffect(() => {
+    setReadNotificationIds(readMiniNotificationIds());
+    const sync = () => setReadNotificationIds(readMiniNotificationIds());
+    window.addEventListener('storage', sync);
+    window.addEventListener(MINI_NOTIFICATION_READ_EVENT, sync);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener(MINI_NOTIFICATION_READ_EVENT, sync);
+    };
+  }, []);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [tab, sub?.kind]);
 
   // Telegram WebApp init: ready/expand once
   useEffect(() => {
@@ -238,7 +275,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
     }
   } else {
     if (tab === 'home') content = <HomeScreen go={goSub} />;
-    else if (tab === 'appts') content = <AppointmentsScreen />;
+    else if (tab === 'appts') content = <AppointmentsScreen go={goSub} />;
     else if (tab === 'chats') content = <ChatsScreen openThread={(t) => setSub({ kind: 'thread', payload: t })} />;
     else if (tab === 'clients') content = <ClientsScreen go={goSub} />;
     else if (tab === 'more') content = <MoreScreen go={goSub} />;
@@ -249,7 +286,14 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
 
   return (
     <ToastCtx.Provider value={toastApi}>
-      <div className="cb-miniapp" data-mini-mode={T.bg === '#0a0a0a' ? 'dark' : 'light'} style={{
+      <div className="cb-miniapp cb-mini-app-root" data-mini-theme={T.bg === '#0a0a0a' ? 'dark' : 'light'} data-mini-mode={T.bg === '#0a0a0a' ? 'dark' : 'light'} style={{
+        '--mini-bg': T.bg,
+        '--mini-card': T.card,
+        '--mini-input-bg': T.inputBg,
+        '--mini-text': T.text,
+        '--mini-text-muted': T.text3,
+        '--mini-accent': T.accent,
+        '--miniapp-accent': T.accent,
         width: '100%', maxWidth: 390, height: '100dvh',
         background: T.bg, color: T.text, colorScheme: T.bg === '#0a0a0a' ? 'dark' : 'light',
         display: 'flex', flexDirection: 'column',
@@ -258,12 +302,17 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
         margin: '0 auto',
         transition: 'background 0.34s cubic-bezier(.2,.8,.2,1), color 0.34s cubic-bezier(.2,.8,.2,1)',
         position: 'relative',
-      }}>
+      } as CSSProperties}>
         <style>{`
           .cb-miniapp, .cb-miniapp * { -webkit-tap-highlight-color: transparent; }
           .cb-miniapp input, .cb-miniapp textarea, .cb-miniapp select {
             -webkit-appearance: none; appearance: none; background-color: transparent !important;
-            color: inherit; color-scheme: dark; caret-color: var(--miniapp-accent, #127dfe);
+            box-shadow: none !important; color: inherit; color-scheme: dark; caret-color: var(--miniapp-accent, #127dfe);
+            -webkit-text-fill-color: currentColor;
+          }
+          .cb-miniapp input:-webkit-autofill, .cb-miniapp textarea:-webkit-autofill {
+            box-shadow: 0 0 0 999px var(--mini-input-bg, #0d0d0d) inset !important;
+            -webkit-text-fill-color: var(--mini-text, #fafafa) !important;
           }
           .cb-miniapp[data-mini-mode="light"] input, .cb-miniapp[data-mini-mode="light"] textarea, .cb-miniapp[data-mini-mode="light"] select { color-scheme: light; }
           .cb-miniapp ::placeholder { color: ${T.text3}; opacity: 1; }
@@ -273,7 +322,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
         {isFullHeight ? (
           <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>{content}</div>
         ) : (
-          <div className="scroll-area" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', position: 'relative' }}>{content}</div>
+          <div ref={scrollRef} className="scroll-area" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', position: 'relative' }}>{content}</div>
         )}
         {!isFullHeight && <BottomNav active={tab} onChange={(id) => { setTab(id); setSub(null); }} />}
         <ToastHost items={toasts} />
