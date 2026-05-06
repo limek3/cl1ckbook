@@ -1,40 +1,26 @@
-# ClickBook Mini App — zero rework 2026-05-04
+# ClickBook multi-booking context fix
 
-Сделана новая мобильная mini app-обёртка с нуля внутри существующего проекта.
+Что сделано:
 
-## Главные изменения
+- Клиентские TG-сообщения теперь показывают контекст записи: код, мастер, список услуг, дата, время, формат/адрес.
+- Если у клиента несколько активных Telegram-записей, обычный текст больше не уходит в случайную запись: бот просит выбрать запись.
+- В Telegram добавлены кнопки клиента: «Мои записи и услуги», «Написать по этой записи», «Детали».
+- При `/start` бот проверяет, есть ли у клиента связанные записи. Если есть — показывает список записей, а не меню мастера.
+- Выбор записи сохраняется через metadata.activeChatContextAt и действует как контекст переписки.
+- В чатах кабинета добавлены метки, когда у клиента несколько записей, и горизонтальный выбор записей в шапке чата.
+- В CRM-карточке клиента добавлен блок всех/активных записей клиента с услугами и переходом в нужный чат.
+- Услуги в сообщениях и карточках выводятся списком, а не мусорной строкой вида `------ входит: -`.
+- VK/TG уведомления мастеру и клиенту приведены к единому формату с услугами списком.
+- Добавлена SQL-миграция `20260503_0033_clickbook_multi_booking_context_ui.sql`.
 
-- Полностью переписан `components/mini/mini-app-entry.tsx`.
-- Mini app больше не пытается быть копией desktop-кабинета: собраны отдельные мобильные экраны.
-- Основная навигация: `Сегодня`, `График`, `Услуги`, `Чаты`, `Ещё`.
-- Вторичные разделы убраны в `Ещё`: клиенты, аналитика, профиль, настройки.
-- Исправлен `components/system/telegram-miniapp-viewport.tsx`: теперь это реальный viewport-компонент, а не битый файл, из-за которого падал build на `_not-found`.
-- В `/app` добавлен режим предпросмотра mini app через `/app?mini=1`.
+SQL запускать после предыдущих миграций:
 
-## Что подтягивается
+1. `20260503_0028_clickbook_client_actions_cleanup.sql`
+2. `20260503_0031_clickbook_telegram_chat_id_and_chat_delete_fix.sql`
+3. `20260503_0032_clickbook_booking_context_threads.sql`
+4. `20260503_0033_clickbook_multi_booking_context_ui.sql`
 
-- Профиль мастера из workspace.
-- Записи и статусы записей.
-- Услуги из `workspace.data.services`.
-- График из `workspace.data.availability`.
-- Чаты через `/api/chats`.
-- Клиенты и аналитика через `buildWorkspaceDatasetFromStored`.
-- Настройки mini app в `workspace.data.miniSettings`.
+Проверка:
 
-## Что сохраняется
-
-- Статусы записей через `updateBookingStatus`.
-- График через `updateWorkspaceSection('availability', ...)`.
-- Услуги через `updateWorkspaceSection('services', ...)` + обновление `profile.services`.
-- Профиль через `saveProfile`.
-- VIP/заметки клиента через `clientFavorites` и `clientNotes`.
-- Настройки через `quietHours`, `fallbackEmail`, `miniSettings`.
-
-## Проверка синтаксиса
-
-```bash
-node _syntax_check_local.js components/mini/mini-app-entry.tsx components/system/telegram-miniapp-viewport.tsx app/app/page.tsx app/layout.tsx
-# OK
-```
-
-Полный `pnpm build` в контейнере не запускался, потому что здесь не установлен `pnpm` и нет `node_modules`.
+- Изменённые TS/TSX-файлы проверены через `_transpile_check.js`.
+- Полный `tsc` в контейнере невалиден без `node_modules` и типов Next/React, поэтому полный проектный typecheck здесь не запускался корректно.

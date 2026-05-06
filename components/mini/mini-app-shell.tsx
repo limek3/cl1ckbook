@@ -86,7 +86,7 @@ function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) 
     <div style={{
       borderTop: `1px solid ${T.border}`,
       background: T.bg,
-      padding: '8px 4px 22px',
+      padding: '6px 4px calc(6px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
       display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 0,
       flexShrink: 0,
     }}>
@@ -114,7 +114,7 @@ function TgHeader({ onToggleTheme, onNotifications, notificationCount = 0 }: { o
   return (
     <div style={{
       flexShrink: 0,
-      padding: '10px 16px',
+      padding: 'calc(var(--miniapp-header-top-offset, 18px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px)))) 16px 10px',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       background: T.bg,
       borderBottom: `1px solid ${T.border}`,
@@ -202,16 +202,36 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
     scrollRef.current?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   }, [tab, sub?.kind]);
 
-  // Telegram WebApp init: ready/expand once
+  // Telegram WebApp init: keep viewport/safe areas in sync.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const tg = (window as any).Telegram?.WebApp;
-    if (!tg) return;
-    try { tg.ready?.(); tg.expand?.(); } catch {}
-    const topInset = Number(tg.contentSafeAreaInset?.top ?? tg.safeAreaInset?.top ?? 0);
-    const bottomInset = Number(tg.contentSafeAreaInset?.bottom ?? tg.safeAreaInset?.bottom ?? 0);
-    if (Number.isFinite(topInset)) document.documentElement.style.setProperty('--miniapp-safe-top', `${Math.max(0, topInset)}px`);
-    if (Number.isFinite(bottomInset)) document.documentElement.style.setProperty('--miniapp-safe-bottom', `${Math.max(0, bottomInset)}px`);
+
+    const applyViewport = () => {
+      try { tg?.ready?.(); tg?.expand?.(); } catch {}
+      const topInset = Number(tg?.contentSafeAreaInset?.top ?? tg?.safeAreaInset?.top ?? 0);
+      const bottomInset = Number(tg?.contentSafeAreaInset?.bottom ?? tg?.safeAreaInset?.bottom ?? 0);
+      const viewportHeight = Number(tg?.viewportStableHeight ?? tg?.viewportHeight ?? window.innerHeight);
+      const isTelegramRuntime = Boolean(tg);
+
+      document.documentElement.style.setProperty('--miniapp-header-top-offset', isTelegramRuntime ? '36px' : '18px');
+      if (Number.isFinite(topInset)) document.documentElement.style.setProperty('--miniapp-safe-top', `${Math.max(0, Math.round(topInset))}px`);
+      if (Number.isFinite(bottomInset)) document.documentElement.style.setProperty('--miniapp-safe-bottom', `${Math.max(0, Math.round(bottomInset))}px`);
+      if (Number.isFinite(viewportHeight) && viewportHeight > 0) {
+        document.documentElement.style.setProperty('--miniapp-viewport-height', `${Math.round(viewportHeight)}px`);
+      }
+    };
+
+    applyViewport();
+    const onChange = () => applyViewport();
+    try { tg?.onEvent?.('viewportChanged', onChange); } catch {}
+    window.addEventListener('resize', onChange);
+    window.addEventListener('orientationchange', onChange);
+    return () => {
+      try { tg?.offEvent?.('viewportChanged', onChange); } catch {}
+      window.removeEventListener('resize', onChange);
+      window.removeEventListener('orientationchange', onChange);
+    };
   }, []);
 
   // Back button
@@ -294,7 +314,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
         '--mini-text-muted': T.text3,
         '--mini-accent': T.accent,
         '--miniapp-accent': T.accent,
-        width: '100%', maxWidth: 390, height: '100dvh',
+        width: '100%', maxWidth: 390, height: 'var(--miniapp-viewport-height, 100dvh)', minHeight: '100svh',
         background: T.bg, color: T.text, colorScheme: T.bg === '#0a0a0a' ? 'dark' : 'light',
         display: 'flex', flexDirection: 'column',
         fontFamily: "'Inter', -apple-system, system-ui, sans-serif",
@@ -330,6 +350,12 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
             background: var(--mini-input-bg, #ffffff) !important;
             background-color: var(--mini-input-bg, #ffffff) !important;
             box-shadow: 0 0 0 1000px var(--mini-input-bg, #ffffff) inset !important;
+          }
+          .cb-miniapp input.cb-mini-transparent, .cb-miniapp textarea.cb-mini-transparent {
+            background: transparent !important;
+            background-color: transparent !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
           }
           .cb-miniapp ::placeholder { color: ${T.text3}; opacity: 1; }
           .cb-miniapp { --miniapp-accent: ${T.accent}; }

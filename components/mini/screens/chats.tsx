@@ -75,28 +75,105 @@ export function ChatsScreen({ openThread, back }: { openThread: (t: Thread) => v
 
 function ThreadRow({ thread, onClick }: { thread: Thread; onClick: () => void }) {
   const { T } = useTheme();
+  const hasUnread = thread.unread > 0;
   return (
-    <div onClick={() => { haptic('light'); onClick(); }} style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', transition: 'background 0.14s ease' }}>
+    <div
+      onClick={() => { haptic('light'); onClick(); }}
+      style={{
+        padding: '14px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        cursor: 'pointer',
+        transition: 'background 0.14s ease, transform 0.12s ease',
+      }}
+    >
       <div style={{ position: 'relative', flexShrink: 0 }}>
-        <Avatar name={thread.name} size={40} radius={20} />
-        {thread.unread > 0 && (
-          <span style={{ position: 'absolute', right: -2, top: -2, width: 10, height: 10, borderRadius: '50%', background: T.accent, border: `2px solid ${T.bg}` }} />
+        <Avatar name={thread.name} size={42} radius={14} />
+        {hasUnread && (
+          <span style={{
+            position: 'absolute', right: -2, top: -2, width: 11, height: 11,
+            borderRadius: '50%', background: T.accent, border: `2px solid ${T.card}`,
+          }} />
         )}
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-          {thread.isPriority && <Icon name="star" size={11} color={T.accent} />}
-          <span style={{ fontSize: 14, color: T.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{thread.name}</span>
-          <ChannelTag channel={thread.channel} />
-          {thread.segment === 'new' && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 999, background: `${T.accent}22`, color: T.accent, fontWeight: 600, letterSpacing: '0.04em' }}>NEW</span>}
+
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{
+            minWidth: 0,
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            color: T.text,
+          }}>
+            {thread.isPriority && <Icon name="star" size={12} color={T.accent} />}
+            <span style={{
+              minWidth: 0,
+              fontSize: 14,
+              fontWeight: hasUnread ? 600 : 500,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}>{thread.name}</span>
+          </div>
+          <span style={{ fontSize: 11, color: T.text3, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{thread.time}</span>
         </div>
-        <div style={{ fontSize: 12, color: T.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{thread.last || 'Нет сообщений'}</div>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
-        <span style={{ fontSize: 11, color: T.text3, fontVariantNumeric: 'tabular-nums' }}>{thread.time}</span>
-        {thread.unread > 0 ? (
-          <span style={{ minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9, background: T.accent, color: '#fff', fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{thread.unread}</span>
-        ) : <span style={{ width: 18 }} />}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{
+            flex: 1,
+            minWidth: 0,
+            fontSize: 12,
+            color: hasUnread ? T.text2 : T.text3,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}>{thread.last || 'Нет сообщений'}</div>
+          {hasUnread && (
+            <span style={{
+              minWidth: 20,
+              height: 20,
+              padding: '0 6px',
+              borderRadius: 10,
+              background: T.accent,
+              color: '#fff',
+              fontSize: 10,
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}>{thread.unread > 9 ? '9+' : thread.unread}</span>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minHeight: 18 }}>
+          <ChannelTag channel={thread.channel} />
+          {thread.segment === 'new' && (
+            <span style={{
+              fontSize: 9,
+              padding: '2px 6px',
+              borderRadius: 999,
+              background: `${T.accent}1f`,
+              color: T.accent,
+              fontWeight: 700,
+              letterSpacing: '0.04em',
+            }}>NEW</span>
+          )}
+          {thread.botConnected && (
+            <span style={{
+              fontSize: 9,
+              padding: '2px 6px',
+              borderRadius: 999,
+              background: T.cardElev,
+              border: `1px solid ${T.border}`,
+              color: T.text3,
+              letterSpacing: '0.04em',
+            }}>БОТ</span>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -174,7 +251,7 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
       <div style={{
-        padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10,
+        padding: '14px 14px', display: 'flex', alignItems: 'center', gap: 8,
         borderBottom: `1px solid ${T.border}`, background: T.bg, flexShrink: 0,
       }}>
         <NavBtn icon="chevron-left" onClick={back} />
@@ -207,7 +284,7 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
         </div>
       )}
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 8px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 14px 12px', display: 'flex', flexDirection: 'column', gap: 7 }}>
         {messages.length === 0 ? (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <EmptyState icon="message-circle" title="Сообщений пока нет" text="Напиши первым или используй быстрый шаблон." />
@@ -219,7 +296,8 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
       </div>
 
       <div style={{
-        padding: '8px 12px 16px', borderTop: `1px solid ${T.border}`,
+        padding: '8px 12px calc(8px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
+        borderTop: `1px solid ${T.border}`,
         display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, background: T.bg,
       }}>
         <button
@@ -227,35 +305,59 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
           onClick={() => { haptic('light'); setShowTemplates((value) => !value); }}
           title="Быстрые ответы"
           style={{
-            width: 36, height: 36, borderRadius: 11, flexShrink: 0,
-            background: showTemplates ? T.accent : 'transparent',
+            width: 40, height: 40, borderRadius: 13, flexShrink: 0,
+            background: showTemplates ? T.accent : T.cardElev,
             border: `1px solid ${showTemplates ? T.accent : T.border}`,
             color: showTemplates ? '#fff' : T.text2,
             cursor: 'pointer', padding: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'background 0.15s ease, border-color 0.15s ease',
+            transition: 'background 0.15s ease, border-color 0.15s ease, color 0.15s ease',
           }}
         >
-          <Icon name="zap" size={15} />
+          <Icon name="zap" size={16} />
         </button>
 
         <div style={{
-          flex: 1, background: T.inputBg, border: `1px solid ${T.border}`,
-          borderRadius: 12, padding: '9px 12px',
+          flex: 1,
+          minWidth: 0,
+          background: T.bg === '#0a0a0a' ? 'rgba(255,255,255,0.06)' : T.bgSoft,
+          border: `1px solid ${T.border}`,
+          borderRadius: 14,
+          minHeight: 42,
+          padding: '0 12px',
           display: 'flex', alignItems: 'center', gap: 6,
-          transition: 'border-color 0.15s ease',
+          transition: 'border-color 0.15s ease, background 0.15s ease',
         }}>
           <input
-            className="cb-mini-input"
+            className="cb-mini-transparent"
             ref={inputRef}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={handleKey}
             placeholder="Сообщение"
-            style={{ flex: 1, minWidth: 0, background: T.inputBg, backgroundColor: T.inputBg, WebkitAppearance: 'none', appearance: 'none', border: 'none', outline: 'none', boxShadow: `0 0 0 1000px ${T.inputBg} inset`, borderRadius: 10, padding: '6px 8px', color: T.text, WebkitTextFillColor: T.text, caretColor: T.accent, fontSize: 14, fontFamily: 'inherit', colorScheme: T.bg === '#0a0a0a' ? 'dark' : 'light' }}
+            autoComplete="off"
+            style={{
+              flex: 1,
+              minWidth: 0,
+              background: 'transparent',
+              backgroundColor: 'transparent',
+              WebkitAppearance: 'none',
+              appearance: 'none',
+              border: 'none',
+              outline: 'none',
+              boxShadow: 'none',
+              borderRadius: 0,
+              padding: 0,
+              color: T.text,
+              WebkitTextFillColor: T.text,
+              caretColor: T.accent,
+              fontSize: 14,
+              fontFamily: 'inherit',
+              colorScheme: T.bg === '#0a0a0a' ? 'dark' : 'light',
+            }}
           />
           {draft.length > 0 && (
-            <button onClick={() => { selectionHaptic(); setDraft(''); }} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: T.text3, display: 'flex' }}>
+            <button onClick={() => { selectionHaptic(); setDraft(''); }} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: T.text3, display: 'flex', flexShrink: 0 }}>
               <Icon name="x" size={13} />
             </button>
           )}
@@ -265,15 +367,16 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
           onClick={() => void send()}
           disabled={!draft.trim()}
           style={{
-            width: 36, height: 36, borderRadius: 11, flexShrink: 0,
-            background: draft.trim() ? T.accent : T.border,
-            border: 'none', color: '#fff',
+            width: 40, height: 40, borderRadius: 13, flexShrink: 0,
+            background: draft.trim() ? T.accent : T.cardElev,
+            border: `1px solid ${draft.trim() ? T.accent : T.border}`,
+            color: draft.trim() ? '#fff' : T.text3,
             cursor: draft.trim() ? 'pointer' : 'default',
             padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'background 0.15s ease, opacity 0.15s ease',
+            transition: 'background 0.15s ease, border-color 0.15s ease, color 0.15s ease',
           }}
         >
-          <Icon name="send" size={15} color="#fff" />
+          <Icon name="send" size={16} color={draft.trim() ? '#fff' : T.text3} />
         </button>
       </div>
 
@@ -281,7 +384,7 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
         <div
           ref={templatePopoverRef}
           style={{
-            position: 'absolute', left: 12, bottom: 70, zIndex: 90,
+            position: 'absolute', left: 12, bottom: 'calc(66px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))', zIndex: 90,
             width: 'min(330px, calc(100% - 24px))',
             background: T.sheetBg,
             border: `1px solid ${T.border}`,

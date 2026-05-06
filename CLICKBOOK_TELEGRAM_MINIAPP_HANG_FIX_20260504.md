@@ -1,33 +1,21 @@
-# ClickBook Telegram Mini App hang fix — 2026-05-04
+# ClickBook Telegram navigation auth fix
 
-Исправлено зависание Mini App на экране «Входим через Telegram».
+Исправлена проблема, когда после успешного входа в Telegram Mini App переход по пунктам меню снова отправлял на `/login`.
 
-## Что было
+Причина: `proxy.ts` проверял защищённые страницы на сервере и редиректил на `/login`, если cookie ещё не пришла в запросе. В Telegram Mini App это нестабильно, потому что `initData` доступна только на клиенте через Telegram WebApp SDK, а не в `proxy.ts`.
 
-Telegram Mini App успешно отправлял запрос на `/api/auth/telegram-miniapp`, webhook работал, но фронт мог зависать на gate-экране из-за гонки:
+Что изменено:
 
-- глобальный `TelegramMiniAppAutoAuth` запускался одновременно с отдельным gate на `/app`;
-- `AppProvider` параллельно пытался грузить `/api/workspace` прямо на странице входа Mini App;
-- после установки cookie первый запрос в Telegram WebView иногда ещё не видел session cookie;
-- UI не имел нормального жёсткого fallback, поэтому визуально оставался на спиннере.
+1. `lib/supabase/proxy.ts`
+   - убран жёсткий серверный редирект `/dashboard` и `/create-profile` на `/login`;
+   - API-роуты всё ещё защищены через `requireAuthUser()`;
+   - если сессия уже есть и пользователь открывает `/login`, его переводит в `/dashboard`.
 
-## Что сделано
+2. `components/auth/telegram-miniapp-auto-auth.tsx`
+   - на страницах `/dashboard/*`, `/create-profile/*` и `/login` Telegram Mini App авторизация запускается с `force: true`, чтобы cookie обновлялась перед работой страницы.
 
-- На маршруте `/app` отключён глобальный `TelegramMiniAppAutoAuth`, потому что входом занимается `TelegramMiniAppGate`.
-- `AppProvider` больше не грузит workspace на `/app`, чтобы не создавать лишние гонки авторизации.
-- `TelegramMiniAppGate` теперь работает как отдельный state-machine:
-  1. ждёт Telegram initData;
-  2. создаёт app-session через `/api/auth/telegram-miniapp`;
-  3. проверяет `/api/workspace` с `X-ClickBook-App-Session`;
-  4. если профиль есть — открывает `/dashboard`;
-  5. если профиля нет — открывает `/create-profile`;
-  6. если Telegram WebView долго не отдаёт cookie — всё равно даёт кнопку «Открыть кабинет», а не висит бесконечно.
-- Добавлен hard-timeout, чтобы экран не мог зависнуть навсегда.
+3. `lib/telegram-miniapp-auth-client.ts`
+   - событие `clickbook:auth-session-ready` теперь отправляется даже при кэшированной успешной авторизации, чтобы `AppProvider` перезагружал workspace.
 
-## Файлы
-
-- `components/auth/telegram-miniapp-gate.tsx`
-- `components/auth/telegram-miniapp-auto-auth.tsx`
-- `lib/app-context.tsx`
-
-SQL запускать не нужно.
+4. `vercel.json`
+   - cron переведён на `0 3 * * *`, чтобы Hobby deploy не падал из-за hourly cron.

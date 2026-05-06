@@ -1,13 +1,24 @@
-# ClickBook slots real-data fix
+# ClickBook smart client bot/chat fix
 
-Fixed the live booking slot chain end-to-end:
+Что изменено:
 
-1. Dashboard availability no longer loses unsaved slot changes when the user immediately leaves the page. The delayed save is no longer cancelled on navigation.
-2. Public profile now falls back to the current in-app workspace state when the master opens their own public page before the public API finishes loading.
-3. Public booking API now reads real saved availability only: workspace JSON data first, normalized `sloty_availability_days` as backup. Demo/default weekly mock availability is not used for live public booking.
-4. Booking validation now checks the same real availability source as the public page.
-5. Availability lookup now lets the latest source win, so date-specific settings override old weekly/default rows.
-6. Workspace section saving now syncs services, availability and templates into normalized Supabase tables for stable public booking and future analytics.
-7. Added SQL migration `20260501_0010_clickbook_availability_sync_hardening.sql` to harden `sloty_services` and `sloty_availability_days`.
+- Чат больше не создаёт отдельную карточку на каждую запись клиента: web/API и UI дополнительно группируют диалоги по телефону, имени, Telegram chat_id и VK peer_id.
+- Выбор записи остаётся внутри одного диалога: bookingIds/bookingContexts собираются в metadata, а activeBookingId используется для отправки сообщений с правильным контекстом услуги.
+- При переходе из карточки клиента в чат по конкретной записи выбирается единый клиентский чат и нужная запись в шапке.
+- Telegram-клиент получил постоянное reply-menu под полем ввода:
+  - 📋 Мои записи и услуги
+  - 💬 Выбрать запись
+  - 🆘 Помощь
+- Telegram служебные карточки теперь переиспользуются/редактируются через сохранённый clientMenuMessageId, а старая reply-keyboard карточка удаляется перед новой.
+- VK-клиент получил постоянную нижнюю клавиатуру через inline:false:
+  - 📋 Мои записи
+  - 💬 Выбрать запись
+  - 🆘 Помощь
+- VK и Telegram клиентская логика выровнена: список записей, выбор записи для переписки, сообщение мастеру с контекстом.
+- Входящие клиентские сообщения в TG/VK теперь пишутся в единый клиентский thread, а не в отдельный booking-thread.
+- Карточки чатов в списке стали компактнее: мета-строка не переносится на несколько строк, нижние плашки уменьшены.
 
-After deploy, open `/dashboard/availability`, change one slot/day once, wait 1-2 seconds, then open the public page. The selected day should show available times.
+SQL не требуется: схема базы не менялась.
+
+Проверка:
+- node _transpile_check.js app/api/chats/route.ts app/api/telegram/webhook/route.ts app/api/vk/webhook/route.ts app/dashboard/chats/page.tsx lib/server/vk-bot.ts — OK.

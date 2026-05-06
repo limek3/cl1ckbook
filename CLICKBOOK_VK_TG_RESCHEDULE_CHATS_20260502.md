@@ -1,35 +1,30 @@
-# ClickBook — VK/Telegram подтверждение, перенос и чаты
+-- Optional patch for older Supabase databases.
+-- Keeps Web / Telegram / VK clients in one scheme and lets Web chats be stored.
 
-Что сделано:
+alter table if exists public.sloty_chat_threads
+  drop constraint if exists sloty_chat_threads_channel_check;
 
-1. Telegram-кнопки клиента теперь реально обрабатываются webhook-ом:
-   - «Подтвердить» переводит запись в `confirmed`.
-   - «Перенос» переводит запись в `cancelled`, проставляет `cancel_reason = client_reschedule_requested` и освобождает слот.
+alter table if exists public.sloty_chat_threads
+  add constraint sloty_chat_threads_channel_check
+  check (channel in ('Telegram', 'Instagram', 'VK', 'Web'));
 
-2. Добавлен такой же сценарий для VK:
-   - при создании записи создаётся индивидуальная VK-ссылка на бот;
-   - клиент открывает VK, бот привязывает `peer_id` к конкретной записи;
-   - VK-напоминания получают кнопки «Подтвердить» и «Перенос».
+create table if not exists public.sloty_clients (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references public.sloty_workspaces(id) on delete cascade,
+  name text not null,
+  phone text not null default '',
+  phone_normalized text generated always as (regexp_replace(coalesce(phone, ''), '\\D', '', 'g')) stored,
+  segment text not null default 'new' check (segment in ('new', 'regular', 'sleeping')),
+  source text,
+  is_vip boolean not null default false,
+  last_visit date,
+  next_visit date,
+  total_visits integer not null default 0,
+  total_revenue numeric not null default 0,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
 
-3. Действия клиента объединены с чатами:
-   - подтверждение добавляет системное сообщение в чат;
-   - запрос переноса создаёт системное сообщение, поднимает чат в priority/followup и добавляет `metadata.activeAlert`;
-   - карточка чата и шапка диалога показывают жёлтое предупреждение «Клиент хочет перенос».
-
-4. Мастер получает уведомления:
-   - в Telegram, если Telegram подключён;
-   - в VK, если VK-бот подключён и сообщения разрешены.
-
-5. Ответы мастера из сайта теперь умеют уходить не только в Telegram, но и в VK, если чат VK-привязанный.
-
-Что нужно загрузить в Supabase:
-
-- Запустить миграцию:
-  `supabase/migrations/20260502_0025_clickbook_vk_client_booking_reschedule.sql`
-
-Она создаёт таблицу `sloty_booking_vk_links` и добавляет недостающие поля для статусов/metadata/чатов.
-
-Проверка:
-
-- Локальная синтаксическая проверка изменённых TS/TSX-файлов пройдена: `OK`.
-- Полный `tsc --noEmit` в этом окружении не проверен корректно, потому что здесь нет полноценного `node_modules`/типов Next/React и `pnpm` не установлен.
+create index if not exists sloty_clients_workspace_phone_idx
+  on public.sloty_clients(workspace_id, phone_normalized);

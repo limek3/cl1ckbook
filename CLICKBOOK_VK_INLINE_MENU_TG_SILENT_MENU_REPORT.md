@@ -1,8 +1,16 @@
-# ClickBook VK/TG bot menu fix
+# ClickBook VK OAuth invalid scope fix
 
-- VK client controls are now inline buttons under the active bot card, matching VK UI: buttons are attached to the message instead of a noisy technical reply-keyboard message.
-- Removed visible service text like “Меню клиента включено. Кнопки доступны...”.
-- VK client booking cards are edited/reused through stored conversation_message_id when possible, so repeated “Мои записи / Выбрать запись” actions do not spam the chat with duplicate cards.
-- Telegram reply keyboard is still enabled, but the technical carrier message is deleted immediately so the client does not see service text.
-- Client booking confirmation in VK now includes the client menu buttons.
-- No SQL migration required.
+Исправлено: классический VK OAuth теперь не отправляет `scope` по умолчанию.
+
+Причина: `oauth.vk.com/authorize` возвращал `invalid scope`, если в ENV оставался `vkid.personal_info email` от VK ID или если приложение VK не принимало `email` scope.
+
+Теперь вход использует только обязательный authorization-code flow: `code` -> `access_token` -> `user_id` -> `users.get`. Email необязателен.
+
+Рекомендуемый ENV:
+
+```env
+VK_ID_CLIENT_ID=54575151
+VK_ID_CLIENT_SECRET=новый_защищённый_ключ
+VK_ID_REDIRECT_URI=https://www.кликбук.рф/api/auth/vk/callback
+VK_ID_SCOPE=
+```

@@ -1,21 +1,21 @@
-# ClickBook Mini App — Redesign V2
+# ClickBook Mini App stable auth patch — 2026-05-04
 
-Переделана мобильная mini app-оболочка с нуля в `components/mini/mini-app-entry.tsx`.
+Что исправлено:
 
-## Что изменено
+1. `/api/auth/telegram-miniapp` больше не вызывает `admin.auth.admin.createUser()` для Mini App входа.
+   - Если Telegram-аккаунт уже связан, используется существующий `sloty_telegram_accounts.user_id`.
+   - Если связи ещё нет, создаётся стабильный детерминированный UUID по `telegram_id`.
+   - Сессия остаётся через `clickbook_auth_session` + `X-ClickBook-App-Session`.
 
-- Новая мобильная структура: `Сегодня`, `График`, `Услуги`, `Чаты`, `Ещё`.
-- Экран `Сегодня` теперь рабочий: ближайшая запись, выбор дня, лента записей, быстрые действия.
-- `График` сделан как мобильный редактор недели: день, короткий день, выходной, рабочее окно, перерыв.
-- `Услуги` сохраняются в `workspaceData.services` и синхронизируются с `profile.services`.
-- `Чаты` читают `/api/chats`, отправляют ответы через тот же API и обновляют активный диалог после отправки.
-- `Ещё` убирает второстепенное: клиенты, аналитика, профиль, публичная ссылка, переход в полный кабинет.
-- Стилистика приведена ближе к кабинету: строгие карточки, тонкие borders, compact controls, light/dark, accent из appearance.
+2. `requireAuthUser()` больше не пытается на каждом `/api/workspace` и `/api/chats` пересоздавать Supabase Auth user по Telegram app-session.
+   - Это убирает повторяющиеся логи вида `Supabase Auth user create failed, using virtual Telegram user`.
+   - Это убирает лишние подвисания кабинета после входа в Mini App.
 
-## Проверка
+3. Реальная Supabase-сессия через Bearer/cookie всё равно остаётся главнее app-session, чтобы VK/обычный вход не перебивались старым Telegram-токеном.
 
-```bash
-node _syntax_check_local.js components/mini/mini-app-entry.tsx app/app/page.tsx components/system/telegram-miniapp-viewport.tsx app/layout.tsx
-```
+После деплоя:
 
-Результат: OK.
+1. В Vercel сделать redeploy.
+2. Открыть `/auth/signout` в браузере.
+3. В Telegram закрыть Mini App полностью и открыть заново из бота.
+4. Если профиль не создаётся/не сохраняется, выполнить SQL `supabase/migrations/20260502_0018_clickbook_telegram_virtual_user_auth_repair.sql`, потому что public-таблицы не должны требовать FK на `auth.users` для virtual app-session.

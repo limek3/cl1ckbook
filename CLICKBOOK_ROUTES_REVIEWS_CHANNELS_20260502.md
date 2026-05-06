@@ -1,57 +1,13 @@
-# ClickBook — VK/Telegram, адрес, маршрут и отзывы
+# ClickBook slots real-data fix
 
-Что добавлено:
+Fixed the live booking slot chain end-to-end:
 
-1. Экран успешной заявки усилен:
-   - текст теперь просит клиента сразу подключить Telegram или VK;
-   - блок объясняет, что бот пришлёт подтверждение, напоминания, кнопки подтверждения/переноса и маршрут;
-   - кнопки Telegram/VK остаются рядом, если обе ссылки сформированы сервером.
+1. Dashboard availability no longer loses unsaved slot changes when the user immediately leaves the page. The delayed save is no longer cancelled on navigation.
+2. Public profile now falls back to the current in-app workspace state when the master opens their own public page before the public API finishes loading.
+3. Public booking API now reads real saved availability only: workspace JSON data first, normalized `sloty_availability_days` as backup. Demo/default weekly mock availability is not used for live public booking.
+4. Booking validation now checks the same real availability source as the public page.
+5. Availability lookup now lets the latest source win, so date-specific settings override old weekly/default rows.
+6. Workspace section saving now syncs services, availability and templates into normalized Supabase tables for stable public booking and future analytics.
+7. Added SQL migration `20260501_0010_clickbook_availability_sync_hardening.sql` to harden `sloty_services` and `sloty_availability_days`.
 
-2. Профиль мастера получил формат визита:
-   - `Онлайн`;
-   - `По адресу`;
-   - поле адреса;
-   - необязательная ручная ссылка на маршрут.
-
-3. Публичная страница клиента теперь показывает формат визита:
-   - в hero-плашке;
-   - в карточках статистики;
-   - в контактах;
-   - как кнопку «Маршрут», если указан адрес.
-
-4. Напоминания клиенту теперь содержат адрес и маршрут:
-   - Telegram;
-   - VK;
-   - в напоминании за 2 часа добавлен текст «Хорошего визита».
-
-5. Отзывы:
-   - у мастера появилась ссылка `/m/[slug]/review` — её можно скопировать из редактора профиля;
-   - клиент может оставить отзыв по этой ссылке;
-   - отзыв автоматически добавляется в `profile.reviews` мастера;
-   - рейтинг и количество отзывов пересчитываются автоматически;
-   - после отметки визита «пришёл» через Telegram мастер-проверку клиенту отправляется персональная ссылка `/review/[token]` в Telegram/VK, если клиент подключал канал.
-
-Что нужно загрузить в Supabase:
-
-`supabase/migrations/20260502_0026_clickbook_location_routes_reviews.sql`
-
-Миграция создаёт таблицу:
-
-`sloty_booking_review_links`
-
-Она нужна для персональных ссылок отзыва после завершённого визита.
-
-Важно для VK-кнопки на успешной заявке:
-
-Чтобы сервер мог сформировать ссылку `Получить в VK`, в Vercel/Supabase env должны быть VK bot переменные:
-
-- `VK_BOT_GROUP_ID`
-- `NEXT_PUBLIC_VK_BOT_SCREEN_NAME`
-- `VK_BOT_ACCESS_TOKEN`
-- `VK_BOT_SECRET`
-- `VK_BOT_CONFIRMATION_CODE`
-
-Проверка:
-
-- Локальная синтаксическая проверка изменённых TS/TSX-файлов пройдена: `OK`.
-- Полный `tsc` не запускался, потому что в архиве нет установленного `node_modules`.
+After deploy, open `/dashboard/availability`, change one slot/day once, wait 1-2 seconds, then open the public page. The selected day should show available times.

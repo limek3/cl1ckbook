@@ -1,79 +1,420 @@
 'use client';
 
-import Image from 'next/image';
+import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
-import { motion, useScroll, useTransform, useInView, AnimatePresence } from 'framer-motion';
+import Image from 'next/image';
+import {
+  motion,
+  useMotionValue,
+  useTransform,
+  useSpring,
+  useInView,
+  AnimatePresence,
+  animate,
+} from 'framer-motion';
 import {
   ArrowRight,
-  CalendarDays,
-  Users,
   Bell,
   BarChart3,
   Building2,
-  Sparkles,
+  CalendarDays,
+  Check,
+  ChevronDown,
+  Layers,
+  Globe,
   Scissors,
+  Sparkles,
+  Star,
+  TrendingDown,
+  Users,
+  Workflow,
   Stethoscope,
   Dumbbell,
   GraduationCap,
   UserRound,
-  Layers,
-  CheckCircle2,
-  Clock,
-  Zap,
-  Shield,
-  TrendingUp,
-  Star,
-  ChevronRight,
-  Globe,
-  MessageSquare,
-  Settings,
   Quote,
-  Phone,
-  PiggyBank,
-  Search,
-  Bot,
-  CreditCard,
-  Check,
-  Copy,
-  Bookmark,
-  Plus,
-  Home,
-  Image as ImageIcon,
-  Calendar,
-  ListChecks,
-  TrendingDown,
-  Workflow,
+  Zap,
   ShieldCheck,
 } from 'lucide-react';
+import { LanguageToggle } from '@/components/shared/language-toggle';
+import { ThemeToggle } from '@/components/shared/theme-toggle';
+import { useLocale } from '@/lib/locale-context';
+import { cn } from '@/lib/utils';
 
-// Brand
 const ACCENT = '#127dfe';
+const ACCENT_ALT = '#7c3aed';
 
-// ───────────────────────── Helpers
-function Container({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <div className={`mx-auto w-full max-w-[1200px] px-6 lg:px-10 ${className}`}>{children}</div>;
+// ─── Stable particles (no hydration mismatch) ────────────────────────────────
+const PARTICLES = Array.from({ length: 24 }, (_, i) => ({
+  id: i,
+  x: ((i * 41 + 11) % 92) + 4,
+  y: ((i * 29 + 7) % 88) + 6,
+  r: 1.2 + (i % 4) * 0.8,
+  dur: 8 + (i % 5) * 2,
+  delay: (i * 0.7) % 7,
+  op: 0.12 + (i % 6) * 0.05,
+}));
+
+// ─── Copy ─────────────────────────────────────────────────────────────────────
+const COPY = {
+  ru: {
+    nav: [
+      ['#features', 'Возможности'],
+      ['#who', 'Для кого'],
+      ['#how', 'Как работает'],
+      ['#proof', 'Отзывы'],
+    ],
+    login: 'Войти',
+    ctaTop: 'Попробовать',
+    hero: {
+      badge: 'Онлайн-запись нового поколения',
+      title1: 'Запись клиентов',
+      title2: 'без хаоса',
+      title3: 'в мессенджерах',
+      sub: 'КликБук объединяет расписание, клиентскую базу и аналитику в одном понятном кабинете.',
+      cta1: 'Начать бесплатно',
+      cta2: 'Смотреть демо',
+      trust: ['Без карты', 'Бесплатный старт', '5 минут до запуска'],
+      chips: [
+        { label: 'Новая запись', sub: 'Дарья · Маникюр' },
+        { label: '+38% записей', sub: 'за этот месяц' },
+        { label: 'Напоминание', sub: 'Анна · 16:00' },
+      ],
+    },
+    why: {
+      eyebrow: 'Зачем',
+      title: 'От хаоса — к спокойному рабочему дню',
+      before: {
+        tag: 'Раньше',
+        items: [
+          'Записи теряются в десяти чатах',
+          'Двойные брони и пропущенные визиты',
+          'Нет данных о клиентах и доходе',
+          'Часы ручной рутины каждый день',
+        ],
+      },
+      after: {
+        tag: 'С КликБук',
+        items: [
+          'Всё расписание в одном экране',
+          'Авто-напоминания убирают no-show',
+          'База клиентов и история за секунду',
+          'Аналитика и выручка в реальном времени',
+        ],
+      },
+    },
+    features: {
+      eyebrow: 'Возможности',
+      title: 'Всё нужное — в одном продукте',
+      sub: 'Один продукт вместо десяти таблиц и чатов.',
+      items: [
+        { title: 'Онлайн-запись', desc: 'Клиент выбирает услугу и время — без звонков.' },
+        { title: 'Расписание', desc: 'Удобный календарь по сотрудникам и локациям.' },
+        { title: 'База клиентов', desc: 'Карточки, история и контакты каждого.' },
+        { title: 'Напоминания', desc: 'Авто-уведомления убирают отмены.' },
+        { title: 'Команда', desc: 'Роли, графики и несколько точек.' },
+        { title: 'Аналитика', desc: 'Выручка и повторы в реальном времени.' },
+        { title: 'Услуги', desc: 'Гибкое управление ценами и категориями.' },
+        { title: 'Интеграции', desc: 'Виджет, Telegram и VK.' },
+      ],
+    },
+    who: {
+      eyebrow: 'Для кого',
+      title: 'Для бизнеса любого масштаба',
+      sub: 'От частного мастера до сети филиалов.',
+      items: [
+        { title: 'Красота', desc: 'Салоны, барбершопы, маникюр, косметология.' },
+        { title: 'Здоровье', desc: 'Массажисты, wellness, частные приёмы.' },
+        { title: 'Спорт', desc: 'Тренеры, студии, йога, фитнес.' },
+        { title: 'Обучение', desc: 'Репетиторы, курсы, мастер-классы.' },
+        { title: 'Специалисты', desc: 'Самозанятые эксперты и консультанты.' },
+        { title: 'Сети', desc: 'Команды с филиалами и сложным расписанием.' },
+      ],
+    },
+    how: {
+      eyebrow: 'Как работает',
+      title: 'Запуск за 5 минут — без обучения',
+      steps: [
+        { n: '01', title: 'Создайте страницу', desc: 'Зарегистрируйтесь и оформите профиль за 2 минуты.' },
+        { n: '02', title: 'Добавьте услуги', desc: 'Услуги, цены, длительность и расписание.' },
+        { n: '03', title: 'Клиенты записываются', desc: 'Делитесь ссылкой или встраивайте виджет.' },
+        { n: '04', title: 'Управляйте всем', desc: 'Расписание, напоминания, аналитика, выручка.' },
+      ],
+    },
+    proof: {
+      eyebrow: 'Результаты',
+      title: 'Бизнесы уже растут с КликБук',
+      stats: [
+        { val: 78, suffix: '%', pre: 'до', label: 'меньше пропущенных' },
+        { val: 2500, suffix: '+', pre: '', label: 'активных бизнесов' },
+        { val: 5, suffix: ' мин', pre: '', label: 'до запуска страницы' },
+        { val: 24, suffix: '/7', pre: '', label: 'онлайн-запись' },
+      ],
+      reviews: [
+        {
+          text: 'Раньше расписание было в трёх таблицах и голове администратора. Теперь всё в одном месте — и клиенты записываются сами.',
+          name: 'Анна Лебедева',
+          role: 'Студия маникюра',
+        },
+        {
+          text: 'Количество no-show упало почти в три раза. Напоминания делают своё дело, сотрудники видят расписание в телефоне.',
+          name: 'Дмитрий Орлов',
+          role: 'Барбершоп, 2 филиала',
+        },
+        {
+          text: 'Запустили страницу записи за вечер. Через неделю поняли, что без аналитики уже не сможем.',
+          name: 'Марина Соколова',
+          role: 'Косметолог',
+        },
+      ],
+    },
+    cta: {
+      badge: 'Бесплатный старт',
+      title: 'Запустите онлайн-запись уже сегодня',
+      sub: 'Создайте страницу записи за 5 минут — клиенты начнут записываться сами.',
+      btn1: 'Начать с КликБук',
+      btn2: 'Смотреть демо',
+      trust: ['Без карты', '5 минут до запуска', 'Поддержка 24/7'],
+    },
+    footer: `© ${new Date().getFullYear()} КликБук. Все права защищены.`,
+  },
+  en: {
+    nav: [
+      ['#features', 'Features'],
+      ['#who', 'For whom'],
+      ['#how', 'How it works'],
+      ['#proof', 'Reviews'],
+    ],
+    login: 'Sign in',
+    ctaTop: 'Try free',
+    hero: {
+      badge: 'Next-generation booking platform',
+      title1: 'Client booking',
+      title2: 'without chaos',
+      title3: 'in messengers',
+      sub: 'ClickBook unifies schedule, client database, and analytics in one clear workspace.',
+      cta1: 'Start for free',
+      cta2: 'View demo',
+      trust: ['No card required', 'Free start', '5 min to launch'],
+      chips: [
+        { label: 'New booking', sub: 'Daria · Nails' },
+        { label: '+38% bookings', sub: 'this month' },
+        { label: 'Reminder sent', sub: 'Anna · 16:00' },
+      ],
+    },
+    why: {
+      eyebrow: 'Why',
+      title: 'From chaos to a calm workday',
+      before: {
+        tag: 'Before',
+        items: [
+          'Bookings lost in ten chats',
+          'Double bookings and missed visits',
+          'No client data or revenue insight',
+          'Hours of manual work every day',
+        ],
+      },
+      after: {
+        tag: 'With ClickBook',
+        items: [
+          'Full schedule in one screen',
+          'Auto-reminders eliminate no-shows',
+          'Client base and history in seconds',
+          'Real-time analytics and revenue',
+        ],
+      },
+    },
+    features: {
+      eyebrow: 'Features',
+      title: 'Everything you need — in one product',
+      sub: 'One product instead of ten spreadsheets and chats.',
+      items: [
+        { title: 'Online booking', desc: 'Client picks a service and time — no calls.' },
+        { title: 'Calendar', desc: 'Schedule view by staff and locations.' },
+        { title: 'Client base', desc: 'Cards, history, and contacts for everyone.' },
+        { title: 'Reminders', desc: 'Auto-notifications reduce cancellations.' },
+        { title: 'Team', desc: 'Roles, schedules, multiple locations.' },
+        { title: 'Analytics', desc: 'Revenue and repeats in real time.' },
+        { title: 'Services', desc: 'Flexible price and category management.' },
+        { title: 'Integrations', desc: 'Widget, Telegram, and VK.' },
+      ],
+    },
+    who: {
+      eyebrow: 'For whom',
+      title: 'For businesses of any scale',
+      sub: 'From solo specialist to a network of branches.',
+      items: [
+        { title: 'Beauty', desc: 'Salons, barbershops, nails, cosmetology.' },
+        { title: 'Health', desc: 'Massage, wellness, private practice.' },
+        { title: 'Fitness', desc: 'Trainers, studios, yoga, gyms.' },
+        { title: 'Education', desc: 'Tutors, courses, workshops.' },
+        { title: 'Specialists', desc: 'Freelancers, experts, consultants.' },
+        { title: 'Networks', desc: 'Teams with branches and complex schedules.' },
+      ],
+    },
+    how: {
+      eyebrow: 'How it works',
+      title: 'Launch in 5 minutes — no training',
+      steps: [
+        { n: '01', title: 'Create your page', desc: 'Sign up and set up your profile in 2 minutes.' },
+        { n: '02', title: 'Add services', desc: 'Services, prices, duration, and schedule.' },
+        { n: '03', title: 'Clients book', desc: 'Share a link or embed a widget.' },
+        { n: '04', title: 'Manage everything', desc: 'Schedule, reminders, analytics, revenue.' },
+      ],
+    },
+    proof: {
+      eyebrow: 'Results',
+      title: 'Businesses growing with ClickBook',
+      stats: [
+        { val: 78, suffix: '%', pre: 'up to', label: 'fewer missed bookings' },
+        { val: 2500, suffix: '+', pre: '', label: 'active businesses' },
+        { val: 5, suffix: ' min', pre: '', label: 'to launch a page' },
+        { val: 24, suffix: '/7', pre: '', label: 'online booking' },
+      ],
+      reviews: [
+        {
+          text: 'Before, the schedule was in three spreadsheets and the admin\'s head. Now everything is in one place and clients book themselves.',
+          name: 'Anna Lebedeva',
+          role: 'Nail studio',
+        },
+        {
+          text: 'No-shows dropped by almost three times. Reminders do their job, staff see the schedule on their phones.',
+          name: 'Dmitry Orlov',
+          role: 'Barbershop, 2 locations',
+        },
+        {
+          text: 'We launched a booking page in an evening. A week later we realized we can\'t work without analytics.',
+          name: 'Marina Sokolova',
+          role: 'Cosmetologist',
+        },
+      ],
+    },
+    cta: {
+      badge: 'Free start',
+      title: 'Launch online booking today',
+      sub: 'Create a booking page in 5 minutes — clients will book themselves.',
+      btn1: 'Start with ClickBook',
+      btn2: 'View demo',
+      trust: ['No card required', '5 minutes to launch', 'Support 24/7'],
+    },
+    footer: `© ${new Date().getFullYear()} ClickBook. All rights reserved.`,
+  },
+} as const;
+
+const FEATURE_ICONS = [Globe, CalendarDays, Users, Bell, Building2, BarChart3, Sparkles, Workflow];
+const WHO_ICONS = [Scissors, Stethoscope, Dumbbell, GraduationCap, UserRound, Layers];
+const CARD_COLORS = [
+  '#127dfe', '#7c3aed', '#0ea5e9', '#10b981',
+  '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4',
+];
+
+// ─── Animated counter ─────────────────────────────────────────────────────────
+function Counter({ target, suffix = '', pre = '' }: { target: number; suffix?: string; pre?: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true });
+
+  useEffect(() => {
+    if (!inView || !ref.current) return;
+    const node = ref.current;
+    const ctrl = animate(0, target, {
+      duration: 2.4,
+      ease: [0.16, 1, 0.3, 1],
+      onUpdate(v) {
+        node.textContent =
+          (pre ? pre + ' ' : '') +
+          (target >= 1000 ? Math.round(v).toLocaleString('ru') : Math.round(v)) +
+          suffix;
+      },
+    });
+    return () => ctrl.stop();
+  }, [inView, target, suffix, pre]);
+
+  return (
+    <span ref={ref}>
+      {pre ? pre + ' ' : ''}0{suffix}
+    </span>
+  );
 }
 
-function Reveal({
+// ─── Magnetic button ──────────────────────────────────────────────────────────
+function MagBtn({
+  href,
   children,
-  delay = 0,
-  y = 24,
+  variant = 'primary',
   className = '',
 }: {
+  href: string;
   children: React.ReactNode;
-  delay?: number;
-  y?: number;
+  variant?: 'primary' | 'ghost';
   className?: string;
 }) {
+  const ref = useRef<HTMLAnchorElement>(null);
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const sx = useSpring(x, { stiffness: 180, damping: 16 });
+  const sy = useSpring(y, { stiffness: 180, damping: 16 });
+
+  const onMove = useCallback((e: React.MouseEvent) => {
+    if (!ref.current) return;
+    const r = ref.current.getBoundingClientRect();
+    x.set((e.clientX - (r.left + r.width / 2)) * 0.32);
+    y.set((e.clientY - (r.top + r.height / 2)) * 0.32);
+  }, [x, y]);
+
+  const onLeave = useCallback(() => {
+    x.set(0);
+    y.set(0);
+  }, [x, y]);
+
+  return (
+    <motion.a
+      ref={ref}
+      href={href}
+      style={{ x: sx, y: sy }}
+      onMouseMove={onMove}
+      onMouseLeave={onLeave}
+      whileTap={{ scale: 0.96 }}
+      className={cn(
+        'group inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-3.5 text-[14px] font-semibold transition-all duration-200',
+        variant === 'primary'
+          ? 'bg-[#127dfe] text-white shadow-[0_16px_40px_-12px_rgba(18,125,254,0.6)] hover:shadow-[0_24px_48px_-12px_rgba(18,125,254,0.75)] hover:brightness-110'
+          : 'border border-current/20 bg-white/8 text-current backdrop-blur hover:bg-white/14',
+        className,
+      )}
+    >
+      {children}
+    </motion.a>
+  );
+}
+
+// ─── 3D tilt card ─────────────────────────────────────────────────────────────
+function TiltCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { once: true, margin: '-80px' });
+  const rx = useMotionValue(0);
+  const ry = useMotionValue(0);
+  const srx = useSpring(rx, { stiffness: 120, damping: 18 });
+  const sry = useSpring(ry, { stiffness: 120, damping: 18 });
+
+  const onMove = (e: React.MouseEvent) => {
+    if (!ref.current) return;
+    const r = ref.current.getBoundingClientRect();
+    const nx = (e.clientX - r.left) / r.width - 0.5;
+    const ny = (e.clientY - r.top) / r.height - 0.5;
+    rx.set(-ny * 10);
+    ry.set(nx * 10);
+  };
+
+  const onLeave = () => {
+    rx.set(0);
+    ry.set(0);
+  };
+
   return (
     <motion.div
       ref={ref}
-      initial={{ opacity: 0, y }}
-      animate={inView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.7, delay, ease: [0.21, 0.47, 0.32, 0.98] }}
+      style={{ rotateX: srx, rotateY: sry, transformPerspective: 900 }}
+      onMouseMove={onMove}
+      onMouseLeave={onLeave}
       className={className}
     >
       {children}
@@ -81,1499 +422,954 @@ function Reveal({
   );
 }
 
-function Eyebrow({ children }: { children: React.ReactNode }) {
+// ─── Eyebrow pill ─────────────────────────────────────────────────────────────
+function Eyebrow({ children, light = false }: { children: React.ReactNode; light?: boolean }) {
   return (
-    <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-slate-600 shadow-[0_1px_0_rgba(15,23,42,0.04)]">
-      <span className="h-1.5 w-1.5 rounded-full" style={{ background: ACCENT }} />
+    <div
+      className={cn(
+        'inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]',
+        light
+          ? 'border border-white/20 bg-white/10 text-white/80'
+          : 'border border-[#127dfe]/20 bg-[#127dfe]/8 text-[#127dfe] dark:border-[#127dfe]/30 dark:bg-[#127dfe]/12',
+      )}
+    >
+      <span className="h-1.5 w-1.5 rounded-full bg-current" />
       {children}
     </div>
   );
 }
 
-function PrimaryButton({
-  children,
-  href = '#cta',
-  className = '',
-}: {
-  children: React.ReactNode;
-  href?: string;
-  className?: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`group relative inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-6 py-3.5 text-[14px] font-semibold text-white shadow-[0_14px_30px_-12px_rgba(15,23,42,0.6)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-black hover:shadow-[0_20px_42px_-12px_rgba(15,23,42,0.8)] active:translate-y-0 ${className}`}
-    >
-      <span>{children}</span>
-      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-    </Link>
-  );
-}
+// ─── Slide nav dots ───────────────────────────────────────────────────────────
+const SLIDE_IDS = ['hero', 'why', 'features', 'who', 'how', 'proof', 'cta'] as const;
+const SLIDE_LABELS_RU = ['Старт', 'Зачем', 'Возможности', 'Для кого', 'Как', 'Отзывы', 'Запуск'];
+const SLIDE_LABELS_EN = ['Start', 'Why', 'Features', 'For whom', 'How', 'Reviews', 'Launch'];
 
-function GhostButton({
-  children,
-  href = '#features',
-  className = '',
-}: {
-  children: React.ReactNode;
-  href?: string;
-  className?: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-6 py-3.5 text-[14px] font-semibold text-slate-800 transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_10px_24px_-12px_rgba(15,23,42,0.2)] ${className}`}
-    >
-      {children}
-    </Link>
-  );
-}
+function SideNav({ locale }: { locale: string }) {
+  const [active, setActive] = useState(0);
+  const labels = locale === 'en' ? SLIDE_LABELS_EN : SLIDE_LABELS_RU;
 
-// ───────────────────────── Header
-function Header() {
-  const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    const els = SLIDE_IDS.map((id) => document.getElementById(id)).filter(Boolean) as HTMLElement[];
+    if (!els.length) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            const idx = SLIDE_IDS.indexOf(e.target.id as typeof SLIDE_IDS[number]);
+            if (idx !== -1) setActive(idx);
+          }
+        });
+      },
+      { threshold: 0.5 },
+    );
+    els.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
   }, []);
 
   return (
-    <header
-      className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
+    <nav className="fixed right-4 top-1/2 z-50 hidden -translate-y-1/2 lg:flex">
+      <div className="flex flex-col items-end gap-3">
+        {SLIDE_IDS.map((id, i) => (
+          <a
+            key={id}
+            href={`#${id}`}
+            className="group flex items-center gap-2"
+            title={labels[i]}
+          >
+            <span
+              className={cn(
+                'text-[10px] font-semibold tracking-wide transition-all duration-300',
+                active === i
+                  ? 'text-[#127dfe] opacity-100'
+                  : 'text-black/30 opacity-0 group-hover:opacity-100 dark:text-white/30',
+              )}
+            >
+              {labels[i]}
+            </span>
+            <span
+              className={cn(
+                'block rounded-full transition-all duration-300',
+                active === i
+                  ? 'h-7 w-2 bg-[#127dfe] shadow-[0_0_12px_rgba(18,125,254,0.7)]'
+                  : 'h-2 w-2 bg-black/20 group-hover:bg-black/40 dark:bg-white/20 dark:group-hover:bg-white/40',
+              )}
+            />
+          </a>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
+// ─── Header ───────────────────────────────────────────────────────────────────
+function LandingHeader({ t }: { t: typeof COPY.ru }) {
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const cb = () => setScrolled(window.scrollY > 12);
+    cb();
+    window.addEventListener('scroll', cb, { passive: true });
+    return () => window.removeEventListener('scroll', cb);
+  }, []);
+
+  return (
+    <motion.header
+      initial={{ y: -20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+      className={cn(
+        'fixed inset-x-0 top-0 z-40 transition-all duration-300',
         scrolled
-          ? 'border-b border-slate-200/70 bg-white/85 backdrop-blur-xl'
-          : 'border-b border-transparent bg-transparent'
-      }`}
+          ? 'border-b border-black/8 bg-white/80 shadow-[0_4px_24px_rgba(0,0,0,0.06)] backdrop-blur-xl dark:border-white/8 dark:bg-black/70'
+          : 'bg-transparent',
+      )}
     >
-      <Container className="flex h-16 items-center justify-between">
-        <Link href="/landing" className="flex items-center gap-2">
+      <div className="mx-auto flex h-16 max-w-[1280px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        <Link href="/landing" className="flex items-center">
           <Image
             src="/brand/clickbook-logo-dark-transparent.png"
             alt="КликБук"
             width={140}
             height={32}
-            className="h-7 w-auto"
+            className="h-7 w-auto dark:hidden"
             priority
           />
+          <Image
+            src="/brand/clickbook-logo-light-transparent.png"
+            alt="КликБук"
+            width={140}
+            height={32}
+            className="hidden h-7 w-auto dark:block"
+            priority
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+          <span className="hidden text-[20px] font-bold tracking-[-0.04em] text-foreground [.dark_&]:hidden">
+          </span>
         </Link>
 
-        <nav className="hidden items-center gap-7 md:flex">
-          {[
-            ['Возможности', '#features'],
-            ['Для кого', '#segments'],
-            ['Как работает', '#how'],
-            ['Тарифы', '#pricing'],
-          ].map(([label, href]) => (
+        <nav className="hidden items-center gap-6 md:flex">
+          {t.nav.map(([href, label]) => (
             <a
               key={href}
-              href={href}
-              className="text-[13.5px] font-medium text-slate-600 transition-colors hover:text-slate-900"
+              href={href as string}
+              className="text-[13px] font-medium text-black/60 transition-colors hover:text-black dark:text-white/56 dark:hover:text-white"
             >
               {label}
             </a>
           ))}
         </nav>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
+          <LanguageToggle compact minimal />
+          <ThemeToggle compact minimal />
           <Link
             href="/login"
-            className="hidden text-[13.5px] font-medium text-slate-600 transition-colors hover:text-slate-900 sm:inline"
+            className="hidden text-[13px] font-medium text-black/60 transition hover:text-black dark:text-white/56 dark:hover:text-white sm:inline"
           >
-            Войти
+            {t.login}
           </Link>
-          <PrimaryButton href="#cta" className="!px-4 !py-2.5 !text-[13px]">
-            Попробовать
-          </PrimaryButton>
+          <motion.a
+            href="#cta"
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[#127dfe] px-4 py-2 text-[13px] font-semibold text-white shadow-[0_8px_24px_-6px_rgba(18,125,254,0.5)] transition-all hover:shadow-[0_12px_32px_-6px_rgba(18,125,254,0.65)]"
+          >
+            {t.ctaTop}
+            <ArrowRight className="h-3.5 w-3.5" />
+          </motion.a>
         </div>
-      </Container>
-    </header>
+      </div>
+    </motion.header>
   );
 }
 
-// ───────────────────────── Hero
-function Hero() {
+// ─── SLIDE 1 · HERO ───────────────────────────────────────────────────────────
+function HeroSlide({ t }: { t: typeof COPY.ru }) {
   const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] });
-  const yMockup = useTransform(scrollYProgress, [0, 1], [0, -60]);
-  const opacityMockup = useTransform(scrollYProgress, [0, 0.6], [1, 0.4]);
+  const inView = useInView(ref, { once: true, margin: '-100px' });
+
+  const words = [t.hero.title1, t.hero.title2, t.hero.title3];
 
   return (
-    <section ref={ref} className="relative overflow-hidden pt-32 pb-20 lg:pt-40 lg:pb-28">
-      {/* Ambient gradients */}
-      <div className="pointer-events-none absolute inset-0 -z-10">
-        <div
-          className="absolute -top-40 left-1/2 h-[680px] w-[680px] -translate-x-1/2 rounded-full opacity-50 blur-[120px]"
-          style={{
-            background: 'radial-gradient(circle at center, rgba(18,125,254,0.22), rgba(18,125,254,0) 70%)',
-          }}
+    <section
+      id="hero"
+      ref={ref}
+      className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-white pt-16 dark:bg-[#06080f]"
+    >
+      {/* Animated gradient blobs */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <motion.div
+          animate={{ x: [0, 60, 0], y: [0, -40, 0], scale: [1, 1.15, 1] }}
+          transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute -left-40 -top-40 h-[600px] w-[600px] rounded-full opacity-30 blur-[100px] dark:opacity-20"
+          style={{ background: `radial-gradient(circle, ${ACCENT}, transparent 70%)` }}
         />
-        <div className="absolute right-0 top-40 h-[420px] w-[420px] rounded-full bg-violet-100/50 blur-3xl" />
-        <div className="absolute left-0 top-60 h-[380px] w-[380px] rounded-full bg-cyan-100/40 blur-3xl" />
+        <motion.div
+          animate={{ x: [0, -50, 0], y: [0, 50, 0], scale: [1, 1.1, 1] }}
+          transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut', delay: 3 }}
+          className="absolute -right-40 bottom-0 h-[500px] w-[500px] rounded-full opacity-25 blur-[100px] dark:opacity-18"
+          style={{ background: `radial-gradient(circle, ${ACCENT_ALT}, transparent 70%)` }}
+        />
+        <motion.div
+          animate={{ x: [0, 30, -20, 0], y: [0, -30, 20, 0] }}
+          transition={{ duration: 25, repeat: Infinity, ease: 'easeInOut', delay: 6 }}
+          className="absolute left-1/2 top-1/3 h-[400px] w-[400px] -translate-x-1/2 rounded-full opacity-15 blur-[120px]"
+          style={{ background: `radial-gradient(circle, #0ea5e9, transparent 70%)` }}
+        />
       </div>
+
+      {/* Dot grid */}
       <div
-        className="pointer-events-none absolute inset-0 -z-10 opacity-[0.16]"
+        className="pointer-events-none absolute inset-0 opacity-[0.12] dark:opacity-[0.07]"
         style={{
-          backgroundImage:
-            'linear-gradient(rgba(15,23,42,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,0.06) 1px, transparent 1px)',
-          backgroundSize: '52px 52px',
-          maskImage: 'radial-gradient(ellipse at center, black 35%, transparent 75%)',
+          backgroundImage: `radial-gradient(circle, #0a0a14 1px, transparent 1px)`,
+          backgroundSize: '32px 32px',
+          maskImage: 'radial-gradient(ellipse at center, black 30%, transparent 72%)',
         }}
       />
 
-      <Container>
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: [0.21, 0.47, 0.32, 0.98] }}
-          className="mx-auto max-w-3xl text-center"
-        >
-          <Eyebrow>Платформа онлайн-записи нового поколения</Eyebrow>
-          <h1 className="mt-6 text-[44px] font-semibold leading-[1.04] tracking-[-0.035em] text-slate-900 sm:text-[60px] lg:text-[76px]">
-            Онлайн-запись
-            <br />и управление клиентами для{' '}
-            <span className="relative inline-block">
-              <span className="relative z-10">современного бизнеса</span>
-              <motion.span
-                aria-hidden
-                initial={{ scaleX: 0, originX: 0 }}
-                animate={{ scaleX: 1 }}
-                transition={{ duration: 1.1, delay: 0.4, ease: [0.21, 0.47, 0.32, 0.98] }}
-                className="absolute bottom-1 left-0 h-[10px] w-full rounded-full"
-                style={{ background: `${ACCENT}22` }}
-              />
-            </span>
-          </h1>
-          <p className="mx-auto mt-7 max-w-2xl text-[16.5px] leading-relaxed text-slate-600 sm:text-[18px]">
-            КликБук помогает клиентам записываться в пару кликов, а бизнесу — управлять расписанием,
-            сотрудниками, заявками и клиентской базой без хаоса.
-          </p>
-          <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <PrimaryButton href="#cta">Начать бесплатно</PrimaryButton>
-            <GhostButton href="#features">Посмотреть возможности</GhostButton>
-          </div>
-          <div className="mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[12.5px] text-slate-500">
-            {['Бесплатный старт', 'Без карты', 'Запуск за 5 минут'].map((t) => (
-              <span key={t} className="inline-flex items-center gap-1.5">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                {t}
-              </span>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Mockup */}
-        <motion.div style={{ y: yMockup, opacity: opacityMockup }} className="relative mx-auto mt-16 max-w-[1200px]">
-          <div
-            className="absolute -inset-x-10 -inset-y-10 -z-10 rounded-[44px] opacity-70 blur-[80px]"
-            style={{
-              background:
-                'radial-gradient(60% 60% at 50% 40%, rgba(18,125,254,0.25), rgba(18,125,254,0) 70%)',
-            }}
-          />
+      {/* Floating particles */}
+      <div className="pointer-events-none absolute inset-0">
+        {PARTICLES.map((p) => (
           <motion.div
-            initial={{ opacity: 0, y: 60, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 1, delay: 0.3, ease: [0.21, 0.47, 0.32, 0.98] }}
-            className="rounded-[28px] border border-slate-200/80 bg-white/90 p-2.5 shadow-[0_40px_100px_-30px_rgba(15,23,42,0.3)] backdrop-blur-xl"
-          >
-            <DashboardMockMain />
-          </motion.div>
-
-          {/* Floating widgets */}
-          <FloatingChip
-            className="left-[-3%] top-[12%] hidden lg:flex"
-            delay={0.7}
-            icon={<Bell className="h-4 w-4" />}
-            tone="bg-amber-50 text-amber-600"
-            title="Напоминание отправлено"
-            sub="Анна · через 2 часа"
+            key={p.id}
+            className="absolute rounded-full"
+            style={{
+              left: `${p.x}%`,
+              top: `${p.y}%`,
+              width: p.r * 2,
+              height: p.r * 2,
+              background: ACCENT,
+              opacity: p.op,
+            }}
+            animate={{ y: [0, -28, 0], opacity: [p.op, p.op * 2.2, p.op] }}
+            transition={{ duration: p.dur, delay: p.delay, repeat: Infinity, ease: 'easeInOut' }}
           />
-          <FloatingChip
-            className="right-[-3%] top-[34%] hidden lg:flex"
-            delay={0.9}
-            icon={<TrendingUp className="h-4 w-4" />}
-            tone="bg-emerald-50 text-emerald-600"
-            title="+38% записей"
-            sub="за этот месяц"
-          />
-          <FloatingChip
-            className="left-[2%] bottom-[12%] hidden lg:flex"
-            delay={1.1}
-            icon={<MessageSquare className="h-4 w-4" />}
-            tone="bg-violet-50 text-violet-600"
-            title="Новая заявка"
-            sub="Дарья · Маникюр"
-          />
-        </motion.div>
-      </Container>
-    </section>
-  );
-}
-
-function FloatingChip({
-  className = '',
-  icon,
-  title,
-  sub,
-  tone,
-  delay = 0,
-}: {
-  className?: string;
-  icon: React.ReactNode;
-  title: string;
-  sub: string;
-  tone: string;
-  delay?: number;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.8, y: 20 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ duration: 0.6, delay, ease: [0.21, 0.47, 0.32, 0.98] }}
-      className={`absolute z-10 items-center gap-3 rounded-2xl border border-slate-200 bg-white/95 px-3.5 py-2.5 shadow-[0_18px_40px_-12px_rgba(15,23,42,0.18)] backdrop-blur ${className}`}
-    >
-      <motion.div
-        animate={{ y: [0, -3, 0] }}
-        transition={{ duration: 3, repeat: Infinity, delay, ease: 'easeInOut' }}
-        className={`flex h-9 w-9 items-center justify-center rounded-xl ${tone}`}
-      >
-        {icon}
-      </motion.div>
-      <div>
-        <div className="text-[12.5px] font-semibold text-slate-900">{title}</div>
-        <div className="text-[11px] text-slate-500">{sub}</div>
-      </div>
-    </motion.div>
-  );
-}
-
-// ───────────────────────── Mockup primitives (matches platform style)
-function MockSidebar({ active = 'home' }: { active?: 'home' | 'today' | 'stats' }) {
-  const sections = [
-    {
-      title: 'РЕЖИМЫ',
-      items: [
-        { label: 'Рабочий', sub: 'боевой кабинет', icon: <Globe className="h-3.5 w-3.5" />, active: false, dot: true },
-        { label: 'Демо', sub: 'пример профиля', icon: <Sparkles className="h-3.5 w-3.5" />, active: false },
-      ],
-      mode: true,
-    },
-    {
-      title: 'ОСНОВНОЕ',
-      items: [
-        { label: 'Главная', icon: <Home className="h-3.5 w-3.5" />, active: active === 'home' },
-        { label: 'Записи на сегодня', icon: <Calendar className="h-3.5 w-3.5" />, active: active === 'today', badge: '2' },
-        { label: 'Статистика', icon: <BarChart3 className="h-3.5 w-3.5" />, active: active === 'stats' },
-      ],
-    },
-    {
-      title: 'РАБОТА',
-      items: [
-        { label: 'Чаты', icon: <MessageSquare className="h-3.5 w-3.5" />, badge: '[бот]' },
-        { label: 'Клиенты', icon: <Users className="h-3.5 w-3.5" /> },
-      ],
-    },
-    {
-      title: 'ВИТРИНА И ЗАПИСЬ',
-      items: [
-        { label: 'Услуги', icon: <Sparkles className="h-3.5 w-3.5" /> },
-        { label: 'График', icon: <CalendarDays className="h-3.5 w-3.5" /> },
-        { label: 'Шаблоны', icon: <ListChecks className="h-3.5 w-3.5" /> },
-      ],
-    },
-    {
-      title: 'УПРАВЛЕНИЕ',
-      items: [
-        { label: 'Профиль', icon: <UserRound className="h-3.5 w-3.5" /> },
-        { label: 'Внешний вид', icon: <ImageIcon className="h-3.5 w-3.5" /> },
-        { label: 'Уведомления', icon: <Bell className="h-3.5 w-3.5" /> },
-        { label: 'Продвижение', icon: <Zap className="h-3.5 w-3.5" /> },
-      ],
-    },
-    {
-      title: 'ОПЛАТА И ДОСТУП',
-      items: [{ label: 'Подписка', icon: <CreditCard className="h-3.5 w-3.5" /> }],
-    },
-  ];
-
-  return (
-    <aside className="col-span-3 hidden border-r border-slate-200 bg-[#fafbfc] p-3.5 lg:block">
-      <div className="flex items-center gap-2 px-2 pt-1">
-        <Image
-          src="/brand/clickbook-logo-dark-transparent.png"
-          alt="КликБук"
-          width={100}
-          height={20}
-          className="h-5 w-auto"
-        />
-      </div>
-      <div className="mt-1 px-2 text-[10px] text-slate-400">Кабинет мастера</div>
-
-      <div className="relative mt-4 px-1">
-        <Search className="absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-        <input
-          readOnly
-          placeholder="Поиск"
-          className="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-2 text-[11px] text-slate-500 outline-none"
-        />
-      </div>
-
-      <div className="mt-4 space-y-4 px-1">
-        {sections.map((section) => (
-          <div key={section.title}>
-            <div className="px-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-              {section.title}
-            </div>
-            <div className={`mt-2 ${section.mode ? 'grid grid-cols-2 gap-1.5' : 'space-y-0.5'}`}>
-              {section.items.map((it: any) => {
-                if (section.mode) {
-                  return (
-                    <div
-                      key={it.label}
-                      className="rounded-lg border border-slate-200 bg-white px-2 py-1.5"
-                    >
-                      <div className="flex items-center gap-1 text-[10px] font-medium text-slate-700">
-                        <span className="text-slate-500">{it.icon}</span>
-                        {it.label}
-                      </div>
-                      <div className="mt-0.5 text-[9px] text-slate-400">{it.sub}</div>
-                    </div>
-                  );
-                }
-                return (
-                  <div
-                    key={it.label}
-                    className={`flex items-center justify-between rounded-md px-2 py-1.5 text-[11px] font-medium transition ${
-                      it.active ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      <span className={it.active ? 'text-white' : 'text-slate-500'}>{it.icon}</span>
-                      {it.label}
-                    </span>
-                    {it.badge && (
-                      <span
-                        className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${
-                          it.active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
-                        }`}
-                      >
-                        {it.badge}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
         ))}
       </div>
-    </aside>
-  );
-}
 
-function MockProfileFooter() {
-  return (
-    <div className="hidden border-t border-slate-200 bg-[#fafbfc] px-4 py-2.5 lg:block">
-      <div className="flex items-center gap-2.5">
-        <div className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-[10px] font-semibold text-slate-600">
-          Б
-        </div>
-        <div className="flex-1">
-          <div className="text-[11px] font-semibold text-slate-900">Борис</div>
-          <div className="text-[9px] text-slate-500">@admin</div>
-        </div>
-        <Bookmark className="h-3.5 w-3.5 text-slate-400" />
-      </div>
-    </div>
-  );
-}
+      <div className="relative z-10 mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-4xl text-center">
+          {/* Badge */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={inView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <Eyebrow>{t.hero.badge}</Eyebrow>
+          </motion.div>
 
-function MetricTile({
-  label,
-  value,
-  hint,
-  icon,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  icon?: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="text-[10px] font-medium text-slate-500">{label}</div>
-        {icon && (
-          <div className="flex h-6 w-6 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-500">
-            {icon}
-          </div>
-        )}
-      </div>
-      <div className="mt-1.5 text-[20px] font-semibold leading-none tracking-tight text-slate-900">
-        {value}
-      </div>
-      {hint && <div className="mt-1.5 text-[9.5px] text-slate-400">{hint}</div>}
-    </div>
-  );
-}
-
-function MockSection({
-  title,
-  desc,
-  children,
-}: {
-  title: string;
-  desc?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <div className="mb-3">
-        <div className="text-[13px] font-semibold tracking-tight text-slate-900">{title}</div>
-        {desc && <div className="mt-0.5 text-[10.5px] text-slate-500">{desc}</div>}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-// ───────────────────────── Mockups
-function DashboardMockMain() {
-  return (
-    <div className="overflow-hidden rounded-[20px] border border-slate-200 bg-[#f5f6f8]">
-      {/* topbar */}
-      <div className="flex items-center justify-between border-b border-slate-200 bg-white px-3 py-2">
-        <div className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-rose-300" />
-          <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
-          <span className="h-2.5 w-2.5 rounded-full bg-emerald-300" />
-        </div>
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-0.5 text-[10px] text-slate-500">
-          app.klikbuk.com
-        </div>
-        <div className="h-2.5 w-12" />
-      </div>
-
-      <div className="grid grid-cols-12">
-        <MockSidebar active="home" />
-
-        <main className="col-span-12 flex flex-col lg:col-span-9">
-          <div className="flex-1 px-5 py-5 lg:px-7 lg:py-6">
-            <div>
-              <div className="text-[26px] font-semibold leading-tight tracking-[-0.025em] text-slate-900 sm:text-[32px]">
-                Кабинет мастера
-              </div>
-              <div className="mt-1.5 text-[12px] text-slate-500">
-                Минималистичный рабочий экран: записи, публичная ссылка, деньги, трафик и клиенты без шума.
-              </div>
-            </div>
-
-            {/* Persona link */}
-            <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
-              <div className="text-[10px] font-medium text-slate-500">Персональная ссылка</div>
-              <div className="mt-1 flex items-center gap-3">
-                <div className="text-[26px] font-semibold tracking-tight text-slate-900 sm:text-[32px]">
-                  /m/klikbuk-demo
-                </div>
-                <button className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-500 transition hover:bg-slate-100">
-                  <Copy className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              <div className="mt-1 text-[11px] text-slate-500">
-                Отправляйте клиентам или закрепите в Telegram / Instagram.
-              </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-                <MetricTile label="Конверсия" value="100%" hint="конверсия" />
-                <MetricTile label="Новые клиенты" value="10" hint="новых за 30 дней" />
-                <MetricTile label="Источник" value="Web" hint="channel" />
-                <MetricTile label="Визиты" value="10" hint="визитов" />
-              </div>
-            </div>
-
-            {/* Metrics */}
-            <div className="mt-3 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-              <MetricTile
-                label="Заявки сегодня"
-                value="10"
-                hint="7 запланировано"
-                icon={<Calendar className="h-3 w-3" />}
-              />
-              <MetricTile
-                label="Факт недели"
-                value="2 750 ₽"
-                hint="средний чек 1 375 ₽"
-                icon={<PiggyBank className="h-3 w-3" />}
-              />
-              <MetricTile
-                label="Просмотры"
-                value="10"
-                hint="100% конверсия"
-                icon={<Globe className="h-3 w-3" />}
-              />
-              <MetricTile
-                label="Повторные"
-                value="0%"
-                hint="10 новых за 30 дней"
-                icon={<Users className="h-3 w-3" />}
-              />
-            </div>
-
-            {/* Two columns */}
-            <div className="mt-3 grid gap-3 lg:grid-cols-2">
-              <MockSection title="Ближайшая запись" desc="Клиент в фокусе и очередь после него.">
-                <div className="rounded-xl border border-slate-200 bg-[#fafbfc] p-3.5">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-1.5 text-[10px]">
-                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: ACCENT }} />
-                      <span className="font-medium text-slate-700">В фокусе</span>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-[9px] text-slate-400">Следующая запись</div>
-                      <div className="text-[10px] font-medium text-slate-700">30 апр · 16:00</div>
-                    </div>
-                  </div>
-                  <div className="mt-2.5 flex items-end justify-between">
-                    <div>
-                      <div className="text-[20px] font-semibold tracking-tight text-slate-900">Дарья</div>
-                      <div className="text-[10.5px] text-slate-500">Укрепление гелем</div>
-                    </div>
-                    <div className="text-right">
-                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold text-emerald-600">
-                        Пришёл
-                      </span>
-                    </div>
-                  </div>
-                  <div className="mt-3 grid grid-cols-3 gap-1.5">
-                    <div className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[9px]">
-                      <div className="text-slate-400">Слот</div>
-                      <div className="font-semibold text-slate-700">30 апр · 16:00</div>
-                    </div>
-                    <div className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[9px]">
-                      <div className="text-slate-400">Телефон</div>
-                      <div className="font-semibold text-slate-700">+7 999 ···</div>
-                    </div>
-                    <div className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[9px]">
-                      <div className="text-slate-400">Статус</div>
-                      <div className="font-semibold text-emerald-600">Пришёл</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-3 text-[10px] font-medium text-slate-500">Очередь</div>
-                <div className="mt-1.5 space-y-1.5">
-                  {[
-                    { n: 'Мария', s: 'Маникюр + покрытие', t: '5 мая · 09:30' },
-                    { n: 'Ольга', s: 'Снятие + укрепление', t: '5 мая · 11:00' },
-                    { n: 'Елена', s: 'Наращивание', t: '5 мая · 12:30' },
-                  ].map((b) => (
-                    <div
-                      key={b.n}
-                      className="flex items-center justify-between rounded-lg border border-slate-100 bg-white px-2.5 py-2"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="h-6 w-1 rounded-full"
-                          style={{ background: ACCENT, opacity: 0.6 }}
-                        />
-                        <div>
-                          <div className="text-[11px] font-semibold text-slate-900">{b.n}</div>
-                          <div className="text-[9px] text-slate-500">{b.s}</div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-[9px] font-medium text-slate-600">{b.t}</div>
-                        <div className="text-[8.5px] text-slate-400">Запланирована</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </MockSection>
-
-              <MockSection title="Услуги" desc="Что чаще выбирают клиенты.">
-                <div className="space-y-2">
-                  {[
-                    { n: '#1', name: 'Маникюр + покрытие', meta: '2 записей · 45 мин', price: '0 ₽', pct: 0.3 },
-                    { n: '#2', name: 'Укрепление гелем', meta: '2 записей · 75 мин', price: '2 750 ₽', pct: 0.8 },
-                    { n: '#3', name: 'Смарт-педикюр', meta: '2 записей · 60 мин', price: '0 ₽', pct: 0.45 },
-                    { n: '#4', name: 'Снятие + новый дизайн', meta: '0 записей · 90 мин', price: '0 ₽', pct: 0.05 },
-                  ].map((s) => (
-                    <div key={s.n} className="rounded-xl border border-slate-100 bg-white p-2.5">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[8.5px] font-semibold text-slate-500">
-                              {s.n}
-                            </span>
-                            <span className="text-[11px] font-semibold text-slate-900">{s.name}</span>
-                          </div>
-                          <div className="mt-0.5 text-[9px] text-slate-500">{s.meta}</div>
-                        </div>
-                        <div className="text-[11px] font-semibold tracking-tight text-slate-900">
-                          {s.price}
-                        </div>
-                      </div>
-                      <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-slate-100">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          whileInView={{ width: `${s.pct * 100}%` }}
-                          viewport={{ once: true }}
-                          transition={{ duration: 1.2, ease: [0.21, 0.47, 0.32, 0.98] }}
-                          className="h-full rounded-full"
-                          style={{ background: ACCENT }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </MockSection>
-            </div>
-          </div>
-
-          <MockProfileFooter />
-        </main>
-      </div>
-    </div>
-  );
-}
-
-// Stats mockup screen
-function DashboardMockStats() {
-  return (
-    <div className="overflow-hidden rounded-[20px] border border-slate-200 bg-[#f5f6f8]">
-      <div className="flex items-center justify-between border-b border-slate-200 bg-white px-3 py-2">
-        <div className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-rose-300" />
-          <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
-          <span className="h-2.5 w-2.5 rounded-full bg-emerald-300" />
-        </div>
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-0.5 text-[10px] text-slate-500">
-          app.klikbuk.com / stats
-        </div>
-        <div className="h-2.5 w-12" />
-      </div>
-      <div className="grid grid-cols-12">
-        <MockSidebar active="stats" />
-        <main className="col-span-12 px-5 py-5 lg:col-span-9 lg:px-7 lg:py-6">
-          <div className="text-[26px] font-semibold tracking-[-0.025em] text-slate-900 sm:text-[32px]">
-            Статистика
-          </div>
-          <div className="mt-1 text-[12px] text-slate-500">
-            Аналитика по записям, доходу, клиентам и публичной странице — в одном спокойном экране.
-          </div>
-
-          <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-5">
-            <div className="text-[26px] font-semibold tracking-tight text-slate-900 sm:text-[34px]">
-              2 750 ₽
-            </div>
-            <div className="mt-1 text-[11px] text-slate-500">
-              Короткий срез по доходу, записям, просмотрам и конверсии.
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-              <MetricTile label="Записи за 30 дней" value="10" hint="записей" />
-              <MetricTile label="Просмотры страницы" value="10" hint="переходов" />
-              <MetricTile label="Конверсия" value="100%" hint="конверсия" />
-              <MetricTile label="Средний чек" value="1 375 ₽" hint="средний" />
-            </div>
-          </div>
-
-          <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="text-[13px] font-semibold tracking-tight text-slate-900">
-                  Активность по дням
-                </div>
-                <div className="mt-0.5 text-[10.5px] text-slate-500">
-                  Динамика просмотров, записей, подтверждений и дохода за 30 дн.
-                </div>
-              </div>
-              <div className="flex rounded-md border border-slate-200 p-0.5 text-[10px] font-medium">
-                <span className="rounded px-2 py-1 text-slate-500">7 дн.</span>
-                <span className="rounded px-2 py-1 text-slate-500">14 дн.</span>
-                <span className="rounded bg-slate-900 px-2 py-1 text-white">30 дн.</span>
-              </div>
-            </div>
-            <ChartLine />
-          </div>
-        </main>
-      </div>
-      <MockProfileFooter />
-    </div>
-  );
-}
-
-function ChartLine() {
-  // 30 days, peak in the middle-late
-  const points = Array.from({ length: 30 }, (_, i) => {
-    const peak = i === 23 ? 1 : 0;
-    const small = Math.max(0, Math.sin(i / 4) * 0.05);
-    return Math.max(small, peak);
-  });
-  const max = Math.max(...points);
-  const W = 720;
-  const H = 200;
-  const stepX = W / (points.length - 1);
-  const path = points
-    .map((v, i) => {
-      const x = i * stepX;
-      const y = H - (v / max) * (H - 12) - 6;
-      return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
-    })
-    .join(' ');
-  const area = `${path} L ${W} ${H} L 0 ${H} Z`;
-
-  return (
-    <div className="mt-4">
-      <div className="overflow-hidden rounded-xl border border-slate-100 bg-[#fafbfc] p-4">
-        <svg viewBox={`0 0 ${W} ${H + 24}`} className="h-[180px] w-full">
-          <defs>
-            <linearGradient id="cb-grad" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor={ACCENT} stopOpacity="0.25" />
-              <stop offset="100%" stopColor={ACCENT} stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          {[0, 0.33, 0.66, 1].map((p, i) => (
-            <line
-              key={i}
-              x1="0"
-              x2={W}
-              y1={p * H}
-              y2={p * H}
-              stroke="rgba(15,23,42,0.06)"
-              strokeDasharray="3 4"
-            />
-          ))}
-          <motion.path
-            d={area}
-            fill="url(#cb-grad)"
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 1, delay: 0.4 }}
-          />
-          <motion.path
-            d={path}
-            fill="none"
-            stroke={ACCENT}
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            initial={{ pathLength: 0 }}
-            whileInView={{ pathLength: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 1.6, ease: 'easeInOut' }}
-          />
-          {/* peak marker */}
-          {points.map((v, i) =>
-            v === max ? (
-              <g key={i}>
-                <motion.circle
-                  cx={i * stepX}
-                  cy={H - (v / max) * (H - 12) - 6}
-                  r="5"
-                  fill={ACCENT}
-                  initial={{ scale: 0 }}
-                  whileInView={{ scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 1.4, duration: 0.4 }}
-                />
-                <motion.circle
-                  cx={i * stepX}
-                  cy={H - (v / max) * (H - 12) - 6}
-                  r="12"
-                  fill={ACCENT}
-                  fillOpacity="0.18"
-                  initial={{ scale: 0 }}
-                  animate={{ scale: [1, 1.4, 1] }}
-                  transition={{ duration: 2, repeat: Infinity, delay: 1.6 }}
-                />
-              </g>
-            ) : null
-          )}
-        </svg>
-        <div className="mt-2 flex justify-between text-[9px] text-slate-400">
-          <span>7 апр</span>
-          <span>13 апр</span>
-          <span>19 апр</span>
-          <span>25 апр</span>
-          <span>1 мая</span>
-          <span>6 мая</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Today bookings mockup
-function DashboardMockToday() {
-  return (
-    <div className="overflow-hidden rounded-[20px] border border-slate-200 bg-[#f5f6f8]">
-      <div className="flex items-center justify-between border-b border-slate-200 bg-white px-3 py-2">
-        <div className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-rose-300" />
-          <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
-          <span className="h-2.5 w-2.5 rounded-full bg-emerald-300" />
-        </div>
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-0.5 text-[10px] text-slate-500">
-          app.klikbuk.com / today
-        </div>
-        <div className="h-2.5 w-12" />
-      </div>
-      <div className="grid grid-cols-12">
-        <MockSidebar active="today" />
-        <main className="col-span-12 px-5 py-5 lg:col-span-9 lg:px-7 lg:py-6">
-          <div className="text-[26px] font-semibold tracking-[-0.025em] text-slate-900 sm:text-[32px]">
-            Записи на сегодня
-          </div>
-          <div className="mt-1 text-[12px] text-slate-500">
-            Рабочий день мастера: таймлайн, статусы, быстрые действия и карточка клиента.
-          </div>
-
-          <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-5">
-            <div className="text-[28px] font-semibold tracking-tight text-slate-900 sm:text-[34px]">
-              13:00 · Борис
-            </div>
-            <div className="mt-1 text-[11px] text-slate-500">
-              Ближайшие визиты, статусы и ритм дня в одном спокойном экране.
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-              <MetricTile label="На сегодня" value="2" hint="Рабочий день" />
-              <MetricTile label="Ближайшие" value="2" hint="Дизайн ногтей" />
-              <MetricTile label="Запланировано" value="2" hint="Запланирована" />
-              <MetricTile label="Завершено" value="0" hint="0% дня закрыто" />
-            </div>
-          </div>
-
-          <div className="mt-3 grid gap-3 lg:grid-cols-3">
-            <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="text-[13px] font-semibold tracking-tight text-slate-900">Таймлайн дня</div>
-                  <div className="mt-0.5 text-[10.5px] text-slate-500">
-                    Список визитов сверху вниз. Видно, кто следующий, где плотный блок и где есть окно.
-                  </div>
-                </div>
-                <div className="flex gap-1 rounded-md border border-slate-200 p-0.5 text-[9.5px]">
-                  <span className="rounded bg-slate-900 px-2 py-1 text-white">Весь день</span>
-                  <span className="rounded px-2 py-1 text-slate-500">Утро</span>
-                  <span className="rounded px-2 py-1 text-slate-500">День</span>
-                  <span className="rounded px-2 py-1 text-slate-500">Вечер</span>
-                </div>
-              </div>
-              <div className="mt-4 space-y-2">
-                {[
-                  { n: 'Борис', s: 'Дизайн ногтей · Проверка', t: '13:00—14:00', state: 'Скоро', tone: 'amber' },
-                  { n: 'Борис', s: 'Хочу что-то · входит', t: '15:30—16:30', state: 'Скоро', tone: 'amber' },
-                ].map((b, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, x: -12 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.5, delay: i * 0.1 }}
-                    className="flex items-center justify-between rounded-xl border border-slate-100 bg-[#fafbfc] px-3 py-3"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="h-9 w-1 rounded-full bg-amber-400" />
-                      <div>
-                        <div className="text-[12.5px] font-semibold text-slate-900">{b.n}</div>
-                        <div className="text-[10px] text-slate-500">{b.s}</div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-[10.5px] font-medium text-slate-700">{b.t}</div>
-                      <div className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-semibold text-amber-700">
-                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                        {b.state}
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
-              <div className="text-[13px] font-semibold tracking-tight text-slate-900">Карточка визита</div>
-              <div className="mt-0.5 text-[10.5px] text-slate-500">Контакт, заметка и статус.</div>
-              <div className="mt-3 rounded-xl border border-slate-100 bg-[#fafbfc] p-3">
-                <div className="text-[10px] text-slate-500">Активная запись</div>
-                <div className="mt-0.5 text-[16px] font-semibold tracking-tight text-slate-900">Борис</div>
-                <div className="text-[10px] text-slate-500">Дизайн ногтей</div>
-                <div className="mt-2.5 flex flex-wrap gap-1">
-                  {['6 мая', '13:00–14:00', '60 мин', 'День'].map((c) => (
-                    <span
-                      key={c}
-                      className="rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[9px] font-medium text-slate-600"
-                    >
-                      {c}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <div className="mt-2.5 space-y-1.5">
-                {[
-                  ['Время', '13:00–14:00'],
-                  ['Телефон', '+7 934 ···'],
-                  ['Статус', 'Скоро'],
-                ].map(([k, v]) => (
-                  <div
-                    key={k}
-                    className="flex items-center justify-between rounded-md border border-slate-100 bg-white px-2.5 py-1.5 text-[10px]"
-                  >
-                    <span className="text-slate-500">{k}</span>
-                    <span className="font-medium text-slate-800">{v}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-1.5">
-                <button className="flex items-center justify-center gap-1 rounded-lg bg-slate-900 px-2.5 py-2 text-[10px] font-semibold text-white">
-                  <Phone className="h-3 w-3" />
-                  Позвонить
-                </button>
-                <button className="flex items-center justify-center gap-1 rounded-lg bg-slate-900 px-2.5 py-2 text-[10px] font-semibold text-white">
-                  <MessageSquare className="h-3 w-3" />
-                  Открыть чат
-                </button>
-              </div>
-            </div>
-          </div>
-        </main>
-      </div>
-      <MockProfileFooter />
-    </div>
-  );
-}
-
-// ───────────────────────── Sections
-function SectionTitle({ eyebrow, title, subtitle }: { eyebrow: string; title: string; subtitle?: string }) {
-  return (
-    <Reveal>
-      <div className="mx-auto max-w-3xl text-center">
-        <Eyebrow>{eyebrow}</Eyebrow>
-        <h2 className="mt-5 text-[36px] font-semibold leading-[1.08] tracking-[-0.028em] text-slate-900 sm:text-[48px]">
-          {title}
-        </h2>
-        {subtitle && (
-          <p className="mx-auto mt-4 max-w-2xl text-[15.5px] leading-relaxed text-slate-600">{subtitle}</p>
-        )}
-      </div>
-    </Reveal>
-  );
-}
-
-function ProblemSolution() {
-  return (
-    <section className="py-24 lg:py-32">
-      <Container>
-        <SectionTitle
-          eyebrow="Зачем это нужно"
-          title="От хаоса в чатах — к спокойному рабочему экрану"
-          subtitle="Записи теряются в мессенджерах, клиенты забывают о визитах, расписание ведётся вручную. КликБук собирает всё в одной системе."
-        />
-
-        <div className="mt-14 grid gap-6 lg:grid-cols-2">
-          <Reveal>
-            <div className="relative overflow-hidden rounded-[28px] border border-slate-200 bg-gradient-to-br from-rose-50/70 via-white to-orange-50/40 p-9">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-500">Проблема</div>
-              <h3 className="mt-3 text-[26px] font-semibold leading-tight tracking-[-0.02em] text-slate-900">
-                Записи теряются. Расписание — в голове и таблицах.
-              </h3>
-              <div className="mt-7 space-y-2.5">
-                {[
-                  'Звонки и переписки в десяти каналах',
-                  'Двойные записи и пропущенные визиты',
-                  'Нет данных о клиентах и истории',
-                  'Часы ручной работы каждый день',
-                ].map((it) => (
-                  <div key={it} className="flex items-start gap-3 rounded-xl border border-rose-100/70 bg-white/70 px-3.5 py-2.5">
-                    <TrendingDown className="mt-0.5 h-4 w-4 flex-shrink-0 text-rose-500" />
-                    <span className="text-[13.5px] text-slate-700">{it}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Reveal>
-
-          <Reveal delay={0.1}>
-            <div className="relative h-full overflow-hidden rounded-[28px] border border-slate-200 bg-white p-9">
-              <div
-                className="absolute -right-24 -top-24 h-72 w-72 rounded-full opacity-50 blur-3xl"
-                style={{ background: 'radial-gradient(circle, rgba(18,125,254,0.2), transparent 70%)' }}
-              />
-              <div className="relative">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: ACCENT }}>
-                  Решение
-                </div>
-                <h3 className="mt-3 text-[26px] font-semibold leading-tight tracking-[-0.02em] text-slate-900">
-                  КликБук собирает всё в одной системе.
-                </h3>
-                <p className="mt-4 text-[14px] leading-relaxed text-slate-600">
-                  Все записи, клиенты, услуги, сотрудники и расписание — в одном понятном продукте.
-                </p>
-                <div className="mt-6 grid grid-cols-2 gap-2.5">
-                  {[
-                    { icon: <CalendarDays className="h-4 w-4" />, label: 'Единое расписание' },
-                    { icon: <Users className="h-4 w-4" />, label: 'База клиентов' },
-                    { icon: <Bell className="h-4 w-4" />, label: 'Авто-напоминания' },
-                    { icon: <BarChart3 className="h-4 w-4" />, label: 'Аналитика' },
-                  ].map((it) => (
-                    <div
-                      key={it.label}
-                      className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[12.5px] font-semibold text-slate-800 transition hover:-translate-y-0.5 hover:shadow-[0_10px_24px_-12px_rgba(15,23,42,0.18)]"
-                    >
-                      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900 text-white">
-                        {it.icon}
-                      </div>
-                      {it.label}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </Container>
-    </section>
-  );
-}
-
-function Segments() {
-  const segments = [
-    { icon: <Scissors className="h-5 w-5" />, title: 'Салоны и барбершопы', desc: 'Маникюр, косметология, парикмахерские, студии красоты.' },
-    { icon: <Stethoscope className="h-5 w-5" />, title: 'Клиники и врачи', desc: 'Массажисты, wellness- и health-специалисты, частные приёмы.' },
-    { icon: <Dumbbell className="h-5 w-5" />, title: 'Спорт и фитнес', desc: 'Тренеры, спорт-студии, йога-центры, фитнес-клубы.' },
-    { icon: <GraduationCap className="h-5 w-5" />, title: 'Школы и курсы', desc: 'Репетиторы, образовательные проекты, мастер-классы.' },
-    { icon: <UserRound className="h-5 w-5" />, title: 'Частные специалисты', desc: 'Самозанятые мастера, эксперты, консультанты.' },
-    { icon: <Layers className="h-5 w-5" />, title: 'Команды и сети', desc: 'Бизнесы с филиалами, сотрудниками и расписаниями.' },
-  ];
-
-  return (
-    <section id="segments" className="relative bg-[#fafbfc] py-24 lg:py-32">
-      <Container>
-        <SectionTitle
-          eyebrow="Для кого"
-          title="Подходит бизнесу любого масштаба"
-          subtitle="От частного мастера до сети филиалов — платформа адаптируется под любой размер команды."
-        />
-        <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {segments.map((s, i) => (
-            <Reveal key={s.title} delay={i * 0.05}>
-              <div className="group relative h-full overflow-hidden rounded-2xl border border-slate-200 bg-white p-7 transition-all duration-300 hover:-translate-y-1 hover:border-slate-300 hover:shadow-[0_28px_56px_-24px_rgba(15,23,42,0.18)]">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-900 text-white transition-colors group-hover:bg-[color:var(--cb-accent)]" style={{ ['--cb-accent' as any]: ACCENT }}>
-                  {s.icon}
-                </div>
-                <h3 className="mt-5 text-[17px] font-semibold tracking-tight text-slate-900">{s.title}</h3>
-                <p className="mt-1.5 text-[13.5px] leading-relaxed text-slate-600">{s.desc}</p>
-                <ChevronRight className="absolute right-5 top-7 h-5 w-5 text-slate-300 transition-all group-hover:translate-x-1 group-hover:text-slate-900" />
-              </div>
-            </Reveal>
-          ))}
-        </div>
-      </Container>
-    </section>
-  );
-}
-
-function Features() {
-  const items = [
-    { icon: <Globe className="h-5 w-5" />, title: 'Онлайн-запись', desc: 'Клиент сам выбирает услугу, специалиста, дату и время — в пару кликов.' },
-    { icon: <CalendarDays className="h-5 w-5" />, title: 'Календарь', desc: 'Удобный календарь по сотрудникам, услугам и филиалам.' },
-    { icon: <Users className="h-5 w-5" />, title: 'Клиенты и история', desc: 'Карточки клиентов, контакты, заметки и история визитов.' },
-    { icon: <Bell className="h-5 w-5" />, title: 'Уведомления', desc: 'Авто-напоминания клиентам и оповещения сотрудникам.' },
-    { icon: <Building2 className="h-5 w-5" />, title: 'Команда и филиалы', desc: 'Управляйте сотрудниками, ролями и несколькими локациями.' },
-    { icon: <BarChart3 className="h-5 w-5" />, title: 'Аналитика', desc: 'Записи, загрузка, выручка и повторные визиты в реальном времени.' },
-    { icon: <Sparkles className="h-5 w-5" />, title: 'Услуги и цены', desc: 'Гибкое управление длительностью, стоимостью и категориями.' },
-    { icon: <Workflow className="h-5 w-5" />, title: 'Интеграции', desc: 'Виджет на сайт, ссылка для соцсетей, Telegram и VK.' },
-  ];
-
-  return (
-    <section id="features" className="py-24 lg:py-32">
-      <Container>
-        <SectionTitle
-          eyebrow="Возможности"
-          title="Всё, что нужно для записи и управления клиентами"
-          subtitle="Один продукт вместо десяти таблиц, чатов и CRM. Запускается за 5 минут."
-        />
-        <div className="mt-14 grid gap-px overflow-hidden rounded-3xl border border-slate-200 bg-slate-200 sm:grid-cols-2 lg:grid-cols-4">
-          {items.map((it, i) => (
-            <motion.div
-              key={it.title}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: '-60px' }}
-              transition={{ duration: 0.5, delay: i * 0.04 }}
-              className="group relative bg-white p-7 transition-colors hover:bg-slate-50/60"
-            >
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-900 text-white transition-all duration-300 group-hover:scale-105 group-hover:bg-[color:var(--cb-a)]" style={{ ['--cb-a' as any]: ACCENT }}>
-                {it.icon}
-              </div>
-              <h3 className="mt-5 text-[15.5px] font-semibold tracking-tight text-slate-900">{it.title}</h3>
-              <p className="mt-1 text-[13px] leading-relaxed text-slate-600">{it.desc}</p>
-            </motion.div>
-          ))}
-        </div>
-      </Container>
-    </section>
-  );
-}
-
-// Showcase split: live mockups
-function ShowcaseSplit() {
-  const blocks = [
-    {
-      eyebrow: 'Аналитика',
-      title: 'Видите бизнес как на ладони',
-      desc: 'Записи, доход, просмотры и конверсия в одном экране. Графики, средний чек и журнал бронирований.',
-      mockup: <DashboardMockStats />,
-      reverse: false,
-    },
-    {
-      eyebrow: 'Расписание',
-      title: 'Чёткий ритм рабочего дня',
-      desc: 'Таймлайн дня, статусы, быстрые действия. Видно следующий визит, плотные блоки и свободные окна.',
-      mockup: <DashboardMockToday />,
-      reverse: true,
-    },
-  ];
-
-  return (
-    <section className="bg-[#fafbfc] py-24 lg:py-32">
-      <Container>
-        <div className="space-y-24 lg:space-y-32">
-          {blocks.map((b, i) => (
-            <div
-              key={b.title}
-              className={`grid items-center gap-10 lg:grid-cols-2 lg:gap-16 ${b.reverse ? 'lg:[&>*:first-child]:order-2' : ''}`}
-            >
-              <Reveal y={32}>
-                <Eyebrow>{b.eyebrow}</Eyebrow>
-                <h3 className="mt-4 text-[34px] font-semibold leading-[1.08] tracking-[-0.025em] text-slate-900 sm:text-[42px]">
-                  {b.title}
-                </h3>
-                <p className="mt-4 max-w-md text-[15px] leading-relaxed text-slate-600">{b.desc}</p>
-                <ul className="mt-5 space-y-2.5">
-                  {[
-                    'Авто-обновление в реальном времени',
-                    'Метрики по сотрудникам и филиалам',
-                    'Экспорт и интеграция с CRM',
-                  ].map((t) => (
-                    <li key={t} className="flex items-center gap-2.5 text-[13.5px] text-slate-700">
-                      <Check className="h-4 w-4 text-emerald-500" />
-                      {t}
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-7">
-                  <PrimaryButton href="#cta">Попробовать</PrimaryButton>
-                </div>
-              </Reveal>
-
-              <Reveal delay={0.15} y={36}>
-                <div className="relative">
-                  <div
-                    className="absolute -inset-6 -z-10 rounded-[36px] opacity-60 blur-3xl"
-                    style={{ background: 'radial-gradient(60% 60% at 50% 50%, rgba(18,125,254,0.18), transparent 70%)' }}
-                  />
-                  <div className="rounded-[24px] border border-slate-200 bg-white/80 p-2 shadow-[0_30px_70px_-30px_rgba(15,23,42,0.25)] backdrop-blur">
-                    {b.mockup}
-                  </div>
-                </div>
-              </Reveal>
-            </div>
-          ))}
-        </div>
-      </Container>
-    </section>
-  );
-}
-
-function HowItWorks() {
-  const steps = [
-    { n: '01', title: 'Создайте страницу записи', desc: 'Зарегистрируйтесь и оформите свой профиль за 2 минуты.' },
-    { n: '02', title: 'Добавьте услуги и команду', desc: 'Услуги, цены, длительность, сотрудники и расписание.' },
-    { n: '03', title: 'Клиенты записываются онлайн', desc: 'Делитесь ссылкой или встраивайте виджет в сайт и соцсети.' },
-    { n: '04', title: 'Управляйте всем в одном месте', desc: 'Расписание, напоминания, клиенты, аналитика и выручка.' },
-  ];
-
-  return (
-    <section id="how" className="relative overflow-hidden py-24 lg:py-32">
-      <Container>
-        <SectionTitle eyebrow="Как это работает" title="Запуск за 5 минут — без обучения" />
-
-        <div className="relative mt-14">
-          <div className="absolute left-1/2 top-0 hidden h-full w-px -translate-x-1/2 bg-slate-200 lg:block" />
-          <div className="grid gap-4 lg:grid-cols-4">
-            {steps.map((s, i) => (
+          {/* Headline */}
+          <div className="mt-7 overflow-hidden">
+            {words.map((word, i) => (
               <motion.div
-                key={s.n}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: '-60px' }}
-                transition={{ duration: 0.6, delay: i * 0.1 }}
-                className="relative rounded-2xl border border-slate-200 bg-white p-6 transition-all hover:-translate-y-1 hover:shadow-[0_20px_48px_-16px_rgba(15,23,42,0.18)]"
-              >
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-[12px] font-semibold text-white">
-                  {s.n}
-                </div>
-                <h3 className="mt-5 text-[16px] font-semibold tracking-tight text-slate-900">{s.title}</h3>
-                <p className="mt-1.5 text-[13.5px] leading-relaxed text-slate-600">{s.desc}</p>
-                {i < steps.length - 1 && (
-                  <ArrowRight className="absolute -right-3 top-1/2 hidden h-4 w-4 -translate-y-1/2 text-slate-300 lg:block" />
+                key={i}
+                initial={{ opacity: 0, y: 60 }}
+                animate={inView ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 0.8, delay: 0.1 + i * 0.12, ease: [0.22, 1, 0.36, 1] }}
+                className={cn(
+                  'block text-[48px] font-bold leading-[0.97] tracking-[-0.045em] sm:text-[66px] lg:text-[82px]',
+                  i === 1
+                    ? 'bg-gradient-to-r from-[#127dfe] to-[#7c3aed] bg-clip-text text-transparent'
+                    : 'text-black dark:text-white',
                 )}
+              >
+                {word}
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Subtitle */}
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={inView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.7, delay: 0.48, ease: [0.22, 1, 0.36, 1] }}
+            className="mx-auto mt-7 max-w-xl text-[16px] leading-7 text-black/58 dark:text-white/52 sm:text-[17px]"
+          >
+            {t.hero.sub}
+          </motion.p>
+
+          {/* CTA buttons */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={inView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.7, delay: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row"
+          >
+            <MagBtn href="/login" variant="primary">
+              {t.hero.cta1}
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </MagBtn>
+            <MagBtn href="#features" variant="ghost">
+              {t.hero.cta2}
+            </MagBtn>
+          </motion.div>
+
+          {/* Trust badges */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={inView ? { opacity: 1 } : {}}
+            transition={{ duration: 0.7, delay: 0.76 }}
+            className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[12.5px] text-black/48 dark:text-white/40"
+          >
+            {t.hero.trust.map((item) => (
+              <span key={item} className="flex items-center gap-1.5">
+                <Check className="h-3.5 w-3.5 text-emerald-500" />
+                {item}
+              </span>
+            ))}
+          </motion.div>
+        </div>
+
+        {/* Floating chips */}
+        <div className="relative mx-auto mt-16 max-w-[680px]">
+          <div className="grid grid-cols-3 gap-3 sm:gap-4">
+            {t.hero.chips.map((chip, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 40, scale: 0.9 }}
+                animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
+                transition={{ duration: 0.7, delay: 0.8 + i * 0.12, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <TiltCard className="rounded-2xl border border-black/8 bg-white/90 p-4 shadow-[0_20px_50px_-20px_rgba(18,125,254,0.2)] backdrop-blur-sm dark:border-white/8 dark:bg-white/5">
+                  <motion.div
+                    animate={{ y: [0, -4, 0] }}
+                    transition={{ duration: 4 + i, repeat: Infinity, ease: 'easeInOut', delay: i * 0.8 }}
+                  >
+                    <div
+                      className="mb-2.5 h-8 w-8 rounded-xl"
+                      style={{ background: `${CARD_COLORS[i]}18` }}
+                    >
+                      <div className="flex h-full items-center justify-center">
+                        <span className="h-3 w-3 rounded-full" style={{ background: CARD_COLORS[i] }} />
+                      </div>
+                    </div>
+                    <div className="text-[13px] font-semibold text-black/82 dark:text-white/82">{chip.label}</div>
+                    <div className="mt-0.5 text-[11px] text-black/46 dark:text-white/40">{chip.sub}</div>
+                  </motion.div>
+                </TiltCard>
               </motion.div>
             ))}
           </div>
         </div>
-      </Container>
+      </div>
+
+      {/* Scroll hint */}
+      <motion.a
+        href="#why"
+        initial={{ opacity: 0 }}
+        animate={inView ? { opacity: 1 } : {}}
+        transition={{ delay: 1.4 }}
+        className="absolute bottom-8 left-1/2 -translate-x-1/2"
+      >
+        <motion.div
+          animate={{ y: [0, 6, 0] }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+          className="flex flex-col items-center gap-1.5 text-black/32 dark:text-white/28"
+        >
+          <ChevronDown className="h-5 w-5" />
+        </motion.div>
+      </motion.a>
     </section>
   );
 }
 
-function Benefits() {
-  const items = [
-    { icon: <Zap className="h-5 w-5" />, title: 'Меньше ручной работы', desc: 'Автоматизация рутины — больше времени на клиентов.' },
-    { icon: <TrendingUp className="h-5 w-5" />, title: 'Больше записей', desc: 'Запись 24/7 без звонков и переписок.' },
-    { icon: <Bell className="h-5 w-5" />, title: 'Меньше пропусков', desc: 'Напоминания снижают количество no-show.' },
-    { icon: <Sparkles className="h-5 w-5" />, title: 'Удобство для клиентов', desc: 'Запись в пару кликов с любого устройства.' },
-    { icon: <Clock className="h-5 w-5" />, title: 'Контроль расписания', desc: 'Прозрачная загрузка по сотрудникам и филиалам.' },
-    { icon: <ShieldCheck className="h-5 w-5" />, title: 'База в одном месте', desc: 'Вся клиентская база, история и контакты под рукой.' },
-  ];
+// ─── SLIDE 2 · WHY ────────────────────────────────────────────────────────────
+function WhySlide({ t }: { t: typeof COPY.ru }) {
+  const ref = useRef<HTMLElement>(null);
+  const inView = useInView(ref, { once: true, margin: '-80px' });
 
   return (
-    <section className="bg-[#fafbfc] py-24 lg:py-32">
-      <Container>
-        <SectionTitle eyebrow="Преимущества" title="Что вы получите с КликБук" />
-        <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {items.map((it, i) => (
-            <Reveal key={it.title} delay={i * 0.05}>
-              <div className="group h-full rounded-2xl border border-slate-200 bg-white p-7 transition-all hover:-translate-y-1 hover:border-slate-300 hover:shadow-[0_20px_48px_-16px_rgba(15,23,42,0.18)]">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white transition-transform group-hover:scale-105">
-                    {it.icon}
-                  </div>
-                  <div>
-                    <h3 className="text-[15.5px] font-semibold tracking-tight text-slate-900">{it.title}</h3>
-                    <p className="mt-1 text-[13.5px] leading-relaxed text-slate-600">{it.desc}</p>
-                  </div>
-                </div>
+    <section
+      id="why"
+      ref={ref}
+      className="relative min-h-screen bg-[#f7f8fc] py-20 dark:bg-[#0a0d17] lg:py-28"
+    >
+      {/* Background accent */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div
+          className="absolute left-1/4 top-1/2 h-[600px] w-[600px] -translate-y-1/2 rounded-full opacity-8 blur-[120px]"
+          style={{ background: `radial-gradient(circle, ${ACCENT}, transparent 70%)` }}
+        />
+      </div>
+
+      <div className="relative mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+          className="mb-14 text-center"
+        >
+          <Eyebrow>{t.why.eyebrow}</Eyebrow>
+          <h2 className="mt-5 text-[36px] font-bold leading-[1.04] tracking-[-0.04em] text-black dark:text-white sm:text-[48px] lg:text-[58px]">
+            {t.why.title}
+          </h2>
+        </motion.div>
+
+        <div className="grid gap-5 lg:grid-cols-2">
+          {/* Before */}
+          <motion.div
+            initial={{ opacity: 0, x: -40 }}
+            animate={inView ? { opacity: 1, x: 0 } : {}}
+            transition={{ duration: 0.8, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <div className="relative h-full overflow-hidden rounded-3xl border border-rose-200/60 bg-gradient-to-br from-rose-50 via-white to-orange-50/60 p-8 dark:border-rose-900/40 dark:from-rose-950/50 dark:via-[#0f1018] dark:to-orange-950/30 lg:p-10">
+              <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-rose-100 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-rose-600 dark:bg-rose-900/50 dark:text-rose-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                {t.why.before.tag}
               </div>
-            </Reveal>
+              <div className="space-y-3">
+                {t.why.before.items.map((item, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={inView ? { opacity: 1, x: 0 } : {}}
+                    transition={{ duration: 0.5, delay: 0.25 + i * 0.08 }}
+                    className="flex items-center gap-3 rounded-2xl border border-rose-100/80 bg-white/70 px-4 py-3.5 dark:border-rose-900/30 dark:bg-rose-950/30"
+                  >
+                    <TrendingDown className="h-4 w-4 flex-shrink-0 text-rose-500" />
+                    <span className="text-[14px] text-black/72 dark:text-white/66">{item}</span>
+                  </motion.div>
+                ))}
+              </div>
+              {/* Decorative */}
+              <div className="pointer-events-none absolute -bottom-10 -right-10 h-48 w-48 rounded-full bg-rose-200/30 blur-3xl dark:bg-rose-800/20" />
+            </div>
+          </motion.div>
+
+          {/* After */}
+          <motion.div
+            initial={{ opacity: 0, x: 40 }}
+            animate={inView ? { opacity: 1, x: 0 } : {}}
+            transition={{ duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <div className="relative h-full overflow-hidden rounded-3xl border border-blue-200/60 bg-gradient-to-br from-blue-50 via-white to-violet-50/60 p-8 dark:border-blue-900/40 dark:from-blue-950/50 dark:via-[#0f1018] dark:to-violet-950/30 lg:p-10">
+              <div
+                className="mb-6 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em]"
+                style={{ background: `${ACCENT}18`, color: ACCENT }}
+              >
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: ACCENT }} />
+                {t.why.after.tag}
+              </div>
+              <div className="space-y-3">
+                {t.why.after.items.map((item, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={inView ? { opacity: 1, x: 0 } : {}}
+                    transition={{ duration: 0.5, delay: 0.35 + i * 0.08 }}
+                    className="flex items-center gap-3 rounded-2xl border border-blue-100/80 bg-white/70 px-4 py-3.5 dark:border-blue-900/30 dark:bg-blue-950/25"
+                  >
+                    <div
+                      className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full"
+                      style={{ background: ACCENT }}
+                    >
+                      <Check className="h-3 w-3 text-white" />
+                    </div>
+                    <span className="text-[14px] text-black/72 dark:text-white/66">{item}</span>
+                  </motion.div>
+                ))}
+              </div>
+              {/* Glow */}
+              <div
+                className="pointer-events-none absolute -bottom-10 -right-10 h-48 w-48 rounded-full blur-3xl opacity-30"
+                style={{ background: `radial-gradient(circle, ${ACCENT}, transparent)` }}
+              />
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── SLIDE 3 · FEATURES ───────────────────────────────────────────────────────
+function FeaturesSlide({ t }: { t: typeof COPY.ru }) {
+  const ref = useRef<HTMLElement>(null);
+  const inView = useInView(ref, { once: true, margin: '-60px' });
+
+  return (
+    <section
+      id="features"
+      ref={ref}
+      className="min-h-screen bg-white py-20 dark:bg-[#06080f] lg:py-28"
+    >
+      <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+          className="mb-14 max-w-2xl"
+        >
+          <Eyebrow>{t.features.eyebrow}</Eyebrow>
+          <h2 className="mt-5 text-[36px] font-bold leading-[1.04] tracking-[-0.04em] text-black dark:text-white sm:text-[48px]">
+            {t.features.title}
+          </h2>
+          <p className="mt-4 text-[15px] leading-7 text-black/54 dark:text-white/46">{t.features.sub}</p>
+        </motion.div>
+
+        <div className="grid gap-px overflow-hidden rounded-3xl border border-black/8 bg-black/8 dark:border-white/8 dark:bg-white/8 sm:grid-cols-2 lg:grid-cols-4">
+          {t.features.items.map((item, i) => {
+            const Icon = FEATURE_ICONS[i];
+            const color = CARD_COLORS[i];
+            return (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 24 }}
+                animate={inView ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 0.55, delay: i * 0.055, ease: [0.22, 1, 0.36, 1] }}
+                className="group relative bg-white p-6 transition-all duration-300 hover:z-10 hover:shadow-[0_0_0_2px_#127dfe,0_20px_60px_-20px_rgba(18,125,254,0.35)] dark:bg-[#06080f] dark:hover:shadow-[0_0_0_2px_#127dfe,0_20px_60px_-20px_rgba(18,125,254,0.3)]"
+              >
+                <motion.div
+                  whileHover={{ scale: 1.12, rotate: 6 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                  className="flex h-12 w-12 items-center justify-center rounded-2xl"
+                  style={{ background: `${color}16` }}
+                >
+                  <Icon className="h-5 w-5" style={{ color }} />
+                </motion.div>
+                <h3 className="mt-5 text-[15.5px] font-semibold tracking-tight text-black dark:text-white">
+                  {item.title}
+                </h3>
+                <p className="mt-1.5 text-[13px] leading-relaxed text-black/52 dark:text-white/44">{item.desc}</p>
+
+                {/* Hover glow */}
+                <div
+                  className="pointer-events-none absolute inset-0 rounded-none opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                  style={{ background: `radial-gradient(200px circle at var(--mx,50%) var(--my,50%), ${color}08, transparent 70%)` }}
+                />
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── SLIDE 4 · WHO ────────────────────────────────────────────────────────────
+function WhoSlide({ t }: { t: typeof COPY.ru }) {
+  const ref = useRef<HTMLElement>(null);
+  const inView = useInView(ref, { once: true, margin: '-60px' });
+
+  return (
+    <section
+      id="who"
+      ref={ref}
+      className="min-h-screen bg-[#f7f8fc] py-20 dark:bg-[#0a0d17] lg:py-28"
+    >
+      <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.7 }}
+          className="mb-14 text-center"
+        >
+          <Eyebrow>{t.who.eyebrow}</Eyebrow>
+          <h2 className="mt-5 text-[36px] font-bold leading-[1.04] tracking-[-0.04em] text-black dark:text-white sm:text-[48px]">
+            {t.who.title}
+          </h2>
+          <p className="mt-4 text-[15px] text-black/52 dark:text-white/44">{t.who.sub}</p>
+        </motion.div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {t.who.items.map((item, i) => {
+            const Icon = WHO_ICONS[i];
+            const color = CARD_COLORS[i];
+            return (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 32, scale: 0.96 }}
+                animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
+                transition={{ duration: 0.6, delay: i * 0.07, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <TiltCard className="group relative h-full cursor-default overflow-hidden rounded-3xl border border-black/8 bg-white p-7 transition-all duration-300 hover:border-transparent hover:shadow-[0_24px_64px_-20px_rgba(18,125,254,0.28)] dark:border-white/8 dark:bg-white/[0.03] dark:hover:shadow-[0_24px_64px_-20px_rgba(18,125,254,0.24)]">
+                  <div
+                    className="relative mb-5 flex h-14 w-14 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-105"
+                    style={{ background: `${color}16` }}
+                  >
+                    <Icon className="h-6 w-6" style={{ color }} />
+                    <motion.div
+                      className="absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                      style={{ boxShadow: `0 0 24px ${color}50` }}
+                    />
+                  </div>
+                  <h3 className="text-[18px] font-bold tracking-tight text-black dark:text-white">{item.title}</h3>
+                  <p className="mt-2 text-[13.5px] leading-relaxed text-black/52 dark:text-white/44">{item.desc}</p>
+
+                  {/* Bottom accent line */}
+                  <motion.div
+                    className="absolute bottom-0 left-0 h-0.5 rounded-full"
+                    style={{ background: `linear-gradient(90deg, ${color}, transparent)` }}
+                    initial={{ width: 0 }}
+                    whileInView={{ width: '60%' }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.8, delay: 0.3 + i * 0.05 }}
+                  />
+                </TiltCard>
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── SLIDE 5 · HOW ────────────────────────────────────────────────────────────
+function HowSlide({ t }: { t: typeof COPY.ru }) {
+  const ref = useRef<HTMLElement>(null);
+  const inView = useInView(ref, { once: true, margin: '-60px' });
+
+  return (
+    <section
+      id="how"
+      ref={ref}
+      className="relative min-h-screen overflow-hidden bg-white py-20 dark:bg-[#06080f] lg:py-28"
+    >
+      {/* Background */}
+      <div className="pointer-events-none absolute inset-0">
+        <div
+          className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 opacity-20"
+          style={{ background: `linear-gradient(90deg, transparent, ${ACCENT}, transparent)` }}
+        />
+      </div>
+
+      <div className="relative mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.7 }}
+          className="mb-16 text-center"
+        >
+          <Eyebrow>{t.how.eyebrow}</Eyebrow>
+          <h2 className="mt-5 text-[36px] font-bold leading-[1.04] tracking-[-0.04em] text-black dark:text-white sm:text-[48px]">
+            {t.how.title}
+          </h2>
+        </motion.div>
+
+        <div className="relative grid gap-6 lg:grid-cols-4">
+          {/* Connector line */}
+          <div className="absolute left-0 right-0 top-[56px] hidden lg:block">
+            <motion.div
+              className="mx-auto h-px"
+              style={{ background: `linear-gradient(90deg, transparent 0%, ${ACCENT}40 20%, ${ACCENT}60 50%, ${ACCENT}40 80%, transparent 100%)` }}
+              initial={{ scaleX: 0, originX: 0 }}
+              animate={inView ? { scaleX: 1 } : {}}
+              transition={{ duration: 1.4, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            />
+          </div>
+
+          {t.how.steps.map((step, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 40 }}
+              animate={inView ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.65, delay: 0.15 + i * 0.12, ease: [0.22, 1, 0.36, 1] }}
+              className="group relative"
+            >
+              <div className="relative overflow-hidden rounded-3xl border border-black/8 bg-white p-7 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_28px_56px_-20px_rgba(18,125,254,0.3)] dark:border-white/8 dark:bg-white/[0.03]">
+                {/* Step number */}
+                <div className="relative mb-6">
+                  <motion.div
+                    className="relative flex h-[52px] w-[52px] items-center justify-center rounded-2xl text-[15px] font-bold text-white"
+                    style={{ background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT_ALT})` }}
+                    whileHover={{ scale: 1.08, rotate: -4 }}
+                    transition={{ type: 'spring', stiffness: 280, damping: 20 }}
+                  >
+                    {step.n}
+                    <motion.div
+                      className="absolute inset-0 rounded-2xl"
+                      style={{ boxShadow: `0 0 0 0 ${ACCENT}` }}
+                      animate={{ boxShadow: [`0 0 0 0px ${ACCENT}60`, `0 0 0 10px ${ACCENT}00`] }}
+                      transition={{ duration: 2, repeat: Infinity, delay: i * 0.5 }}
+                    />
+                  </motion.div>
+                </div>
+
+                <h3 className="text-[17px] font-bold tracking-tight text-black dark:text-white">{step.title}</h3>
+                <p className="mt-2.5 text-[13.5px] leading-relaxed text-black/52 dark:text-white/44">{step.desc}</p>
+
+                {/* Hover gradient */}
+                <div
+                  className="pointer-events-none absolute inset-0 rounded-3xl opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                  style={{ background: `linear-gradient(135deg, ${ACCENT}06, ${ACCENT_ALT}04)` }}
+                />
+              </div>
+            </motion.div>
           ))}
         </div>
-      </Container>
+      </div>
     </section>
   );
 }
 
-function Trust() {
-  const stats = [
-    { num: 'до 78%', label: 'меньше пропущенных записей' },
-    { num: '2 500+', label: 'бизнесов используют КликБук' },
-    { num: '5 минут', label: 'на запуск страницы записи' },
-    { num: '24/7', label: 'клиенты записываются онлайн' },
-  ];
-
-  const reviews = [
-    {
-      quote:
-        'Раньше расписание было в трёх таблицах и голове администратора. Теперь всё в одном месте — и клиенты записываются сами.',
-      author: 'Анна Лебедева',
-      role: 'Владелица студии маникюра',
-    },
-    {
-      quote:
-        'Количество no-show упало почти в три раза. Напоминания делают своё дело, а сотрудники видят расписание в телефоне.',
-      author: 'Дмитрий Орлов',
-      role: 'Барбершоп, 2 филиала',
-    },
-    {
-      quote:
-        'Запустили страницу записи за вечер. Через неделю поняли, что без аналитики уже не сможем — выручка стала прозрачной.',
-      author: 'Марина Соколова',
-      role: 'Косметолог, частная практика',
-    },
-  ];
+// ─── SLIDE 6 · PROOF ─────────────────────────────────────────────────────────
+function ProofSlide({ t }: { t: typeof COPY.ru }) {
+  const ref = useRef<HTMLElement>(null);
+  const inView = useInView(ref, { once: true, margin: '-60px' });
 
   return (
-    <section className="py-24 lg:py-32">
-      <Container>
-        <SectionTitle eyebrow="Доверие" title="Бизнесы уже растут вместе с КликБук" />
+    <section
+      id="proof"
+      ref={ref}
+      className="min-h-screen bg-[#f7f8fc] py-20 dark:bg-[#0a0d17] lg:py-28"
+    >
+      <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.7 }}
+          className="mb-14 text-center"
+        >
+          <Eyebrow>{t.proof.eyebrow}</Eyebrow>
+          <h2 className="mt-5 text-[36px] font-bold leading-[1.04] tracking-[-0.04em] text-black dark:text-white sm:text-[48px]">
+            {t.proof.title}
+          </h2>
+        </motion.div>
 
-        <div className="mt-14 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {stats.map((stat, i) => (
+        {/* Stats */}
+        <div className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {t.proof.stats.map((stat, i) => (
             <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: i * 0.07 }}
-              className="rounded-2xl border border-slate-200 bg-white p-7 text-center"
+              key={i}
+              initial={{ opacity: 0, y: 28, scale: 0.94 }}
+              animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
+              transition={{ duration: 0.6, delay: i * 0.08 }}
+              className="group overflow-hidden rounded-3xl border border-black/8 bg-white p-7 text-center transition-all duration-300 hover:shadow-[0_20px_50px_-16px_rgba(18,125,254,0.25)] dark:border-white/8 dark:bg-white/[0.03]"
             >
-              <div className="text-[40px] font-semibold leading-none tracking-tight text-slate-900 sm:text-[44px]">
-                {stat.num}
+              {stat.pre && (
+                <div className="mb-1 text-[12px] font-semibold uppercase tracking-[0.1em] text-black/38 dark:text-white/32">
+                  {stat.pre}
+                </div>
+              )}
+              <div className="text-[48px] font-black leading-none tracking-[-0.05em] sm:text-[52px]">
+                <span
+                  className="bg-gradient-to-br from-[#127dfe] to-[#7c3aed] bg-clip-text text-transparent"
+                >
+                  {inView && <Counter target={stat.val} suffix={stat.suffix} pre="" />}
+                </span>
               </div>
-              <div className="mt-2 text-[12.5px] leading-snug text-slate-500">{stat.label}</div>
+              <div className="mt-3 text-[12.5px] leading-snug text-black/48 dark:text-white/40">{stat.label}</div>
             </motion.div>
           ))}
         </div>
 
-        <div className="mt-10 grid gap-4 lg:grid-cols-3">
-          {reviews.map((t, i) => (
-            <Reveal key={t.author} delay={i * 0.07}>
-              <div className="h-full rounded-2xl border border-slate-200 bg-white p-7">
-                <Quote className="h-6 w-6" style={{ color: ACCENT, opacity: 0.4 }} />
-                <p className="mt-4 text-[14px] leading-relaxed text-slate-700">{t.quote}</p>
-                <div className="mt-6 flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-[13px] font-semibold text-white">
-                    {t.author
-                      .split(' ')
-                      .map((p) => p[0])
-                      .join('')}
-                  </div>
-                  <div>
-                    <div className="text-[13.5px] font-semibold text-slate-900">{t.author}</div>
-                    <div className="text-[11.5px] text-slate-500">{t.role}</div>
-                  </div>
-                </div>
-                <div className="mt-4 flex items-center gap-1 text-amber-500">
-                  {[...Array(5)].map((_, idx) => (
-                    <Star key={idx} className="h-3.5 w-3.5 fill-current" />
-                  ))}
-                </div>
-              </div>
-            </Reveal>
-          ))}
-        </div>
-      </Container>
-    </section>
-  );
-}
-
-function FinalCta() {
-  return (
-    <section id="cta" className="relative overflow-hidden py-24 lg:py-32">
-      <Container>
-        <Reveal y={32}>
-          <div className="relative overflow-hidden rounded-[36px] border border-slate-800 bg-slate-950 px-8 py-16 text-center sm:px-16 sm:py-20">
-            {/* Animated grid */}
-            <div
-              className="pointer-events-none absolute inset-0 opacity-[0.08]"
-              style={{
-                backgroundImage:
-                  'linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)',
-                backgroundSize: '40px 40px',
-              }}
-            />
-            {/* Glow */}
+        {/* Reviews */}
+        <div className="grid gap-4 lg:grid-cols-3">
+          {t.proof.reviews.map((review, i) => (
             <motion.div
-              className="pointer-events-none absolute -top-40 left-1/2 h-[420px] w-[700px] -translate-x-1/2 rounded-full blur-3xl"
-              style={{ background: `radial-gradient(circle, ${ACCENT}55, transparent 70%)` }}
-              animate={{ opacity: [0.5, 0.9, 0.5] }}
-              transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
-            />
-            <div
-              className="pointer-events-none absolute -bottom-40 right-0 h-[320px] w-[420px] rounded-full blur-3xl"
-              style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.35), transparent 70%)' }}
-            />
+              key={i}
+              initial={{ opacity: 0, y: 32 }}
+              animate={inView ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.65, delay: 0.3 + i * 0.1 }}
+              className="group relative overflow-hidden rounded-3xl border border-black/8 bg-white p-7 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_60px_-20px_rgba(18,125,254,0.22)] dark:border-white/8 dark:bg-white/[0.03]"
+            >
+              {/* Quote icon with glow */}
+              <div className="mb-5">
+                <motion.div
+                  whileHover={{ scale: 1.1, rotate: -8 }}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl"
+                  style={{ background: `${ACCENT}14` }}
+                >
+                  <Quote className="h-4 w-4" style={{ color: ACCENT }} />
+                </motion.div>
+              </div>
 
-            <div className="relative">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-white/80 backdrop-blur">
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: ACCENT }} />
-                Бесплатный старт
+              <p className="text-[14px] leading-7 text-black/66 dark:text-white/58">{review.text}</p>
+
+              <div className="mt-6 flex items-center gap-3">
+                <div
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-[13px] font-bold text-white"
+                  style={{ background: `linear-gradient(135deg, ${ACCENT}, ${ACCENT_ALT})` }}
+                >
+                  {review.name.slice(0, 1)}
+                </div>
+                <div>
+                  <div className="text-[13.5px] font-semibold text-black dark:text-white">{review.name}</div>
+                  <div className="text-[11.5px] text-black/46 dark:text-white/40">{review.role}</div>
+                </div>
               </div>
-              <h2 className="mx-auto mt-6 max-w-3xl text-[36px] font-semibold leading-[1.08] tracking-[-0.025em] text-white sm:text-[56px]">
-                Запустите онлайн-запись для своего бизнеса{' '}
-                <span
-                  className="bg-clip-text text-transparent"
-                  style={{ backgroundImage: `linear-gradient(135deg, ${ACCENT}, #8b5cf6)` }}
-                >
-                  уже сегодня
-                </span>
-              </h2>
-              <p className="mx-auto mt-5 max-w-xl text-[15.5px] leading-relaxed text-white/70">
-                Создайте страницу записи за 5 минут — клиенты начнут записываться сами,
-                а вы сэкономите часы рутины.
-              </p>
-              <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <Link
-                  href="/login"
-                  className="group inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-7 py-3.5 text-[14px] font-semibold text-slate-900 shadow-[0_18px_44px_-12px_rgba(0,0,0,0.5)] transition-all hover:-translate-y-0.5"
-                >
-                  Начать с КликБук
-                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                </Link>
-                <Link
-                  href="#features"
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/5 px-7 py-3.5 text-[14px] font-semibold text-white backdrop-blur transition-all hover:bg-white/10"
-                >
-                  Создать страницу записи
-                </Link>
-              </div>
-              <div className="mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[12px] text-white/60">
-                {['Без карты', 'Запуск за 5 минут', 'Поддержка 24/7'].map((t) => (
-                  <span key={t} className="inline-flex items-center gap-1.5">
-                    <Check className="h-3.5 w-3.5 text-emerald-400" />
-                    {t}
-                  </span>
+
+              <div className="mt-4 flex gap-0.5">
+                {Array.from({ length: 5 }).map((_, si) => (
+                  <Star key={si} className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
                 ))}
               </div>
-            </div>
-          </div>
-        </Reveal>
-      </Container>
+
+              {/* Hover gradient */}
+              <div
+                className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                style={{ background: `linear-gradient(135deg, ${ACCENT}04, transparent 60%)` }}
+              />
+            </motion.div>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }
 
-function Footer() {
+// ─── SLIDE 7 · CTA ────────────────────────────────────────────────────────────
+function CtaSlide({ t }: { t: typeof COPY.ru }) {
+  const ref = useRef<HTMLElement>(null);
+  const inView = useInView(ref, { once: true, margin: '-60px' });
+
   return (
-    <footer className="border-t border-slate-200 bg-white py-12">
-      <Container>
-        <div className="flex flex-col items-start justify-between gap-8 sm:flex-row sm:items-center">
-          <div className="flex items-center gap-3">
-            <Image
-              src="/brand/clickbook-logo-dark-transparent.png"
-              alt="КликБук"
-              width={120}
-              height={28}
-              className="h-7 w-auto"
-            />
-            <span className="text-[12px] text-slate-400">Онлайн-запись и управление клиентами</span>
-          </div>
-          <div className="flex flex-wrap items-center gap-x-7 gap-y-2 text-[13px] text-slate-500">
-            <a href="#features" className="hover:text-slate-900">Возможности</a>
-            <a href="#segments" className="hover:text-slate-900">Для кого</a>
-            <a href="#how" className="hover:text-slate-900">Как работает</a>
-            <Link href="/login" className="hover:text-slate-900">Войти</Link>
-          </div>
+    <section
+      id="cta"
+      ref={ref}
+      className="relative min-h-screen overflow-hidden bg-[#060914] py-20 lg:py-28"
+    >
+      {/* Stars/particles */}
+      {PARTICLES.map((p) => (
+        <motion.div
+          key={p.id}
+          className="absolute rounded-full bg-white"
+          style={{ left: `${p.x}%`, top: `${p.y}%`, width: p.r, height: p.r, opacity: p.op * 0.7 }}
+          animate={{ opacity: [p.op * 0.4, p.op * 1.4, p.op * 0.4] }}
+          transition={{ duration: p.dur, delay: p.delay, repeat: Infinity }}
+        />
+      ))}
+
+      {/* Big glow */}
+      <motion.div
+        className="pointer-events-none absolute inset-x-0 top-1/4 flex justify-center"
+        animate={{ scale: [1, 1.08, 1], opacity: [0.5, 0.75, 0.5] }}
+        transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+      >
+        <div
+          className="h-[500px] w-[800px] rounded-full blur-[100px]"
+          style={{ background: `radial-gradient(ellipse at center, ${ACCENT}60, ${ACCENT_ALT}30, transparent 70%)` }}
+        />
+      </motion.div>
+
+      {/* Grid */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.04]"
+        style={{
+          backgroundImage: `linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)`,
+          backgroundSize: '52px 52px',
+        }}
+      />
+
+      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-80px)] max-w-[1280px] flex-col items-center justify-center px-4 text-center sm:px-6 lg:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: 40, scale: 0.96 }}
+          animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
+          transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <Eyebrow light>{t.cta.badge}</Eyebrow>
+
+          <h2 className="mx-auto mt-7 max-w-3xl text-[42px] font-black leading-[0.98] tracking-[-0.04em] text-white sm:text-[60px] lg:text-[72px]">
+            {t.cta.title.split(' ').map((word, i) => (
+              <motion.span
+                key={i}
+                initial={{ opacity: 0, y: 30 }}
+                animate={inView ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 0.6, delay: 0.1 + i * 0.05 }}
+                className="inline-block mr-[0.18em]"
+              >
+                {word}
+              </motion.span>
+            ))}
+          </h2>
+
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={inView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.7, delay: 0.5 }}
+            className="mx-auto mt-6 max-w-lg text-[16px] leading-7 text-white/58"
+          >
+            {t.cta.sub}
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={inView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.7, delay: 0.65 }}
+            className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row"
+          >
+            {/* Primary glow button */}
+            <motion.a
+              href="/login"
+              whileHover={{ scale: 1.04, y: -2 }}
+              whileTap={{ scale: 0.97 }}
+              className="group relative inline-flex items-center gap-2.5 overflow-hidden rounded-2xl bg-white px-8 py-4 text-[15px] font-bold text-black shadow-[0_24px_60px_-12px_rgba(255,255,255,0.35)] transition-all duration-300 hover:shadow-[0_32px_72px_-12px_rgba(255,255,255,0.5)]"
+            >
+              {/* Shimmer */}
+              <span className="absolute inset-y-0 -left-10 w-10 rotate-12 bg-gradient-to-r from-transparent via-black/8 to-transparent transition-all duration-700 group-hover:left-[110%]" />
+              {t.cta.btn1}
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </motion.a>
+
+            <motion.a
+              href="/demo/klikbuk-demo"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white/8 px-8 py-4 text-[15px] font-semibold text-white backdrop-blur transition-all hover:bg-white/14"
+            >
+              {t.cta.btn2}
+            </motion.a>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={inView ? { opacity: 1 } : {}}
+            transition={{ delay: 0.85 }}
+            className="mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[12.5px] text-white/48"
+          >
+            {t.cta.trust.map((item) => (
+              <span key={item} className="flex items-center gap-1.5">
+                <Check className="h-3.5 w-3.5 text-emerald-400" />
+                {item}
+              </span>
+            ))}
+          </motion.div>
+        </motion.div>
+      </div>
+
+      {/* Footer */}
+      <div className="relative z-10 border-t border-white/8 px-4 py-6 text-center sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-[1280px] flex-col items-center justify-between gap-4 sm:flex-row">
+          <Image
+            src="/brand/clickbook-logo-light-transparent.png"
+            alt="КликБук"
+            width={120}
+            height={28}
+            className="h-6 w-auto"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+          <div className="text-[11.5px] text-white/32">{t.footer}</div>
         </div>
-        <div className="mt-8 border-t border-slate-100 pt-6 text-[12px] text-slate-400">
-          © {new Date().getFullYear()} КликБук. Все права защищены.
-        </div>
-      </Container>
-    </footer>
+      </div>
+    </section>
   );
 }
 
-// ───────────────────────── Page
+// ─── ROOT ─────────────────────────────────────────────────────────────────────
 export default function ClickbookLanding() {
+  const { locale } = useLocale();
+  const t = locale === 'en' ? COPY.en : COPY.ru;
+
   return (
-    <div className="min-h-screen bg-white text-slate-900 antialiased">
-      <Header />
+    <div className="min-h-screen bg-white antialiased dark:bg-[#06080f]">
+      <LandingHeader t={t} />
+      <SideNav locale={locale} />
+
       <main>
-        <Hero />
-        <ProblemSolution />
-        <Segments />
-        <Features />
-        <ShowcaseSplit />
-        <HowItWorks />
-        <Benefits />
-        <Trust />
-        <FinalCta />
+        <HeroSlide t={t} />
+        <WhySlide t={t} />
+        <FeaturesSlide t={t} />
+        <WhoSlide t={t} />
+        <HowSlide t={t} />
+        <ProofSlide t={t} />
+        <CtaSlide t={t} />
       </main>
-      <Footer />
     </div>
   );
 }

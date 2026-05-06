@@ -1,67 +1,30 @@
-# ClickBook — final real booking repair
+# ClickBook full working auth + slots final fix
 
-Дата: 2026-05-01
+Что исправлено в этой версии:
 
-## Что было исправлено
+1. Авторизация и сессия
+   - Telegram Mini App API теперь возвращает подписанный `appSessionToken` вместе с установкой cookie.
+   - Клиент сохраняет этот токен в `localStorage` и добавляет его в каждый защищенный запрос как `X-ClickBook-App-Session`.
+   - Серверный `requireAuthUser()` теперь принимает не только Supabase cookie / Bearer token, но и `X-ClickBook-App-Session`.
+   - Поэтому сохранение профиля, услуг, графика, шаблонов, клиентов, чатов и статусов больше не зависит только от cookie Telegram WebView.
+   - После refresh страницы приложение может восстановить кабинет через сохраненный app-session token и не должно показывать `Сессия истекла` при обычных переходах.
 
-### 1. Неправильные слоты на публичной странице
+2. Сохранение услуг и графика
+   - Все PATCH/POST запросы из `AppProvider` теперь повторяются с актуальными auth headers после Telegram auto-auth.
+   - Даже если cookie не попала в запрос, запрос уходит с app-session header.
+   - Это чинит сохранение профиля, списка услуг и календаря/слотов.
 
-Причина: публичная страница могла брать старые строки из нормализованных таблиц Supabase или seed-график, хотя актуальный график уже лежал в `sloty_workspaces.data.availability`.
+3. Публичная запись и слоты
+   - Публичный API `/api/public/[slug]` теперь собирает график из трех источников: seed-недельный график, JSON workspace data и нормализованные таблицы Supabase.
+   - Сервер создания записи `/api/bookings` проверяет слот по той же логике, что и публичная форма.
+   - Случайные пустые календарные строки `custom=false` больше не перекрывают недельный график и не закрывают все слоты.
+   - Реальные точечные дни `custom=true` по-прежнему имеют приоритет: если мастер закрыл день или выбрал конкретные часы, публичная страница использует именно их.
 
-Исправлено:
-- `app/api/public/[slug]/route.ts` теперь считает JSON-график рабочего кабинета главным источником.
-- `app/api/bookings/route.ts` проверяет слот по той же логике, что и публичная форма.
-- `lib/availability.ts` теперь понимает, что выбранные в календаре часовые ячейки — это конкретные старты записи, а не длинное окно для генерации лишних времен.
+После установки:
+1. Заменить файлы из архива.
+2. Запустить `git add . && git commit -m "fix auth persistence and real slots"`.
+3. Запустить `git push --force-with-lease origin main`.
+4. Сделать production deploy.
+5. В кабинете открыть `График`, изменить один день, подождать 1-2 секунды и открыть публичную страницу.
 
-### 2. Запись создана, но не видна в кабинете
-
-Причина: запись могла создаваться в нормализованной таблице или только в JSON fallback, а `/api/workspace` не всегда объединял оба источника.
-
-Исправлено:
-- `/api/bookings` после создания всегда сохраняет запись в `workspace.data.bookings`.
-- `/api/workspace` возвращает объединение `sloty_bookings` + `workspace.data.bookings`.
-- PATCH статуса записи также обновляет JSON fallback.
-
-### 3. Клиенты не подтягивались
-
-Причина: клиентская база строится из списка записей. Если запись не попадала в `/api/workspace`, клиенты оставались пустыми.
-
-Исправлено через объединение записей в `/api/workspace`.
-
-### 4. Чаты не загружались
-
-Причина: нормализованные чат-таблицы могли быть пустыми/недоступными, а страница показывала ошибку.
-
-Исправлено:
-- `/api/chats` теперь строит fallback-диалоги из реальных записей, если чат-таблицы пустые или вернули ошибку.
-- В `supabase-chats.ts` исправлена PostgREST-фильтрация сообщений по thread_id.
-- Страница чатов отправляет `X-ClickBook-App-Session`, чтобы Telegram-сессия не терялась.
-
-### 5. Кнопка Telegram «Открыть записи» зависала
-
-Причина: `/app` всегда открывал `/dashboard`, а при пустом/зависшем initData не было нормального fallback на сохраненный app-session token.
-
-Исправлено:
-- `/app` принимает `redirectTo`, например `/app?redirectTo=/dashboard/today`.
-- Telegram bot теперь открывает «Открыть записи» сразу на `/dashboard/today`.
-- `TelegramMiniAppGate` умеет открывать кабинет по сохраненному `X-ClickBook-App-Session`, даже если Telegram initData не пришла вовремя.
-- Добавлен timeout для `/api/auth/telegram-miniapp`, чтобы экран входа не висел бесконечно.
-
-## Файлы с ключевыми правками
-
-- `lib/availability.ts`
-- `app/api/public/[slug]/route.ts`
-- `app/api/bookings/route.ts`
-- `app/api/workspace/route.ts`
-- `app/api/chats/route.ts`
-- `lib/server/supabase-chats.ts`
-- `components/auth/telegram-miniapp-gate.tsx`
-- `lib/telegram-miniapp-auth-client.ts`
-- `app/app/page.tsx`
-- `lib/server/telegram-bot.ts`
-- `hooks/use-workspace-section.ts`
-- `app/dashboard/chats/page.tsx`
-
-## SQL
-
-Новый SQL не требуется, если уже выполнены миграции `0009` и `0010` из прошлых архивов. Текущий фикс работает через устойчивый JSON fallback и нормализованные таблицы одновременно.
+SQL заново запускать не нужно, если миграции 0009/0010 уже прошли. Если Supabase таблицы старые — запустить последнюю миграцию из `supabase/migrations/20260501_0010_clickbook_availability_sync_hardening.sql`.

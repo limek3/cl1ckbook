@@ -1,14 +1,59 @@
-# ClickBook UI reference pass v3
+# ClickBook VK ID Auth — 2026-05-02
 
-Сделано под референс `app/dashboard/appearance/page.tsx`:
+Что добавлено:
 
-- Вынесен единый динамический `.cb-soft-gradient-button` в `app/globals.css`.
-- Градиент больше не статичный: он строится от `--primary`, который меняется через выбранный цвет во «Внешнем виде» (`data-sloty-accent`).
-- Все основные кнопки `Button` через `default` теперь получают пастельный animated-gradient стиль.
-- `outline`, `secondary`, quiet-кнопки тоже подмешивают выбранный accent через `color-mix`, а не остаются просто серыми/чёрными.
-- Убраны локальные статичные градиент-стили из страниц `appearance`, `availability`, `templates`, чтобы они не перебивали глобальный выбранный цвет.
-- Активные элементы меню, мобильного бара, drawer, переключатели и pills переведены на общий accent/pastel язык.
-- Тёмная тема выровнена под референс: фон `#090909`, карточки `#101010`, панели без чисто-чёрных провалов.
-- `components/ui/button.tsx` приведён к компактному референсу: `h-8`, `rounded-[9px]`, плотная типографика.
+- Кастомная авторизация VK ID через OAuth 2.1 + PKCE.
+- Новый redirect route: `/api/auth/vk/start`.
+- Новый callback route: `/api/auth/vk/callback`.
+- VK ID больше не идёт через Supabase Auth provider `vk`, потому что старый VK OAuth часто ломается/устарел.
+- После успешного VK входа создаётся ClickBook app-session cookie `clickbook_auth_session`.
+- Пользователь VK получает стабильный виртуальный UUID по `vk_id`, чтобы создание профиля не зависело от `auth.users`.
+- Подключение VK на странице профиля работает через `mode=link` и пишет связь в `sloty_vk_accounts`.
+- `/api/auth/accounts` теперь видит VK-связь из таблицы `sloty_vk_accounts`.
 
-Проверка архива: zip пересобран после правок.
+ENV для Vercel:
+
+```env
+VK_ID_CLIENT_ID=...
+VK_ID_CLIENT_SECRET=...
+VK_ID_REDIRECT_URI=https://www.кликбук.рф/api/auth/vk/callback
+VK_ID_SCOPE=vkid.personal_info email
+```
+
+В кабинете VK ID нужно создать Web/Website приложение и добавить trusted/authorized redirect URI:
+
+```txt
+https://www.кликбук.рф/api/auth/vk/callback
+```
+
+SQL:
+
+```txt
+supabase/migrations/20260502_0020_clickbook_vk_id_auth.sql
+```
+
+Проверка после деплоя:
+
+1. Выполнить SQL-патч.
+2. Добавить ENV в Vercel Production.
+3. Redeploy without cache.
+4. Открыть `/auth/signout`.
+5. Открыть `/login`.
+6. Нажать `VK ID`.
+7. После возврата должен открыться `/dashboard`.
+
+Проверочный запрос:
+
+```sql
+select
+  vk_id,
+  user_id,
+  screen_name,
+  first_name,
+  last_name,
+  email,
+  last_login_at,
+  created_at
+from public.sloty_vk_accounts
+order by last_login_at desc nulls last, created_at desc;
+```

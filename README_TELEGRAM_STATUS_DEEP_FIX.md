@@ -1,17 +1,16 @@
-# Telegram status deep fix
+# ClickBook UI polish
 
-This patch hardens `/api/auth/telegram/status`.
+Что обновлено:
 
-It now tries three ways to create a Supabase session after Telegram confirms login:
-
-1. Supabase Auth REST password grant.
-2. `supabase-js` `signInWithPassword`.
-3. Admin-generated magic link + server-side `verifyOtp`.
-
-It also uses a normal synthetic email domain:
-
-```txt
-telegram_<telegram_id>@auth.clickbook.app
-```
-
-If Vercel still returns an error, the response now includes the real chained reason instead of a generic `Internal Server Error`.
+- Единый строгий рабочий стиль под актуальный референс `dashboard/availability`.
+- Глобально выровнены фон, поверхности, бордеры, радиусы и тени для старых `workspace-page` страниц.
+- Активные/основные кнопки переведены на мягкий градиент в светлой и тёмной темах.
+- Для тёмной темы обновлён более спокойный, но заметный градиент кнопок.
+- `components/dashboard/workspace-ui.tsx` приведён к минималистичному стилю: карточки `rounded-[11px]`, строгие панели, компактная типографика.
+- В `dashboard/services` убран отдельный блок метрик, чтобы страница не дублировала верхнюю сводку и стала проще.
+- Проверена синтаксическая валидность ключевых dashboard-страниц через TypeScript transpile check.
+- Убран плавающий кастомный курсор и Telegram floating-widget из глобальных providers, чтобы не было фиолетовых точек/колец поверх интерфейса.
+- В `next.config.js` отключён dev indicator (`N`) для локальной разработки.
+- `dashboard/notifications` очищен от отдельного блока метрик, исправлено выравнивание action-кнопок в хедере.
+- `dashboard/profile` пересобран под текущий референс: строгий header, hero-сводка, карточка публичной страницы и форма в едином каркасе.
+- На главной странице прогресс-линии услуг переведены на тот же мягкий градиент, что и CTA-кнопки.

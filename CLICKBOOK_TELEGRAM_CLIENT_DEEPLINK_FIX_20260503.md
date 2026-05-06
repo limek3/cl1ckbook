@@ -1,16 +1,21 @@
-# ClickBook Telegram client deep-link fix — 2026-05-03
+# ClickBook Telegram/VK domain setup fix
 
-Что исправлено:
+Исправлен серверный `getAppUrl()` для Telegram/VK:
 
-- Клиентская ссылка Telegram теперь использует payload `b_<token>` вместо `booking_<64 hex>`.
-- Payload стал короче 64 символов, поэтому Telegram реально передаёт `/start <payload>` боту, а не просто открывает чат.
-- Webhook Telegram теперь понимает оба формата:
-  - новый: `/start b_<token>`
-  - старый ручной: `/start booking_<token>`
-- После привязки бот всегда отправляет клиенту подтверждение записи с услугой, датой, временем и маршрутом/напоминанием.
-- Ручной fallback на странице заявки остался, но теперь он тоже короткий: `/start b_<token>`.
-- Подключение Telegram больше не должно выглядеть как обычный мастерский `/start` без привязки сделки.
+- технический домен по умолчанию: `https://xn--90anfbbc3d.xn--p1ai`;
+- `APP_URL` имеет приоритет над `NEXT_PUBLIC_APP_URL`;
+- кириллический домен автоматически нормализуется в punycode;
+- `www.xn--90anfbbc3d.xn--p1ai` автоматически приводится к `xn--90anfbbc3d.xn--p1ai`;
+- `/api/telegram/setup` теперь возвращает `appUrl` и `webhookUrl`, чтобы сразу видеть, какой URL отправляется в Telegram.
 
-Почему так было:
+После деплоя:
 
-У Telegram есть ограничение на payload deep-link `start`: до 64 символов. Старый payload был `booking_` + 64 hex = 72 символа. Из-за этого Telegram открывал бот, но не передавал код в webhook, поэтому сделка не связывалась с клиентом.
+1. В Vercel env поставить:
+   - `APP_URL=https://xn--90anfbbc3d.xn--p1ai`
+   - `NEXT_PUBLIC_APP_URL=https://xn--90anfbbc3d.xn--p1ai`
+   - `VK_ID_REDIRECT_URI=https://xn--90anfbbc3d.xn--p1ai/api/auth/vk/callback`
+2. Redeploy without cache.
+3. Открыть `/api/telegram/setup?secret=...`.
+4. Проверить, что в JSON вернулись:
+   - `appUrl: https://xn--90anfbbc3d.xn--p1ai`
+   - `webhookUrl: https://xn--90anfbbc3d.xn--p1ai/api/telegram/webhook`

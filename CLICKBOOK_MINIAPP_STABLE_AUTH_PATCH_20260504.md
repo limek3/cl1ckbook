@@ -1,21 +1,31 @@
-# ClickBook Mini App stable auth patch — 2026-05-04
+# ClickBook miniapp/web notifications + theme/input fix — 2026-05-06
 
-Что исправлено:
+## Исправлено
 
-1. `/api/auth/telegram-miniapp` больше не вызывает `admin.auth.admin.createUser()` для Mini App входа.
-   - Если Telegram-аккаунт уже связан, используется существующий `sloty_telegram_accounts.user_id`.
-   - Если связи ещё нет, создаётся стабильный детерминированный UUID по `telegram_id`.
-   - Сессия остаётся через `clickbook_auth_session` + `X-ClickBook-App-Session`.
+- Убрана нестабильная ветка `document.startViewTransition` для Telegram WebView: переключение темы теперь CSS-driven, без client-side exception в WebView.
+- Miniapp root получил `cb-mini-app-root` и CSS-переменные темы, чтобы input/search корректно наследовали тёмную и светлую темы.
+- Поиск и поле сообщения больше не дают белую системную плашку в тёмной теме: добавлены `cb-mini-input`, `-webkit-text-fill-color`, autofill hardening и прозрачный background.
+- Read-state событийных уведомлений miniapp сохраняется в `localStorage` и синхронизируется с badge в header.
+- Список/страницы miniapp при переходе открываются сверху: scroll-area сбрасывается при смене tab/sub-route.
+- В sheet записи добавлены действия: написать, позвонить, скопировать телефон, перенести.
+- Быстрые ответы в чате заменены с bottom sheet на компактный popover-bubble, который раскрывается от кнопки-шаблона и закрывается по клику снаружи.
+- Исправлена JSX-ошибка в bot-message bubble.
+- На основном сайте read-state событий также сохраняется в `localStorage`.
+- Web notification popover закрывается кликом в любое место вне панели.
+- Badge количества уведомлений на сайте расширен до `99+` и больше не должен обрезаться.
 
-2. `requireAuthUser()` больше не пытается на каждом `/api/workspace` и `/api/chats` пересоздавать Supabase Auth user по Telegram app-session.
-   - Это убирает повторяющиеся логи вида `Supabase Auth user create failed, using virtual Telegram user`.
-   - Это убирает лишние подвисания кабинета после входа в Mini App.
+## Изменённые файлы
 
-3. Реальная Supabase-сессия через Bearer/cookie всё равно остаётся главнее app-session, чтобы VK/обычный вход не перебивались старым Telegram-токеном.
+- `components/mini/theme.tsx`
+- `components/mini/mini-app-shell.tsx`
+- `components/mini/primitives/atoms.tsx`
+- `components/mini/screens/settings.tsx`
+- `components/mini/screens/chats.tsx`
+- `components/mini/screens/appointments.tsx`
+- `components/mini/sheets/detail-sheets.tsx`
+- `components/shared/workspace-shell.tsx`
+- `app/globals.css`
 
-После деплоя:
+## Проверка
 
-1. В Vercel сделать redeploy.
-2. Открыть `/auth/signout` в браузере.
-3. В Telegram закрыть Mini App полностью и открыть заново из бота.
-4. Если профиль не создаётся/не сохраняется, выполнить SQL `supabase/migrations/20260502_0018_clickbook_telegram_virtual_user_auth_repair.sql`, потому что public-таблицы не должны требовать FK на `auth.users` для virtual app-session.
+Focused TS/TSX syntax check по изменённым файлам: OK.

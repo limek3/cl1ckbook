@@ -1,48 +1,54 @@
-# ClickBook real-data working pass
+# ClickBook real subscriptions fix — 2026-05-02
 
-## Что исправлено
+## Что сделано
 
-- Live-режим больше не подставляет мок-записи в рабочие экраны.
-- Демо-режим остался отдельным: демо-данные продолжают работать только через `?demo=1` / `/demo/klikbuk-demo`.
-- Публичная страница теперь получает из API: профиль, внешний вид, услуги, график/слоты и занятые слоты без персональных данных клиента.
-- Форма записи теперь строит доступное время из графика мастера, длительности услуги и уже существующих записей.
-- Серверный `/api/bookings` проверяет, что услуга существует, день/время есть в графике и слот не занят другой активной записью.
-- При новой записи создаётся реальная запись в `sloty_bookings`, обновляется workspace, создаётся чат/сообщение клиента.
-- Статистика, клиенты, день, услуги и аналитика в live считаются от реальных записей, без синтетических клиентов/визитов/выручки.
-- Убрана автозапись fallback/mock-секций в live-workspace при простом открытии страницы.
-- Исправлен compile-баг в `app/dashboard/chats/page.tsx` с повторным `const nextThreads`.
-- Исправлен баг в `BookingForm` с дублированным параметром weekdayIndex и вынесена логика слотов в общий `lib/availability.ts`.
+1. Подписка больше не захардкожена как `Pro` на фронте.
+2. Новый workspace получает реальную подписку `Start` в `sloty_workspace_subscriptions`.
+3. Страница `/dashboard/subscription` берёт текущий тариф из БД.
+4. Переключение тарифа на странице подписки сохраняется в БД через `/api/subscription`.
+5. История оплат/активаций пишется в `sloty_subscription_events`.
+6. `/api/workspace` возвращает в `workspace.data` реальные `subscription` и `subscriptionEvents`.
+7. `/dashboard/limits` показывает реальный текущий тариф и лимиты выбранного плана.
+8. `/dashboard/payments` показывает реальную историю оплат/активаций из событий подписки.
+9. Лимит активных услуг начал реально проверяться на сервере:
+   - при сохранении профиля;
+   - при сохранении секции услуг.
+10. SQL-патч чинит старые варианты таблицы, где мог быть `plan_id`, но не было `plan`.
 
-## Новые/изменённые файлы
+## Тарифы
 
-- `lib/availability.ts`
-- `components/booking/booking-form.tsx`
-- `components/profile/public-master-page.tsx`
-- `app/api/public/[slug]/route.ts`
-- `app/api/bookings/route.ts`
-- `app/api/profile/route.ts`
-- `lib/master-workspace.ts`
-- `hooks/use-workspace-section.ts`
-- `app/dashboard/today/page.tsx`
-- `app/dashboard/chats/page.tsx`
-- `supabase/migrations/20260501_0009_clickbook_real_data_no_mocks.sql`
-- `supabase/RUN_ALL_CLICKBOOK_SQL.sql`
+- Start: 0 ₽, до 5 услуг, 30 клиентов/мес, 30 напоминаний.
+- Pro: 990 ₽/мес или 9 990 ₽/год, до 20 услуг, 150 клиентов/мес.
+- Studio: 2 490 ₽/мес или 24 990 ₽/год, до 80 услуг, 500 клиентов/мес.
+- Premium: 5 990 ₽/мес или 59 990 ₽/год, расширенные лимиты.
 
-## SQL
+## Важно
 
-Добавлена миграция `20260501_0009_clickbook_real_data_no_mocks.sql`.
+Это рабочая подписочная логика приложения: тариф хранится в БД, меняется через API, влияет на лимиты и отображение.
+Платёжный эквайринг пока в режиме `manual_mvp`: тариф активируется через кабинет без реального списания денег. Для настоящего списания нужно отдельно подключить ЮKassa/CloudPayments/Stripe и заменить manual-активацию в `/api/subscription` на создание checkout/payment link.
 
-Главное:
-- уникальный индекс на активный слот записи, чтобы не было двойной записи на одно время;
-- индексы под записи и чаты;
-- optional compatibility tables для услуг, графика и шаблонов, если дальше будем выносить JSON-секции из `sloty_workspaces.data` в отдельные таблицы.
+## Что выполнить в Supabase
 
-## Проверка
+Выполнить:
 
-- ZIP проверен через `unzip -t`.
-- Полный `next build` здесь не запускался: в окружении нет `node_modules`, а установка зависимостей из сети недоступна.
+`supabase/migrations/20260502_0019_clickbook_real_subscriptions.sql`
 
+После этого можно проверять:
 
-## SQL fix v2
-
-Дополнительно усилена миграция `20260501_0009_clickbook_real_data_no_mocks.sql`: для уже существующей старой таблицы `sloty_availability_days` теперь добавляются `weekday_index`, `status`, `slots` и переносится старый weekday из `day_index` / `day_of_week` / `weekday`, если такая колонка была в прежней схеме.
+```sql
+select
+  w.id,
+  w.slug,
+  w.owner_id,
+  s.plan,
+  s.status,
+  s.billing_cycle,
+  s.current_period_start,
+  s.current_period_end,
+  s.provider,
+  s.payment_method_label
+from public.sloty_workspaces w
+left join public.sloty_workspace_subscriptions s
+  on s.workspace_id = w.id
+order by w.created_at desc;
+```

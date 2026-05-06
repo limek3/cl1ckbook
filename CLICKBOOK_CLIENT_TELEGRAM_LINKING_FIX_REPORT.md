@@ -1,24 +1,53 @@
-# ClickBook — client Telegram linking fix
+# ClickBook — clients, CRM, chat and sources repair
 
-## Fixed
+## What changed
 
-- Public booking success now shows a fallback Telegram command after the “Connect Telegram” button.
-- If Telegram opens the bot without passing the deep-link payload, the client can copy the command and send it to the bot manually.
-- Bot no longer looks like it is only for masters on plain `/start`: the start message now explains both client and master scenarios.
-- If a client writes to the bot before the booking is linked, the bot answers with clear linking instructions instead of silently doing nothing.
-- Malformed booking-code attempts now return instructions instead of falling through.
-- Telegram linking no longer overwrites the original booking/source as `ТГ`; it preserves the original source and stores Telegram as the communication channel.
+### Clients page
+- Removed the top status chips from `/dashboard/clients`.
+- Removed the favorite/status pill from the client CRM modal header.
+- Moved **Note** and **Remind** from inline blocks into compact modal popups in the same ClickBook dialog style.
+- Configured the **Call** action as a real `tel:` link with normalized phone digits.
+- Reworked visit timeline labels:
+  - first/only visit is shown as **Первый визит**;
+  - repeat clients get **Последний визит**, **Первый визит**, and intermediate previous visit when available.
 
-## Changed files
+### Client calculations
+- Fixed client average check and revenue calculations from real bookings.
+- Fixed favorite/regular/sleeping segmentation so new one-off clients are not marked as favorites by default.
+- Sleeping clients are now calculated from real inactivity: no future booking and last past visit older than the inactivity threshold.
 
-- `components/booking/booking-form.tsx`
+### Chat delivery
+- Dashboard chat messages now try to deliver to the client through Telegram when:
+  - the thread channel is Telegram;
+  - client message notifications are enabled;
+  - the client has connected Telegram through the booking confirmation link or the thread metadata contains `clientTelegramChatId`.
+- Client replies to the Telegram bot are written back to the dashboard chat even when the original booking link row is missing, as long as the chat thread has Telegram metadata.
+- Bot delivery now searches client Telegram linkage by booking id, phone, client name and direct thread chat id.
+
+### Sources/channels
+- Removed MAX from visible CRM/chat/source options.
+- Normalized visible source set to: **ТГ / Telegram**, **Инстаграм / Instagram**, **ВК / VK**.
+- Existing MAX chat threads are migrated to VK by the new SQL migration.
+
+## Files touched
+- `app/dashboard/clients/page.tsx`
+- `app/dashboard/chats/page.tsx`
+- `app/api/chats/route.ts`
+- `app/api/bookings/route.ts`
 - `app/api/telegram/webhook/route.ts`
-- `lib/server/telegram-bot.ts`
+- `lib/master-workspace.ts`
+- `lib/chat-types.ts`
+- `lib/server/client-telegram.ts`
+- source labels in dashboard/profile/public/template/integration files
+- `supabase/migrations/20260501_0012_clickbook_clients_chat_sources_repair.sql`
+- `supabase/RUN_ALL_CLICKBOOK_SQL.sql`
 
-## Client flow after fix
+## Required SQL
+Run:
 
-1. Client creates booking on public page.
-2. Client taps “Подключить Telegram”.
-3. If Telegram links correctly, bot sends booking confirmation and chat becomes connected.
-4. If Telegram only opens the bot, client copies the shown `/start booking_...` command and sends it to the bot.
-5. Bot links the booking to the Telegram chat, so notifications and chat replies can work.
+```sql
+supabase/migrations/20260501_0012_clickbook_clients_chat_sources_repair.sql
+```
+
+## Notes
+Full Next.js build was not executed in this environment because dependencies (`node_modules`) are not installed here. The archive was checked for zip integrity.

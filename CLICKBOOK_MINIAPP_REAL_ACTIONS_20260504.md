@@ -1,96 +1,53 @@
-# ClickBook Mini App — реальные действия и мобильная логика
+# ClickBook Miniapp — stabilization and real-data pass (2026-05-06)
 
-Что сделано в этой сборке:
+## Scope
+Доработана текущая miniapp без редизайна с нуля: сохранён существующий визуальный язык, исправлены реальные UX/логические баги, экраны привязаны к данным workspace/bookings/profile/chats там, где раньше были заглушки или несовместимые структуры.
 
-## 1. Mini App теперь работает как мобильный пульт
+## Key changes
 
-Нижняя навигация приведена к продуктовой логике:
+### Real data adapter
+- `lib/mini-adapter.ts` теперь корректно собирает данные для miniapp из `workspaceData`, `ownedProfile`, `bookings` и billing.
+- Услуги читаются из `workspaceData.services`, а не только из `profile.services`.
+- Записи получают реальные дату, статус, сумму, длительность, источник и человекочитаемый статус.
+- Клиенты собираются из реальных бронирований.
+- График и шаблоны понимают как старый JSON-формат, так и формат, который синхронизируется в нормализованные Supabase-таблицы.
 
-- Сегодня
-- График
-- Чаты
-- Клиенты
-- Ещё
+### Screens
+- `HomeScreen`: убраны захардкоженные даты/суммы; карточки и метрики считаются из реальных записей, услуг, клиентов и чатов.
+- `AppointmentsScreen`: переключение дней работает от текущей даты, список фильтруется по выбранному дню, статусы обновляются с реальным error handling.
+- `ServicesScreen`: добавление/редактирование/скрытие услуг сохраняет цену, длительность, статус, видимость и id.
+- `ScheduleScreen`: сохранение графика теперь отправляет `weekdayIndex`, `slots`, `status`, `enabled`, `startTime`, `endTime` — это совместимо с серверной синхронизацией.
+- `TemplatesScreen`: сохранение шаблонов теперь отправляет `title/content/variables/enabled`, совместимо с серверной синхронизацией.
+- `MoreScreen`: счётчики чатов/шаблонов/подписки подтягиваются из реальных данных.
+- `AnalyticsScreen`: метрики строятся из реальных записей, клиентов и услуг.
+- `FinanceScreen`: баланс и операции строятся из завершённых записей.
+- `SourcesScreen`: источники строятся по реальным записям за 30 дней.
+- `ReviewsScreen`: отзывы берутся из профиля мастера, вместо статичного демо-списка.
+- `ProfileScreen`: сохранение профиля теперь идёт через основной `saveProfile`/`/api/profile`, а не в отдельную workspace-секцию.
 
-Услуги, аналитика, профиль и настройки убраны в «Ещё», чтобы нижнее меню не было перегружено на телефоне.
+### Runtime/auth fixes
+- `hooks/use-chats.ts` теперь отправляет Supabase bearer и Telegram app-session headers, а при 401 пытается восстановить Telegram miniapp-сессию.
+- `lib/app-context.tsx:updateBookingStatus` больше не показывает ложный успех: при ошибке API откатывается через `refreshWorkspace()` и пробрасывает ошибку в UI.
+- Навигация `home → appointments/services` больше не попадает в `Coming soon`, а переключает реальные вкладки.
 
-## 2. Перенос теперь не просто визуальная кнопка
+## Validation
+- Выполнена focused TS/TSX transpile syntax check по изменённым файлам — синтаксических ошибок не найдено.
+- Полный `tsc --noEmit` в текущем архиве не является показательным без установленных `node_modules`: отсутствуют типы `next`, `react`, `@types/node` и т.д. Также в проекте уже есть сторонние/pre-existing TypeScript warnings в API-роутах, не относящиеся к miniapp-pass.
 
-Исправлена связка:
-
-```txt
-Mini App → /api/bookings PATCH → Supabase/workspace.data → чат → Telegram/VK клиент
-```
-
-Теперь сценарий такой:
-
-1. Клиент просит перенос.
-2. Запись получает metadata-флаги переноса.
-3. В Mini App появляется сигнал «Клиент просит перенос».
-4. Мастер открывает запись и предлагает новую дату/время.
-5. API создаёт настоящее предложение переноса.
-6. Клиент получает кнопку подтверждения в Telegram/VK.
-7. При подтверждении используется существующая серверная логика `booking-reschedule-proposals`, которая меняет дату/время записи.
-
-## 3. API записей стал action-based
-
-`app/api/bookings/route.ts` теперь поддерживает действия:
-
-- `confirm`
-- `complete`
-- `no_show`
-- `cancel`
-- `request_reschedule`
-- `decline_reschedule`
-- `offer_reschedule`
-- `accept_reschedule`
-
-Это позволяет сайту, Mini App, Telegram и VK использовать одну общую серверную логику.
-
-## 4. Чаты связаны с действиями по записи
-
-При изменении записи API пишет системное сообщение в связанный чат и обновляет metadata треда:
-
-- запись подтверждена;
-- запись отменена;
-- клиент запросил перенос;
-- мастер предложил новое время;
-- запрос переноса закрыт.
-
-## 5. График сохраняется в публичную availability-структуру
-
-Mini App теперь сохраняет график в тот же формат, который использует публичная запись:
-
-```ts
-{
-  id,
-  label,
-  weekdayIndex,
-  status,
-  slots: ['10:00–18:00'],
-  breaks: ['13:00–14:00'],
-  custom: false,
-}
-```
-
-То есть изменения графика из Mini App должны отражаться в доступных слотах клиента.
-
-## 6. Расширен серверный слой Supabase bookings
-
-В `lib/server/supabase-bookings.ts` добавлена универсальная функция:
-
-```ts
-updateBookingRecord(workspaceId, bookingId, patch)
-```
-
-Теперь можно обновлять не только статус, но и дату, время, metadata, completed/no-show/cancel timestamps.
-
-## 7. Важно по базе
-
-Новые статусы в базу не добавлялись специально, чтобы не сломать текущий SQL constraint:
-
-```txt
-new / confirmed / completed / no_show / cancelled
-```
-
-Состояние переноса хранится в `metadata`, потому что в проекте уже есть таблица и логика `sloty_booking_reschedule_proposals`.
+## Main touched files
+- `lib/mini-adapter.ts`
+- `lib/mini-demo.ts`
+- `lib/app-context.tsx`
+- `hooks/use-mini-data.ts`
+- `hooks/use-chats.ts`
+- `components/mini/mini-app-shell.tsx`
+- `components/mini/screens/home.tsx`
+- `components/mini/screens/appointments.tsx`
+- `components/mini/screens/services.tsx`
+- `components/mini/screens/schedule.tsx`
+- `components/mini/screens/templates.tsx`
+- `components/mini/screens/more.tsx`
+- `components/mini/screens/analytics.tsx`
+- `components/mini/screens/money.tsx`
+- `components/mini/screens/settings.tsx`
+- `components/mini/sheets/detail-sheets.tsx`

@@ -1,79 +1,29 @@
-# Telegram bot auth flow
+# Telegram bot auth — status 500 fix
 
-This build uses bot-based login instead of Telegram Login Widget. It does **not** use the browser widget, so `Bot domain invalid` is avoided.
+Этот патч исправляет ситуацию, когда бот уже пишет «Вход подтверждён», но сайт остаётся на `/login` и показывает `Internal Server Error`.
 
-Flow:
+Что изменено:
 
-1. User clicks “Войти через Telegram”.
-2. App creates a temporary login token.
-3. Browser opens `https://t.me/<bot>?start=auth_<token>`.
-4. User presses Start in the bot.
-5. Telegram sends an update to `/api/telegram/webhook`.
-6. The site polls `/api/auth/telegram/status` and receives Supabase session tokens.
+- `app/api/auth/telegram/status/route.ts`
+  - сделал Telegram-аккаунт идемпотентным;
+  - если Supabase user уже был создан раньше, но строки в `sloty_telegram_accounts` нет, API найдёт пользователя по техническому email и привяжет его заново;
+  - добавлен `Authorization: Bearer <publishable key>` для Supabase token endpoint;
+  - ошибки теперь логируются как `[telegram-status] ...`.
 
-If Telegram sends only `/start`, the bot now replies with instructions. The UI also has a fallback button: “Скопировать команду для бота”.
+- `components/auth/telegram-login-button.tsx`
+  - безопасно читает ответ API даже если Vercel вернул plain text;
+  - показывает более понятную ошибку вместо голого `Internal Server Error`.
 
-## Required Vercel variables
+После загрузки:
 
-```env
-NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=your_bot_username_without_at
-TELEGRAM_BOT_TOKEN=your_bot_token
-TELEGRAM_WEBHOOK_SECRET=random_secret
-NEXT_PUBLIC_APP_URL=https://www.кликбук.рф
-SUPABASE_SERVICE_ROLE_KEY=...
-NEXT_PUBLIC_SUPABASE_URL=...
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
-```
+1. `git add .`
+2. `git commit -m "fix telegram auth status session"`
+3. `git push origin main`
+4. дождаться Vercel Ready / или Redeploy without cache
+5. проверить `/login` заново в инкогнито
 
-`TELEGRAM_BOT_TOKEN` and `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` must belong to the same bot.
+Если будет ошибка `supabase_token_failed`, проверь в Supabase:
 
-## Supabase SQL
-
-Run:
-
-```txt
-supabase/migrations/20260430_0006_telegram_bot_auth.sql
-```
-
-## Set Telegram webhook
-
-Run after Vercel deploy is Ready.
-
-PowerShell:
-
-```powershell
-$TOKEN="TELEGRAM_BOT_TOKEN"
-$SECRET="TELEGRAM_WEBHOOK_SECRET"
-
-Invoke-RestMethod `
-  -Uri "https://api.telegram.org/bot$TOKEN/setWebhook" `
-  -Method Post `
-  -Body @{
-    url = "https://www.кликбук.рф/api/telegram/webhook"
-    secret_token = $SECRET
-  }
-```
-
-Check:
-
-```powershell
-Invoke-RestMethod -Uri "https://api.telegram.org/bot$TOKEN/getWebhookInfo" -Method Get
-```
-
-Expected important fields:
-
-```txt
-url: https://www.кликбук.рф/api/telegram/webhook
-pending_update_count: 0 or more
-last_error_message: empty/null
-```
-
-If bot is silent after `/start`, webhook is not set or the `secret_token` does not match `TELEGRAM_WEBHOOK_SECRET` in Vercel.
-
-To reset webhook:
-
-```powershell
-Invoke-RestMethod -Uri "https://api.telegram.org/bot$TOKEN/deleteWebhook" -Method Post
-```
-
-Then run `setWebhook` again.
+- Authentication → Providers → Email включён;
+- в Vercel есть `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`;
+- миграция `20260430_0006_telegram_bot_auth.sql` выполнена.

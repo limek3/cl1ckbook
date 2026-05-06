@@ -245,7 +245,7 @@ export function ListRow({ icon, label, sub, right, onClick, danger, accent }: Li
 export function ScreenHeader({ title, subtitle, onBack, right }: { title: string; subtitle?: string; onBack?: () => void; right?: ReactNode }) {
   const { T } = useTheme();
   return (
-    <div style={{ padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ padding: '16px 16px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         {onBack ? <NavBtn icon="chevron-left" onClick={onBack} /> : <span />}
         {right || <span />}
@@ -281,7 +281,8 @@ export function EmptyState({
 export function SearchBox({
   value, onChange, placeholder,
 }: { value: string; onChange: (value: string) => void; placeholder: string }) {
-  const { T } = useTheme();
+  const { T, mode } = useTheme();
+  const searchFieldBg = mode === 'dark' ? 'rgba(255,255,255,0.06)' : T.bgSoft;
   return (
     <div style={{
       background: T.card, border: `1px solid ${T.border}`, borderRadius: 14,
@@ -289,18 +290,53 @@ export function SearchBox({
       display: 'flex', alignItems: 'center', gap: 10,
       transition: 'border-color 0.15s ease, background 0.15s ease',
     }}>
-      <Icon name="search" size={16} color={T.text3} />
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="cb-mini-input" style={{ flex: 1, minWidth: 0, background: T.inputBg, backgroundColor: T.inputBg, WebkitAppearance: 'none', appearance: 'none', border: 'none', outline: 'none', boxShadow: `0 0 0 1000px ${T.inputBg} inset`, borderRadius: 10, padding: '6px 8px', color: T.text, WebkitTextFillColor: T.text, caretColor: T.accent, fontSize: 14, fontFamily: 'inherit', colorScheme: T.bg === '#0a0a0a' ? 'dark' : 'light' }}
-      />
-      {value && (
-        <button onClick={() => { tap('selection'); onChange(''); }} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: T.text3, display: 'flex' }}>
-          <Icon name="x" size={14} />
-        </button>
-      )}
+      <div style={{
+        flex: 1,
+        minWidth: 0,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '0 12px',
+        minHeight: 44,
+        borderRadius: 12,
+        background: searchFieldBg,
+        border: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.04)' : T.border}`,
+      }}>
+        <Icon name="search" size={16} color={T.text3} />
+        <input
+          type="text"
+          inputMode="search"
+          autoComplete="off"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="cb-mini-transparent"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            background: 'transparent',
+            backgroundColor: 'transparent',
+            WebkitAppearance: 'none',
+            appearance: 'none',
+            border: 'none',
+            outline: 'none',
+            boxShadow: 'none',
+            borderRadius: 0,
+            padding: 0,
+            color: T.text,
+            WebkitTextFillColor: T.text,
+            caretColor: T.accent,
+            fontSize: 14,
+            fontFamily: 'inherit',
+            colorScheme: T.bg === '#0a0a0a' ? 'dark' : 'light',
+          }}
+        />
+        {value && (
+          <button onClick={() => { tap('selection'); onChange(''); }} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: T.text3, display: 'flex', flexShrink: 0 }}>
+            <Icon name="x" size={14} />
+          </button>
+        )}
+      </div>
     </div>
   );
 }

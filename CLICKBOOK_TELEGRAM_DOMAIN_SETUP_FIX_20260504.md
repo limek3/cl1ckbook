@@ -1,21 +1,33 @@
-# ClickBook Telegram/VK domain setup fix
+# ClickBook Telegram Mini App hang fix — 2026-05-04
 
-Исправлен серверный `getAppUrl()` для Telegram/VK:
+Исправлено зависание Mini App на экране «Входим через Telegram».
 
-- технический домен по умолчанию: `https://xn--90anfbbc3d.xn--p1ai`;
-- `APP_URL` имеет приоритет над `NEXT_PUBLIC_APP_URL`;
-- кириллический домен автоматически нормализуется в punycode;
-- `www.xn--90anfbbc3d.xn--p1ai` автоматически приводится к `xn--90anfbbc3d.xn--p1ai`;
-- `/api/telegram/setup` теперь возвращает `appUrl` и `webhookUrl`, чтобы сразу видеть, какой URL отправляется в Telegram.
+## Что было
 
-После деплоя:
+Telegram Mini App успешно отправлял запрос на `/api/auth/telegram-miniapp`, webhook работал, но фронт мог зависать на gate-экране из-за гонки:
 
-1. В Vercel env поставить:
-   - `APP_URL=https://xn--90anfbbc3d.xn--p1ai`
-   - `NEXT_PUBLIC_APP_URL=https://xn--90anfbbc3d.xn--p1ai`
-   - `VK_ID_REDIRECT_URI=https://xn--90anfbbc3d.xn--p1ai/api/auth/vk/callback`
-2. Redeploy without cache.
-3. Открыть `/api/telegram/setup?secret=...`.
-4. Проверить, что в JSON вернулись:
-   - `appUrl: https://xn--90anfbbc3d.xn--p1ai`
-   - `webhookUrl: https://xn--90anfbbc3d.xn--p1ai/api/telegram/webhook`
+- глобальный `TelegramMiniAppAutoAuth` запускался одновременно с отдельным gate на `/app`;
+- `AppProvider` параллельно пытался грузить `/api/workspace` прямо на странице входа Mini App;
+- после установки cookie первый запрос в Telegram WebView иногда ещё не видел session cookie;
+- UI не имел нормального жёсткого fallback, поэтому визуально оставался на спиннере.
+
+## Что сделано
+
+- На маршруте `/app` отключён глобальный `TelegramMiniAppAutoAuth`, потому что входом занимается `TelegramMiniAppGate`.
+- `AppProvider` больше не грузит workspace на `/app`, чтобы не создавать лишние гонки авторизации.
+- `TelegramMiniAppGate` теперь работает как отдельный state-machine:
+  1. ждёт Telegram initData;
+  2. создаёт app-session через `/api/auth/telegram-miniapp`;
+  3. проверяет `/api/workspace` с `X-ClickBook-App-Session`;
+  4. если профиль есть — открывает `/dashboard`;
+  5. если профиля нет — открывает `/create-profile`;
+  6. если Telegram WebView долго не отдаёт cookie — всё равно даёт кнопку «Открыть кабинет», а не висит бесконечно.
+- Добавлен hard-timeout, чтобы экран не мог зависнуть навсегда.
+
+## Файлы
+
+- `components/auth/telegram-miniapp-gate.tsx`
+- `components/auth/telegram-miniapp-auto-auth.tsx`
+- `lib/app-context.tsx`
+
+SQL запускать не нужно.

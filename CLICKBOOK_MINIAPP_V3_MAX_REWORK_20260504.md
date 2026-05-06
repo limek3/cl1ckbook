@@ -1,26 +1,40 @@
-# ClickBook Mini App — V3 Max Rework
+# ClickBook Mini App — zero rework 2026-05-04
 
-Главный файл: `components/mini/mini-app-entry.tsx`.
+Сделана новая мобильная mini app-обёртка с нуля внутри существующего проекта.
 
-## Что усилено
+## Главные изменения
 
-- Пересобран главный экран `Сегодня` в формат мобильного рабочего пульта.
-- Добавлена быстрая ручная запись клиента через общий `createBooking` API.
-- Добавлен блок готовности к записи: услуги, график, контакты.
-- Добавлены быстрые переходы к проблемным местам настройки.
-- Добавлена касса выбранного дня и более плотные операционные метрики.
-- Улучшена карточка записи: статусы, звонок, копирование текста напоминания.
-- В чатах добавлены быстрые заготовки ответов.
-- В услугах добавлена мини-аналитика каталога: видно клиенту, средний чек, категории.
-- В графике добавлены быстрые шаблоны 5/2 и 7 дней.
+- Полностью переписан `components/mini/mini-app-entry.tsx`.
+- Mini app больше не пытается быть копией desktop-кабинета: собраны отдельные мобильные экраны.
+- Основная навигация: `Сегодня`, `График`, `Услуги`, `Чаты`, `Ещё`.
+- Вторичные разделы убраны в `Ещё`: клиенты, аналитика, профиль, настройки.
+- Исправлен `components/system/telegram-miniapp-viewport.tsx`: теперь это реальный viewport-компонент, а не битый файл, из-за которого падал build на `_not-found`.
+- В `/app` добавлен режим предпросмотра mini app через `/app?mini=1`.
 
-## Проверка
+## Что подтягивается
 
-Локальная проверка JSX/TSX-синтаксиса:
+- Профиль мастера из workspace.
+- Записи и статусы записей.
+- Услуги из `workspace.data.services`.
+- График из `workspace.data.availability`.
+- Чаты через `/api/chats`.
+- Клиенты и аналитика через `buildWorkspaceDatasetFromStored`.
+- Настройки mini app в `workspace.data.miniSettings`.
+
+## Что сохраняется
+
+- Статусы записей через `updateBookingStatus`.
+- График через `updateWorkspaceSection('availability', ...)`.
+- Услуги через `updateWorkspaceSection('services', ...)` + обновление `profile.services`.
+- Профиль через `saveProfile`.
+- VIP/заметки клиента через `clientFavorites` и `clientNotes`.
+- Настройки через `quietHours`, `fallbackEmail`, `miniSettings`.
+
+## Проверка синтаксиса
 
 ```bash
-node _syntax_check_local.js components/mini/mini-app-entry.tsx app/app/page.tsx components/system/telegram-miniapp-viewport.tsx app/layout.tsx
+node _syntax_check_local.js components/mini/mini-app-entry.tsx components/system/telegram-miniapp-viewport.tsx app/app/page.tsx app/layout.tsx
 # OK
 ```
 
-Полный `pnpm build` в контейнере не запускался, потому что нет `pnpm` и `node_modules`.
+Полный `pnpm build` в контейнере не запускался, потому что здесь не установлен `pnpm` и нет `node_modules`.

@@ -1,29 +1,17 @@
-# Telegram bot auth — status 500 fix
+# Telegram status deep fix
 
-Этот патч исправляет ситуацию, когда бот уже пишет «Вход подтверждён», но сайт остаётся на `/login` и показывает `Internal Server Error`.
+This patch hardens `/api/auth/telegram/status`.
 
-Что изменено:
+It now tries three ways to create a Supabase session after Telegram confirms login:
 
-- `app/api/auth/telegram/status/route.ts`
-  - сделал Telegram-аккаунт идемпотентным;
-  - если Supabase user уже был создан раньше, но строки в `sloty_telegram_accounts` нет, API найдёт пользователя по техническому email и привяжет его заново;
-  - добавлен `Authorization: Bearer <publishable key>` для Supabase token endpoint;
-  - ошибки теперь логируются как `[telegram-status] ...`.
+1. Supabase Auth REST password grant.
+2. `supabase-js` `signInWithPassword`.
+3. Admin-generated magic link + server-side `verifyOtp`.
 
-- `components/auth/telegram-login-button.tsx`
-  - безопасно читает ответ API даже если Vercel вернул plain text;
-  - показывает более понятную ошибку вместо голого `Internal Server Error`.
+It also uses a normal synthetic email domain:
 
-После загрузки:
+```txt
+telegram_<telegram_id>@auth.clickbook.app
+```
 
-1. `git add .`
-2. `git commit -m "fix telegram auth status session"`
-3. `git push origin main`
-4. дождаться Vercel Ready / или Redeploy without cache
-5. проверить `/login` заново в инкогнито
-
-Если будет ошибка `supabase_token_failed`, проверь в Supabase:
-
-- Authentication → Providers → Email включён;
-- в Vercel есть `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`;
-- миграция `20260430_0006_telegram_bot_auth.sql` выполнена.
+If Vercel still returns an error, the response now includes the real chained reason instead of a generic `Internal Server Error`.

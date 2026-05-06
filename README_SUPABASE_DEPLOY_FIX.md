@@ -1,44 +1,55 @@
-# ClickBook Supabase deploy fix
+# Telegram auth app-session fix
 
-Что исправлено в архиве:
+This build removes the fragile final step where Telegram auth tried to create a Supabase browser session through password/magic-link flows.
 
-1. Supabase Auth переведён на cookie-based SSR через `@supabase/ssr`.
-2. `proxy.ts` больше не использует `getClaims()` — теперь проверка идёт через `getUser()`.
-3. API routes принудительно динамические (`force-dynamic`), чтобы Vercel не кэшировал auth-запросы.
-4. Клиентские запросы к защищённым API отправляются с `credentials: 'include'`.
-5. `/api/profile` теперь не доверяет произвольному `workspaceId` из клиента и проверяет владельца.
-6. Добавлена совместимая Supabase migration:
-   `supabase/migrations/20260430_0005_clickbook_supabase_compat.sql`
-7. `.env.example` очищен от дублей и реальных значений.
+New flow:
 
-## Что сделать после загрузки в GitHub
+1. `/api/auth/telegram/start` creates a short-lived login token and opens the bot.
+2. `/api/telegram/webhook` confirms the token when the user sends `/start auth_<token>`.
+3. `/api/auth/telegram/status` creates or finds the Supabase Auth user by Telegram id.
+4. Instead of calling Supabase password/magic-link session APIs, the server sets a signed HttpOnly cookie: `clickbook_auth_session`.
+5. `requireAuthUser()` accepts this signed cookie and returns the same stable user id.
+6. `lib/supabase/proxy.ts` allows dashboard pages when this app session cookie exists.
 
-1. В Supabase SQL Editor выполни свой полный SQL schema из чата или хотя бы migration:
-   `supabase/migrations/20260430_0005_clickbook_supabase_compat.sql`
+Why:
 
-2. В Vercel проверь Production env:
+- This avoids `Internal Server Error` on `/api/auth/telegram/status` caused by Supabase token generation.
+- The user no longer needs email/password.
+- The client flow stays simple: click Telegram → confirm in bot → return/open dashboard.
+
+Required env:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=sb_secret_...
-DATABASE_URL=postgresql://...
-NEXT_PUBLIC_APP_URL=https://your-domain-or-vercel-url
-KEY_VAULTS_SECRET=long_random_secret
 TELEGRAM_BOT_TOKEN=...
-TELEGRAM_SUPPORT_CHAT_ID=...
-NEXT_PUBLIC_SUPPORT_TELEGRAM_URL=https://t.me/...
+TELEGRAM_WEBHOOK_SECRET=letters_numbers_only
+NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=bot_username_without_@
+NEXT_PUBLIC_APP_URL=https://www.кликбук.рф
+KEY_VAULTS_SECRET=long_random_secret
+SUPABASE_SERVICE_ROLE_KEY=...
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
 ```
 
-3. В Supabase Authentication → URL Configuration добавь:
+After deploy, set webhook:
 
-```txt
-https://www.кликбук.рф/**
-https://www.кликбук.рф/**
-http://localhost:3000/**
+```powershell
+$TOKEN="TELEGRAM_BOT_TOKEN"
+$SECRET="TELEGRAM_WEBHOOK_SECRET"
+
+Invoke-RestMethod `
+  -Uri "https://api.telegram.org/bot$TOKEN/setWebhook" `
+  -Method Post `
+  -Body @{
+    url = "https://www.кликбук.рф/api/telegram/webhook"
+    secret_token = $SECRET
+    drop_pending_updates = "true"
+  }
 ```
 
-4. Сделай Redeploy without cache.
+Check:
 
-5. После деплоя зайди в инкогнито, авторизуйся заново и создай профиль.
+```powershell
+Invoke-RestMethod `
+  -Uri "https://api.telegram.org/bot$TOKEN/getWebhookInfo" `
+  -Method Get
+```

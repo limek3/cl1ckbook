@@ -1,26 +1,52 @@
-# ClickBook multi-booking context fix
+# ClickBook — profile editor + connected accounts rework
 
-Что сделано:
+## Что изменено
 
-- Клиентские TG-сообщения теперь показывают контекст записи: код, мастер, список услуг, дата, время, формат/адрес.
-- Если у клиента несколько активных Telegram-записей, обычный текст больше не уходит в случайную запись: бот просит выбрать запись.
-- В Telegram добавлены кнопки клиента: «Мои записи и услуги», «Написать по этой записи», «Детали».
-- При `/start` бот проверяет, есть ли у клиента связанные записи. Если есть — показывает список записей, а не меню мастера.
-- Выбор записи сохраняется через metadata.activeChatContextAt и действует как контекст переписки.
-- В чатах кабинета добавлены метки, когда у клиента несколько записей, и горизонтальный выбор записей в шапке чата.
-- В CRM-карточке клиента добавлен блок всех/активных записей клиента с услугами и переходом в нужный чат.
-- Услуги в сообщениях и карточках выводятся списком, а не мусорной строкой вида `------ входит: -`.
-- VK/TG уведомления мастеру и клиенту приведены к единому формату с услугами списком.
-- Добавлена SQL-миграция `20260503_0033_clickbook_multi_booking_context_ui.sql`.
+1. `app/login/page.tsx`
+   - Включены реальные OAuth-кнопки Google и VK ID через Supabase `signInWithOAuth`.
+   - Telegram вход сохранён: Mini App + веб-вход через бота.
+   - Убраны нерабочие disabled-кнопки Google/VK.
 
-SQL запускать после предыдущих миграций:
+2. `app/dashboard/profile/page.tsx`
+   - Добавлен блок «Связанные аккаунты»: Google, Telegram, VK ID.
+   - Google/VK подключаются через Supabase `linkIdentity`, с fallback на `signInWithOAuth`.
+   - Telegram подключается через отдельный link-flow: создаётся токен, открывается бот, страница ждёт подтверждение.
+   - Убран старый CSS-хак, который скрывал части формы.
+   - Профильная страница получила более спокойный letter-spacing.
 
-1. `20260503_0028_clickbook_client_actions_cleanup.sql`
-2. `20260503_0031_clickbook_telegram_chat_id_and_chat_delete_fix.sql`
-3. `20260503_0032_clickbook_booking_context_threads.sql`
-4. `20260503_0033_clickbook_multi_booking_context_ui.sql`
+3. `components/profile/master-profile-form.tsx`
+   - Упрощён редактор профиля: убран лишний верхний дубль текущего шага с бейджем `3/5`.
+   - Сохранена навигация по разделам слева, основная рабочая область и все маршруты.
+   - Правая колонка показывается только там, где явно передан `showPreviewPanel=true`.
+   - Для страницы `/dashboard/profile` правая колонка не появляется.
 
-Проверка:
+4. `app/api/auth/accounts/route.ts`
+   - Новый endpoint для безопасного чтения текущих подключённых провайдеров.
+   - Работает и с обычной Supabase-сессией, и с Telegram app-session через `requireAuthUser`.
 
-- Изменённые TS/TSX-файлы проверены через `_transpile_check.js`.
-- Полный `tsc` в контейнере невалиден без `node_modules` и типов Next/React, поэтому полный проектный typecheck здесь не запускался корректно.
+5. `app/api/auth/telegram/link/start/route.ts`
+   - Новый endpoint для подключения Telegram к текущему аккаунту.
+
+6. `app/api/auth/telegram/status/route.ts`
+   - Добавлена обработка link-flow для Telegram.
+   - Если login request создан как `purpose=link_account`, Telegram не создаёт новую сессию, а привязывается к текущему пользователю.
+
+7. `app/globals.css`
+   - Базовый `letter-spacing` сделан мягче: `-0.005em` вместо `-0.02em`.
+   - Для `.cb-profile-page` добавлен отдельный override, чтобы профиль читался легче.
+
+## Важно для Supabase
+
+Для Google и VK нужно включить провайдеры в Supabase:
+
+- Authentication → Providers → Google
+- Authentication → Providers → VK
+
+Redirect URLs:
+
+- `https://your-domain/auth/callback`
+- `http://localhost:3000/auth/callback`
+
+## Проверка
+
+Из-за отсутствия `node_modules` полный `next build` в окружении не запускался. Изменённые TS/TSX файлы проверены через локальный `typescript.transpileModule` syntax-check.

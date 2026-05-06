@@ -1,36 +1,45 @@
-# Telegram auth app-session fix
+# Telegram bot auth flow
 
-This build removes the fragile final step where Telegram auth tried to create a Supabase browser session through password/magic-link flows.
+This build uses bot-based login instead of Telegram Login Widget. It does **not** use the browser widget, so `Bot domain invalid` is avoided.
 
-New flow:
+Flow:
 
-1. `/api/auth/telegram/start` creates a short-lived login token and opens the bot.
-2. `/api/telegram/webhook` confirms the token when the user sends `/start auth_<token>`.
-3. `/api/auth/telegram/status` creates or finds the Supabase Auth user by Telegram id.
-4. Instead of calling Supabase password/magic-link session APIs, the server sets a signed HttpOnly cookie: `clickbook_auth_session`.
-5. `requireAuthUser()` accepts this signed cookie and returns the same stable user id.
-6. `lib/supabase/proxy.ts` allows dashboard pages when this app session cookie exists.
+1. User clicks “Войти через Telegram”.
+2. App creates a temporary login token.
+3. Browser opens `https://t.me/<bot>?start=auth_<token>`.
+4. User presses Start in the bot.
+5. Telegram sends an update to `/api/telegram/webhook`.
+6. The site polls `/api/auth/telegram/status` and receives Supabase session tokens.
 
-Why:
+If Telegram sends only `/start`, the bot now replies with instructions. The UI also has a fallback button: “Скопировать команду для бота”.
 
-- This avoids `Internal Server Error` on `/api/auth/telegram/status` caused by Supabase token generation.
-- The user no longer needs email/password.
-- The client flow stays simple: click Telegram → confirm in bot → return/open dashboard.
-
-Required env:
+## Required Vercel variables
 
 ```env
-TELEGRAM_BOT_TOKEN=...
-TELEGRAM_WEBHOOK_SECRET=letters_numbers_only
-NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=bot_username_without_@
+NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=your_bot_username_without_at
+TELEGRAM_BOT_TOKEN=your_bot_token
+TELEGRAM_WEBHOOK_SECRET=random_secret
 NEXT_PUBLIC_APP_URL=https://www.кликбук.рф
-KEY_VAULTS_SECRET=long_random_secret
 SUPABASE_SERVICE_ROLE_KEY=...
 NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
 ```
 
-After deploy, set webhook:
+`TELEGRAM_BOT_TOKEN` and `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` must belong to the same bot.
+
+## Supabase SQL
+
+Run:
+
+```txt
+supabase/migrations/20260430_0006_telegram_bot_auth.sql
+```
+
+## Set Telegram webhook
+
+Run after Vercel deploy is Ready.
+
+PowerShell:
 
 ```powershell
 $TOKEN="TELEGRAM_BOT_TOKEN"
@@ -42,14 +51,29 @@ Invoke-RestMethod `
   -Body @{
     url = "https://www.кликбук.рф/api/telegram/webhook"
     secret_token = $SECRET
-    drop_pending_updates = "true"
   }
 ```
 
 Check:
 
 ```powershell
-Invoke-RestMethod `
-  -Uri "https://api.telegram.org/bot$TOKEN/getWebhookInfo" `
-  -Method Get
+Invoke-RestMethod -Uri "https://api.telegram.org/bot$TOKEN/getWebhookInfo" -Method Get
 ```
+
+Expected important fields:
+
+```txt
+url: https://www.кликбук.рф/api/telegram/webhook
+pending_update_count: 0 or more
+last_error_message: empty/null
+```
+
+If bot is silent after `/start`, webhook is not set or the `secret_token` does not match `TELEGRAM_WEBHOOK_SECRET` in Vercel.
+
+To reset webhook:
+
+```powershell
+Invoke-RestMethod -Uri "https://api.telegram.org/bot$TOKEN/deleteWebhook" -Method Post
+```
+
+Then run `setWebhook` again.

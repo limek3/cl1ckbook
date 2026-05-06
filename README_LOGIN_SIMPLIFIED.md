@@ -1,18 +1,34 @@
-# Login simplified / Telegram bot auth
+# Sloty real data mode (Supabase)
 
-Что изменено:
-- `/login` теперь узкий минимальный экран без большой левой промо-колонки.
-- Email-форма убрана полностью.
-- Оставлены только три способа входа: Telegram активный, Google и MAX как неактивные варианты "скоро".
-- Telegram Login Widget больше не используется, поэтому ошибка `Bot domain invalid` не должна появляться.
-- Основной поток: сайт открывает бота через `/start auth_<token>`, webhook подтверждает вход, сайт получает Supabase session.
+Что уже подключено:
+- `AppProvider` больше не использует `localStorage` как основное хранилище кабинета.
+- Рабочие данные идут через API-роуты:
+  - `GET /api/workspace`
+  - `PATCH /api/workspace/section`
+  - `POST /api/profile`
+  - `POST /api/bookings`
+  - `GET /api/public/[slug]`
+  - `PATCH /api/appearance`
+- Демо осталось отдельным маршрутом `/demo/[slug]`.
 
-Важно после деплоя:
-1. В Vercel Production должны быть:
-   - `TELEGRAM_BOT_TOKEN`
-   - `TELEGRAM_WEBHOOK_SECRET`
-   - `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME`
-   - `NEXT_PUBLIC_APP_URL=https://www.кликбук.рф`
-2. После изменения env сделать `Redeploy without cache`.
-3. Webhook должен быть установлен на:
-   `https://www.кликбук.рф/api/telegram/webhook`
+Что нужно сделать в Supabase:
+1. Выполнить миграцию:
+   - `supabase/migrations/20260407_0002_sloty_workspaces.sql`
+2. Заполнить `.env.local`:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+
+Что хранится в базе:
+- профиль мастера
+- slug публичной страницы
+- bookings
+- services
+- availability
+- templates
+- notifications
+- chats
+- appearance
+
+Примечание:
+- для production лучше вынести бизнес-сущности в отдельные таблицы (`clients`, `chat_threads`, `chat_messages`, `services`, `bookings` и т.д.).
+- текущая интеграция сделана как быстрый рабочий переход с моков на реальное серверное хранилище без слома текущего UI.

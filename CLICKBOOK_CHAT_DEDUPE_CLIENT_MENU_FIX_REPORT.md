@@ -1,13 +1,24 @@
-# ClickBook chat dedupe + client Telegram menu fix
+# ClickBook — client Telegram linking fix
 
-Изменения:
+## Fixed
 
-- Чаты на сайте стали компактнее: карточки в списке меньше, контекст записи не раздувает карточку, метка нескольких записей вынесена в короткий бейдж.
-- Усилен dedupe сообщений в web-чате: оптимистичное сообщение мастера схлопывается с серверным, а повтор одинакового сообщения за короткий промежуток не создаёт дубль.
-- API `/api/chats` дополнительно проверяет повторную отправку одного и того же сообщения по `clientMessageKey` и по совпадению автор/текст/время.
-- Переход из карточки клиента в чат по `bookingId` стал устойчивее: учитывается `metadata.bookingId`, `metadata.bookingIds`, fallback thread id и `threadId`; после ручного выбора чата query-параметры очищаются.
-- Telegram-клиенту добавлено меню: `📋 Мои записи и услуги`, `💬 Выбрать запись`, `🆘 Помощь`.
-- Telegram-списки записей стали компактнее: одна строка выбора + маленькая кнопка деталей.
-- Повторные клиентские меню в Telegram больше не должны спамить чат: предыдущая служебная карточка меню удаляется, а при callback-кнопках текущая карточка редактируется.
+- Public booking success now shows a fallback Telegram command after the “Connect Telegram” button.
+- If Telegram opens the bot without passing the deep-link payload, the client can copy the command and send it to the bot manually.
+- Bot no longer looks like it is only for masters on plain `/start`: the start message now explains both client and master scenarios.
+- If a client writes to the bot before the booking is linked, the bot answers with clear linking instructions instead of silently doing nothing.
+- Malformed booking-code attempts now return instructions instead of falling through.
+- Telegram linking no longer overwrites the original booking/source as `ТГ`; it preserves the original source and stores Telegram as the communication channel.
 
-SQL не требуется: схема базы не менялась.
+## Changed files
+
+- `components/booking/booking-form.tsx`
+- `app/api/telegram/webhook/route.ts`
+- `lib/server/telegram-bot.ts`
+
+## Client flow after fix
+
+1. Client creates booking on public page.
+2. Client taps “Подключить Telegram”.
+3. If Telegram links correctly, bot sends booking confirmation and chat becomes connected.
+4. If Telegram only opens the bot, client copies the shown `/start booking_...` command and sends it to the bot.
+5. Bot links the booking to the Telegram chat, so notifications and chat replies can work.
