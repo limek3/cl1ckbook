@@ -5,14 +5,21 @@ import { useTheme } from '../theme';
 import {
   Card, FieldLabel, SectionTitle, Divider, StatusDot, Icon, ListRow,
 } from '../primitives/atoms';
-import { type Appointment, type Service } from '@/lib/mini-demo';
+import { type Appointment, type Client, type Service } from '@/lib/mini-demo';
 import { useMiniData } from '@/hooks/use-mini-data';
+import { ClientDetailSheet } from '../sheets/detail-sheets';
 
 export function HomeScreen({ go }: { go: (kind: string) => void }) {
   const { T } = useTheme();
-  const { APPOINTMENTS, SERVICES } = useMiniData();
+  const { APPOINTMENTS, SERVICES, CLIENTS } = useMiniData();
   const [copied, setCopied] = useState(false);
+  const [activeClient, setActiveClient] = useState<Client | null>(null);
   const copy = () => { setCopied(true); setTimeout(() => setCopied(false), 1400); };
+
+  function openClient(appt: Appointment) {
+    const found = CLIENTS.find((c) => c.name === appt.name);
+    setActiveClient(found ?? { name: appt.name, phone: appt.phone, visits: 0, total: 0 });
+  }
   const next = APPOINTMENTS[0];
   const queue = APPOINTMENTS.slice(1, 4);
   const topServices = SERVICES.slice(0, 3);
@@ -60,7 +67,10 @@ export function HomeScreen({ go }: { go: (kind: string) => void }) {
         <SectionTitle title="Ближайшая запись" subtitle="Клиент в фокусе и очередь после него."
           right={<button onClick={() => go('appts')} style={chevBtn}>Все <Icon name="chevron-right" size={12} /></button>} />
         <Card padded={false} style={{ overflow: 'hidden' }}>
-          <div style={{ position: 'relative', padding: '20px 20px 18px' }}>
+          <div
+            onClick={() => next && openClient(next)}
+            style={{ position: 'relative', padding: '20px 20px 18px', cursor: next ? 'pointer' : 'default' }}
+          >
             <div style={{ position: 'absolute', left: 0, top: 16, bottom: 16, width: 2, background: T.accent }} />
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -88,7 +98,7 @@ export function HomeScreen({ go }: { go: (kind: string) => void }) {
         <Card padded={false}>
           {queue.map((a, i) => (
             <Fragment key={i}>
-              <QueueRow appt={a} />
+              <QueueRow appt={a} onClick={() => openClient(a)} />
               {i < queue.length - 1 && <Divider />}
             </Fragment>
           ))}
@@ -112,6 +122,8 @@ export function HomeScreen({ go }: { go: (kind: string) => void }) {
         <ShortcutCard icon="message-square" label="Чаты" sub="3 непрочитанных" onClick={() => go('chats')} />
         <ShortcutCard icon="bar-chart-3" label="Аналитика" sub="за неделю" onClick={() => go('analytics')} />
       </div>
+
+      <ClientDetailSheet client={activeClient} onClose={() => setActiveClient(null)} />
     </div>
   );
 }
@@ -165,10 +177,10 @@ function KVItem({ k, v, right }: { k: string; v: string; right?: boolean }) {
   );
 }
 
-function QueueRow({ appt }: { appt: Appointment }) {
+function QueueRow({ appt, onClick }: { appt: Appointment; onClick?: () => void }) {
   const { T } = useTheme();
   return (
-    <div style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+    <div onClick={onClick} style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14, cursor: onClick ? 'pointer' : 'default' }}>
       <div style={{ fontSize: 14, fontWeight: 600, color: T.text, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em', minWidth: 44 }}>
         {appt.time}
       </div>
