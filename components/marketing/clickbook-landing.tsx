@@ -11,6 +11,7 @@ import {
   useInView,
   useScroll,
   animate,
+  AnimatePresence,
 } from 'framer-motion';
 import useEmblaCarousel from 'embla-carousel-react';
 import {
@@ -715,89 +716,416 @@ function LandingHeader({ t }: { t: typeof COPY.ru }) {
   );
 }
 
-// ─── SLIDE 1 · HERO ───────────────────────────────────────────────────────────
+// ─── Aurora background (mesh gradient + grain) ────────────────────────────────
+function AuroraBg() {
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      {/* Aurora blobs */}
+      <motion.div
+        animate={{ x: [0, 80, -40, 0], y: [0, -40, 60, 0], scale: [1, 1.18, 0.92, 1] }}
+        transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut' }}
+        className="absolute -left-32 -top-32 h-[640px] w-[640px] rounded-full opacity-40 blur-[110px] dark:opacity-25"
+        style={{ background: `radial-gradient(circle, ${ACCENT} 0%, transparent 70%)` }}
+      />
+      <motion.div
+        animate={{ x: [0, -60, 30, 0], y: [0, 50, -30, 0], scale: [1, 0.9, 1.15, 1] }}
+        transition={{ duration: 26, repeat: Infinity, ease: 'easeInOut', delay: 3 }}
+        className="absolute -right-32 top-10 h-[560px] w-[560px] rounded-full opacity-35 blur-[110px] dark:opacity-22"
+        style={{ background: `radial-gradient(circle, ${ACCENT_ALT} 0%, transparent 70%)` }}
+      />
+      <motion.div
+        animate={{ x: [0, 40, -50, 0], y: [0, -60, 40, 0] }}
+        transition={{ duration: 24, repeat: Infinity, ease: 'easeInOut', delay: 6 }}
+        className="absolute bottom-0 left-1/3 h-[480px] w-[480px] rounded-full opacity-25 blur-[120px]"
+        style={{ background: `radial-gradient(circle, ${ACCENT_CYAN} 0%, transparent 70%)` }}
+      />
+      {/* Subtle grain (svg noise) */}
+      <div
+        className="absolute inset-0 opacity-[0.04] mix-blend-overlay dark:opacity-[0.06]"
+        style={{
+          backgroundImage:
+            "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E\")",
+        }}
+      />
+    </div>
+  );
+}
+
+// ─── Live dashboard mockup (cycling notifications, slots, chart, stat) ────────
+type ChipsTuple = ReadonlyArray<{ readonly label: string; readonly sub: string }>;
+
+function DashboardMockup({ chips, inView }: { chips: ChipsTuple; inView: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const rx = useMotionValue(0);
+  const ry = useMotionValue(0);
+  const srx = useSpring(rx, { stiffness: 100, damping: 18 });
+  const sry = useSpring(ry, { stiffness: 100, damping: 18 });
+
+  const onMove = (e: React.MouseEvent) => {
+    if (!ref.current) return;
+    const r = ref.current.getBoundingClientRect();
+    const nx = (e.clientX - r.left) / r.width - 0.5;
+    const ny = (e.clientY - r.top) / r.height - 0.5;
+    rx.set(-ny * 8);
+    ry.set(nx * 8);
+  };
+  const onLeave = () => { rx.set(0); ry.set(0); };
+
+  // Cycling notification
+  const [notiIdx, setNotiIdx] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setNotiIdx((i) => (i + 1) % chips.length), 3200);
+    return () => clearInterval(id);
+  }, [chips.length]);
+
+  // Booking rows derived from chips (deterministic display data)
+  const slots = [
+    { name: chips[0].sub.split(' · ')[0] || 'Дарья', service: chips[0].sub.split(' · ')[1] || 'Маникюр', time: '12:30', color: '#127dfe' },
+    { name: chips[2].sub.split(' · ')[0] || 'Анна', service: 'Стрижка', time: chips[2].sub.split(' · ')[1] || '16:00', color: '#7c3aed' },
+    { name: 'Михаил', service: 'Массаж', time: '18:00', color: '#10b981' },
+  ];
+
+  // Mini chart data (8 points, smooth wave)
+  const chartPoints = [22, 38, 31, 52, 44, 70, 62, 88];
+  const chartW = 240;
+  const chartH = 56;
+  const stepX = chartW / (chartPoints.length - 1);
+  const maxY = Math.max(...chartPoints);
+  const pathD = chartPoints
+    .map((v, i) => `${i === 0 ? 'M' : 'L'} ${i * stepX} ${chartH - (v / maxY) * chartH * 0.92}`)
+    .join(' ');
+  const areaD = `${pathD} L ${chartW} ${chartH} L 0 ${chartH} Z`;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 60, scale: 0.94 }}
+      animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
+      transition={{ duration: 1.1, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      className="relative mx-auto w-full max-w-[480px] lg:max-w-none"
+    >
+      {/* Halo glow behind */}
+      <motion.div
+        animate={{ opacity: [0.4, 0.7, 0.4], scale: [0.95, 1.05, 0.95] }}
+        transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+        className="pointer-events-none absolute -inset-10 rounded-[40px] blur-[60px]"
+        style={{ background: `radial-gradient(ellipse at center, ${ACCENT}55, ${ACCENT_ALT}30, transparent 70%)` }}
+      />
+
+      <motion.div
+        ref={ref}
+        onMouseMove={onMove}
+        onMouseLeave={onLeave}
+        style={{ rotateX: srx, rotateY: sry, transformPerspective: 1100 }}
+        className="relative"
+      >
+        {/* Conic gradient border wrapper */}
+        <div className="relative rounded-[28px] p-[1.5px]" style={{ background: `conic-gradient(from 120deg, ${ACCENT}, ${ACCENT_ALT}, ${ACCENT_CYAN}, ${ACCENT})` }}>
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 12, repeat: Infinity, ease: 'linear' }}
+            className="pointer-events-none absolute inset-0 rounded-[28px] opacity-60"
+            style={{ background: `conic-gradient(from 0deg, transparent 0%, ${ACCENT}40 25%, transparent 50%, ${ACCENT_ALT}40 75%, transparent 100%)` }}
+          />
+          <div className="relative overflow-hidden rounded-[27px] bg-white/95 p-5 backdrop-blur-xl dark:bg-[#0b0e1a]/95">
+            {/* Header bar */}
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-rose-400/80" />
+                <span className="h-2.5 w-2.5 rounded-full bg-amber-400/80" />
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/80" />
+              </div>
+              <div className="flex items-center gap-2 rounded-full border border-black/8 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-black/55 dark:border-white/10 dark:bg-white/5 dark:text-white/55">
+                <CalendarDays className="h-3 w-3" />
+                clickbook · сегодня
+              </div>
+              <motion.div
+                animate={{ scale: [1, 1.15, 1] }}
+                transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+                className="relative"
+              >
+                <Bell className="h-4 w-4 text-[#127dfe]" />
+                <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-[#0b0e1a]" />
+              </motion.div>
+            </div>
+
+            {/* Floating notification (cycles) */}
+            <div className="relative mb-4 h-[58px]">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={notiIdx}
+                  initial={{ opacity: 0, y: -16, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 16, scale: 0.96 }}
+                  transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                  className="absolute inset-0 flex items-center gap-3 rounded-2xl border border-[#127dfe]/15 bg-gradient-to-r from-[#127dfe]/8 via-[#7c3aed]/8 to-transparent p-3 shadow-[0_12px_30px_-12px_rgba(18,125,254,0.35)] backdrop-blur"
+                >
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl" style={{ background: `linear-gradient(135deg, ${CARD_COLORS[notiIdx]}, ${CARD_COLORS[(notiIdx + 1) % CARD_COLORS.length]})` }}>
+                    <Sparkles className="h-4 w-4 text-white" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[12.5px] font-semibold text-black/85 dark:text-white/85">{chips[notiIdx].label}</div>
+                    <div className="truncate text-[11px] text-black/50 dark:text-white/45">{chips[notiIdx].sub}</div>
+                  </div>
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: '100%' }}
+                    transition={{ duration: 3, ease: 'linear' }}
+                    className="absolute bottom-0 left-0 h-[2px] rounded-full bg-gradient-to-r from-[#127dfe] to-[#7c3aed]"
+                  />
+                </motion.div>
+              </AnimatePresence>
+            </div>
+
+            {/* Booking slots */}
+            <div className="mb-5 space-y-2">
+              {slots.map((s, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={inView ? { opacity: 1, x: 0 } : {}}
+                  transition={{ duration: 0.5, delay: 0.6 + i * 0.12 }}
+                  className="group flex items-center gap-3 rounded-xl border border-black/6 bg-black/[0.015] px-3 py-2.5 transition-all hover:border-[#127dfe]/30 hover:bg-[#127dfe]/[0.04] dark:border-white/8 dark:bg-white/[0.025] dark:hover:bg-[#127dfe]/[0.08]"
+                >
+                  <div
+                    className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-white"
+                    style={{ background: `linear-gradient(135deg, ${s.color}, ${s.color}cc)`, boxShadow: `0 6px 16px -6px ${s.color}88` }}
+                  >
+                    {s.name.charAt(0)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[12.5px] font-semibold text-black/85 dark:text-white/85">{s.name}</div>
+                    <div className="truncate text-[10.5px] text-black/45 dark:text-white/40">{s.service}</div>
+                  </div>
+                  <div className="rounded-md bg-[#127dfe]/10 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[#127dfe]">{s.time}</div>
+                  <motion.span
+                    animate={{ opacity: [0.4, 1, 0.4] }}
+                    transition={{ duration: 2, repeat: Infinity, delay: i * 0.4 }}
+                    className="h-1.5 w-1.5 rounded-full bg-emerald-500"
+                  />
+                </motion.div>
+              ))}
+            </div>
+
+            {/* Mini chart */}
+            <div className="mb-4 rounded-2xl border border-black/6 bg-gradient-to-br from-[#127dfe]/[0.04] to-transparent p-3 dark:border-white/8">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-black/45 dark:text-white/40">Записи · 7 дней</div>
+                <div className="text-[10.5px] font-bold text-emerald-500">▲ 24%</div>
+              </div>
+              <svg viewBox={`0 0 ${chartW} ${chartH}`} className="h-12 w-full" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="chartLine" x1="0" x2="1" y1="0" y2="0">
+                    <stop offset="0%" stopColor={ACCENT} />
+                    <stop offset="50%" stopColor={ACCENT_ALT} />
+                    <stop offset="100%" stopColor={ACCENT_CYAN} />
+                  </linearGradient>
+                  <linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stopColor={ACCENT} stopOpacity="0.3" />
+                    <stop offset="100%" stopColor={ACCENT} stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                <motion.path
+                  d={areaD}
+                  fill="url(#chartFill)"
+                  initial={{ opacity: 0 }}
+                  animate={inView ? { opacity: 1 } : {}}
+                  transition={{ duration: 1.2, delay: 1.1 }}
+                />
+                <motion.path
+                  d={pathD}
+                  fill="none"
+                  stroke="url(#chartLine)"
+                  strokeWidth={2.2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  initial={{ pathLength: 0 }}
+                  animate={inView ? { pathLength: 1 } : {}}
+                  transition={{ duration: 1.6, delay: 0.9, ease: [0.22, 1, 0.36, 1] }}
+                />
+                {chartPoints.map((v, i) => (
+                  <motion.circle
+                    key={i}
+                    cx={i * stepX}
+                    cy={chartH - (v / maxY) * chartH * 0.92}
+                    r={2.2}
+                    fill={ACCENT}
+                    initial={{ opacity: 0, scale: 0 }}
+                    animate={inView ? { opacity: 1, scale: 1 } : {}}
+                    transition={{ duration: 0.4, delay: 1.5 + i * 0.05 }}
+                  />
+                ))}
+              </svg>
+            </div>
+
+            {/* Bottom stat */}
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={inView ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.6, delay: 1.4 }}
+              className="flex items-center justify-between rounded-2xl bg-gradient-to-r from-[#127dfe] via-[#7c3aed] to-[#0ea5e9] p-3 text-white shadow-[0_16px_40px_-14px_rgba(18,125,254,0.6)] [background-size:200%_auto]"
+              style={{ animation: 'gradient-pan 6s linear infinite' }}
+            >
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.1em] opacity-80">{chips[1].sub}</div>
+                <div className="text-[24px] font-black leading-none tracking-[-0.03em]">{chips[1].label}</div>
+              </div>
+              <BarChart3 className="h-7 w-7 opacity-90" />
+            </motion.div>
+          </div>
+        </div>
+
+        {/* Floating side chips */}
+        <motion.div
+          initial={{ opacity: 0, x: -30, y: 20 }}
+          animate={inView ? { opacity: 1, x: 0, y: 0 } : {}}
+          transition={{ duration: 0.7, delay: 1.6 }}
+          className="absolute -left-6 top-20 hidden lg:block"
+        >
+          <motion.div
+            animate={{ y: [0, -8, 0] }}
+            transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+            className="flex items-center gap-2 rounded-2xl border border-black/8 bg-white/95 px-3 py-2 shadow-[0_18px_40px_-12px_rgba(18,125,254,0.35)] backdrop-blur dark:border-white/10 dark:bg-[#0b0e1a]/95"
+          >
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/15">
+              <Check className="h-3.5 w-3.5 text-emerald-500" />
+            </div>
+            <div>
+              <div className="text-[10.5px] font-bold text-black/80 dark:text-white/80">−78%</div>
+              <div className="text-[9.5px] text-black/45 dark:text-white/40">no-show</div>
+            </div>
+          </motion.div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, x: 30, y: -20 }}
+          animate={inView ? { opacity: 1, x: 0, y: 0 } : {}}
+          transition={{ duration: 0.7, delay: 1.8 }}
+          className="absolute -right-6 bottom-24 hidden lg:block"
+        >
+          <motion.div
+            animate={{ y: [0, 8, 0] }}
+            transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+            className="flex items-center gap-2 rounded-2xl border border-black/8 bg-white/95 px-3 py-2 shadow-[0_18px_40px_-12px_rgba(124,58,237,0.35)] backdrop-blur dark:border-white/10 dark:bg-[#0b0e1a]/95"
+          >
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#7c3aed]/15">
+              <Users className="h-3.5 w-3.5 text-[#7c3aed]" />
+            </div>
+            <div>
+              <div className="text-[10.5px] font-bold text-black/80 dark:text-white/80">2 500+</div>
+              <div className="text-[9.5px] text-black/45 dark:text-white/40">бизнесов</div>
+            </div>
+          </motion.div>
+        </motion.div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ─── Marquee strip (infinite scroll) ──────────────────────────────────────────
+function MarqueeStrip({ items }: { items: string[] }) {
+  const list = [...items, ...items, ...items];
+  return (
+    <div className="relative w-full overflow-hidden py-3" style={{ maskImage: 'linear-gradient(90deg, transparent, black 12%, black 88%, transparent)' }}>
+      <motion.div
+        animate={{ x: ['0%', '-33.333%'] }}
+        transition={{ duration: 28, repeat: Infinity, ease: 'linear' }}
+        className="flex w-max items-center gap-10 whitespace-nowrap text-[12.5px] font-semibold uppercase tracking-[0.18em] text-black/35 dark:text-white/30"
+      >
+        {list.map((item, i) => (
+          <span key={i} className="flex items-center gap-10">
+            <span className="flex items-center gap-2">
+              <span className="h-1 w-1 rounded-full bg-current" />
+              {item}
+            </span>
+          </span>
+        ))}
+      </motion.div>
+    </div>
+  );
+}
+
+// ─── SLIDE 1 · HERO (split layout + live mockup) ──────────────────────────────
 function HeroSlide({ t }: { t: typeof COPY.ru }) {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: '-100px' });
 
-  // Scroll-driven parallax for hero contents
+  // Scroll-driven parallax
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] });
-  const yTitle = useTransform(scrollYProgress, [0, 1], [0, -120]);
-  const ySub = useTransform(scrollYProgress, [0, 1], [0, -60]);
-  const yChips = useTransform(scrollYProgress, [0, 1], [0, 60]);
+  const yLeft = useTransform(scrollYProgress, [0, 1], [0, -100]);
+  const yRight = useTransform(scrollYProgress, [0, 1], [0, -160]);
   const opacity = useTransform(scrollYProgress, [0, 0.7], [1, 0]);
-  const blob1Y = useTransform(scrollYProgress, [0, 1], [0, -180]);
-  const blob2Y = useTransform(scrollYProgress, [0, 1], [0, 200]);
+
+  // Cursor parallax for hero blobs
+  const cx = useMotionValue(0);
+  const cy = useMotionValue(0);
+  const sx = useSpring(cx, { stiffness: 60, damping: 18 });
+  const sy = useSpring(cy, { stiffness: 60, damping: 18 });
+  const blobX = useTransform(sx, (v) => v * 30);
+  const blobY = useTransform(sy, (v) => v * 30);
+  const blob2X = useTransform(sx, (v) => v * -40);
+  const blob2Y = useTransform(sy, (v) => v * -40);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      cx.set((e.clientX - w / 2) / w);
+      cy.set((e.clientY - h / 2) / h);
+    };
+    window.addEventListener('mousemove', onMove);
+    return () => window.removeEventListener('mousemove', onMove);
+  }, [cx, cy]);
 
   const words = [t.hero.title1, t.hero.title2, t.hero.title3];
+
+  const marqueeItems = [
+    ...t.hero.trust,
+    'no-show −78%',
+    '2 500+',
+    '24/7',
+    'Telegram · VK · Web',
+    ...t.hero.trust,
+  ];
 
   return (
     <section
       id="hero"
       ref={ref}
-      className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-white pt-16 dark:bg-[#06080f]"
+      className="relative flex min-h-screen flex-col overflow-hidden bg-white pt-16 dark:bg-[#06080f]"
     >
-      {/* Animated gradient blobs (parallax + drift) */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <motion.div
-          style={{ y: blob1Y }}
-          animate={{ x: [0, 60, 0], scale: [1, 1.15, 1] }}
-          transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
-          className="absolute -left-40 -top-40 h-[600px] w-[600px] rounded-full opacity-30 blur-[100px] dark:opacity-20"
-          aria-hidden
-        >
-          <div className="h-full w-full" style={{ background: `radial-gradient(circle, ${ACCENT}, transparent 70%)` }} />
-        </motion.div>
-        <motion.div
-          style={{ y: blob2Y }}
-          animate={{ x: [0, -50, 0], scale: [1, 1.1, 1] }}
-          transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut', delay: 3 }}
-          className="absolute -right-40 bottom-0 h-[500px] w-[500px] rounded-full opacity-25 blur-[100px] dark:opacity-18"
-          aria-hidden
-        >
-          <div className="h-full w-full" style={{ background: `radial-gradient(circle, ${ACCENT_ALT}, transparent 70%)` }} />
-        </motion.div>
-        <motion.div
-          animate={{ x: [0, 30, -20, 0], y: [0, -30, 20, 0] }}
-          transition={{ duration: 25, repeat: Infinity, ease: 'easeInOut', delay: 6 }}
-          className="absolute left-1/2 top-1/3 h-[400px] w-[400px] -translate-x-1/2 rounded-full opacity-15 blur-[120px]"
-          style={{ background: `radial-gradient(circle, ${ACCENT_CYAN}, transparent 70%)` }}
-        />
-      </div>
+      <AuroraBg />
 
-      {/* Dot grid */}
+      {/* Cursor-following accent blobs (subtle) */}
+      <motion.div
+        style={{ x: blobX, y: blobY }}
+        className="pointer-events-none absolute left-[-20%] top-[10%] h-[420px] w-[420px] rounded-full opacity-30 blur-[120px] dark:opacity-20"
+      >
+        <div className="h-full w-full" style={{ background: `radial-gradient(circle, ${ACCENT}, transparent 70%)` }} />
+      </motion.div>
+      <motion.div
+        style={{ x: blob2X, y: blob2Y }}
+        className="pointer-events-none absolute right-[-15%] top-[40%] h-[360px] w-[360px] rounded-full opacity-30 blur-[120px] dark:opacity-20"
+      >
+        <div className="h-full w-full" style={{ background: `radial-gradient(circle, ${ACCENT_ALT}, transparent 70%)` }} />
+      </motion.div>
+
+      {/* Soft dot grid */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.12] dark:opacity-[0.07]"
+        className="pointer-events-none absolute inset-0 opacity-[0.1] dark:opacity-[0.06]"
         style={{
-          backgroundImage: `radial-gradient(circle, #0a0a14 1px, transparent 1px)`,
-          backgroundSize: '32px 32px',
-          maskImage: 'radial-gradient(ellipse at center, black 30%, transparent 72%)',
+          backgroundImage: `radial-gradient(circle, currentColor 1px, transparent 1px)`,
+          color: '#0a0a14',
+          backgroundSize: '36px 36px',
+          maskImage: 'radial-gradient(ellipse at center, black 35%, transparent 78%)',
         }}
       />
 
-      {/* Floating particles */}
-      <div className="pointer-events-none absolute inset-0">
-        {PARTICLES.map((p) => (
-          <motion.div
-            key={p.id}
-            className="absolute rounded-full"
-            style={{
-              left: `${p.x}%`,
-              top: `${p.y}%`,
-              width: p.r * 2,
-              height: p.r * 2,
-              background: ACCENT,
-              opacity: p.op,
-            }}
-            animate={{ y: [0, -28, 0], opacity: [p.op, p.op * 2.2, p.op] }}
-            transition={{ duration: p.dur, delay: p.delay, repeat: Infinity, ease: 'easeInOut' }}
-          />
-        ))}
-      </div>
-
-      <motion.div style={{ opacity }} className="relative z-10 mx-auto w-full max-w-[1280px] px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-4xl text-center">
-          {/* Badge */}
+      <motion.div
+        style={{ opacity }}
+        className="relative z-10 mx-auto flex w-full max-w-[1280px] flex-1 flex-col items-center px-4 pt-8 sm:px-6 lg:flex-row lg:items-center lg:gap-10 lg:px-8 lg:pt-0"
+      >
+        {/* LEFT: Text */}
+        <motion.div style={{ y: yLeft }} className="w-full text-center lg:w-[58%] lg:text-left">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={inView ? { opacity: 1, y: 0 } : {}}
@@ -806,16 +1134,15 @@ function HeroSlide({ t }: { t: typeof COPY.ru }) {
             <Eyebrow>{t.hero.badge}</Eyebrow>
           </motion.div>
 
-          {/* Headline */}
-          <motion.div style={{ y: yTitle }} className="mt-7 overflow-hidden">
+          <h1 className="mt-6 overflow-hidden">
             {words.map((word, i) => (
-              <motion.div
+              <motion.span
                 key={i}
-                initial={{ opacity: 0, y: 60 }}
+                initial={{ opacity: 0, y: 80 }}
                 animate={inView ? { opacity: 1, y: 0 } : {}}
                 transition={{ duration: 0.85, delay: 0.1 + i * 0.12, ease: [0.22, 1, 0.36, 1] }}
                 className={cn(
-                  'block text-[48px] font-bold leading-[0.97] tracking-[-0.045em] sm:text-[66px] lg:text-[86px]',
+                  'block text-[44px] font-bold leading-[0.97] tracking-[-0.045em] sm:text-[60px] lg:text-[76px]',
                   i === 1
                     ? 'bg-gradient-to-r from-[#127dfe] via-[#7c3aed] to-[#0ea5e9] bg-clip-text text-transparent [background-size:200%_auto]'
                     : 'text-black dark:text-white',
@@ -823,27 +1150,24 @@ function HeroSlide({ t }: { t: typeof COPY.ru }) {
                 style={i === 1 ? { animation: 'gradient-pan 6s linear infinite' } : undefined}
               >
                 {word}
-              </motion.div>
+              </motion.span>
             ))}
-          </motion.div>
+          </h1>
 
-          {/* Subtitle */}
           <motion.p
-            style={{ y: ySub }}
             initial={{ opacity: 0, y: 20 }}
             animate={inView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.7, delay: 0.48, ease: [0.22, 1, 0.36, 1] }}
-            className="mx-auto mt-7 max-w-xl text-[16px] leading-7 text-black/58 dark:text-white/52 sm:text-[17px]"
+            transition={{ duration: 0.7, delay: 0.55, ease: [0.22, 1, 0.36, 1] }}
+            className="mx-auto mt-6 max-w-xl text-[16px] leading-7 text-black/58 dark:text-white/52 sm:text-[17px] lg:mx-0"
           >
             {t.hero.sub}
           </motion.p>
 
-          {/* CTA buttons */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={inView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.7, delay: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row"
+            transition={{ duration: 0.7, delay: 0.7, ease: [0.22, 1, 0.36, 1] }}
+            className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start"
           >
             <MagBtn href="/login" variant="primary">
               {t.hero.cta1}
@@ -854,12 +1178,11 @@ function HeroSlide({ t }: { t: typeof COPY.ru }) {
             </MagBtn>
           </motion.div>
 
-          {/* Trust badges */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={inView ? { opacity: 1 } : {}}
-            transition={{ duration: 0.7, delay: 0.76 }}
-            className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[12.5px] text-black/48 dark:text-white/40"
+            transition={{ duration: 0.7, delay: 0.86 }}
+            className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[12.5px] text-black/48 dark:text-white/40 lg:justify-start"
           >
             {t.hero.trust.map((item) => (
               <span key={item} className="flex items-center gap-1.5">
@@ -868,12 +1191,22 @@ function HeroSlide({ t }: { t: typeof COPY.ru }) {
               </span>
             ))}
           </motion.div>
-        </div>
-
-        {/* Hero chip slider (mobile-first horizontal carousel) */}
-        <motion.div style={{ y: yChips }} className="relative mx-auto mt-14 max-w-[760px]">
-          <HeroChipSlider chips={t.hero.chips} inView={inView} />
         </motion.div>
+
+        {/* RIGHT: Mockup */}
+        <motion.div style={{ y: yRight }} className="mt-14 w-full lg:mt-0 lg:w-[42%]">
+          <DashboardMockup chips={t.hero.chips} inView={inView} />
+        </motion.div>
+      </motion.div>
+
+      {/* Marquee strip */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={inView ? { opacity: 1 } : {}}
+        transition={{ duration: 0.7, delay: 1.2 }}
+        className="relative z-10 mt-10 border-y border-black/6 bg-white/40 backdrop-blur-sm dark:border-white/6 dark:bg-white/[0.02]"
+      >
+        <MarqueeStrip items={marqueeItems} />
       </motion.div>
 
       {/* Scroll hint */}
@@ -881,8 +1214,8 @@ function HeroSlide({ t }: { t: typeof COPY.ru }) {
         href="#why"
         initial={{ opacity: 0 }}
         animate={inView ? { opacity: 1 } : {}}
-        transition={{ delay: 1.4 }}
-        className="absolute bottom-8 left-1/2 -translate-x-1/2"
+        transition={{ delay: 1.6 }}
+        className="relative z-10 mx-auto -mt-6 mb-6 hidden lg:block"
       >
         <motion.div
           animate={{ y: [0, 6, 0] }}
@@ -893,65 +1226,13 @@ function HeroSlide({ t }: { t: typeof COPY.ru }) {
         </motion.div>
       </motion.a>
 
-      {/* Local keyframes for gradient pan */}
-      <style jsx>{`
+      <style jsx global>{`
         @keyframes gradient-pan {
           0% { background-position: 0% 50%; }
           100% { background-position: 200% 50%; }
         }
       `}</style>
     </section>
-  );
-}
-
-function HeroChipSlider({
-  chips,
-  inView,
-}: {
-  chips: ReadonlyArray<{ readonly label: string; readonly sub: string }>;
-  inView: boolean;
-}) {
-  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true, align: 'center', skipSnaps: false });
-
-  useEffect(() => {
-    if (!emblaApi) return;
-    const id = setInterval(() => {
-      if (emblaApi.canScrollNext()) emblaApi.scrollNext();
-      else emblaApi.scrollTo(0);
-    }, 3500);
-    return () => clearInterval(id);
-  }, [emblaApi]);
-
-  return (
-    <div className="overflow-hidden" ref={emblaRef}>
-      <div className="flex -ml-3 sm:-ml-4">
-        {chips.map((chip, i) => (
-          <div
-            key={i}
-            className="flex-[0_0_70%] pl-3 sm:flex-[0_0_38%] sm:pl-4 md:flex-[0_0_33.333%]"
-          >
-            <motion.div
-              initial={{ opacity: 0, y: 30, scale: 0.92 }}
-              animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
-              transition={{ duration: 0.7, delay: 0.8 + i * 0.12, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <TiltCard className="rounded-2xl border border-black/8 bg-white/90 p-4 shadow-[0_20px_50px_-20px_rgba(18,125,254,0.25)] backdrop-blur-sm dark:border-white/10 dark:bg-white/5">
-                <motion.div
-                  animate={{ y: [0, -4, 0] }}
-                  transition={{ duration: 4 + i, repeat: Infinity, ease: 'easeInOut', delay: i * 0.8 }}
-                >
-                  <div className="mb-2.5 flex h-8 w-8 items-center justify-center rounded-xl" style={{ background: `${CARD_COLORS[i]}18` }}>
-                    <span className="h-3 w-3 rounded-full" style={{ background: CARD_COLORS[i], boxShadow: `0 0 12px ${CARD_COLORS[i]}` }} />
-                  </div>
-                  <div className="text-[13px] font-semibold text-black/82 dark:text-white/82">{chip.label}</div>
-                  <div className="mt-0.5 text-[11px] text-black/46 dark:text-white/40">{chip.sub}</div>
-                </motion.div>
-              </TiltCard>
-            </motion.div>
-          </div>
-        ))}
-      </div>
-    </div>
   );
 }
 
@@ -1460,7 +1741,7 @@ function ProofSlide({ t }: { t: typeof COPY.ru }) {
         </Slider>
       </div>
 
-      <style jsx>{`
+      <style jsx global>{`
         @keyframes gradient-pan {
           0% { background-position: 0% 50%; }
           100% { background-position: 200% 50%; }
