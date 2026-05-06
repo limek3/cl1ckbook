@@ -235,7 +235,7 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={handleKey}
             placeholder="Сообщение"
-            style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: T.text, fontSize: 14, fontFamily: 'inherit' }}
+            style={{ flex: 1, background: 'transparent', backgroundColor: 'transparent', WebkitAppearance: 'none', appearance: 'none', border: 'none', outline: 'none', color: T.text, fontSize: 14, fontFamily: 'inherit', colorScheme: T.bg === '#0a0a0a' ? 'dark' : 'light' }}
           />
           {draft.length > 0 && (
             <button onClick={() => { selectionHaptic(); setDraft(''); }} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: T.text3, display: 'flex' }}>
@@ -333,27 +333,42 @@ function InfoCell({ icon, label, children }: { icon: string; label: string; chil
   );
 }
 
+function isBotMessage(text: string) {
+  return /(бот|bot|клиент подтвердил|клиенту отправлен|предложен перенос|запись обновлена|новое время|кнопки подтверждения|авто)/i.test(text);
+}
+
 function Bubble({ m }: { m: Message }) {
   const { T } = useTheme();
   const me = m.from === 'me';
+  const bot = isBotMessage(m.text);
+  const bg = bot ? T.cardElev : me ? T.accent : T.msgIn;
+  const fg = bot ? T.text : me ? '#fff' : T.text;
+  const checkColor = bot ? T.accent : 'rgba(255,255,255,0.8)';
   return (
     <div style={{ display: 'flex', justifyContent: me ? 'flex-end' : 'flex-start', animation: 'mini-scale-in 0.16s ease both' }}>
       <div style={{
-        maxWidth: '78%', padding: '9px 13px', borderRadius: 14,
+        maxWidth: bot ? '82%' : '78%', padding: bot ? '10px 13px 9px' : '9px 13px', borderRadius: 14,
         borderTopRightRadius: me ? 4 : 14,
         borderTopLeftRadius: me ? 14 : 4,
-        background: me ? T.accent : T.msgIn,
-        color: me ? '#fff' : T.text,
+        background: bg,
+        color: fg,
+        border: bot ? `1px solid ${T.accentSoft}` : '1px solid transparent',
+        boxShadow: bot ? `inset 3px 0 0 ${T.accent}` : 'none',
         fontSize: 13, lineHeight: 1.45,
       }}>
+        {bot && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, color: T.accent, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            <Icon name="bot" size={12} /> Автосообщение
+          </div>
+        )}
         <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{m.text}</div>
         <div style={{
-          fontSize: 9, opacity: 0.65, marginTop: 3,
+          fontSize: 9, opacity: bot ? 0.75 : 0.65, marginTop: 3,
           display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 3,
-          fontVariantNumeric: 'tabular-nums',
+          fontVariantNumeric: 'tabular-nums', color: bot ? T.text3 : undefined,
         }}>
           <span>{m.t}</span>
-          {me && <Icon name="check-check" size={10} color="rgba(255,255,255,0.8)" />}
+          {me && <Icon name="check-check" size={10} color={checkColor} />}
         </div>
       </div>
     </div>

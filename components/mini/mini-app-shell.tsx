@@ -6,6 +6,7 @@ import { Icon } from './primitives/atoms';
 import { useChats } from '@/hooks/use-chats';
 import { useMiniData } from '@/hooks/use-mini-data';
 import { ToastCtx, haptic, tgClose, type ToastItem, type MiniToastCtxValue } from './bridge';
+import { buildMiniEventNotifications, unreadEventCount } from '@/lib/notification-events';
 
 function ToastHost({ items }: { items: ToastItem[] }) {
   const { T } = useTheme();
@@ -98,7 +99,7 @@ function TgHeader({ onToggleTheme, onNotifications, notificationCount = 0 }: { o
   return (
     <div style={{
       flexShrink: 0,
-      padding: 'calc(10px + env(safe-area-inset-top, 0px) + var(--miniapp-safe-top, 0px)) 16px 10px',
+      padding: 'calc(52px + env(safe-area-inset-top, 0px) + var(--miniapp-safe-top, 0px)) 16px 10px',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       background: T.bg,
       borderBottom: `1px solid ${T.border}`,
@@ -152,7 +153,8 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const { threads } = useChats();
   const { APPOINTMENTS } = useMiniData();
-  const notificationCount = Math.min(99, threads.reduce((sum, thread) => sum + thread.unread, 0) + APPOINTMENTS.filter((a) => a.rawStatus === 'new').length);
+  const notificationEvents = useMemo(() => buildMiniEventNotifications(APPOINTMENTS, threads), [APPOINTMENTS, threads]);
+  const notificationCount = Math.min(99, unreadEventCount(notificationEvents));
 
   const toastApi = useMemo<MiniToastCtxValue>(() => ({
     show: (text, tone = 'info') => {
@@ -247,16 +249,26 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
 
   return (
     <ToastCtx.Provider value={toastApi}>
-      <div style={{
+      <div className="cb-miniapp" data-mini-mode={T.bg === '#0a0a0a' ? 'dark' : 'light'} style={{
         width: '100%', maxWidth: 390, height: '100dvh',
-        background: T.bg, color: T.text,
+        background: T.bg, color: T.text, colorScheme: T.bg === '#0a0a0a' ? 'dark' : 'light',
         display: 'flex', flexDirection: 'column',
         fontFamily: "'Inter', -apple-system, system-ui, sans-serif",
         overflow: 'hidden',
         margin: '0 auto',
-        transition: 'background 0.2s, color 0.2s',
+        transition: 'background 0.34s cubic-bezier(.2,.8,.2,1), color 0.34s cubic-bezier(.2,.8,.2,1)',
         position: 'relative',
       }}>
+        <style>{`
+          .cb-miniapp, .cb-miniapp * { -webkit-tap-highlight-color: transparent; }
+          .cb-miniapp input, .cb-miniapp textarea, .cb-miniapp select {
+            -webkit-appearance: none; appearance: none; background-color: transparent !important;
+            color: inherit; color-scheme: dark; caret-color: var(--miniapp-accent, #127dfe);
+          }
+          .cb-miniapp[data-mini-mode="light"] input, .cb-miniapp[data-mini-mode="light"] textarea, .cb-miniapp[data-mini-mode="light"] select { color-scheme: light; }
+          .cb-miniapp ::placeholder { color: ${T.text3}; opacity: 1; }
+          .cb-miniapp { --miniapp-accent: ${T.accent}; }
+        `}</style>
         <TgHeader onToggleTheme={toggle} onNotifications={() => setSub({ kind: 'notifications' })} notificationCount={notificationCount} />
         {isFullHeight ? (
           <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>{content}</div>

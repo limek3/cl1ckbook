@@ -294,7 +294,7 @@ export function SearchBox({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: T.text, fontSize: 14, fontFamily: 'inherit' }}
+        style={{ flex: 1, background: 'transparent', backgroundColor: 'transparent', WebkitAppearance: 'none', appearance: 'none', border: 'none', outline: 'none', color: T.text, fontSize: 14, fontFamily: 'inherit', colorScheme: T.bg === '#0a0a0a' ? 'dark' : 'light' }}
       />
       {value && (
         <button onClick={() => { tap('selection'); onChange(''); }} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: T.text3, display: 'flex' }}>
@@ -319,7 +319,7 @@ export function FormField({
   const { T } = useTheme();
   const common: CSSProperties = {
     width: '100%', marginTop: 8, padding: 0, background: 'transparent', border: 'none', outline: 'none',
-    color: T.text, fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5,
+    color: T.text, fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5, WebkitAppearance: 'none', appearance: 'none', colorScheme: T.bg === '#0a0a0a' ? 'dark' : 'light',
   };
   return (
     <div style={{ background: T.cardElev, border: `1px solid ${T.border}`, borderRadius: 14, padding: '12px 14px' }}>

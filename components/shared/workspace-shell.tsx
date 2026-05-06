@@ -58,6 +58,7 @@ import {
 } from '@/lib/dashboard-demo';
 import { useLocale } from '@/lib/locale-context';
 import { cn } from '@/lib/utils';
+import { buildBookingEventNotifications, type NotificationEvent } from '@/lib/notification-events';
 
 import { Button } from '@/components/ui/button';
 import { BrandLogo } from '@/components/brand/brand-logo';
@@ -160,7 +161,7 @@ function BotBadge({
   locale,
   active,
 }: {
-  locale: 'ru' | 'en';
+  locale: string;
   active: boolean;
 }) {
   return (
@@ -1796,6 +1797,8 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [navQuery, setNavQuery] = useState('');
+  const [eventPanelOpen, setEventPanelOpen] = useState(false);
+  const [readEventIds, setReadEventIds] = useState<string[]>([]);
 
   const demoMode = isDashboardDemoEnabled(searchParams);
   const selectedWorkspaceMode: 'live' | 'demo' = demoMode ? 'demo' : 'live';
@@ -1818,6 +1821,17 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
   const profileBookings = ownedProfile
     ? getBookingsBySlug(ownedProfile.slug)
     : [];
+
+  const workspaceEvents = useMemo(() => (
+    buildBookingEventNotifications(profileBookings).map((event) => ({
+      ...event,
+      unread: event.unread && !readEventIds.includes(event.id),
+    }))
+  ), [profileBookings, readEventIds]);
+  const workspaceUnreadEvents = workspaceEvents.filter((event) => event.unread).length;
+  const markWorkspaceEventsRead = () => {
+    setReadEventIds((prev) => Array.from(new Set([...prev, ...workspaceEvents.map((event) => event.id)])));
+  };
 
   const todayIso = (() => {
     const now = new Date();
@@ -2027,6 +2041,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
         href: withDashboardDemoParam('/dashboard/notifications', demoMode),
         label: labels.items.notifications,
         icon: Bell,
+        badge: workspaceUnreadEvents > 0 ? String(Math.min(workspaceUnreadEvents, 9)) : undefined,
       },
       {
         href: withDashboardDemoParam('/dashboard/marketing', demoMode),
@@ -2090,6 +2105,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
     labels.navigation.settings,
     labels.navigation.storefront,
     labels.navigation.work,
+    workspaceUnreadEvents,
     newBookings,
   ]);
 
@@ -2151,6 +2167,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
         href: withDashboardDemoParam('/dashboard/notifications', demoMode),
         label: labels.items.notifications,
         icon: Bell,
+        badge: workspaceUnreadEvents > 0 ? String(Math.min(workspaceUnreadEvents, 9)) : undefined,
       },
       {
         href: withDashboardDemoParam('/dashboard/marketing', demoMode),
@@ -2199,6 +2216,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
     labels.items.services,
     labels.items.subscription,
     labels.items.templates,
+    workspaceUnreadEvents,
     locale,
   ]);
 
@@ -2366,6 +2384,23 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
               </Link>
             </div>
 
+            <button
+              type="button"
+              onClick={() => setEventPanelOpen((value) => !value)}
+              className={cn(
+                'relative flex size-8 shrink-0 items-center justify-center rounded-[10px] border border-black/[0.08] bg-[var(--cb-surface)] text-slate-500 transition hover:text-slate-950 dark:border-white/[0.08] dark:bg-[#101010] dark:text-white/40 dark:hover:text-white',
+                eventPanelOpen && 'cb-neutral-primary',
+              )}
+              aria-label={locale === 'ru' ? 'События' : 'Events'}
+            >
+              <Bell className="size-3.5" />
+              {workspaceUnreadEvents > 0 && (
+                <span className="absolute -right-1 -top-1 flex min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold leading-[16px] text-white ring-2 ring-[#f4f4f2] dark:ring-[#090909]">
+                  {workspaceUnreadEvents > 9 ? '9+' : workspaceUnreadEvents}
+                </span>
+              )}
+            </button>
+
             <Link
               href={publicPageItem.href}
               aria-label={labels.items.publicPage}
@@ -2382,6 +2417,34 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
             </Link>
           </div>
         </div>
+
+        <div className="fixed right-4 top-4 z-50 hidden xl:block">
+          <button
+            type="button"
+            onClick={() => setEventPanelOpen((value) => !value)}
+            className={cn(
+              'relative flex h-10 w-10 items-center justify-center rounded-[14px] border border-black/[0.08] bg-[var(--cb-surface)] text-muted-foreground shadow-sm transition hover:text-foreground dark:border-white/[0.08] dark:bg-[#101010]',
+              eventPanelOpen && 'cb-neutral-primary',
+            )}
+            aria-label={locale === 'ru' ? 'События' : 'Events'}
+          >
+            <Bell className="size-4" />
+            {workspaceUnreadEvents > 0 && (
+              <span className="absolute -right-1 -top-1 flex min-w-[17px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold leading-[17px] text-white ring-2 ring-[#f4f4f2] dark:ring-[#090909]">
+                {workspaceUnreadEvents > 9 ? '9+' : workspaceUnreadEvents}
+              </span>
+            )}
+          </button>
+        </div>
+
+        <WorkspaceEventsPanel
+          open={eventPanelOpen}
+          events={workspaceEvents}
+          locale={locale}
+          onClose={() => setEventPanelOpen(false)}
+          onMarkAll={markWorkspaceEventsRead}
+          onRead={(id) => setReadEventIds((prev) => Array.from(new Set([...prev, id])))}
+        />
 
         <div className="workspace-main-shell">{children}</div>
       </main>
@@ -2420,5 +2483,104 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
 
       <WorkspaceAssistant />
     </div>
+  );
+}
+function WorkspaceEventsPanel({
+  open,
+  events,
+  locale,
+  onClose,
+  onMarkAll,
+  onRead,
+}: {
+  open: boolean;
+  events: NotificationEvent[];
+  locale: 'ru' | 'en';
+  onClose: () => void;
+  onMarkAll: () => void;
+  onRead: (id: string) => void;
+}) {
+  if (!open) return null;
+  const title = locale === 'ru' ? 'События' : 'Events';
+  const subtitle = locale === 'ru' ? 'Переносы, отмены и новые записи' : 'Reschedules, cancellations, and bookings';
+  const emptyTitle = locale === 'ru' ? 'Сейчас всё спокойно' : 'All quiet now';
+  const emptyText = locale === 'ru' ? 'Новые события клиентов появятся здесь.' : 'Client events will appear here.';
+  return (
+    <div className="fixed inset-x-3 top-[64px] z-[60] mx-auto max-w-[420px] xl:inset-x-auto xl:right-4 xl:top-[64px] xl:w-[380px]">
+      <div className="overflow-hidden rounded-[24px] border border-black/[0.08] bg-[#fbfbfa]/96 shadow-2xl shadow-black/10 backdrop-blur-xl dark:border-white/[0.09] dark:bg-[#101010]/96 dark:shadow-black/40">
+        <div className="flex items-start justify-between gap-3 border-b border-black/[0.06] px-4 py-3 dark:border-white/[0.07]">
+          <div className="min-w-0">
+            <div className="text-[15px] font-semibold tracking-[-0.03em]">{title}</div>
+            <div className="mt-0.5 text-[11px] text-muted-foreground">{subtitle}</div>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            {events.length > 0 && (
+              <button type="button" onClick={onMarkAll} className="rounded-full px-2.5 py-1 text-[11px] text-primary transition hover:bg-primary/10">
+                {locale === 'ru' ? 'Прочитать' : 'Read'}
+              </button>
+            )}
+            <button type="button" onClick={onClose} className="flex size-7 items-center justify-center rounded-full text-muted-foreground transition hover:bg-foreground/[0.06] hover:text-foreground" aria-label={locale === 'ru' ? 'Закрыть' : 'Close'}>
+              <X className="size-3.5" />
+            </button>
+          </div>
+        </div>
+        <div className="max-h-[min(520px,calc(100vh-110px))] overflow-y-auto p-2">
+          {events.length === 0 ? (
+            <div className="px-5 py-8 text-center">
+              <div className="mx-auto mb-3 flex size-11 items-center justify-center rounded-[16px] border border-black/[0.07] bg-black/[0.025] text-muted-foreground dark:border-white/[0.08] dark:bg-white/[0.04]">
+                <Bell className="size-5" />
+              </div>
+              <div className="text-[13px] font-medium">{emptyTitle}</div>
+              <div className="mt-1 text-[11px] leading-5 text-muted-foreground">{emptyText}</div>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {events.slice(0, 12).map((event) => (
+                <WorkspaceEventRow key={event.id} event={event} onRead={() => onRead(event.id)} />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WorkspaceEventRow({ event, onRead }: { event: NotificationEvent; onRead: () => void }) {
+  const toneClass = event.tone === 'danger'
+    ? 'text-red-500 bg-red-500/10 border-red-500/15'
+    : event.tone === 'warning'
+      ? 'text-amber-500 bg-amber-500/10 border-amber-500/15'
+      : event.tone === 'success'
+        ? 'text-emerald-500 bg-emerald-500/10 border-emerald-500/15'
+        : 'text-primary bg-primary/10 border-primary/15';
+  const IconComponent = event.kind === 'message'
+    ? MessageCircleMore
+    : event.kind === 'reschedule'
+      ? CalendarRange
+      : event.tone === 'success'
+        ? CheckCircle2
+        : CalendarClock;
+  return (
+    <button
+      type="button"
+      onClick={onRead}
+      className={cn(
+        'flex w-full items-start gap-3 rounded-[18px] px-3 py-3 text-left transition hover:bg-foreground/[0.045]',
+        event.unread && 'bg-primary/[0.055]',
+      )}
+    >
+      <span className={cn('mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-[14px] border', toneClass)}>
+        <IconComponent className="size-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className={cn('truncate text-[12.5px] font-medium tracking-[-0.02em]', event.unread && 'font-semibold')}>{event.title}</span>
+          {event.unread && <span className="size-1.5 shrink-0 rounded-full bg-primary" />}
+        </span>
+        <span className="mt-1 block text-[11px] leading-4 text-muted-foreground">{event.text}</span>
+        <span className="mt-1.5 block text-[10px] text-muted-foreground/70">{event.time}{event.source ? ` · ${event.source}` : ''}</span>
+      </span>
+    </button>
   );
 }

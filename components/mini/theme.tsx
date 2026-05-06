@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { accentPalette, type AccentTone } from '@/lib/appearance-palette';
 import type { RadiusMode } from '@/lib/appearance';
 
@@ -147,23 +147,56 @@ export function ThemeProvider({ initialMode = 'dark', children }: { initialMode?
     writeStoredAppearance({ mode, accentTone, radius });
   }, [mode, accentTone, radius]);
 
-  const setMiniAppearance = (value: Partial<StoredMiniAppearance>) => {
-    if (value.mode) setMode(value.mode);
-    if (value.accentTone) setAccentToneState(value.accentTone);
-    if (value.radius) setRadiusState(value.radius);
-  };
+  const transitionTheme = useCallback((update: () => void) => {
+    if (typeof document === 'undefined') {
+      update();
+      return;
+    }
+    const prefersReducedMotion = typeof window !== 'undefined'
+      && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const startViewTransition = (document as Document & { startViewTransition?: (cb: () => void) => void }).startViewTransition;
+    if (!prefersReducedMotion && typeof startViewTransition === 'function') {
+      startViewTransition(() => update());
+      return;
+    }
+    update();
+  }, []);
+
+  const setModeSmooth = useCallback((next: ThemeMode) => {
+    transitionTheme(() => setMode(next));
+  }, [transitionTheme]);
+
+  const toggleSmooth = useCallback(() => {
+    transitionTheme(() => setMode((m) => (m === 'dark' ? 'light' : 'dark')));
+  }, [transitionTheme]);
+
+  const setAccentToneSmooth = useCallback((tone: AccentTone) => {
+    transitionTheme(() => setAccentToneState(tone));
+  }, [transitionTheme]);
+
+  const setRadiusSmooth = useCallback((nextRadius: RadiusMode) => {
+    transitionTheme(() => setRadiusState(nextRadius));
+  }, [transitionTheme]);
+
+  const setMiniAppearance = useCallback((value: Partial<StoredMiniAppearance>) => {
+    transitionTheme(() => {
+      if (value.mode) setMode(value.mode);
+      if (value.accentTone) setAccentToneState(value.accentTone);
+      if (value.radius) setRadiusState(value.radius);
+    });
+  }, [transitionTheme]);
 
   const value = useMemo<ThemeCtxValue>(() => ({
     T,
     mode,
     accentTone,
     radius,
-    toggle: () => setMode((m) => (m === 'dark' ? 'light' : 'dark')),
-    set: setMode,
-    setAccentTone: setAccentToneState,
-    setRadius: setRadiusState,
+    toggle: toggleSmooth,
+    set: setModeSmooth,
+    setAccentTone: setAccentToneSmooth,
+    setRadius: setRadiusSmooth,
     setMiniAppearance,
-  }), [mode, T, accentTone, radius]);
+  }), [mode, T, accentTone, radius, toggleSmooth, setModeSmooth, setAccentToneSmooth, setRadiusSmooth, setMiniAppearance]);
 
   return <ThemeCtx.Provider value={value}>{children}</ThemeCtx.Provider>;
 }

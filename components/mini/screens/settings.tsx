@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { useTheme } from '../theme';
 import {
   Card, FieldLabel, SectionTitle, Divider, Avatar, Toggle, Icon, NeutralBtn, ScreenHeader,
@@ -8,6 +8,8 @@ import {
 import { useMiniData } from '@/hooks/use-mini-data';
 import { useApp } from '@/lib/app-context';
 import { useMiniToast } from '../bridge';
+import { useChats } from '@/hooks/use-chats';
+import { buildMiniEventNotifications, type NotificationEvent } from '@/lib/notification-events';
 import { accentPalette, type AccentTone } from '@/lib/appearance-palette';
 import { defaultAppearanceSettings, normalizeAppearanceSettings, type AppearanceSettings, type CardMode, type MotionMode, type RadiusMode } from '@/lib/appearance';
 
@@ -432,42 +434,81 @@ interface NotifState {
 
 export function NotificationsScreen({ back }: { back: () => void }) {
   const { T } = useTheme();
-  const { updateSection } = useMiniData();
+  const { APPOINTMENTS, updateSection } = useMiniData();
+  const { threads } = useChats();
   const { show } = useMiniToast();
   const [v, setV] = useState<NotifState>({
     appts: true, remind: true, msgs: true, reviews: true, marketing: false,
     push: true, email: false, tg: true,
   });
+  const [readIds, setReadIds] = useState<string[]>([]);
   const t = (k: keyof NotifState) => setV((s) => ({ ...s, [k]: !s[k] }));
+
+  const events = useMemo(() => (
+    buildMiniEventNotifications(APPOINTMENTS, threads).map((event) => ({
+      ...event,
+      unread: event.unread && !readIds.includes(event.id),
+    }))
+  ), [APPOINTMENTS, threads, readIds]);
+  const unread = events.filter((event) => event.unread).length;
 
   async function save() {
     const ok = await updateSection('notifications', v);
-    show(ok ? 'Сохранено' : 'Не удалось сохранить', ok ? 'success' : 'error');
+    show(ok ? 'Настройки уведомлений сохранены' : 'Не удалось сохранить', ok ? 'success' : 'error');
+  }
+
+  function markAllRead() {
+    setReadIds((prev) => Array.from(new Set([...prev, ...events.map((event) => event.id)])));
+    show('Все события отмечены прочитанными', 'success');
   }
 
   return (
     <div>
       <ScreenHeader
         title="Уведомления"
-        subtitle="Что и куда присылать."
+        subtitle={unread > 0 ? `${unread} новых событий` : 'События, запросы клиентов и настройки доставки.'}
         onBack={back}
         right={
           <button
-            onClick={save}
+            onClick={markAllRead}
             style={{
               background: 'transparent', border: 'none', color: T.accent,
-              fontSize: 14, fontFamily: 'inherit', cursor: 'pointer', padding: '6px 8px',
+              fontSize: 13, fontFamily: 'inherit', cursor: 'pointer', padding: '6px 8px',
             }}
-          >Сохранить</button>
+          >Прочитать</button>
         }
       />
-      <div style={{ padding: '0 16px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ padding: '0 16px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div>
+          <SectionTitle title="События" subtitle="То, что реально требует внимания: переносы, новые записи, входящие." />
+          {events.length > 0 ? (
+            <Card padded={false}>
+              {events.slice(0, 12).map((event, index) => (
+                <div key={event.id}>
+                  <NotificationEventRow event={event} onClick={() => setReadIds((prev) => Array.from(new Set([...prev, event.id])))} />
+                  {index < Math.min(events.length, 12) - 1 && <Divider />}
+                </div>
+              ))}
+            </Card>
+          ) : (
+            <Card>
+              <div style={{ textAlign: 'center', padding: '8px 0' }}>
+                <div style={{ width: 44, height: 44, borderRadius: 16, margin: '0 auto 12px', background: T.cardElev, border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.text2 }}>
+                  <Icon name="bell-check" size={20} />
+                </div>
+                <div style={{ fontSize: 14, color: T.text, fontWeight: 500 }}>Сейчас всё спокойно</div>
+                <div style={{ fontSize: 12, color: T.text3, lineHeight: 1.5, marginTop: 6 }}>Новые переносы, отмены, записи и сообщения появятся здесь.</div>
+              </div>
+            </Card>
+          )}
+        </div>
+
         <div>
           <SectionTitle title="Что присылать" />
           <Card padded={false}>
             <ToggleRow label="Новые записи" sub="Когда клиент бронирует слот" on={v.appts} onChange={() => t('appts')} />
             <Divider />
-            <ToggleRow label="Напоминания" sub="За 24 и за 2 часа до визита" on={v.remind} onChange={() => t('remind')} />
+            <ToggleRow label="Переносы и отмены" sub="Когда клиент просит другое время или отменяет визит" on={v.remind} onChange={() => t('remind')} />
             <Divider />
             <ToggleRow label="Сообщения" sub="Новые входящие в чатах" on={v.msgs} onChange={() => t('msgs')} />
             <Divider />
@@ -497,8 +538,37 @@ export function NotificationsScreen({ back }: { back: () => void }) {
             <ToggleRow label="Telegram" on={v.tg} onChange={() => t('tg')} />
           </Card>
         </div>
+
+        <NeutralBtn icon="check" full onClick={save}>Сохранить настройки доставки</NeutralBtn>
       </div>
     </div>
+  );
+}
+
+function NotificationEventRow({ event, onClick }: { event: NotificationEvent; onClick?: () => void }) {
+  const { T } = useTheme();
+  const tone = event.tone === 'danger' ? T.danger
+    : event.tone === 'warning' ? T.warn
+    : event.tone === 'success' ? T.success
+    : event.tone === 'accent' ? T.accent
+    : T.text2;
+  return (
+    <button onClick={onClick} style={{
+      width: '100%', padding: '14px 16px', display: 'flex', alignItems: 'flex-start', gap: 12,
+      background: event.unread ? T.accentSoft : 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+    }}>
+      <span style={{ width: 34, height: 34, borderRadius: 12, background: event.unread ? T.bg : T.cardElev, border: `1px solid ${T.border}`, color: tone, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <Icon name={event.icon} size={16} />
+      </span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          <span style={{ fontSize: 13, color: T.text, fontWeight: event.unread ? 600 : 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{event.title}</span>
+          {event.unread && <span style={{ width: 6, height: 6, borderRadius: '50%', background: T.accent, flexShrink: 0 }} />}
+        </span>
+        <span style={{ display: 'block', marginTop: 3, fontSize: 12, color: T.text2, lineHeight: 1.4 }}>{event.text}</span>
+        <span style={{ display: 'block', marginTop: 5, fontSize: 10, color: T.text3, fontVariantNumeric: 'tabular-nums' }}>{event.time}{event.source ? ` · ${event.source}` : ''}</span>
+      </span>
+    </button>
   );
 }
 
