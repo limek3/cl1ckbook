@@ -86,7 +86,7 @@ function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) 
     <div style={{
       borderTop: `1px solid ${T.border}`,
       background: T.bg,
-      padding: '8px 4px calc(22px + env(safe-area-inset-bottom, 0px) + var(--miniapp-safe-bottom, 0px))',
+      padding: '8px 4px 22px',
       display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 0,
       flexShrink: 0,
     }}>
@@ -114,7 +114,7 @@ function TgHeader({ onToggleTheme, onNotifications, notificationCount = 0 }: { o
   return (
     <div style={{
       flexShrink: 0,
-      padding: 'calc(52px + env(safe-area-inset-top, 0px) + var(--miniapp-safe-top, 0px)) 16px 10px',
+      padding: '10px 16px',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       background: T.bg,
       borderBottom: `1px solid ${T.border}`,
@@ -306,15 +306,31 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
         <style>{`
           .cb-miniapp, .cb-miniapp * { -webkit-tap-highlight-color: transparent; }
           .cb-miniapp input, .cb-miniapp textarea, .cb-miniapp select {
-            -webkit-appearance: none; appearance: none; background-color: transparent !important;
-            box-shadow: none !important; color: inherit; color-scheme: dark; caret-color: var(--miniapp-accent, #127dfe);
-            -webkit-text-fill-color: currentColor;
+            -webkit-appearance: none !important; appearance: none !important;
+            background: var(--mini-input-bg, #0d0d0d) !important;
+            background-color: var(--mini-input-bg, #0d0d0d) !important;
+            box-shadow: 0 0 0 1000px var(--mini-input-bg, #0d0d0d) inset !important;
+            color: var(--mini-text, #fafafa) !important;
+            color-scheme: dark; caret-color: var(--miniapp-accent, #127dfe);
+            -webkit-text-fill-color: var(--mini-text, #fafafa) !important;
+            border-radius: 10px;
+          }
+          .cb-miniapp input.cb-mini-transparent, .cb-miniapp textarea.cb-mini-transparent {
+            background: transparent !important;
+            background-color: transparent !important;
+            box-shadow: none !important;
+            border-radius: 0;
           }
           .cb-miniapp input:-webkit-autofill, .cb-miniapp textarea:-webkit-autofill {
             box-shadow: 0 0 0 999px var(--mini-input-bg, #0d0d0d) inset !important;
             -webkit-text-fill-color: var(--mini-text, #fafafa) !important;
           }
-          .cb-miniapp[data-mini-mode="light"] input, .cb-miniapp[data-mini-mode="light"] textarea, .cb-miniapp[data-mini-mode="light"] select { color-scheme: light; }
+          .cb-miniapp[data-mini-mode="light"] input, .cb-miniapp[data-mini-mode="light"] textarea, .cb-miniapp[data-mini-mode="light"] select {
+            color-scheme: light;
+            background: var(--mini-input-bg, #ffffff) !important;
+            background-color: var(--mini-input-bg, #ffffff) !important;
+            box-shadow: 0 0 0 1000px var(--mini-input-bg, #ffffff) inset !important;
+          }
           .cb-miniapp ::placeholder { color: ${T.text3}; opacity: 1; }
           .cb-miniapp { --miniapp-accent: ${T.accent}; }
         `}</style>

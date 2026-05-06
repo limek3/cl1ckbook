@@ -117,6 +117,8 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const templateButtonRef = useRef<HTMLButtonElement>(null);
+  const templatePopoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (thread.unread > 0) markRead(thread.id);
@@ -250,7 +252,7 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={handleKey}
             placeholder="Сообщение"
-            style={{ flex: 1, minWidth: 0, background: 'transparent', backgroundColor: 'transparent', WebkitAppearance: 'none', appearance: 'none', border: 'none', outline: 'none', boxShadow: 'none', color: T.text, WebkitTextFillColor: T.text, caretColor: T.accent, fontSize: 14, fontFamily: 'inherit', colorScheme: T.bg === '#0a0a0a' ? 'dark' : 'light' }}
+            style={{ flex: 1, minWidth: 0, background: T.inputBg, backgroundColor: T.inputBg, WebkitAppearance: 'none', appearance: 'none', border: 'none', outline: 'none', boxShadow: `0 0 0 1000px ${T.inputBg} inset`, borderRadius: 10, padding: '6px 8px', color: T.text, WebkitTextFillColor: T.text, caretColor: T.accent, fontSize: 14, fontFamily: 'inherit', colorScheme: T.bg === '#0a0a0a' ? 'dark' : 'light' }}
           />
           {draft.length > 0 && (
             <button onClick={() => { selectionHaptic(); setDraft(''); }} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: T.text3, display: 'flex' }}>

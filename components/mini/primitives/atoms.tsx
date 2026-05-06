@@ -294,7 +294,7 @@ export function SearchBox({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="cb-mini-input" style={{ flex: 1, minWidth: 0, background: 'transparent', backgroundColor: 'transparent', WebkitAppearance: 'none', appearance: 'none', border: 'none', outline: 'none', boxShadow: 'none', color: T.text, WebkitTextFillColor: T.text, caretColor: T.accent, fontSize: 14, fontFamily: 'inherit', colorScheme: T.bg === '#0a0a0a' ? 'dark' : 'light' }}
+        className="cb-mini-input" style={{ flex: 1, minWidth: 0, background: T.inputBg, backgroundColor: T.inputBg, WebkitAppearance: 'none', appearance: 'none', border: 'none', outline: 'none', boxShadow: `0 0 0 1000px ${T.inputBg} inset`, borderRadius: 10, padding: '6px 8px', color: T.text, WebkitTextFillColor: T.text, caretColor: T.accent, fontSize: 14, fontFamily: 'inherit', colorScheme: T.bg === '#0a0a0a' ? 'dark' : 'light' }}
       />
       {value && (
         <button onClick={() => { tap('selection'); onChange(''); }} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: T.text3, display: 'flex' }}>
@@ -318,8 +318,8 @@ export function FormField({
 }) {
   const { T } = useTheme();
   const common: CSSProperties = {
-    width: '100%', marginTop: 8, padding: 0, background: 'transparent', backgroundColor: 'transparent', border: 'none', outline: 'none',
-    boxShadow: 'none', color: T.text, WebkitTextFillColor: T.text, caretColor: T.accent, fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5, WebkitAppearance: 'none', appearance: 'none', colorScheme: T.bg === '#0a0a0a' ? 'dark' : 'light',
+    width: '100%', marginTop: 8, padding: '6px 8px', background: T.inputBg, backgroundColor: T.inputBg, border: 'none', outline: 'none',
+    boxShadow: `0 0 0 1000px ${T.inputBg} inset`, borderRadius: 10, color: T.text, WebkitTextFillColor: T.text, caretColor: T.accent, fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5, WebkitAppearance: 'none', appearance: 'none', colorScheme: T.bg === '#0a0a0a' ? 'dark' : 'light',
   };
   return (
     <div style={{ background: T.cardElev, border: `1px solid ${T.border}`, borderRadius: 14, padding: '12px 14px' }}>

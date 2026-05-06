@@ -2413,14 +2413,14 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
               type="button"
               onClick={() => setEventPanelOpen((value) => !value)}
               className={cn(
-                'relative flex size-8 shrink-0 items-center justify-center rounded-[10px] border border-black/[0.08] bg-[var(--cb-surface)] text-slate-500 transition hover:text-slate-950 dark:border-white/[0.08] dark:bg-[#101010] dark:text-white/40 dark:hover:text-white',
+                'relative flex size-8 shrink-0 items-center justify-center overflow-visible rounded-[10px] border border-black/[0.08] bg-[var(--cb-surface)] text-slate-500 transition hover:text-slate-950 dark:border-white/[0.08] dark:bg-[#101010] dark:text-white/40 dark:hover:text-white',
                 eventPanelOpen && 'cb-neutral-primary',
               )}
               aria-label={locale === 'ru' ? 'События' : 'Events'}
             >
               <Bell className="size-3.5" />
               {workspaceUnreadEvents > 0 && (
-                <span className="absolute -right-2 -top-2 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold leading-none text-white ring-2 ring-[#f4f4f2] dark:ring-[#090909]">
+                <span className="absolute -right-2.5 -top-2.5 z-20 flex h-5 min-w-[22px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold leading-none text-white ring-2 ring-[#f4f4f2] dark:ring-[#090909]">
                   {workspaceUnreadEvents > 99 ? '99+' : workspaceUnreadEvents}
                 </span>
               )}
@@ -2448,14 +2448,14 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
             type="button"
             onClick={() => setEventPanelOpen((value) => !value)}
             className={cn(
-              'relative flex h-10 w-10 items-center justify-center rounded-[14px] border border-black/[0.08] bg-[var(--cb-surface)] text-muted-foreground shadow-sm transition hover:text-foreground dark:border-white/[0.08] dark:bg-[#101010]',
+              'relative flex h-10 w-10 items-center justify-center overflow-visible rounded-[14px] border border-black/[0.08] bg-[var(--cb-surface)] text-muted-foreground shadow-sm transition hover:text-foreground dark:border-white/[0.08] dark:bg-[#101010]',
               eventPanelOpen && 'cb-neutral-primary',
             )}
             aria-label={locale === 'ru' ? 'События' : 'Events'}
           >
             <Bell className="size-4" />
             {workspaceUnreadEvents > 0 && (
-              <span className="absolute -right-2 -top-2 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold leading-none text-white ring-2 ring-[#f4f4f2] dark:ring-[#090909]">
+              <span className="absolute -right-2.5 -top-2.5 z-20 flex h-5 min-w-[22px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold leading-none text-white ring-2 ring-[#f4f4f2] dark:ring-[#090909]">
                 {workspaceUnreadEvents > 99 ? '99+' : workspaceUnreadEvents}
               </span>
             )}
