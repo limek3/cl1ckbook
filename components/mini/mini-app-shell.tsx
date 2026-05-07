@@ -84,7 +84,7 @@ const introPaths = {
 
 function StaticIntroLogo() {
   return (
-    <svg viewBox="0 0 1523 422" role="img" aria-labelledby="clickbook-static-title clickbook-static-desc" style={{ width: '60%', maxWidth: 600, height: 'auto' }}>
+    <svg viewBox="0 0 1523 422" role="img" aria-labelledby="clickbook-static-title clickbook-static-desc" style={{ width: '60%', maxWidth: 720, height: 'auto' }}>
       <title id="clickbook-static-title">КликБук — логотип</title>
       <desc id="clickbook-static-desc">Минималистичный чёрно-белый логотип КликБук.</desc>
       <rect width="100%" height="100%" fill={INTRO_WHITE} />
@@ -149,26 +149,6 @@ function ClickBookLogoIntro({ variant = 'ultra', onDone }: { variant?: IntroVari
         transition={isSkipping ? { duration: 0.18, ease: 'easeOut' } : { duration: overlayDuration, times: [0, fadeStart, 1], ease: 'easeOut' }}
       >
         <StaticIntroLogo />
-        <button
-          type="button"
-          onClick={finishIntro}
-          style={{
-            position: 'absolute',
-            right: 16,
-            bottom: 'calc(18px + var(--miniapp-safe-bottom, 0px))',
-            border: '1px solid rgba(0,0,0,0.08)',
-            background: 'rgba(0,0,0,0.045)',
-            color: INTRO_BLACK,
-            borderRadius: 999,
-            padding: '8px 12px',
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: '-0.02em',
-            cursor: 'pointer',
-          }}
-        >
-          Пропустить
-        </button>
       </motion.div>
     );
   }
@@ -193,14 +173,13 @@ function ClickBookLogoIntro({ variant = 'ultra', onDone }: { variant?: IntroVari
       }}
       animate={{ opacity: isSkipping ? 0 : [1, 1, 0] }}
       transition={isSkipping ? { duration: 0.18, ease: 'easeOut' } : { duration: overlayDuration, times: [0, fadeStart, 1], ease: 'easeOut' }}
-      onClick={finishIntro}
     >
       <motion.svg
         viewBox="0 0 1523 422"
         xmlns="http://www.w3.org/2000/svg"
         role="img"
         aria-labelledby={`${titleId} ${descId}`}
-        style={{ width: '50%', maxWidth: 600, height: 'auto' }}
+        style={{ width: '60%', maxWidth: 720, height: 'auto' }}
         initial="hidden"
         animate="show"
       >
@@ -412,32 +391,6 @@ function ClickBookLogoIntro({ variant = 'ultra', onDone }: { variant?: IntroVari
         </motion.g>
       </motion.svg>
 
-      <button
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation();
-          finishIntro();
-        }}
-        style={{
-          position: 'absolute',
-          right: 16,
-          bottom: 'calc(18px + var(--miniapp-safe-bottom, 0px))',
-          border: '1px solid rgba(0,0,0,0.08)',
-          background: 'rgba(0,0,0,0.045)',
-          color: INTRO_BLACK,
-          borderRadius: 999,
-          padding: '8px 12px',
-          fontSize: 11,
-          fontWeight: 700,
-          letterSpacing: '-0.02em',
-          cursor: 'pointer',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-        }}
-      >
-        Пропустить
-      </button>
-
       <div
         aria-hidden="true"
         style={{
@@ -530,9 +483,9 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
 function miniGlass(mode: ThemeMode, edge: 'top' | 'bottom' = 'top'): CSSProperties {
   const dark = mode === 'dark';
   return {
-    backgroundColor: dark ? 'rgba(10,10,13,0.86)' : 'rgba(250,250,254,0.86)',
-    backdropFilter: 'blur(44px) saturate(2.4) brightness(0.97)',
-    WebkitBackdropFilter: 'blur(44px) saturate(2.4) brightness(0.97)',
+    backgroundColor: dark ? 'rgba(10,10,13,0.62)' : 'rgba(250,250,254,0.58)',
+    backdropFilter: 'blur(34px) saturate(2.15) brightness(0.98)',
+    WebkitBackdropFilter: 'blur(34px) saturate(2.15) brightness(0.98)',
     boxShadow: edge === 'top'
       ? (dark
         ? 'inset 0 -1px 0 rgba(255,255,255,0.07), 0 12px 48px rgba(0,0,0,0.52)'
@@ -573,9 +526,9 @@ function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) 
         gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
         gap: 3,
         padding: 4,
-        border: `1px solid ${dark ? 'rgba(255,255,255,0.085)' : 'rgba(0,0,0,0.07)'}`,
+        border: `1px solid ${dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.045)'}`,
         borderRadius: 20,
-        backgroundColor: dark ? 'rgba(17,17,17,0.84)' : 'rgba(255,255,255,0.84)',
+        backgroundColor: dark ? 'rgba(17,17,17,0.58)' : 'rgba(255,255,255,0.54)',
         boxShadow: dark
           ? '0 -16px 44px rgba(0,0,0,0.46), inset 0 1px 0 rgba(255,255,255,0.045)'
           : '0 -16px 44px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.78)',
@@ -645,7 +598,7 @@ function TgHeader({ onToggleTheme, onNotifications, notificationCount = 0 }: { o
       transform: 'translateX(-50%)',
       width: '100%',
       maxWidth: 390,
-      padding: 'calc(8px + var(--miniapp-safe-top, var(--tg-content-safe-top, 0px))) 10px 4px',
+      padding: 'calc(28px + var(--miniapp-safe-top, var(--tg-content-safe-top, 0px))) 10px 4px',
       zIndex: 80,
       pointerEvents: 'auto',
     }}>
@@ -655,8 +608,8 @@ function TgHeader({ onToggleTheme, onNotifications, notificationCount = 0 }: { o
         minHeight: 52,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
         borderRadius: 18,
-        border: `1px solid ${dark ? 'rgba(255,255,255,0.075)' : 'rgba(0,0,0,0.07)'}`,
-        backgroundColor: dark ? 'rgba(17,17,17,0.82)' : 'rgba(255,255,255,0.84)',
+        border: `1px solid ${dark ? 'rgba(255,255,255,0.055)' : 'rgba(0,0,0,0.045)'}`,
+        backgroundColor: dark ? 'rgba(17,17,17,0.56)' : 'rgba(255,255,255,0.52)'
         boxShadow: dark
           ? '0 14px 42px rgba(0,0,0,0.46), inset 0 1px 0 rgba(255,255,255,0.045)'
           : '0 14px 42px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.72)',
@@ -715,7 +668,10 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
   const [tab, setTab] = useState<TabId>(initialTab);
   const [sub, setSub] = useState<SubRoute | null>(initialSub);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
-  const [showIntro, setShowIntro] = useState(false);
+  const [showIntro, setShowIntro] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.sessionStorage.getItem(INTRO_SEEN_KEY) !== '1';
+  });
   const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { threads } = useChats();
@@ -727,12 +683,6 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
     }))
   ), [APPOINTMENTS, threads, readNotificationIds]);
   const notificationCount = Math.min(99, unreadEventCount(notificationEvents));
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const alreadySeen = window.sessionStorage.getItem(INTRO_SEEN_KEY) === '1';
-    if (!alreadySeen) setShowIntro(true);
-  }, []);
 
   const closeIntro = useCallback(() => {
     if (typeof window !== 'undefined') {
@@ -961,7 +911,13 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
           .cb-miniapp ::placeholder { color: ${T.text3}; opacity: 1; }
           .cb-miniapp { --miniapp-accent: ${T.accent}; }
         `}</style>
-        <TgHeader onToggleTheme={toggle} onNotifications={() => setSub({ kind: 'notifications' })} notificationCount={notificationCount} />
+        {!isFullHeight && (
+          <TgHeader
+            onToggleTheme={toggle}
+            onNotifications={() => setSub({ kind: 'notifications' })}
+            notificationCount={notificationCount}
+          />
+        )}
         {isFullHeight ? (
           <div
             style={{
@@ -983,7 +939,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
               minHeight: 0,
               overflowY: 'auto',
               overflowX: 'hidden',
-              paddingTop: 'calc(72px + var(--miniapp-safe-top, 0px))',
+              paddingTop: 'calc(92px + var(--miniapp-safe-top, 0px))'
               paddingBottom: 'calc(76px + var(--miniapp-safe-bottom, 0px))',
               WebkitOverflowScrolling: 'touch',
             }}
