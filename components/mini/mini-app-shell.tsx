@@ -598,7 +598,7 @@ function TgHeader({ onToggleTheme, onNotifications, notificationCount = 0 }: { o
       transform: 'translateX(-50%)',
       width: '100%',
       maxWidth: 390,
-      padding: 'calc(28px + var(--miniapp-safe-top, var(--tg-content-safe-top, 0px))) 10px 4px',
+      padding: 'calc(36px + var(--miniapp-safe-top, var(--tg-content-safe-top, 0px))) 10px 4px',
       zIndex: 80,
       pointerEvents: 'auto',
     }}>
@@ -817,8 +817,8 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
     else if (tab === 'more') content = <MoreScreen go={goSub} />;
   }
 
-  // Chat thread = full height (no tabs)
-  const isFullHeight = sub && sub.kind === 'thread';
+  // Chat thread = full height (no global mini header/nav)
+  const isFullHeight = Boolean(sub && sub.kind === 'thread');
 
   return (
     <ToastCtx.Provider value={toastApi}>
@@ -939,7 +939,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
               minHeight: 0,
               overflowY: 'auto',
               overflowX: 'hidden',
-              paddingTop: 'calc(92px + var(--miniapp-safe-top, 0px))',
+              paddingTop: 'calc(100px + var(--miniapp-safe-top, 0px))',
               paddingBottom: 'calc(76px + var(--miniapp-safe-bottom, 0px))',
               WebkitOverflowScrolling: 'touch',
             }}
