@@ -92,15 +92,10 @@ export function Avatar({ name, src, size = 36, radius = 10 }: { name: string; sr
       border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontSize: size * 0.34, color: T.text2, fontWeight: 500, flexShrink: 0,
       letterSpacing: '0.02em', overflow: 'hidden',
-      boxShadow: '0 12px 28px rgba(0,0,0,0.22)',
     }}>
       {src ? (
-        <img
-          src={src}
-          alt={name || 'avatar'}
-          loading="lazy"
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-        />
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
       ) : initials}
     </div>
   );

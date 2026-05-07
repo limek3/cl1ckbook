@@ -46,7 +46,7 @@ import {
   FinanceScreen, PaymentsScreen, IntegrationsScreen, SourcesScreen, MarketingScreen, ReviewsScreen,
 } from './screens/money';
 
-import type { Thread, MasterInfo } from '@/lib/mini-demo';
+import type { Thread } from '@/lib/mini-demo';
 
 const MINI_NOTIFICATION_READ_KEY = 'clickbook-mini-notification-read-ids';
 const MINI_NOTIFICATION_READ_EVENT = 'clickbook-mini-notification-read-change';
@@ -77,21 +77,19 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
 function miniGlass(mode: ThemeMode, edge: 'top' | 'bottom' = 'top'): CSSProperties {
   const dark = mode === 'dark';
   return {
-    background: dark
-      ? 'linear-gradient(180deg, rgba(28,28,32,0.46) 0%, rgba(18,18,22,0.38) 100%)'
-      : 'linear-gradient(180deg, rgba(255,255,255,0.62) 0%, rgba(248,248,250,0.5) 100%)',
-    backdropFilter: 'blur(44px) saturate(1.8)',
-    WebkitBackdropFilter: 'blur(44px) saturate(1.8)',
-    border: 'none',
+    backgroundColor: dark ? 'rgba(10,10,13,0.86)' : 'rgba(250,250,254,0.86)',
+    backdropFilter: 'blur(44px) saturate(2.4) brightness(0.97)',
+    WebkitBackdropFilter: 'blur(44px) saturate(2.4) brightness(0.97)',
     boxShadow: edge === 'top'
       ? (dark
-        ? '0 18px 40px -10px rgba(0,0,0,0.5), 0 2px 14px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.08), inset 0 0 0 1px rgba(255,255,255,0.035)'
-        : '0 18px 40px -10px rgba(20,20,30,0.18), 0 2px 14px rgba(20,20,30,0.06), inset 0 1px 0 rgba(255,255,255,0.85), inset 0 0 0 1px rgba(255,255,255,0.4)')
+        ? 'inset 0 -1px 0 rgba(255,255,255,0.07), 0 12px 48px rgba(0,0,0,0.52)'
+        : 'inset 0 -1px 0 rgba(0,0,0,0.06), 0 12px 48px rgba(0,0,0,0.07)')
       : (dark
-        ? '0 -18px 40px -10px rgba(0,0,0,0.5), 0 -2px 14px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.08), inset 0 0 0 1px rgba(255,255,255,0.035)'
-        : '0 -18px 40px -10px rgba(20,20,30,0.18), 0 -2px 14px rgba(20,20,30,0.06), inset 0 1px 0 rgba(255,255,255,0.85), inset 0 0 0 1px rgba(255,255,255,0.4)')
-      ,
+        ? 'inset 0 1px 0 rgba(255,255,255,0.07), 0 -24px 64px rgba(0,0,0,0.56)'
+        : 'inset 0 1px 0 rgba(0,0,0,0.06), 0 -24px 64px rgba(0,0,0,0.05)'),
+    transform: 'translate3d(0,0,0)',
     willChange: 'backdrop-filter',
+    isolation: 'isolate',
   };
 }
 
@@ -104,85 +102,60 @@ interface SubRoute {
 function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) => void }) {
   const { T, mode } = useTheme();
   const dark = mode === 'dark';
-  const activeColor = dark ? '#f5a623' : '#d97706';
-
   return (
-    <div
-      style={{
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 80,
-        padding: '8px 10px calc(1px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
-        background: 'transparent',
-        pointerEvents: 'auto',
-      }}
-    >
-      <div
-        style={{
-          ...miniGlass(mode, 'bottom'),
-          minHeight: 58,
-          borderRadius: 20,
-          padding: 5,
-          display: 'grid',
-          gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
-          gap: 3,
-        }}
-      >
+    <div style={{
+      flexShrink: 0,
+      padding: '8px 12px calc(10px + var(--miniapp-safe-bottom, var(--tg-content-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)))))',
+      zIndex: 80,
+    }}>
+      <div style={{
+        ...miniGlass(mode, 'bottom'),
+        display: 'grid',
+        gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+        gap: 4,
+        padding: 6,
+        border: `1px solid ${dark ? 'rgba(255,255,255,0.085)' : 'rgba(0,0,0,0.07)'}`,
+        borderRadius: 25,
+        backgroundColor: dark ? 'rgba(17,17,17,0.84)' : 'rgba(255,255,255,0.84)',
+        boxShadow: dark
+          ? '0 -20px 54px rgba(0,0,0,0.46), inset 0 1px 0 rgba(255,255,255,0.045)'
+          : '0 -20px 54px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.78)',
+      }}>
         {TABS.map((t) => {
           const isActive = active === t.id;
           return (
-            <button
-              key={t.id}
-              onClick={() => { haptic('light'); onChange(t.id); }}
-              aria-label={t.label}
-              style={{
-                height: 48,
-                minWidth: 0,
-                background: isActive ? (dark ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.03)') : 'transparent',
-                border: `1px solid ${isActive ? (dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)') : 'transparent'}`,
-                borderRadius: 14,
-                cursor: 'pointer',
-                padding: '5px 2px 4px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 4,
-                fontFamily: 'inherit',
-                WebkitTapHighlightColor: 'transparent',
-                transition: 'background 0.2s ease, border-color 0.2s ease, transform 0.12s ease, opacity 0.12s ease',
-              }}
-            >
-              <span
-                style={{
-                  width: 22,
-                  height: 20,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: isActive ? activeColor : T.text3,
-                  filter: isActive ? `drop-shadow(0 0 7px ${activeColor}38)` : 'none',
-                  transition: 'color 0.2s ease, filter 0.2s ease',
-                }}
-              >
-                <Icon name={t.icon} size={17} stroke={isActive ? 2.1 : 1.6} />
-              </span>
-              <span
-                style={{
-                  maxWidth: '100%',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  fontSize: 9,
-                  lineHeight: 1,
-                  fontWeight: isActive ? 600 : 450,
-                  color: isActive ? activeColor : T.text3,
-                  letterSpacing: '-0.01em',
-                  whiteSpace: 'nowrap',
-                  transition: 'color 0.2s ease, font-weight 0.2s ease',
-                }}
-              >{t.label}</span>
+            <button key={t.id} onClick={() => { haptic('light'); onChange(t.id); }} style={{
+              border: `1px solid ${isActive ? (dark ? 'rgba(255,255,255,0.075)' : 'rgba(0,0,0,0.06)') : 'transparent'}`,
+              cursor: 'pointer',
+              height: 62,
+              minWidth: 0,
+              borderRadius: 19,
+              padding: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              fontFamily: 'inherit',
+              WebkitTapHighlightColor: 'transparent',
+              background: isActive
+                ? (dark ? 'rgba(255,255,255,0.065)' : 'rgba(0,0,0,0.045)')
+                : 'transparent',
+              color: isActive ? T.accent : T.text3,
+              boxShadow: isActive ? 'inset 0 1px 0 rgba(255,255,255,0.05), 0 8px 22px rgba(0,0,0,0.24)' : 'none',
+              transition: 'background 0.18s ease, color 0.18s ease, transform 0.12s ease, border-color 0.18s ease',
+            }}>
+              <Icon name={t.icon} size={21} stroke={isActive ? 2.05 : 1.6} />
+              <span style={{
+                maxWidth: '100%',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                fontSize: 10,
+                lineHeight: 1,
+                fontWeight: isActive ? 600 : 500,
+                letterSpacing: '-0.04em',
+              }}>{t.label}</span>
             </button>
           );
         })}
@@ -192,142 +165,89 @@ function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) 
 }
 
 // ─── Telegram-style header ───────────────────
-function TgHeader({
-  master,
-  onToggleTheme,
-  onNotifications,
-  notificationCount = 0,
-}: {
-  master: MasterInfo;
-  onToggleTheme: () => void;
-  onNotifications: () => void;
-  notificationCount?: number;
-}) {
+function TgHeader({ onToggleTheme, onNotifications, notificationCount = 0 }: { onToggleTheme: () => void; onNotifications: () => void; notificationCount?: number }) {
   const { T, mode } = useTheme();
+  const { MASTER } = useMiniData();
   const dark = mode === 'dark';
-  const activeColor = dark ? '#f5a623' : '#d97706';
-  const avatar = master.avatar;
-  const initials = (master.name || 'КликБук').split(' ').map((part) => part[0]).filter(Boolean).slice(0, 1).join('') || 'К';
   const iconBtn: CSSProperties = {
-    width: 34,
-    height: 34,
-    background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.025)',
-    border: `1px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'}`,
-    borderRadius: 11,
-    cursor: 'pointer',
-    color: T.text2,
-    padding: 0,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 40, height: 40,
+    background: dark ? 'rgba(255,255,255,0.055)' : 'rgba(0,0,0,0.045)',
+    border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
+    borderRadius: 15, cursor: 'pointer', color: T.text2, padding: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
     flexShrink: 0,
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.045)',
   };
-
   return (
-    <div
-      style={{
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        top: 0,
-        zIndex: 80,
-        padding: 'calc(var(--miniapp-header-top-offset, 10px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px)))) 10px 4px',
-        background: 'transparent',
-        pointerEvents: 'auto',
-      }}
-    >
-      <div
-        style={{
-          ...miniGlass(mode, 'top'),
-          minHeight: 64,
-          borderRadius: 20,
-          padding: '10px 10px 10px 12px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 8,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-          <div
-            style={{
-              width: 38,
-              height: 38,
-              borderRadius: 13,
-              flexShrink: 0,
-              background: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.035)',
-              border: `1px solid ${dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'}`,
-              boxShadow: avatar
-                ? '0 8px 18px rgba(0,0,0,0.18)'
-                : `0 8px 18px rgba(0,0,0,0.18), 0 0 16px ${activeColor}1c`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              overflow: 'hidden',
-              color: '#fff',
-              fontSize: 16,
-              fontWeight: 760,
-              letterSpacing: '-0.04em',
-            }}
-          >
-            {avatar ? (
-              <img
-                src={avatar}
-                alt={master.name || 'КликБук'}
-                loading="lazy"
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-              />
-            ) : initials}
+    <div style={{
+      flexShrink: 0,
+      padding: 'calc(12px + var(--miniapp-safe-top, var(--tg-content-safe-top, 0px))) 12px 16px',
+      zIndex: 80,
+    }}>
+      <div style={{
+        ...miniGlass(mode, 'top'),
+        padding: 12,
+        minHeight: 68,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+        borderRadius: 25,
+        border: `1px solid ${dark ? 'rgba(255,255,255,0.075)' : 'rgba(0,0,0,0.07)'}`,
+        backgroundColor: dark ? 'rgba(17,17,17,0.82)' : 'rgba(255,255,255,0.84)',
+        boxShadow: dark
+          ? '0 18px 52px rgba(0,0,0,0.46), inset 0 1px 0 rgba(255,255,255,0.045)'
+          : '0 18px 52px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.72)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 16, flexShrink: 0,
+            background: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+            border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
+            boxShadow: dark ? '0 10px 26px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.05)' : '0 10px 26px rgba(0,0,0,0.08)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            overflow: 'hidden',
+            fontSize: 15, color: T.text, fontWeight: 800, letterSpacing: '-0.05em',
+          }}>
+            {MASTER.avatar ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={MASTER.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            ) : 'К'}
           </div>
           <div style={{ minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: 15,
-                fontWeight: 700,
-                color: T.text,
-                lineHeight: 1.05,
-                letterSpacing: '-0.035em',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-            >КликБук</div>
-            <div
-              style={{
-                fontSize: 10,
-                color: T.text3,
-                marginTop: 3,
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
-              }}
-            >MINI APP</div>
+            <div style={{ fontSize: 18, fontWeight: 650, color: T.text, lineHeight: 1, letterSpacing: '-0.055em' }}>КликБук</div>
+            <div style={{ fontSize: 12, color: T.text3, marginTop: 6, letterSpacing: '0.02em', textTransform: 'uppercase', fontWeight: 500 }}>MINI APP</div>
           </div>
         </div>
-
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           <button onClick={() => { haptic('light'); onNotifications(); }} aria-label="notifications" style={{ ...iconBtn, position: 'relative' }}>
-            <Icon name="bell" size={15} stroke={1.65} />
+            <Icon name="bell" size={18} stroke={1.65} />
             {notificationCount > 0 && (
               <span className="notif-badge" style={{
-                position: 'absolute', top: -4, right: -4, minWidth: 15, height: 15,
-                padding: '0 3px', borderRadius: 999,
+                position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18,
+                padding: '0 5px', borderRadius: 999,
                 background: T.danger, color: '#fff',
                 border: `2px solid ${T.bg}`,
-                fontSize: 8, fontWeight: 800,
+                fontSize: 9, fontWeight: 800,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontVariantNumeric: 'tabular-nums',
-                boxShadow: `0 3px 8px ${T.danger}55`,
+                boxShadow: `0 2px 8px ${T.danger}66`,
               }}>{notificationCount > 9 ? '9+' : notificationCount}</span>
             )}
           </button>
           <button onClick={onToggleTheme} aria-label="theme" style={iconBtn}>
-            <Icon name={mode === 'dark' ? 'sun' : 'moon'} size={15} stroke={1.6} />
+            <Icon name={mode === 'dark' ? 'sun' : 'moon'} size={18} stroke={1.55} />
           </button>
-          <button onClick={tgClose} aria-label="close" style={{
-            ...iconBtn,
-            width: 34,
-          }}>
-            <Icon name="x" size={16} stroke={1.8} />
+          <button onClick={tgClose} style={{
+            height: 40,
+            paddingLeft: 12, paddingRight: 12,
+            background: dark ? 'rgba(255,255,255,0.055)' : 'rgba(0,0,0,0.045)',
+            border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
+            borderRadius: 15, cursor: 'pointer',
+            color: T.text2, fontSize: 14, fontFamily: 'inherit', fontWeight: 600,
+            display: 'flex', alignItems: 'center', letterSpacing: '-0.035em',
+            whiteSpace: 'nowrap',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.045)',
+          }}>Закрыть</button>
+          <button onClick={() => { haptic('light'); }} aria-label="more" style={iconBtn}>
+            <Icon name="more-vertical" size={18} stroke={1.75} />
           </button>
         </div>
       </div>
@@ -344,7 +264,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
   const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { threads } = useChats();
-  const { APPOINTMENTS, MASTER } = useMiniData();
+  const { APPOINTMENTS } = useMiniData();
   const notificationEvents = useMemo(() => (
     buildMiniEventNotifications(APPOINTMENTS, threads).map((event) => ({
       ...event,
@@ -378,35 +298,22 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
   }, [tab, sub?.kind]);
 
   // Telegram WebApp init: keep viewport/safe areas in sync.
-  const stableInsetsRef = useRef({ headerOffset: 0, topInset: 0, bottomInset: 0 });
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const tg = (window as any).Telegram?.WebApp;
 
     const applyViewport = () => {
-      try { tg?.ready?.(); tg?.expand?.(); } catch {}
-      const tgContentTop = Number(tg?.contentSafeAreaInset?.top ?? 0);
-      const tgContentBottom = Number(tg?.contentSafeAreaInset?.bottom ?? 0);
-      const tgSafeTop = Number(tg?.safeAreaInset?.top ?? 0);
-      const tgSafeBottom = Number(tg?.safeAreaInset?.bottom ?? 0);
-      const topInsetRaw = Math.max(Number.isFinite(tgContentTop) ? tgContentTop : 0, Number.isFinite(tgSafeTop) ? tgSafeTop : 0);
-      const bottomInsetRaw = Math.max(Number.isFinite(tgContentBottom) ? tgContentBottom : 0, Number.isFinite(tgSafeBottom) ? tgSafeBottom : 0);
+      try { tg?.ready?.(); tg?.expand?.(); tg?.requestFullscreen?.(); tg?.disableVerticalSwipes?.(); } catch {}
+      const contentSafeArea = tg?.contentSafeAreaInset ?? {};
+      const safeArea = tg?.safeAreaInset ?? {};
+      const topInset = Number(contentSafeArea.top ?? 0);
+      const bottomInset = Number(contentSafeArea.bottom ?? safeArea.bottom ?? 0);
       const viewportHeight = Number(tg?.viewportStableHeight ?? tg?.viewportHeight ?? window.innerHeight);
-      const isTelegramRuntime = Boolean(tg);
-      const tgButtonsIncluded = tgContentTop >= (tgSafeTop > 0 ? tgSafeTop + 24 : 60);
-      const headerOffsetRaw = isTelegramRuntime ? (tgButtonsIncluded ? 29 : 77) : 33;
 
-      // Ratchet: never shrink — TG sometimes reports 0 mid-session (chat focus, BackButton),
-      // shrinking would make header overlap TG controls. Keep the largest seen value.
-      const prev = stableInsetsRef.current;
-      const headerOffset = Math.max(prev.headerOffset, headerOffsetRaw);
-      const topInset = Math.max(prev.topInset, topInsetRaw);
-      const bottomInset = Math.max(prev.bottomInset, bottomInsetRaw);
-      stableInsetsRef.current = { headerOffset, topInset, bottomInset };
-
-      document.documentElement.style.setProperty('--miniapp-header-top-offset', `${headerOffset}px`);
-      document.documentElement.style.setProperty('--miniapp-safe-top', `${Math.max(0, Math.round(topInset))}px`);
-      document.documentElement.style.setProperty('--miniapp-safe-bottom', `${Math.max(0, Math.round(bottomInset))}px`);
+      // Не прибавляем native Telegram/header safe area второй раз: WebView уже стартует ниже него.
+      document.documentElement.style.setProperty('--miniapp-header-top-offset', '12px');
+      if (Number.isFinite(topInset)) document.documentElement.style.setProperty('--miniapp-safe-top', `${Math.max(0, Math.round(topInset))}px`);
+      if (Number.isFinite(bottomInset)) document.documentElement.style.setProperty('--miniapp-safe-bottom', `${Math.max(0, Math.round(bottomInset))}px`);
       if (Number.isFinite(viewportHeight) && viewportHeight > 0) {
         document.documentElement.style.setProperty('--miniapp-viewport-height', `${Math.round(viewportHeight)}px`);
       }
@@ -517,8 +424,6 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
       } as CSSProperties}>
         <style>{`
           .cb-miniapp, .cb-miniapp * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
-          .cb-miniapp .scroll-area { scrollbar-width: none; }
-          .cb-miniapp .scroll-area::-webkit-scrollbar { display: none; }
           .cb-miniapp button:active { opacity: 0.7; transform: scale(0.94); }
           @keyframes badge-pop { 0% { transform: scale(0); } 70% { transform: scale(1.25); } 100% { transform: scale(1); } }
           .cb-miniapp .notif-badge { animation: badge-pop 0.28s cubic-bezier(.2,.8,.2,1) both; }
@@ -570,48 +475,34 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
           .cb-miniapp ::placeholder { color: ${T.text3}; opacity: 1; }
           .cb-miniapp { --miniapp-accent: ${T.accent}; }
         `}</style>
+        <TgHeader onToggleTheme={toggle} onNotifications={() => setSub({ kind: 'notifications' })} notificationCount={notificationCount} />
         {isFullHeight ? (
-          <>
-            <TgHeader master={MASTER} onToggleTheme={toggle} onNotifications={() => setSub({ kind: 'notifications' })} notificationCount={notificationCount} />
-            <div
-              style={{
-                flex: 1,
-                minHeight: 0,
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-                paddingTop: 'calc(var(--miniapp-header-top-offset, 10px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 64px + 6px)',
-              }}
-            >
-              {content}
-            </div>
-          </>
+          <div
+            style={{
+              flex: 1,
+              minHeight: 0,
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            {content}
+          </div>
         ) : (
-          <>
-            <div
-              ref={scrollRef}
-              className="scroll-area"
-              style={{
-                flex: 1,
-                minHeight: 0,
-                overflowY: 'auto',
-                overflowX: 'hidden',
-                overscrollBehavior: 'contain',
-                display: 'flex',
-                flexDirection: 'column',
-                paddingTop: 'calc(var(--miniapp-header-top-offset, 10px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 64px + 6px)',
-                paddingBottom: 'calc(var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))) + 58px + 9px)',
-              }}
-            >
-              <div style={{ flex: '1 0 auto', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-                {content}
-                <div aria-hidden style={{ height: 8, flexShrink: 0 }} />
-              </div>
-            </div>
-            <TgHeader master={MASTER} onToggleTheme={toggle} onNotifications={() => setSub({ kind: 'notifications' })} notificationCount={notificationCount} />
-            <BottomNav active={tab} onChange={(id) => { setTab(id); setSub(null); }} />
-          </>
+          <div
+            ref={scrollRef}
+            className="scroll-area"
+            style={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: 'auto',
+              overflowX: 'hidden',
+            }}
+          >
+            {content}
+          </div>
         )}
+        {!isFullHeight && <BottomNav active={tab} onChange={(id) => { setTab(id); setSub(null); }} />}
         <ToastHost items={toasts} />
       </div>
     </ToastCtx.Provider>

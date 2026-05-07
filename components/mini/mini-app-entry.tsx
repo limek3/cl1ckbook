@@ -13,6 +13,7 @@ import {
 import {
   BarChart3,
   Bell,
+  Home,
   CalendarClock,
   Check,
   CheckCircle2,
@@ -25,6 +26,7 @@ import {
   MapPin,
   MessageCircle,
   MoreHorizontal,
+  MoreVertical,
   Palette,
   Phone,
   Plus,
@@ -34,6 +36,7 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  Sun,
   Star,
   Trash2,
   UserRound,
@@ -337,16 +340,6 @@ function getInitials(name?: string | null) {
     .map((part) => part[0])
     .join('')
     .toUpperCase();
-}
-
-function closeMiniApp() {
-  if (typeof window === 'undefined') return;
-  const tg = (window as any).Telegram?.WebApp as { close?: () => void } | undefined;
-  if (tg?.close) {
-    tg.close();
-    return;
-  }
-  window.history.length > 1 ? window.history.back() : window.location.assign('/');
 }
 
 function sortBookings(a: Booking, b: Booking) {
@@ -776,6 +769,13 @@ function MiniLoading() {
   );
 }
 
+function closeTelegramMiniApp() {
+  if (typeof window === 'undefined') return;
+  try {
+    (window as typeof window & { Telegram?: { WebApp?: { close?: () => void } } }).Telegram?.WebApp?.close?.();
+  } catch {}
+}
+
 function MiniShell({
   screen,
   setScreen,
@@ -792,10 +792,10 @@ function MiniShell({
   accent: (typeof ACCENT_OPTIONS)[number];
 }) {
   const shellStyle = {
-    paddingTop: 'calc(var(--tg-safe-top, 0px) + 12px)',
-    paddingBottom: 'calc(var(--tg-safe-bottom, 0px) + 104px)',
     '--mini-accent': accent.value,
     '--mini-accent-soft': accent.soft,
+    '--mini-shell-top-gap': 'calc(var(--tg-content-safe-top, 0px) + 12px)',
+    '--mini-shell-bottom-gap': 'calc(var(--tg-content-safe-bottom, var(--tg-safe-bottom, 0px)) + 10px)',
   } as CSSProperties & Record<string, string>;
 
   const navItems: Array<{
@@ -803,64 +803,72 @@ function MiniShell({
     label: string;
     icon: ReactNode;
   }> = [
-    { id: 'today', label: 'Главная', icon: <LayoutDashboard className="size-5" /> },
-    { id: 'availability', label: 'Записи', icon: <CalendarClock className="size-5" /> },
-    { id: 'chats', label: 'Чаты', icon: <MessageCircle className="size-5" /> },
-    { id: 'clients', label: 'Клиенты', icon: <Users2 className="size-5" /> },
-    { id: 'more', label: 'Ещё', icon: <MoreHorizontal className="size-5" /> },
+    { id: 'today', label: 'Главная', icon: <Home className="size-[21px]" /> },
+    { id: 'availability', label: 'Записи', icon: <CalendarClock className="size-[21px]" /> },
+    { id: 'chats', label: 'Чаты', icon: <MessageCircle className="size-[21px]" /> },
+    { id: 'clients', label: 'Клиенты', icon: <Users2 className="size-[21px]" /> },
+    { id: 'more', label: 'Ещё', icon: <MoreHorizontal className="size-[22px]" /> },
   ];
+
+  const topButtonClass =
+    'flex size-10 shrink-0 items-center justify-center rounded-[15px] border border-white/[0.08] bg-white/[0.055] text-white/62 shadow-[inset_0_1px_0_rgba(255,255,255,0.045)] transition hover:bg-white/[0.075] hover:text-white/82 active:scale-95';
 
   return (
     <main
       style={shellStyle}
-      className="cb-mini-app-root min-h-screen bg-[#090909] px-3 text-white"
+      className="cb-mini-app-root h-[var(--tg-viewport-height,100dvh)] min-h-[100svh] overflow-hidden bg-[#080808] text-white"
     >
-      <div className="mx-auto w-full max-w-[430px]">
-        <header className="sticky top-[calc(var(--tg-safe-top,0px)+10px)] z-40 mb-4 rounded-[22px] border border-white/[0.085] bg-[#111113]/75 px-3 py-3 shadow-[0_18px_44px_rgba(0,0,0,0.42)] backdrop-blur-[28px] backdrop-saturate-[1.35]">
-          <div className="flex min-h-[58px] items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-[16px] border border-white/[0.08] bg-white/[0.06] shadow-[0_14px_30px_rgba(0,0,0,0.28)]">
+      <div className="mx-auto flex h-full w-full max-w-[430px] flex-col px-3">
+        <style>{`
+          .cb-mini-shell-scroll { scrollbar-width: none; }
+          .cb-mini-shell-scroll::-webkit-scrollbar { display: none; }
+        `}</style>
+
+        <header className="mt-[var(--mini-shell-top-gap)] mb-4 shrink-0 rounded-[25px] border border-white/[0.075] bg-[#111111]/82 px-3 py-3 shadow-[0_18px_52px_rgba(0,0,0,0.46),inset_0_1px_0_rgba(255,255,255,0.045)] backdrop-blur-[30px] backdrop-saturate-[1.25]">
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            <div className="flex min-w-0 flex-1 items-center gap-2.5">
+              <div className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-[17px] border border-white/[0.08] bg-white/[0.06] shadow-[0_10px_26px_rgba(0,0,0,0.36),inset_0_1px_0_rgba(255,255,255,0.05)]">
                 {profile?.avatar ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={profile.avatar} alt={profile.name || 'КликБук'} className="size-full object-cover" />
+                  <img src={profile.avatar} alt="" className="size-full object-cover" />
                 ) : (
-                  <span className="text-[18px] font-bold tracking-[-0.04em] text-white">
-                    {getInitials(profile?.name || 'КликБук').slice(0, 1)}
+                  <span className="text-[15px] font-bold tracking-[-0.05em] text-white/88">
+                    {getInitials(profile?.name || 'КликБук')}
                   </span>
                 )}
               </div>
 
               <div className="min-w-0">
-                <div className="truncate text-[18px] font-bold tracking-[-0.04em] text-white">
+                <div className="truncate text-[18px] font-semibold leading-none tracking-[-0.055em] text-white">
                   КликБук
                 </div>
-                <div className="mt-1 truncate text-[12px] font-medium uppercase tracking-[0.02em] text-white/32">
+                <div className="mt-1 truncate text-[12px] font-medium uppercase tracking-[0.02em] text-white/38">
                   MINI APP
                 </div>
               </div>
             </div>
 
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1.5">
               <button
                 type="button"
                 onClick={onRefresh}
-                aria-label="Уведомления"
-                className="flex size-10 items-center justify-center rounded-[14px] border border-white/[0.085] bg-white/[0.055] text-white/52 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] active:scale-95"
+                aria-label="Обновить"
+                className={topButtonClass}
               >
-                <Bell className="size-[18px]" />
+                <Bell className="size-[18px]" strokeWidth={1.65} />
               </button>
               <button
                 type="button"
                 onClick={() => setScreen('appearance')}
-                aria-label="Внешний вид"
-                className="flex size-10 items-center justify-center rounded-[14px] border border-white/[0.085] bg-white/[0.055] text-white/52 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] active:scale-95"
+                aria-label="Оформление"
+                className={topButtonClass}
               >
-                <Palette className="size-[18px]" />
+                <Sun className="size-[18px]" strokeWidth={1.55} />
               </button>
               <button
                 type="button"
-                onClick={closeMiniApp}
-                className="flex h-10 items-center rounded-[15px] border border-white/[0.085] bg-white/[0.055] px-4 text-[14px] font-semibold tracking-[-0.02em] text-white/52 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] active:scale-95"
+                onClick={closeTelegramMiniApp}
+                className="flex h-10 shrink-0 items-center rounded-[15px] border border-white/[0.08] bg-white/[0.055] px-3 text-[13px] font-semibold tracking-[-0.035em] text-white/58 shadow-[inset_0_1px_0_rgba(255,255,255,0.045)] transition hover:bg-white/[0.075] hover:text-white/82 active:scale-95"
               >
                 Закрыть
               </button>
@@ -868,46 +876,47 @@ function MiniShell({
                 type="button"
                 onClick={() => setScreen('more')}
                 aria-label="Ещё"
-                className="flex size-10 items-center justify-center rounded-[14px] border border-white/[0.085] bg-white/[0.055] text-white/52 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] active:scale-95"
+                className={topButtonClass}
               >
-                <MoreHorizontal className="size-[18px]" />
+                <MoreVertical className="size-[18px]" strokeWidth={1.75} />
               </button>
             </div>
           </div>
         </header>
 
-        {children}
+        <section className="cb-mini-shell-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pb-5">
+          {children}
+        </section>
+
+        <nav className="shrink-0 pb-[var(--mini-shell-bottom-gap)] pt-2">
+          <div className="grid grid-cols-5 gap-1 rounded-[25px] border border-white/[0.085] bg-[#111111]/84 p-1.5 shadow-[0_-20px_54px_rgba(0,0,0,0.46),inset_0_1px_0_rgba(255,255,255,0.045)] backdrop-blur-[30px] backdrop-saturate-[1.25]">
+            {navItems.map((item) => {
+              const active =
+                screen === item.id ||
+                (item.id === 'more' && ['profile', 'services', 'analytics', 'appearance', 'settings'].includes(screen));
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setScreen(item.id)}
+                  className={cn(
+                    'flex h-[62px] min-w-0 flex-col items-center justify-center gap-1.5 rounded-[19px] text-[10px] font-medium tracking-[-0.04em] transition active:scale-[0.98]',
+                    active
+                      ? 'border border-white/[0.075] bg-white/[0.065] text-[var(--mini-accent)] shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_22px_rgba(0,0,0,0.24)]'
+                      : 'border border-transparent text-white/42 hover:bg-white/[0.035] hover:text-white/68',
+                  )}
+                >
+                  <span className={cn('leading-none', active ? 'text-[var(--mini-accent)] drop-shadow-[0_0_10px_var(--mini-accent-soft)]' : 'text-current')}>
+                    {item.icon}
+                  </span>
+                  <span className="truncate leading-none">{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </nav>
       </div>
-
-      <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-[430px] px-4 pb-[calc(var(--tg-safe-bottom,0px)+10px)]">
-        <div className="grid min-h-[70px] grid-cols-5 gap-1 rounded-[22px] border border-white/[0.095] bg-[#111113]/76 p-1.5 shadow-[0_-18px_44px_rgba(0,0,0,0.38)] backdrop-blur-[28px] backdrop-saturate-[1.35]">
-          {navItems.map((item) => {
-            const active =
-              screen === item.id ||
-              (item.id === 'more' &&
-                ['more', 'profile', 'services', 'analytics', 'appearance', 'settings'].includes(screen));
-
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setScreen(item.id)}
-                className={cn(
-                  'flex h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-[16px] px-1 text-[10px] font-semibold tracking-[-0.04em] transition active:scale-[0.98]',
-                  active
-                    ? 'border border-white/[0.075] bg-white/[0.055] text-[var(--mini-accent)] shadow-[0_10px_24px_rgba(0,0,0,0.25)]'
-                    : 'border border-transparent text-white/34 hover:bg-white/[0.035] hover:text-white/62',
-                )}
-              >
-                <span className={cn(active ? 'text-[var(--mini-accent)] drop-shadow-[0_0_9px_var(--mini-accent-soft)]' : 'text-white/38')}>
-                  {item.icon}
-                </span>
-                <span className="max-w-full truncate">{item.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </nav>
     </main>
   );
 }
