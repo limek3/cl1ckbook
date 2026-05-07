@@ -42,8 +42,8 @@ export const TOKENS: Record<ThemeMode, ThemeTokens> = {
     text: '#fafafa',
     text2: 'rgba(250,250,250,0.5)',
     text3: 'rgba(250,250,250,0.3)',
-    accent: '#127dfe',
-    accentSoft: 'rgba(18,125,254,0.12)',
+    accent: '#2dd4bf',
+    accentSoft: 'rgba(45,212,191,0.12)',
     danger: '#ef4444',
     success: '#22c55e',
     warn: '#f59e0b',
@@ -56,7 +56,7 @@ export const TOKENS: Record<ThemeMode, ThemeTokens> = {
   },
   light: {
     bg: '#fafaf9',
-    bgSoft: '#f4f4f2',
+    bgSoft: '#f7f6f2',
     card: '#ffffff',
     cardElev: '#ffffff',
     cardHover: '#f8f8f6',
@@ -65,8 +65,8 @@ export const TOKENS: Record<ThemeMode, ThemeTokens> = {
     text: '#0a0a0a',
     text2: 'rgba(10,10,10,0.5)',
     text3: 'rgba(10,10,10,0.3)',
-    accent: '#127dfe',
-    accentSoft: 'rgba(18,125,254,0.10)',
+    accent: '#0f766e',
+    accentSoft: 'rgba(15,118,110,0.10)',
     danger: '#dc2626',
     success: '#16a34a',
     warn: '#d97706',
@@ -173,7 +173,7 @@ interface ThemeCtxValue {
 const ThemeCtx = createContext<ThemeCtxValue>({
   T: TOKENS.dark,
   mode: 'dark',
-  accentTone: 'cobalt',
+  accentTone: 'teal',
   radius: 'medium',
   toggle: () => {},
   set: () => {},
@@ -185,11 +185,11 @@ const ThemeCtx = createContext<ThemeCtxValue>({
 export function ThemeProvider({ initialMode = 'dark', children }: { initialMode?: ThemeMode; children: ReactNode }) {
   const stored = readStoredAppearance();
   const [mode, setMode] = useState<ThemeMode>(stored.mode ?? initialMode);
-  const [accentTone, setAccentToneState] = useState<AccentTone>(stored.accentTone ?? 'cobalt');
+  const [accentTone, setAccentToneState] = useState<AccentTone>(stored.accentTone ?? 'teal');
   const [radius, setRadiusState] = useState<RadiusMode>(stored.radius ?? 'medium');
 
   const T = useMemo(() => {
-    const accent = accentPalette[accentTone] ?? accentPalette.cobalt;
+    const accent = accentPalette[accentTone] ?? accentPalette.teal;
     return {
       ...TOKENS[mode],
       accent: accent.solid,

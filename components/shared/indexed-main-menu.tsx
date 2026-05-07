@@ -20,7 +20,7 @@ export function IndexedMainMenu({
   return (
     <nav
       className={cn(
-        'rounded-[22px] border border-black/[0.08] bg-[#fbfbfa]/82 p-2.5 shadow-none backdrop-blur-[22px]',
+        'rounded-[22px] border border-black/[0.08] bg-[#ffffff]/82 p-2.5 shadow-none backdrop-blur-[22px]',
         'dark:border-white/[0.08] dark:bg-[#0d0d0d]/82',
         compact ? 'w-full' : 'w-[184px]',
       )}

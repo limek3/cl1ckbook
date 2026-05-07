@@ -233,15 +233,15 @@ function mergeThreadSnapshots(
 }
 
 function pageBg(light: boolean) {
-  return light ? 'bg-[#f4f4f2]' : 'bg-[#090909]';
+  return light ? 'bg-[#f7f6f2]' : 'bg-[#080808]';
 }
 
 function pageText(light: boolean) {
-  return light ? 'text-[#0e0e0e]' : 'text-white';
+  return light ? 'text-[#111111]' : 'text-[#f8f7f4]';
 }
 
 function mutedText(light: boolean) {
-  return light ? 'text-black/48' : 'text-white/42';
+  return light ? 'text-[#6b7280]' : 'text-[#9ca3af]';
 }
 
 function faintText(light: boolean) {
@@ -249,19 +249,19 @@ function faintText(light: boolean) {
 }
 
 function borderTone(light: boolean) {
-  return light ? 'border-black/[0.08]' : 'border-white/[0.08]';
+  return light ? 'border-[#e6e2da]' : 'border-white/[0.08]';
 }
 
 function cardTone(light: boolean) {
   return light
-    ? 'border-black/[0.08] bg-[#fbfbfa]'
-    : 'border-white/[0.08] bg-[#101010]';
+    ? 'border-[#e6e2da] bg-white shadow-[0_12px_30px_rgba(17,17,17,0.035)]'
+    : 'border-white/[0.08] bg-[#141414]';
 }
 
 function insetTone(light: boolean) {
   return light
-    ? 'border-black/[0.07] bg-black/[0.025]'
-    : 'border-white/[0.07] bg-white/[0.035]';
+    ? 'border-[#e6e2da] bg-black/[0.015]'
+    : 'border-white/[0.07] bg-white/[0.026]';
 }
 
 function inputTone(light: boolean) {
@@ -3231,7 +3231,7 @@ export default function DashboardChatsPage() {
       className={cn(
         'shrink-0 border-t',
         borderTone(isLight),
-        isLight ? 'bg-[#fbfbfa]' : 'bg-[#101010]',
+        isLight ? 'bg-[#ffffff]' : 'bg-[#141414]',
         mobile
           ? 'px-3 py-2.5 pb-[calc(env(safe-area-inset-bottom,0px)+0.65rem)]'
           : 'px-4 py-3',
@@ -3404,7 +3404,7 @@ export default function DashboardChatsPage() {
         className={cn(
           'relative z-[1] shrink-0 border-b px-4 py-3',
           borderTone(isLight),
-          isLight ? 'bg-[#fbfbfa]' : 'bg-[#101010]',
+          isLight ? 'bg-[#ffffff]' : 'bg-[#141414]',
         )}
       >
         {activeThread ? (
@@ -3838,7 +3838,7 @@ export default function DashboardChatsPage() {
                   className={cn(
                     'shrink-0 border-b px-3 py-2',
                     borderTone(isLight),
-                    isLight ? 'bg-[#fbfbfa]' : 'bg-[#101010]',
+                    isLight ? 'bg-[#ffffff]' : 'bg-[#141414]',
                   )}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -4014,14 +4014,14 @@ export default function DashboardChatsPage() {
                 className={cn(
                   'flex min-h-0 flex-col border-b lg:border-b-0 lg:border-r',
                   borderTone(isLight),
-                  isLight ? 'bg-[#fbfbfa]' : 'bg-[#101010]',
+                  isLight ? 'bg-[#ffffff]' : 'bg-[#141414]',
                 )}
               >
                 <div
                   className={cn(
                     'relative z-[2] shrink-0 space-y-3 border-b px-3 py-3',
                     borderTone(isLight),
-                    isLight ? 'bg-[#fbfbfa]' : 'bg-[#101010]',
+                    isLight ? 'bg-[#ffffff]' : 'bg-[#141414]',
                   )}
                 >
                   {renderFilters(false)}
@@ -4057,7 +4057,7 @@ export default function DashboardChatsPage() {
                 className={cn(
                   'hidden min-h-0 flex-col border-l xl:flex',
                   borderTone(isLight),
-                  isLight ? 'bg-[#fbfbfa]' : 'bg-[#101010]',
+                  isLight ? 'bg-[#ffffff]' : 'bg-[#141414]',
                 )}
               >
                 <div className={cn('shrink-0 border-b px-4 py-4', borderTone(isLight))}>

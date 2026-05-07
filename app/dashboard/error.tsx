@@ -15,8 +15,8 @@ export default function DashboardError({
   }, [error]);
 
   return (
-    <main className="grid min-h-screen place-items-center bg-[#f4f4f2] px-4 py-10 text-[#0e0e0e] dark:bg-[#090909] dark:text-white">
-      <section className="w-full max-w-[560px] overflow-hidden rounded-[18px] border border-black/[0.09] bg-[#fbfbfa] shadow-[0_34px_90px_rgba(0,0,0,0.12)] dark:border-white/[0.10] dark:bg-[#101010] dark:shadow-[0_34px_90px_rgba(0,0,0,0.55)]">
+    <main className="grid min-h-screen place-items-center bg-[#f7f6f2] px-4 py-10 text-[#111111] dark:bg-[#080808] dark:text-white">
+      <section className="w-full max-w-[560px] overflow-hidden rounded-[18px] border border-black/[0.09] bg-[#ffffff] shadow-[0_34px_90px_rgba(0,0,0,0.12)] dark:border-white/[0.10] dark:bg-[#141414] dark:shadow-[0_34px_90px_rgba(0,0,0,0.55)]">
         <div className="h-px bg-gradient-to-r from-transparent via-black/20 to-transparent dark:via-white/18" />
 
         <div className="space-y-5 p-5 sm:p-6">
@@ -42,7 +42,7 @@ export default function DashboardError({
             <button
               type="button"
               onClick={reset}
-              className="h-10 rounded-[10px] border border-black/[0.12] bg-[#0e0e0e] px-4 text-[12px] font-semibold text-white transition hover:bg-black dark:border-white/[0.12] dark:bg-white dark:text-black dark:hover:bg-white/88"
+              className="h-10 rounded-[10px] border border-black/[0.12] bg-[#111111] px-4 text-[12px] font-semibold text-white transition hover:bg-black dark:border-white/[0.12] dark:bg-white dark:text-black dark:hover:bg-white/88"
             >
               Повторить
             </button>

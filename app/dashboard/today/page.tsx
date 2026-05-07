@@ -88,17 +88,23 @@ interface CalendarMetrics {
   next: CalendarBooking | null;
 }
 
+const CALENDAR_BOOKING_COLOR = '#0F766E';
+const CALENDAR_BOOKING_COLOR_DARK = '#2DD4BF';
+const CALENDAR_BREAK_COLOR = '#D6B98C';
+const CALENDAR_CONFLICT_COLOR = '#E5484D';
+const CALENDAR_FREE_COLOR = '#8B948E';
+
 const AUTO_SERVICE_COLORS = [
-  '#58A6FF',
-  '#F472B6',
-  '#A78BFA',
-  '#34D399',
-  '#FBBF24',
-  '#22D3EE',
-  '#FB7185',
-  '#60A5FA',
-  '#C084FC',
-  '#2DD4BF',
+  '#0F766E',
+  '#14B8A6',
+  '#2563EB',
+  '#7C3AED',
+  '#CA8A04',
+  '#0891B2',
+  '#4F46E5',
+  '#16A34A',
+  '#0E7490',
+  '#65A30D',
 ];
 
 const ROW_HEIGHT = 46;
@@ -107,39 +113,39 @@ const WEEKDAY_SHORT_FALLBACK_RU = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб
 const WEEKDAY_SHORT_FALLBACK_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 function pageBg(light: boolean) {
-  return light ? 'bg-[#f4f4f2]' : 'bg-[#090909]';
+  return light ? 'bg-[#f7f6f2]' : 'bg-[#080808]';
 }
 
 function pageText(light: boolean) {
-  return light ? 'text-[#0e0e0e]' : 'text-white';
+  return light ? 'text-[#111111]' : 'text-[#f8f7f4]';
 }
 
 function mutedText(light: boolean) {
-  return light ? 'text-black/48' : 'text-white/42';
+  return light ? 'text-[#6b7280]' : 'text-[#9ca3af]';
 }
 
 function faintText(light: boolean) {
-  return light ? 'text-black/32' : 'text-white/26';
+  return light ? 'text-black/34' : 'text-white/30';
 }
 
 function borderTone(light: boolean) {
-  return light ? 'border-black/[0.08]' : 'border-white/[0.08]';
+  return light ? 'border-[#e6e2da]' : 'border-white/[0.08]';
 }
 
 function divideTone(light: boolean) {
-  return light ? 'divide-black/[0.08]' : 'divide-white/[0.08]';
+  return light ? 'divide-[#e6e2da]' : 'divide-white/[0.08]';
 }
 
 function cardTone(light: boolean) {
   return light
-    ? 'border-black/[0.08] bg-[#fbfbfa]'
-    : 'border-white/[0.08] bg-[#101010]';
+    ? 'border-[#e6e2da] bg-white shadow-[0_12px_30px_rgba(17,17,17,0.035)]'
+    : 'border-white/[0.08] bg-[#141414]';
 }
 
 function insetTone(light: boolean) {
   return light
-    ? 'border-black/[0.07] bg-black/[0.025]'
-    : 'border-white/[0.07] bg-white/[0.035]';
+    ? 'border-[#e6e2da] bg-black/[0.015]'
+    : 'border-white/[0.07] bg-white/[0.026]';
 }
 
 function buttonBase(light: boolean, active = false) {
@@ -194,41 +200,43 @@ function accentPillStyle(
 function bookingSurfaceStyle(color: string, light: boolean, active = false): CSSProperties {
   return {
     background: light
-      ? `linear-gradient(135deg, color-mix(in srgb, ${color} 11%, #ffffff), color-mix(in srgb, ${color} 4%, #ffffff))`
-      : `linear-gradient(135deg, color-mix(in srgb, ${color} 20%, #131313), color-mix(in srgb, ${color} 7%, #101010))`,
+      ? `linear-gradient(135deg, color-mix(in srgb, ${color} 13%, #ffffff), color-mix(in srgb, ${color} 5%, #ffffff))`
+      : `linear-gradient(135deg, color-mix(in srgb, ${color} 22%, #141414), color-mix(in srgb, ${color} 8%, #101010))`,
     borderColor: light
-      ? `color-mix(in srgb, ${color} 32%, rgba(0,0,0,0.08))`
-      : `color-mix(in srgb, ${color} 38%, rgba(255,255,255,0.08))`,
+      ? `color-mix(in srgb, ${color} 34%, #e6e2da)`
+      : `color-mix(in srgb, ${color} 40%, rgba(255,255,255,0.08))`,
     boxShadow: active
       ? light
-        ? `0 10px 26px color-mix(in srgb, ${color} 14%, transparent), inset 0 0 0 1px color-mix(in srgb, ${color} 14%, transparent)`
-        : `0 12px 28px color-mix(in srgb, ${color} 16%, transparent), inset 0 0 0 1px color-mix(in srgb, ${color} 18%, transparent)`
-      : undefined,
+        ? `0 10px 26px color-mix(in srgb, ${color} 10%, transparent), inset 0 0 0 1px color-mix(in srgb, ${color} 18%, transparent)`
+        : `0 12px 28px color-mix(in srgb, ${color} 14%, transparent), inset 0 0 0 1px color-mix(in srgb, ${color} 20%, transparent)`
+      : light
+        ? '0 1px 2px rgba(17,17,17,0.025)'
+        : undefined,
   };
 }
 
 function slotStateClass(state: SlotState, light: boolean) {
   if (state === 'busy') {
     return light
-      ? 'border-black/[0.08] bg-white/75'
-      : 'border-white/[0.08] bg-white/[0.035]';
+      ? 'border-[#e6e2da] bg-white/55'
+      : 'border-white/[0.075] bg-white/[0.026]';
   }
 
   if (state === 'free') {
     return light
-      ? 'border-black/[0.06] bg-white/45 hover:bg-white/75'
-      : 'border-white/[0.055] bg-white/[0.018] hover:bg-white/[0.032]';
+      ? 'border-[#e6e2da]/80 bg-black/[0.008] hover:border-[#d8d0c2] hover:bg-white/64'
+      : 'border-white/[0.048] bg-white/[0.012] hover:border-white/[0.08] hover:bg-white/[0.028]';
   }
 
   if (state === 'break') {
     return light
-      ? 'border-dashed border-black/[0.08] bg-black/[0.018]'
-      : 'border-dashed border-white/[0.075] bg-white/[0.018]';
+      ? 'border-dashed border-[#d6b98c]/55 bg-[#f1e8d8]/34'
+      : 'border-dashed border-[#d6b98c]/34 bg-[#d6b98c]/[0.055]';
   }
 
   return light
-    ? 'border-black/[0.04] bg-black/[0.012]'
-    : 'border-white/[0.04] bg-white/[0.01]';
+    ? 'border-[#e6e2da]/60 bg-black/[0.006]'
+    : 'border-white/[0.036] bg-white/[0.008]';
 }
 
 function toLocalIsoDate(date: Date) {
@@ -515,11 +523,11 @@ function getServiceColor(
   );
   if (serviceColor) return serviceColor;
 
-  if (booking.status === 'new') return publicAccentColor;
-  if (booking.status === 'confirmed') return accentColor;
+  if (booking.status === 'cancelled' || booking.status === 'no_show') return CALENDAR_CONFLICT_COLOR;
+  if (booking.status === 'new' || booking.status === 'confirmed') return CALENDAR_BOOKING_COLOR;
 
   const index = hashString(booking.service || booking.id) % AUTO_SERVICE_COLORS.length;
-  return AUTO_SERVICE_COLORS[index] ?? accentColor;
+  return AUTO_SERVICE_COLORS[index] ?? CALENDAR_BOOKING_COLOR;
 }
 
 function getServiceDuration(booking: Booking, services: Map<string, Record<string, unknown>>) {
@@ -739,9 +747,9 @@ function bookingStatusHint(status: BookingStatus, locale: 'ru' | 'en') {
 }
 
 function statusColor(booking: CalendarBooking, light: boolean) {
-  if (booking.status === 'completed') return light ? 'rgba(0,0,0,0.34)' : 'rgba(255,255,255,0.38)';
-  if (booking.status === 'no_show' || booking.status === 'cancelled') return light ? '#B64A4A' : '#FF8585';
-  return booking.color;
+  if (booking.status === 'completed') return light ? 'rgba(17,17,17,0.38)' : 'rgba(255,255,255,0.42)';
+  if (booking.status === 'no_show' || booking.status === 'cancelled') return light ? CALENDAR_CONFLICT_COLOR : '#FB7185';
+  return light ? booking.color : CALENDAR_BOOKING_COLOR_DARK;
 }
 
 function PageAction({
@@ -977,10 +985,10 @@ function MetricTile({
   return (
     <div
       className={cn(
-        'min-w-0 rounded-[10px] border px-3 py-2.5 transition-colors duration-150',
+        'min-w-0 rounded-[10px] border px-3 py-2.5 transition-[background,border-color,transform] duration-150 hover:-translate-y-px',
         light
-          ? 'border-black/[0.07] bg-white hover:bg-black/[0.018]'
-          : 'border-white/[0.07] bg-white/[0.035] hover:bg-white/[0.055]',
+          ? 'border-[#e6e2da] bg-white shadow-[0_8px_20px_rgba(17,17,17,0.025)] hover:border-[#d8d0c2] hover:bg-[#fffdf9]'
+          : 'border-white/[0.07] bg-white/[0.035] hover:border-white/[0.11] hover:bg-white/[0.055]',
       )}
     >
       <div className={cn('truncate text-[10.5px] font-medium', mutedText(light))}>
@@ -1108,7 +1116,7 @@ function SlotCell({
   return (
     <div
       className={cn(
-        'min-h-[46px] rounded-[9px] border px-1.5 py-1.5 transition-colors duration-150',
+        'group/slot min-h-[46px] rounded-[9px] border px-1.5 py-1.5 transition-[background,border-color,box-shadow] duration-150',
         slotStateClass(state, light),
         className,
       )}
@@ -1121,7 +1129,41 @@ function SlotCell({
 function FreeSlotHint({ light, label }: { light: boolean; label: string }) {
   return (
     <div className="flex h-full min-h-[31px] items-center justify-center">
-      <span className={cn('text-[10px] font-medium', faintText(light))}>{label}</span>
+      <span
+        className={cn(
+          'text-[10px] font-medium opacity-45 transition-opacity duration-150 group-hover/slot:opacity-100',
+          faintText(light),
+        )}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function CalendarLegend({ light, locale }: { light: boolean; locale: 'ru' | 'en' }) {
+  const items = locale === 'ru'
+    ? [
+        { label: 'Запись', color: light ? CALENDAR_BOOKING_COLOR : CALENDAR_BOOKING_COLOR_DARK },
+        { label: 'Перерыв', color: CALENDAR_BREAK_COLOR },
+        { label: 'Свободно', color: CALENDAR_FREE_COLOR },
+        { label: 'Конфликт', color: CALENDAR_CONFLICT_COLOR },
+      ]
+    : [
+        { label: 'Booking', color: light ? CALENDAR_BOOKING_COLOR : CALENDAR_BOOKING_COLOR_DARK },
+        { label: 'Break', color: CALENDAR_BREAK_COLOR },
+        { label: 'Free', color: CALENDAR_FREE_COLOR },
+        { label: 'Conflict', color: CALENDAR_CONFLICT_COLOR },
+      ];
+
+  return (
+    <div className="hidden items-center gap-3 sm:flex">
+      {items.map((item) => (
+        <span key={item.label} className={cn('inline-flex items-center gap-1.5 text-[10.5px] font-medium', mutedText(light))}>
+          <span aria-hidden="true" className="size-1.5 rounded-full" style={{ background: item.color }} />
+          {item.label}
+        </span>
+      ))}
     </div>
   );
 }
@@ -1273,8 +1315,8 @@ function WeekPlanner({
                     borderTone(light),
                     isToday
                       ? light
-                        ? 'bg-black/[0.025]'
-                        : 'bg-white/[0.035]'
+                        ? 'bg-[#faf4ea]'
+                        : 'bg-[#181511]'
                       : light
                         ? 'hover:bg-black/[0.018]'
                         : 'hover:bg-white/[0.026]',
@@ -1289,8 +1331,8 @@ function WeekPlanner({
                         'grid size-6 place-items-center rounded-[8px] text-[11px] font-semibold',
                         isToday
                           ? light
-                            ? 'bg-black text-white'
-                            : 'bg-white text-black'
+                            ? 'bg-[#f1e8d8] text-[#111111] ring-1 ring-black/[0.06]'
+                            : 'bg-[#f1e8d8] text-[#111111]'
                           : mutedText(light),
                       )}
                     >
@@ -1338,7 +1380,11 @@ function WeekPlanner({
                       <SlotCell
                         state={state}
                         light={light}
-                        className={cn('min-h-[42px]', isCurrent && 'ring-1 ring-current/20')}
+                        className={cn(
+                          'min-h-[42px]',
+                          plan.iso === todayIso && (light ? 'bg-[#faf4ea]/52' : 'bg-[#181511]'),
+                          isCurrent && 'ring-1 ring-current/20',
+                        )}
                       >
                         {rowBookings.length ? (
                           <div className="grid gap-1">
@@ -1453,8 +1499,8 @@ function MonthPlanner({
                     'grid size-6 place-items-center rounded-[8px] text-[11px] font-semibold',
                     isToday
                       ? light
-                        ? 'bg-black text-white'
-                        : 'bg-white text-black'
+                        ? 'bg-[#f1e8d8] text-[#111111] ring-1 ring-black/[0.06]'
+                        : 'bg-[#f1e8d8] text-[#111111]'
                       : pageText(light),
                   )}
                 >
@@ -1545,7 +1591,7 @@ function BookingDetails({
       <div
         className={cn(
           'relative w-full max-w-[430px] overflow-hidden rounded-[18px] border shadow-[0_24px_90px_rgba(0,0,0,0.32)]',
-          light ? 'border-black/[0.08] bg-[#fbfbfa]' : 'border-white/[0.09] bg-[#101010]',
+          light ? 'border-black/[0.08] bg-[#ffffff]' : 'border-white/[0.09] bg-[#141414]',
         )}
       >
         <div className="p-4">
@@ -2155,6 +2201,7 @@ export default function DashboardTodayPage() {
                 title={copy.calendar}
                 description={view === 'month' ? copy.monthHint : copy.calendarDescription}
                 light={isLight}
+                action={<CalendarLegend light={isLight} locale={locale} />}
               />
 
               <div className="p-3 md:p-4">

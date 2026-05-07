@@ -32,8 +32,8 @@ class MiniBoundary extends Component<{ children: ReactNode }, BoundaryState> {
     if (!this.state.error) return this.props.children;
 
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#090909] px-5 text-white">
-        <div className="w-full max-w-[350px] rounded-[18px] border border-white/[0.10] bg-[#101010] p-5 text-center">
+      <main className="flex min-h-screen items-center justify-center bg-[#080808] px-5 text-white">
+        <div className="w-full max-w-[350px] rounded-[18px] border border-white/[0.10] bg-[#141414] p-5 text-center">
           <BrandLogo />
           <div className="mt-5 text-[22px] font-semibold leading-none tracking-[-0.08em]">
             Mini app поймала ошибку
@@ -122,8 +122,8 @@ export default function AppPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#090909] px-6 text-white">
-      <div className="flex w-full max-w-[320px] flex-col items-center rounded-[22px] border border-white/[0.08] bg-[#101010]/92 px-5 py-6 text-center backdrop-blur-[22px]">
+    <main className="flex min-h-screen items-center justify-center bg-[#080808] px-6 text-white">
+      <div className="flex w-full max-w-[320px] flex-col items-center rounded-[22px] border border-white/[0.08] bg-[#141414]/92 px-5 py-6 text-center backdrop-blur-[22px]">
         <BrandLogo />
         <div className="mt-5 size-9 animate-spin rounded-full border border-white/[0.08] border-t-white/60" />
         <div className="mt-5 text-[15px] font-semibold tracking-[-0.045em]">Открываем кабинет</div>

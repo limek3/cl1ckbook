@@ -15,8 +15,8 @@ export default function AppError({
   }, [error]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#090909] px-5 text-white">
-      <div className="w-full max-w-[350px] rounded-[18px] border border-white/[0.10] bg-[#101010] p-5 text-center">
+    <main className="flex min-h-screen items-center justify-center bg-[#080808] px-5 text-white">
+      <div className="w-full max-w-[350px] rounded-[18px] border border-white/[0.10] bg-[#141414] p-5 text-center">
         <BrandLogo />
         <div className="mt-5 text-[22px] font-semibold leading-none tracking-[-0.08em]">
           Mini app не открылась

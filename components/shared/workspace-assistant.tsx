@@ -92,11 +92,11 @@ type LaunchStep = {
 const CHECKLIST_STORAGE_KEY = 'clickbook:robo-launch-checklist:v3';
 
 function pageText(light: boolean) {
-  return light ? 'text-[#0e0e0e]' : 'text-white';
+  return light ? 'text-[#111111]' : 'text-[#f8f7f4]';
 }
 
 function mutedText(light: boolean) {
-  return light ? 'text-black/48' : 'text-white/42';
+  return light ? 'text-[#6b7280]' : 'text-[#9ca3af]';
 }
 
 function faintText(light: boolean) {
@@ -109,8 +109,8 @@ function borderTone(light: boolean) {
 
 function modalTone(light: boolean) {
   return light
-    ? 'border-black/[0.09] bg-[var(--cb-surface)] text-[#0e0e0e] shadow-[0_34px_90px_rgba(0,0,0,0.18)]'
-    : 'border-white/[0.10] bg-[#101010] text-white shadow-[0_34px_90px_rgba(0,0,0,0.55)]';
+    ? 'border-black/[0.09] bg-[var(--cb-surface)] text-[#111111] shadow-[0_34px_90px_rgba(0,0,0,0.18)]'
+    : 'border-white/[0.10] bg-[#141414] text-white shadow-[0_34px_90px_rgba(0,0,0,0.55)]';
 }
 
 function panelTone(light: boolean) {

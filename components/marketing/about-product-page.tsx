@@ -367,7 +367,7 @@ function Surface({
   return (
     <section
       className={cn(
-        'relative rounded-[22px] border border-[var(--cb-border)] bg-[var(--cb-surface)] text-[#0e0e0e] shadow-none dark:text-white',
+        'relative rounded-[22px] border border-[var(--cb-border)] bg-[var(--cb-surface)] text-[#111111] shadow-none dark:text-white',
         className,
       )}
     >
@@ -941,7 +941,7 @@ export default function AboutProductPage() {
   const totalSheets = 7;
 
   return (
-    <div className="min-h-screen bg-[var(--cb-shell-bg)] text-[#0e0e0e] dark:text-white">
+    <div className="min-h-screen bg-[var(--cb-shell-bg)] text-[#111111] dark:text-white">
       <SiteHeader />
 
       <SheetNavigation items={t.nav} />

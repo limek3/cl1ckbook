@@ -83,8 +83,8 @@ export const accentPalette: Record<AccentTone, AccentPaletteMeta> = {
   teal: {
     hue: '173',
     sat: '80%',
-    solid: '#14b8a6',
-    soft: 'rgba(20, 184, 166, 0.14)',
+    solid: '#0f766e',
+    soft: 'rgba(15, 118, 110, 0.14)',
     gradient: 'linear-gradient(135deg, #14b8a6, #0f766e)',
   },
   cobalt: {

@@ -253,7 +253,7 @@ export function AppearanceScreen({ back }: { back: () => void }) {
     show('Внешний вид сохранён', 'success');
   }
 
-  const accent = accentPalette[accentTone] ?? accentPalette.cobalt;
+  const accent = accentPalette[accentTone] ?? accentPalette.teal;
   const previewRadius = radius === 'tight' ? 10 : radius === 'soft' ? 22 : 16;
   const previewShadow = cardStyle === 'flat' ? 'none' : cardStyle === 'glass' ? '0 14px 34px rgba(0,0,0,0.18)' : T.cardShadow;
 

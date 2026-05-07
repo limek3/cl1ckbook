@@ -33,7 +33,7 @@ export function DashboardHeader({
           </div>
         ) : null}
 
-        <h1 className="text-[31px] font-semibold tracking-[-0.075em] text-[#0e0e0e] dark:text-white md:text-[42px]">
+        <h1 className="text-[31px] font-semibold tracking-[-0.075em] text-[#111111] dark:text-white md:text-[42px]">
           {title}
         </h1>
 
@@ -71,7 +71,7 @@ export function MetricCard({
           <div className="text-[11px] font-medium text-black/48 dark:text-white/42">{label}</div>
           <div
             className={cn(
-              'mt-2 truncate text-[25px] font-semibold tracking-[-0.06em] text-[#0e0e0e] dark:text-white',
+              'mt-2 truncate text-[25px] font-semibold tracking-[-0.06em] text-[#111111] dark:text-white',
               compactValue && 'text-[21px]',
             )}
           >
@@ -118,7 +118,7 @@ export function SectionCard({
             <Sparkles className="size-4" />
           </span>
           <div className="min-w-0">
-            <h2 className="text-[13px] font-semibold tracking-[-0.018em] text-[#0e0e0e] dark:text-white">{title}</h2>
+            <h2 className="text-[13px] font-semibold tracking-[-0.018em] text-[#111111] dark:text-white">{title}</h2>
             {description ? (
               <p className="mt-1 max-w-[720px] text-[11px] leading-4 text-black/48 dark:text-white/42">
                 {description}
@@ -129,7 +129,7 @@ export function SectionCard({
         {actions ? <div className="shrink-0">{actions}</div> : null}
       </div>
 
-      <div className="overflow-hidden rounded-[11px] border border-black/[0.08] bg-[#fbfbfa] shadow-none dark:border-white/[0.08] dark:bg-[#101010]">
+      <div className="overflow-hidden rounded-[11px] border border-black/[0.08] bg-[#ffffff] shadow-none dark:border-white/[0.08] dark:bg-[#141414]">
         <div className={cn('p-4', bodyClassName)}>{children}</div>
       </div>
     </section>
@@ -216,7 +216,7 @@ export function PublicPageHero({
                 {labels.connected}
               </Badge>
             </div>
-            <div className="mt-1 truncate text-[15px] font-semibold tracking-[-0.03em] text-[#0e0e0e] dark:text-white">
+            <div className="mt-1 truncate text-[15px] font-semibold tracking-[-0.03em] text-[#111111] dark:text-white">
               {profile.name}
             </div>
             <div className="truncate text-[11px] font-medium text-black/48 dark:text-white/42">
@@ -239,7 +239,7 @@ export function PublicPageHero({
           ].map((item) => (
             <div key={item.label} className="rounded-[14px] border border-border/80 bg-card/72 px-2.5 py-2">
               <div className="truncate text-[9.5px] uppercase tracking-[0.14em] text-black/48 dark:text-white/42">{item.label}</div>
-              <div className="mt-1 truncate text-[11px] font-medium text-[#0e0e0e] dark:text-white">{item.value}</div>
+              <div className="mt-1 truncate text-[11px] font-medium text-[#111111] dark:text-white">{item.value}</div>
             </div>
           ))}
         </div>
@@ -285,7 +285,7 @@ export function PublicPageHero({
           </Badge>
 
           <div>
-            <h2 className="text-[20px] font-semibold tracking-[-0.04em] text-[#0e0e0e] dark:text-white md:text-[30px]">{labels.title}</h2>
+            <h2 className="text-[20px] font-semibold tracking-[-0.04em] text-[#111111] dark:text-white md:text-[30px]">{labels.title}</h2>
             <p className="mt-2 max-w-[720px] text-[12px] leading-6 text-black/48 dark:text-white/42 md:mt-3 md:text-[14px] md:leading-7">
               {labels.description}
             </p>
@@ -299,7 +299,7 @@ export function PublicPageHero({
             ].map((item) => (
               <div key={item.label} className="rounded-[14px] border border-border bg-card/70 px-3 py-2.5 backdrop-blur">
                 <div className="text-[10px] text-black/48 dark:text-white/42 md:text-[11px]">{item.label}</div>
-                <div className="mt-1 truncate text-[12px] font-medium text-[#0e0e0e] dark:text-white md:text-[13px]">{item.value}</div>
+                <div className="mt-1 truncate text-[12px] font-medium text-[#111111] dark:text-white md:text-[13px]">{item.value}</div>
               </div>
             ))}
           </div>
@@ -307,7 +307,7 @@ export function PublicPageHero({
           <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
             <div className="workspace-soft-panel flex min-h-10 items-center gap-2.5 px-3 py-2.5">
               <Link2 className="size-4 text-black/48 dark:text-white/42" />
-              <span className="truncate text-[12px] text-[#0e0e0e] dark:text-white md:text-[13px]">{publicUrl}</span>
+              <span className="truncate text-[12px] text-[#111111] dark:text-white md:text-[13px]">{publicUrl}</span>
             </div>
             <Button type="button" variant="outline" size="sm" onClick={() => copyValue(publicUrl, 'link')}>
               <Copy className="size-4" />
@@ -329,7 +329,7 @@ export function PublicPageHero({
             <MasterAvatar name={profile.name} avatar={profile.avatar} className="h-14 w-14 rounded-[16px] md:h-16 md:w-16 md:rounded-[18px]" />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <div className="truncate text-[15px] font-semibold text-[#0e0e0e] dark:text-white md:text-[17px]">{profile.name}</div>
+                <div className="truncate text-[15px] font-semibold text-[#111111] dark:text-white md:text-[17px]">{profile.name}</div>
                 <Badge variant="outline">
                   <Globe2 className="size-3.5" />
                   {labels.connected}

@@ -582,7 +582,7 @@ function MiniCard({
   return (
     <section
       className={cn(
-        'rounded-[20px] border border-white/[0.08] bg-[#101010]/92 shadow-none backdrop-blur-[18px]',
+        'rounded-[20px] border border-white/[0.08] bg-[#141414]/92 shadow-none backdrop-blur-[18px]',
         className,
       )}
     >
@@ -752,8 +752,8 @@ function EmptyState({
 
 function MiniLoading() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#090909] px-6 text-white">
-      <div className="flex w-full max-w-[310px] flex-col items-center rounded-[22px] border border-white/[0.08] bg-[#101010]/92 px-5 py-6 text-center">
+    <main className="flex min-h-screen items-center justify-center bg-[#080808] px-6 text-white">
+      <div className="flex w-full max-w-[310px] flex-col items-center rounded-[22px] border border-white/[0.08] bg-[#141414]/92 px-5 py-6 text-center">
         <BrandLogo />
 
         <div className="mt-5 size-8 animate-spin rounded-full border border-white/[0.08] border-t-white/60" />
@@ -1005,7 +1005,7 @@ function MiniOnboarding({
     <main
       data-mini-theme="dark"
       data-mini-mode="dark"
-      className="cb-mini-app-root min-h-screen bg-[#090909] px-3 text-white"
+      className="cb-mini-app-root min-h-screen bg-[#080808] px-3 text-white"
       style={{
         paddingTop: 'calc(var(--tg-safe-top, 0px) + 10px)',
         paddingBottom: 'calc(var(--tg-safe-bottom, 0px) + 24px)',
@@ -3090,7 +3090,7 @@ function BookingSheet({
 
   return (
     <div className="fixed inset-0 z-[80] flex items-end bg-black/55 px-3 pb-[calc(var(--tg-safe-bottom,0px)+10px)] backdrop-blur-[8px]">
-      <div className="mx-auto w-full max-w-[430px] overflow-hidden rounded-[26px] border border-white/[0.10] bg-[#101010] shadow-[0_28px_90px_rgba(0,0,0,0.72)]">
+      <div className="mx-auto w-full max-w-[430px] overflow-hidden rounded-[26px] border border-white/[0.10] bg-[#141414] shadow-[0_28px_90px_rgba(0,0,0,0.72)]">
         <div className="flex items-start justify-between gap-4 border-b border-white/[0.08] p-4">
           <div>
             <MiniLabel>запись</MiniLabel>

@@ -77,15 +77,15 @@ type PublicProfilePayload = {
 };
 
 function pageBg(light: boolean) {
-  return light ? 'bg-[#f4f4f2]' : 'bg-[#090909]';
+  return light ? 'bg-[#f7f6f2]' : 'bg-[#080808]';
 }
 
 function pageText(light: boolean) {
-  return light ? 'text-[#0e0e0e]' : 'text-white';
+  return light ? 'text-[#111111]' : 'text-[#f8f7f4]';
 }
 
 function mutedText(light: boolean) {
-  return light ? 'text-black/48' : 'text-white/42';
+  return light ? 'text-[#6b7280]' : 'text-[#9ca3af]';
 }
 
 function faintText(light: boolean) {
@@ -93,19 +93,19 @@ function faintText(light: boolean) {
 }
 
 function borderTone(light: boolean) {
-  return light ? 'border-black/[0.08]' : 'border-white/[0.08]';
+  return light ? 'border-[#e6e2da]' : 'border-white/[0.08]';
 }
 
 function cardTone(light: boolean) {
   return light
-    ? 'border-black/[0.08] bg-[#fbfbfa]'
-    : 'border-white/[0.08] bg-[#101010]';
+    ? 'border-[#e6e2da] bg-white shadow-[0_12px_30px_rgba(17,17,17,0.035)]'
+    : 'border-white/[0.08] bg-[#141414]';
 }
 
 function insetTone(light: boolean) {
   return light
-    ? 'border-black/[0.07] bg-black/[0.025]'
-    : 'border-white/[0.07] bg-white/[0.035]';
+    ? 'border-[#e6e2da] bg-black/[0.015]'
+    : 'border-white/[0.07] bg-white/[0.026]';
 }
 
 function softBg(light: boolean) {
@@ -202,7 +202,7 @@ function PublicPageGlobalStyles({ light }: { light: boolean }) {
       .cb-public-master-page[data-public-button='contrast'] .cb-public-primary-action {
         border-color: ${light ? 'rgba(0,0,0,0.24)' : 'rgba(255,255,255,0.26)'} !important;
         background: ${light ? '#111111' : '#f4f0e7'} !important;
-        color: ${light ? '#ffffff' : '#090909'} !important;
+        color: ${light ? '#ffffff' : '#080808'} !important;
       }
 
       .cb-public-master-page[data-public-surface='glass'] [class*='rounded-[11px]'][class*='border'],
@@ -2256,7 +2256,7 @@ export function PublicMasterPage({
           className={cn(
             'fixed inset-x-0 bottom-0 z-30 border-t px-3 py-2.5 backdrop-blur-xl xl:hidden',
             borderTone(isLight),
-            isLight ? 'bg-[#f4f4f2]/92' : 'bg-[#090909]/92',
+            isLight ? 'bg-[#f7f6f2]/92' : 'bg-[#080808]/92',
           )}
         >
           <div className="mx-auto flex max-w-[390px] items-center gap-2">
@@ -2314,8 +2314,8 @@ export function PublicMasterPage({
             'transition-[opacity,transform] duration-300 ease-out',
             'sm:max-w-[560px]',
             isLight
-              ? 'border-black/[0.08] bg-[#f4f4f2]/94 text-black backdrop-blur-2xl'
-              : 'border-white/[0.08] bg-[#090909]/94 text-white backdrop-blur-2xl',
+              ? 'border-black/[0.08] bg-[#f7f6f2]/94 text-black backdrop-blur-2xl'
+              : 'border-white/[0.08] bg-[#080808]/94 text-white backdrop-blur-2xl',
             bookingOpen ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0',
           )}
         >
@@ -2323,7 +2323,7 @@ export function PublicMasterPage({
             className={cn(
               'shrink-0 border-b px-4 pb-4 pt-[calc(env(safe-area-inset-top,0px)+16px)] md:px-5',
               borderTone(isLight),
-              isLight ? 'bg-[#f4f4f2]/88' : 'bg-[#090909]/88',
+              isLight ? 'bg-[#f7f6f2]/88' : 'bg-[#080808]/88',
             )}
           >
             <div className="flex items-start justify-between gap-4">
@@ -2412,8 +2412,8 @@ export function PublicMasterPage({
               className={cn(
                 'rounded-[13px] border p-3 shadow-[0_18px_60px_rgba(0,0,0,0.08)]',
                 isLight
-                  ? 'border-black/[0.08] bg-[#fbfbfa]/86 backdrop-blur-xl'
-                  : 'border-white/[0.08] bg-[#101010]/82 backdrop-blur-xl',
+                  ? 'border-black/[0.08] bg-[#ffffff]/86 backdrop-blur-xl'
+                  : 'border-white/[0.08] bg-[#141414]/82 backdrop-blur-xl',
               )}
             >
               <BookingForm
@@ -2437,8 +2437,8 @@ export function PublicMasterPage({
             'w-[calc(100vw-32px)] !max-w-[760px] overflow-hidden rounded-[14px] border p-0 shadow-[0_24px_90px_rgba(0,0,0,0.22)]',
             '[&>button]:right-5 [&>button]:top-5 [&>button]:z-30',
             isLight
-              ? 'border-black/[0.08] bg-[#f4f4f2]'
-              : 'border-white/[0.08] bg-[#090909]',
+              ? 'border-black/[0.08] bg-[#f7f6f2]'
+              : 'border-white/[0.08] bg-[#080808]',
           )}
         >
           {selectedWork ? (
@@ -2446,7 +2446,7 @@ export function PublicMasterPage({
               <div
                 className={cn(
                   'aspect-[4/5] w-full overflow-hidden sm:aspect-[16/10]',
-                  isLight ? 'bg-white' : 'bg-[#101010]',
+                  isLight ? 'bg-white' : 'bg-[#141414]',
                 )}
               >
                 <img

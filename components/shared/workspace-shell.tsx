@@ -276,7 +276,7 @@ function ModePanel({
         {locale === 'ru' ? 'Режимы' : 'Modes'}
       </div>
 
-      <div className="grid grid-cols-2 gap-1 rounded-[13px] border border-black/[0.07] bg-[#fbfbfa] p-1 shadow-[0_8px_24px_rgba(15,23,42,0.035)] dark:border-white/[0.075] dark:bg-[#101010] dark:shadow-none">
+      <div className="grid grid-cols-2 gap-1 rounded-[13px] border border-black/[0.07] bg-[#ffffff] p-1 shadow-[0_8px_24px_rgba(15,23,42,0.035)] dark:border-white/[0.075] dark:bg-[#141414] dark:shadow-none">
         {options.map((option) => {
           const active = selectedMode === option.value;
           const Icon = option.icon;
@@ -604,7 +604,7 @@ function WorkspaceIdentityAvatar({
           ? 'size-9 rounded-[11px] text-[12px]'
           : 'size-8 rounded-[10px] text-[11px]',
         'border-black/[0.08] bg-[var(--cb-surface)] text-black/72',
-        'dark:border-white/[0.09] dark:bg-[#101010] dark:text-white/78',
+        'dark:border-white/[0.09] dark:bg-[#141414] dark:text-white/78',
       )}
     >
       {identity.avatar ? (
@@ -1089,8 +1089,8 @@ function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
       <div
         className={cn(
           'absolute bottom-[calc(100%+10px)] left-0 z-50 w-[292px] origin-bottom-left overflow-hidden rounded-[15px] border p-1 backdrop-blur-[24px] transition duration-150',
-          'border-black/[0.09] bg-[#fbfbfa]/88 text-black shadow-[0_24px_80px_rgba(15,15,15,0.12)]',
-          'dark:border-white/[0.10] dark:bg-[#101010]/88 dark:text-white dark:shadow-[0_28px_90px_rgba(0,0,0,0.58)]',
+          'border-black/[0.09] bg-[#ffffff]/88 text-black shadow-[0_24px_80px_rgba(15,15,15,0.12)]',
+          'dark:border-white/[0.10] dark:bg-[#141414]/88 dark:text-white dark:shadow-[0_28px_90px_rgba(0,0,0,0.58)]',
           open
             ? 'pointer-events-auto translate-y-0 scale-100 opacity-100'
             : 'pointer-events-none translate-y-1.5 scale-[0.985] opacity-0',
@@ -1537,7 +1537,7 @@ function AccountFooterMenu({ locale }: { locale: 'ru' | 'en' }) {
             className="absolute right-2 top-2 size-1.5 rounded-full bg-black/55 dark:bg-white/70"
           />
 
-          <span className="pointer-events-none absolute bottom-[calc(100%+9px)] right-0 hidden w-[158px] rounded-[12px] border border-black/[0.08] bg-[#fbfbfa]/90 px-3 py-2 text-left text-[10px] text-black/44 backdrop-blur-[22px] shadow-[0_18px_54px_rgba(15,15,15,0.12)] group-hover:block dark:border-white/[0.10] dark:bg-[#101010]/90 dark:text-white/36 dark:shadow-[0_24px_70px_rgba(0,0,0,0.50)]">
+          <span className="pointer-events-none absolute bottom-[calc(100%+9px)] right-0 hidden w-[158px] rounded-[12px] border border-black/[0.08] bg-[#ffffff]/90 px-3 py-2 text-left text-[10px] text-black/44 backdrop-blur-[22px] shadow-[0_18px_54px_rgba(15,15,15,0.12)] group-hover:block dark:border-white/[0.10] dark:bg-[#141414]/90 dark:text-white/36 dark:shadow-[0_24px_70px_rgba(0,0,0,0.50)]">
             <span className="block text-[11.5px] font-semibold text-black dark:text-white">
               {labels.robo}
             </span>
@@ -1779,7 +1779,7 @@ function MobileSheet({
 
       <aside
         className={cn(
-          'absolute inset-y-0 left-0 w-[min(92vw,356px)] border-r border-black/[0.08] bg-[#f4f4f2] shadow-[0_24px_70px_rgba(15,23,42,0.22)] transition-transform duration-200 dark:border-white/[0.08] dark:bg-[#090909] dark:shadow-[0_28px_80px_rgba(0,0,0,0.55)]',
+          'absolute inset-y-0 left-0 w-[min(92vw,356px)] border-r border-black/[0.08] bg-[#f7f6f2] shadow-[0_24px_70px_rgba(15,23,42,0.22)] transition-transform duration-200 dark:border-white/[0.08] dark:bg-[#080808] dark:shadow-[0_28px_80px_rgba(0,0,0,0.55)]',
           open ? 'translate-x-0' : '-translate-x-full',
         )}
       >
@@ -2344,13 +2344,13 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
 
   return (
     <div
-      className="min-h-screen bg-[#f4f4f2] text-slate-950 dark:bg-[#090909] dark:text-white"
+      className="min-h-screen bg-[#f7f6f2] text-slate-950 dark:bg-[#080808] dark:text-white"
       style={{ '--sidebar-width': `${SIDEBAR_WIDTH}px` } as CSSProperties}
     >
       <style dangerouslySetInnerHTML={{ __html: SHIMMER_CSS }} />
 
       <aside
-        className="cb-workspace-sidebar fixed inset-y-0 left-0 z-40 hidden border-r border-black/[0.07] bg-[#f4f4f2] dark:border-white/[0.07] dark:bg-[#090909] xl:block"
+        className="cb-workspace-sidebar fixed inset-y-0 left-0 z-40 hidden border-r border-black/[0.07] bg-[#f7f6f2] dark:border-white/[0.07] dark:bg-[#080808] xl:block"
         style={{ width: SIDEBAR_WIDTH }}
       >
         <SidebarContent {...sidebarProps} />
@@ -2373,7 +2373,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
         )}
         data-workspace-route={getPathOnly(pathname)}
       >
-        <div className="cb-workspace-mobile-topbar sticky top-0 z-30 border-b border-black/[0.07] bg-[#f4f4f2]/92 backdrop-blur-xl dark:border-white/[0.07] dark:bg-[#090909]/92 xl:hidden">
+        <div className="cb-workspace-mobile-topbar sticky top-0 z-30 border-b border-black/[0.07] bg-[#f7f6f2]/92 backdrop-blur-xl dark:border-white/[0.07] dark:bg-[#080808]/92 xl:hidden">
           <div className="flex h-[54px] items-center justify-between gap-2 px-2.5 pt-[env(safe-area-inset-top,0px)]">
             <div className="flex min-w-0 items-center gap-2">
               <Button
@@ -2393,7 +2393,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
                 scroll={false}
                 className="flex min-w-0 items-center gap-2"
               >
-                <span className="flex h-8 w-[82px] shrink-0 items-center justify-center rounded-[10px] border border-black/[0.08] bg-[#fbfbfa] px-2 dark:border-white/[0.08] dark:bg-[#101010]">
+                <span className="flex h-8 w-[82px] shrink-0 items-center justify-center rounded-[10px] border border-black/[0.08] bg-[#ffffff] px-2 dark:border-white/[0.08] dark:bg-[#141414]">
                   <BrandLogo className="w-[82px]" />
                 </span>
 
@@ -2413,14 +2413,14 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
               type="button"
               onClick={() => setEventPanelOpen((value) => !value)}
               className={cn(
-                'relative flex size-8 shrink-0 items-center justify-center overflow-visible rounded-[10px] border border-black/[0.08] bg-[var(--cb-surface)] text-slate-500 transition hover:text-slate-950 dark:border-white/[0.08] dark:bg-[#101010] dark:text-white/40 dark:hover:text-white',
+                'relative flex size-8 shrink-0 items-center justify-center overflow-visible rounded-[10px] border border-black/[0.08] bg-[var(--cb-surface)] text-slate-500 transition hover:text-slate-950 dark:border-white/[0.08] dark:bg-[#141414] dark:text-white/40 dark:hover:text-white',
                 eventPanelOpen && 'cb-neutral-primary',
               )}
               aria-label={locale === 'ru' ? 'События' : 'Events'}
             >
               <Bell className="size-3.5" />
               {workspaceUnreadEvents > 0 && (
-                <span className="absolute -right-2.5 -top-2.5 z-20 flex h-5 min-w-[22px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold leading-none text-white ring-2 ring-[#f4f4f2] dark:ring-[#090909]">
+                <span className="absolute -right-2.5 -top-2.5 z-20 flex h-5 min-w-[22px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold leading-none text-white ring-2 ring-[#f7f6f2] dark:ring-[#080808]">
                   {workspaceUnreadEvents > 99 ? '99+' : workspaceUnreadEvents}
                 </span>
               )}
@@ -2435,7 +2435,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
                 'flex size-8 shrink-0 items-center justify-center rounded-[10px] transition',
                 publicPageItem.forceActive
                   ? 'cb-neutral-primary'
-                  : 'border border-black/[0.08] bg-[var(--cb-surface)] text-slate-500 hover:text-slate-950 dark:border-white/[0.08] dark:bg-[#101010] dark:text-white/40 dark:hover:text-white',
+                  : 'border border-black/[0.08] bg-[var(--cb-surface)] text-slate-500 hover:text-slate-950 dark:border-white/[0.08] dark:bg-[#141414] dark:text-white/40 dark:hover:text-white',
               )}
             >
               <Globe2 className="size-3.5" />
@@ -2448,14 +2448,14 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
             type="button"
             onClick={() => setEventPanelOpen((value) => !value)}
             className={cn(
-              'relative flex h-10 w-10 items-center justify-center overflow-visible rounded-[14px] border border-black/[0.08] bg-[var(--cb-surface)] text-muted-foreground shadow-sm transition hover:text-foreground dark:border-white/[0.08] dark:bg-[#101010]',
+              'relative flex h-10 w-10 items-center justify-center overflow-visible rounded-[14px] border border-black/[0.08] bg-[var(--cb-surface)] text-muted-foreground shadow-sm transition hover:text-foreground dark:border-white/[0.08] dark:bg-[#141414]',
               eventPanelOpen && 'cb-neutral-primary',
             )}
             aria-label={locale === 'ru' ? 'События' : 'Events'}
           >
             <Bell className="size-4" />
             {workspaceUnreadEvents > 0 && (
-              <span className="absolute -right-2.5 -top-2.5 z-20 flex h-5 min-w-[22px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold leading-none text-white ring-2 ring-[#f4f4f2] dark:ring-[#090909]">
+              <span className="absolute -right-2.5 -top-2.5 z-20 flex h-5 min-w-[22px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold leading-none text-white ring-2 ring-[#f7f6f2] dark:ring-[#080808]">
                 {workspaceUnreadEvents > 99 ? '99+' : workspaceUnreadEvents}
               </span>
             )}
@@ -2475,10 +2475,10 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
       </main>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-black/[0.07] bg-[#f4f4f2]/94 px-2 pb-[calc(env(safe-area-inset-bottom,0px)+8px)] pt-2 backdrop-blur-xl dark:border-white/[0.07] dark:bg-[#090909]/94 xl:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-black/[0.07] bg-[#f7f6f2]/94 px-2 pb-[calc(env(safe-area-inset-bottom,0px)+8px)] pt-2 backdrop-blur-xl dark:border-white/[0.07] dark:bg-[#080808]/94 xl:hidden"
         aria-label={labels.product}
       >
-        <div className="mx-auto grid max-w-[430px] grid-cols-5 gap-1 rounded-[20px] border border-black/[0.07] bg-[#fbfbfa]/82 p-1 dark:border-white/[0.08] dark:bg-[#101010]/86">
+        <div className="mx-auto grid max-w-[430px] grid-cols-5 gap-1 rounded-[20px] border border-black/[0.07] bg-[#ffffff]/82 p-1 dark:border-white/[0.08] dark:bg-[#141414]/86">
           {mobilePrimaryItems.map((item) => (
             <MobileBottomItem
               key={item.href}
@@ -2539,7 +2539,7 @@ function WorkspaceEventsPanel({
         onClick={onClose}
       />
       <div className="fixed inset-x-3 top-[64px] z-[60] mx-auto max-w-[420px] xl:inset-x-auto xl:right-4 xl:top-[64px] xl:w-[380px]">
-        <div className="overflow-hidden rounded-[24px] border border-black/[0.08] bg-[#fbfbfa]/96 shadow-2xl shadow-black/10 backdrop-blur-xl dark:border-white/[0.09] dark:bg-[#101010]/96 dark:shadow-black/40">
+        <div className="overflow-hidden rounded-[24px] border border-black/[0.08] bg-[#ffffff]/96 shadow-2xl shadow-black/10 backdrop-blur-xl dark:border-white/[0.09] dark:bg-[#141414]/96 dark:shadow-black/40">
         <div className="flex items-start justify-between gap-3 border-b border-black/[0.06] px-4 py-3 dark:border-white/[0.07]">
           <div className="min-w-0">
             <div className="text-[15px] font-semibold tracking-[-0.03em]">{title}</div>

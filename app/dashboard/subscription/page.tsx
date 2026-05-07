@@ -71,15 +71,15 @@ type PlanVisual = {
 };
 
 function pageBg(light: boolean) {
-  return light ? 'bg-[#f4f4f2]' : 'bg-[#090909]';
+  return light ? 'bg-[#f7f6f2]' : 'bg-[#080808]';
 }
 
 function pageText(light: boolean) {
-  return light ? 'text-[#0e0e0e]' : 'text-white';
+  return light ? 'text-[#111111]' : 'text-[#f8f7f4]';
 }
 
 function mutedText(light: boolean) {
-  return light ? 'text-black/48' : 'text-white/42';
+  return light ? 'text-[#6b7280]' : 'text-[#9ca3af]';
 }
 
 function faintText(light: boolean) {
@@ -87,23 +87,23 @@ function faintText(light: boolean) {
 }
 
 function borderTone(light: boolean) {
-  return light ? 'border-black/[0.08]' : 'border-white/[0.08]';
+  return light ? 'border-[#e6e2da]' : 'border-white/[0.08]';
 }
 
 function divideTone(light: boolean) {
-  return light ? 'divide-black/[0.08]' : 'divide-white/[0.08]';
+  return light ? 'divide-[#e6e2da]' : 'divide-white/[0.08]';
 }
 
 function cardTone(light: boolean) {
   return light
-    ? 'border-black/[0.08] bg-[#fbfbfa]'
-    : 'border-white/[0.08] bg-[#101010]';
+    ? 'border-[#e6e2da] bg-white shadow-[0_12px_30px_rgba(17,17,17,0.035)]'
+    : 'border-white/[0.08] bg-[#141414]';
 }
 
 function insetTone(light: boolean) {
   return light
-    ? 'border-black/[0.07] bg-black/[0.025]'
-    : 'border-white/[0.07] bg-white/[0.035]';
+    ? 'border-[#e6e2da] bg-black/[0.015]'
+    : 'border-white/[0.07] bg-white/[0.026]';
 }
 
 function buttonBase(light: boolean, active = false) {
@@ -928,7 +928,7 @@ function ReceiptRow({
       <div
         className={cn(
           'min-w-[86px] rounded-[8px] px-2 py-1 text-center text-[12px] font-semibold',
-          light ? 'bg-black/[0.025] text-[#0e0e0e]' : 'bg-white/[0.035] text-white',
+          light ? 'bg-black/[0.025] text-[#111111]' : 'bg-white/[0.035] text-white',
         )}
       >
         {value}
@@ -973,8 +973,8 @@ function FeatureRow({
         className={cn(
           'mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-[8px] border',
           light
-            ? 'border-black/[0.08] bg-[#fbfbfa]'
-            : 'border-white/[0.08] bg-[#101010]',
+            ? 'border-black/[0.08] bg-[#ffffff]'
+            : 'border-white/[0.08] bg-[#141414]',
         )}
       >
         <Check className={cn('size-3.5', pageText(light))} />
@@ -1151,7 +1151,7 @@ function PaymentManageDialog({
         <div
           className={cn(
             'max-w-[190px] truncate rounded-[8px] px-2.5 py-1 text-right text-[12px] font-semibold',
-            light ? 'bg-black/[0.025] text-[#0e0e0e]' : 'bg-white/[0.04] text-white',
+            light ? 'bg-black/[0.025] text-[#111111]' : 'bg-white/[0.04] text-white',
           )}
         >
           {value}
@@ -1201,8 +1201,8 @@ function PaymentManageDialog({
         className={cn(
           'relative w-full max-w-[620px] overflow-hidden rounded-[18px] border',
           light
-            ? 'border-black/[0.09] bg-[var(--cb-surface)] text-[#0e0e0e] shadow-[0_34px_90px_rgba(0,0,0,0.18)]'
-            : 'border-white/[0.10] bg-[#101010] text-white shadow-[0_34px_90px_rgba(0,0,0,0.55)]',
+            ? 'border-black/[0.09] bg-[var(--cb-surface)] text-[#111111] shadow-[0_34px_90px_rgba(0,0,0,0.18)]'
+            : 'border-white/[0.10] bg-[#141414] text-white shadow-[0_34px_90px_rgba(0,0,0,0.55)]',
         )}
       >
         <div

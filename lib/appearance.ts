@@ -143,7 +143,7 @@ export const defaultLayoutConstructor: LayoutConstructorSettings = {
 };
 
 export const defaultAppearanceSettings: AppearanceSettings = {
-  accentTone: 'cobalt',
+  accentTone: 'teal',
   neutralTone: 'zinc',
   density: 'standard',
   radius: 'medium',
@@ -152,7 +152,7 @@ export const defaultAppearanceSettings: AppearanceSettings = {
   dashboardSurface: 'calm',
   dashboardControlStyle: 'capsule',
   publicCover: 'gradient',
-  publicAccent: 'cobalt',
+  publicAccent: 'teal',
   publicButtonStyle: 'pill',
   publicCardStyle: 'soft',
   publicServicesStyle: 'grid',
@@ -307,7 +307,7 @@ export function normalizeAppearanceSettings(value?: Partial<AppearanceSettings> 
 }
 
 export function applyAppearanceToElement(element: HTMLElement, settings: AppearanceSettings) {
-  const accent = accentPalette[settings.accentTone] ?? accentPalette.cobalt;
+  const accent = accentPalette[settings.accentTone] ?? accentPalette.teal;
   const publicAccent = accentPalette[settings.publicAccent] ?? accent;
 
   element.style.setProperty('--accent-hue', accent.hue);
@@ -362,7 +362,7 @@ export function buildAppearancePreferenceScript() {
       const raw = window.localStorage.getItem(${key});
       const parsed = raw ? JSON.parse(raw) : fallback;
       const settings = { ...fallback, ...parsed };
-      const accent = palette[settings.accentTone] || palette.cobalt;
+      const accent = palette[settings.accentTone] || palette.teal;
       const publicAccent = palette[settings.publicAccent] || accent;
       const root = document.documentElement;
       root.style.setProperty('--accent-hue', accent.hue);
@@ -404,7 +404,7 @@ export function buildAppearancePreferenceScript() {
       root.dataset.slotyMobileScale = settings.mobileFontScale || 'compact';
     } catch (error) {
       const root = document.documentElement;
-      root.dataset.slotyAccent = 'cobalt';
+      root.dataset.slotyAccent = 'teal';
       root.dataset.slotyNeutral = 'zinc';
       root.dataset.slotyDensity = 'standard';
       root.dataset.slotyRadius = 'medium';
@@ -413,7 +413,7 @@ export function buildAppearancePreferenceScript() {
       root.dataset.slotyDashboardSurface = 'calm';
       root.dataset.slotyDashboardControl = 'capsule';
       root.dataset.slotyPublicCover = 'gradient';
-      root.dataset.slotyPublicAccent = 'cobalt';
+      root.dataset.slotyPublicAccent = 'teal';
       root.dataset.slotyPublicButton = 'pill';
       root.dataset.slotyPublicCard = 'soft';
       root.dataset.slotyPublicServices = 'grid';

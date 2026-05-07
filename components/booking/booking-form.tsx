@@ -66,11 +66,11 @@ function createInitialValues(service = ''): BookingFormValues {
 }
 
 function pageText(light: boolean) {
-  return light ? 'text-[#0e0e0e]' : 'text-white';
+  return light ? 'text-[#111111]' : 'text-[#f8f7f4]';
 }
 
 function mutedText(light: boolean) {
-  return light ? 'text-black/48' : 'text-white/42';
+  return light ? 'text-[#6b7280]' : 'text-[#9ca3af]';
 }
 
 function faintText(light: boolean) {
@@ -87,8 +87,8 @@ function divideTone(light: boolean) {
 
 function cardTone(light: boolean) {
   return light
-    ? 'border-black/[0.08] bg-[#fbfbfa]'
-    : 'border-white/[0.08] bg-[#101010]';
+    ? 'border-black/[0.08] bg-[#ffffff]'
+    : 'border-white/[0.08] bg-[#141414]';
 }
 
 function insetTone(light: boolean) {
@@ -430,7 +430,7 @@ function ServiceDropdown({
           glassSelectTriggerClass(light),
           open &&
             (light
-              ? 'border-black/[0.16] bg-[#fbfbfa] shadow-[0_14px_44px_rgba(15,15,15,0.08)]'
+              ? 'border-black/[0.16] bg-[#ffffff] shadow-[0_14px_44px_rgba(15,15,15,0.08)]'
               : 'border-white/[0.18] bg-[#343432]/94 shadow-[0_18px_56px_rgba(0,0,0,0.56)]'),
         )}
         style={
@@ -767,7 +767,7 @@ function ManualTelegramCodeBox({
         'mt-3 rounded-[12px] border p-3',
         light
           ? 'border-black/[0.08] bg-white/72'
-          : 'border-white/[0.08] bg-[#101010]/72',
+          : 'border-white/[0.08] bg-[#141414]/72',
       )}
     >
       <div className={cn('text-[12px] font-semibold', pageText(light))}>

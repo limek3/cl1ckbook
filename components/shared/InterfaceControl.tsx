@@ -249,7 +249,7 @@ export function InterfaceControl({
           onClick={() => setOpen((value) => !value)}
           className={cn(
             'relative size-8 shrink-0 rounded-[10px] border p-0 shadow-none outline-none',
-            'border-black/[0.08] bg-[#fbfbfa]/70 text-black/58 backdrop-blur-[18px]',
+            'border-black/[0.08] bg-[#ffffff]/70 text-black/58 backdrop-blur-[18px]',
             'transition-[border-color,background-color,color,transform] duration-200',
             'hover:border-black/[0.14] hover:bg-white/85 hover:text-black active:scale-[0.96]',
             'dark:border-white/[0.09] dark:bg-white/[0.055] dark:text-white/58',
@@ -289,7 +289,7 @@ export function InterfaceControl({
         onClick={() => setOpen((value) => !value)}
         className={cn(
           'group inline-flex shrink-0 items-center justify-between rounded-[11px] border outline-none',
-          'border-black/[0.08] bg-[#fbfbfa]/72 text-black backdrop-blur-[18px]',
+          'border-black/[0.08] bg-[#ffffff]/72 text-black backdrop-blur-[18px]',
           'shadow-[0_10px_34px_rgba(15,15,15,0.035)]',
           'transition-[border-color,background-color,box-shadow,transform] duration-200',
           'hover:border-black/[0.13] hover:bg-white/88',
@@ -382,8 +382,8 @@ function InterfacePanel({
     <div
       className={cn(
         'absolute top-[calc(100%+8px)] z-[100] w-[286px] overflow-hidden rounded-[16px] border p-2 backdrop-blur-[24px]',
-        'border-black/[0.09] bg-[#fbfbfa]/88 text-black shadow-[0_24px_80px_rgba(15,15,15,0.13)]',
-        'dark:border-white/[0.10] dark:bg-[#101010]/88 dark:text-white dark:shadow-[0_28px_90px_rgba(0,0,0,0.58)]',
+        'border-black/[0.09] bg-[#ffffff]/88 text-black shadow-[0_24px_80px_rgba(15,15,15,0.13)]',
+        'dark:border-white/[0.10] dark:bg-[#141414]/88 dark:text-white dark:shadow-[0_28px_90px_rgba(0,0,0,0.58)]',
         align === 'right' ? 'right-0' : 'left-0',
       )}
       role="menu"

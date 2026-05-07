@@ -200,7 +200,7 @@ function Surface({
   return (
     <section
       className={cn(
-        'relative rounded-[18px] border border-[var(--cb-border)] bg-[var(--cb-surface)] text-[#0e0e0e] shadow-none dark:text-white',
+        'relative rounded-[18px] border border-[var(--cb-border)] bg-[var(--cb-surface)] text-[#111111] shadow-none dark:text-white',
         className,
       )}
     >
@@ -345,7 +345,7 @@ function ErrorBanner({ children }: { children: ReactNode }) {
 
 function SetupMissingScreen({ t }: { t: LoginCopy }) {
   return (
-    <main className="grid min-h-screen place-items-center bg-[var(--cb-shell-bg)] px-4 py-8 text-[#0e0e0e] dark:text-white">
+    <main className="grid min-h-screen place-items-center bg-[var(--cb-shell-bg)] px-4 py-8 text-[#111111] dark:text-white">
       <Surface className="w-full max-w-[560px] overflow-hidden">
         <div className="border-b border-[var(--cb-border)] p-5">
           <div className="flex items-center gap-3">
@@ -592,7 +592,7 @@ export default function LoginPage() {
   const ActiveIcon = activeChannelData.icon;
 
   return (
-    <main className="grid min-h-screen place-items-center bg-[var(--cb-shell-bg)] px-4 py-8 text-[#0e0e0e] dark:text-white">
+    <main className="grid min-h-screen place-items-center bg-[var(--cb-shell-bg)] px-4 py-8 text-[#111111] dark:text-white">
       <div className="w-full max-w-[430px]">
         <AuthCardShell>
           <div className="border-b border-[var(--cb-border)] p-5">

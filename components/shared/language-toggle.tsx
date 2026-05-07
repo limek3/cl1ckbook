@@ -95,7 +95,7 @@ export function LanguageToggle({
         aria-hidden="true"
         className={cn(
           'absolute bottom-1 left-1 top-1 rounded-[12px]',
-          'border border-black/[0.06] bg-[#fbfbfa]/95',
+          'border border-black/[0.06] bg-[#ffffff]/95',
           'shadow-[0_10px_26px_rgba(15,15,15,0.10)]',
           'transition-transform duration-500',
           'dark:border-white/[0.10] dark:bg-white/[0.115]',

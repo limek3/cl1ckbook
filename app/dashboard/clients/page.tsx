@@ -61,15 +61,15 @@ const tableGridClass =
   'lg:grid-cols-[minmax(240px,1.25fr)_142px_86px_132px_150px_minmax(260px,1fr)_28px]';
 
 function pageBg(light: boolean) {
-  return light ? 'bg-[#f4f4f2]' : 'bg-[#090909]';
+  return light ? 'bg-[#f7f6f2]' : 'bg-[#080808]';
 }
 
 function pageText(light: boolean) {
-  return light ? 'text-[#0e0e0e]' : 'text-white';
+  return light ? 'text-[#111111]' : 'text-[#f8f7f4]';
 }
 
 function mutedText(light: boolean) {
-  return light ? 'text-black/48' : 'text-white/42';
+  return light ? 'text-[#6b7280]' : 'text-[#9ca3af]';
 }
 
 function faintText(light: boolean) {
@@ -77,29 +77,29 @@ function faintText(light: boolean) {
 }
 
 function borderTone(light: boolean) {
-  return light ? 'border-black/[0.08]' : 'border-white/[0.08]';
+  return light ? 'border-[#e6e2da]' : 'border-white/[0.08]';
 }
 
 function divideTone(light: boolean) {
-  return light ? 'divide-black/[0.08]' : 'divide-white/[0.08]';
+  return light ? 'divide-[#e6e2da]' : 'divide-white/[0.08]';
 }
 
 function cardTone(light: boolean) {
   return light
-    ? 'border-black/[0.08] bg-[#fbfbfa]'
-    : 'border-white/[0.08] bg-[#090909]';
+    ? 'border-[#e6e2da] bg-white shadow-[0_12px_30px_rgba(17,17,17,0.035)]'
+    : 'border-white/[0.08] bg-[#141414]';
 }
 
 function insetTone(light: boolean) {
   return light
-    ? 'border-black/[0.07] bg-black/[0.025]'
-    : 'border-white/[0.08] bg-[#101010]';
+    ? 'border-[#e6e2da] bg-black/[0.015]'
+    : 'border-white/[0.07] bg-white/[0.026]';
 }
 
 function fieldClass(light: boolean) {
   return light
     ? 'border-black/[0.08] bg-white text-black placeholder:text-black/32'
-    : 'border-white/[0.08] bg-[#101010] text-white placeholder:text-white/30';
+    : 'border-white/[0.08] bg-[#141414] text-white placeholder:text-white/30';
 }
 
 function buttonBase(light: boolean, active = false) {
@@ -203,8 +203,8 @@ function calendarPopoverClass(light: boolean) {
   return cn(
     'z-[80] w-auto overflow-hidden rounded-[12px] border p-1 shadow-none backdrop-blur-[24px]',
     light
-      ? 'border-black/[0.09] bg-[#fbfbfa]/92 text-black shadow-[0_24px_80px_rgba(15,15,15,0.12)]'
-      : 'border-white/[0.10] bg-[#101010]/92 text-white shadow-[0_28px_90px_rgba(0,0,0,0.58)]',
+      ? 'border-black/[0.09] bg-[#ffffff]/92 text-black shadow-[0_24px_80px_rgba(15,15,15,0.12)]'
+      : 'border-white/[0.10] bg-[#141414]/92 text-white shadow-[0_28px_90px_rgba(0,0,0,0.58)]',
   );
 }
 
@@ -1313,7 +1313,7 @@ function ClientCrmDialog({
         <div
           className={cn(
             'max-w-[150px] truncate rounded-[8px] px-2.5 py-1 text-right text-[12px] font-semibold',
-            light ? 'bg-black/[0.025] text-[#0e0e0e]' : 'bg-white/[0.04] text-white',
+            light ? 'bg-black/[0.025] text-[#111111]' : 'bg-white/[0.04] text-white',
           )}
         >
           {value}
@@ -1341,7 +1341,7 @@ function ClientCrmDialog({
           'flex h-11 w-full items-center justify-between gap-3 rounded-[10px] border px-3 text-left text-[12px] font-medium transition-colors active:scale-[0.992]',
           light
             ? 'border-black/[0.08] bg-white text-black/62 hover:bg-black/[0.025] hover:text-black'
-            : 'border-white/[0.08] bg-[#101010] text-white/58 hover:bg-white/[0.06] hover:text-white',
+            : 'border-white/[0.08] bg-[#141414] text-white/58 hover:bg-white/[0.06] hover:text-white',
         );
 
     const content = (
@@ -1385,8 +1385,8 @@ function ClientCrmDialog({
           'relative w-full max-w-[620px] overflow-hidden rounded-[18px] border',
           'max-h-[calc(100dvh-32px)]',
           light
-            ? 'border-black/[0.09] bg-[var(--cb-surface)] text-[#0e0e0e] shadow-[0_34px_90px_rgba(0,0,0,0.18)]'
-            : 'border-white/[0.10] bg-[#101010] text-white shadow-[0_34px_90px_rgba(0,0,0,0.55)]',
+            ? 'border-black/[0.09] bg-[var(--cb-surface)] text-[#111111] shadow-[0_34px_90px_rgba(0,0,0,0.18)]'
+            : 'border-white/[0.10] bg-[#141414] text-white shadow-[0_34px_90px_rgba(0,0,0,0.55)]',
         )}
       >
         <div
@@ -1633,7 +1633,7 @@ function ClientCrmDialog({
                     'flex h-11 w-full items-center justify-between gap-3 rounded-[10px] border px-3 text-left text-[12px] font-medium transition-colors active:scale-[0.992]',
                     light
                       ? 'border-black/[0.08] bg-white text-black/62 hover:bg-black/[0.025] hover:text-black'
-                      : 'border-white/[0.08] bg-[#101010] text-white/58 hover:bg-white/[0.06] hover:text-white',
+                      : 'border-white/[0.08] bg-[#141414] text-white/58 hover:bg-white/[0.06] hover:text-white',
                   )}
                 >
                   <span className="flex min-w-0 items-center gap-2">
@@ -1691,7 +1691,7 @@ function ClientCrmDialog({
           <div
             className={cn(
               'w-full max-w-[420px] rounded-[16px] border p-4 shadow-[0_24px_70px_rgba(0,0,0,0.22)]',
-              light ? 'border-black/[0.09] bg-[#fbfbfa]' : 'border-white/[0.10] bg-[#101010]',
+              light ? 'border-black/[0.09] bg-[#ffffff]' : 'border-white/[0.10] bg-[#141414]',
             )}
           >
             <div className="flex items-start justify-between gap-4">
@@ -1738,7 +1738,7 @@ function ClientCrmDialog({
                           'flex h-10 w-full items-center justify-between gap-3 rounded-[10px] border px-3 text-left text-[12px] font-medium outline-none transition active:scale-[0.985]',
                           light
                             ? 'border-black/[0.08] bg-white text-black hover:border-black/[0.14]'
-                            : 'border-white/[0.08] bg-[#101010] text-white hover:border-white/[0.14]',
+                            : 'border-white/[0.08] bg-[#141414] text-white hover:border-white/[0.14]',
                         )}
                       >
                         <span className="inline-flex min-w-0 items-center gap-2">
@@ -1771,7 +1771,7 @@ function ClientCrmDialog({
                       'flex h-10 items-center gap-2 rounded-[10px] border px-3',
                       light
                         ? 'border-black/[0.08] bg-white text-black'
-                        : 'border-white/[0.08] bg-[#101010] text-white',
+                        : 'border-white/[0.08] bg-[#141414] text-white',
                     )}
                   >
                     <Clock3 className={cn('size-4 shrink-0', mutedText(light))} />
@@ -1799,7 +1799,7 @@ function ClientCrmDialog({
                 'mt-3 w-full resize-none rounded-[10px] border px-3 py-2 text-[12px] leading-5 outline-none transition-colors',
                 light
                   ? 'border-black/[0.08] bg-white text-black placeholder:text-black/28 focus:border-black/[0.16]'
-                  : 'border-white/[0.08] bg-[#101010] text-white placeholder:text-white/28 focus:border-white/[0.16]',
+                  : 'border-white/[0.08] bg-[#141414] text-white placeholder:text-white/28 focus:border-white/[0.16]',
               )}
               placeholder={
                 activeMiniDialog === 'note'

@@ -58,12 +58,12 @@ export function menuContentClass(light: boolean) {
     light
       ? [
           'border-black/[0.09]',
-          'bg-[#fbfbfa]/82 text-black',
+          'bg-[#ffffff]/82 text-black',
           'shadow-[0_24px_80px_rgba(15,15,15,0.12)]',
         ]
       : [
           'border-white/[0.10]',
-          'bg-[#101010]/82 text-white',
+          'bg-[#141414]/82 text-white',
           'shadow-[0_28px_90px_rgba(0,0,0,0.58)]',
         ],
   );
