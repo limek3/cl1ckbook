@@ -11,17 +11,16 @@ import {
 } from 'react';
 import { useTheme } from 'next-themes';
 import {
+  Ban,
   CalendarClock,
-  CalendarDays,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  CheckCircle2,
+  Clock3,
   Globe2,
   MessageCircleMore,
   PhoneCall,
   SquarePen,
-  UserRound,
-  Wallet,
   X,
 } from 'lucide-react';
 
@@ -35,19 +34,14 @@ import type { Booking, BookingStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 type ThemeMode = 'light' | 'dark';
-type CalendarViewMode = 'day' | 'week' | 'month';
-
-type ServiceLike = {
-  name: string;
-  duration?: number;
-  color?: string;
-  category?: string;
-};
+type CalendarView = 'day' | 'week' | 'month';
 
 interface CalendarBooking {
   id: string;
+  source: Booking;
   clientName: string;
   service: string;
+  phone: string;
   date: string;
   start: string;
   end: string;
@@ -55,42 +49,33 @@ interface CalendarBooking {
   endMinutes: number;
   durationMinutes: number;
   status: BookingStatus;
-  phone: string;
   note?: string;
-  source: string;
-  color: string;
+  sourceLabel?: string;
   amount: number;
-  raw: Booking;
+  color: string;
 }
 
 interface LaidOutBooking extends CalendarBooking {
   lane: number;
-  lanes: number;
+  laneCount: number;
 }
 
-interface WorkWindow {
-  startMinutes: number;
-  endMinutes: number;
-  hours: number[];
-}
-
-const DEFAULT_WORK_START = 8 * 60;
-const DEFAULT_WORK_END = 22 * 60;
-const DAY_HOUR_HEIGHT = 78;
-const WEEK_HOUR_HEIGHT = 66;
-
-const SERVICE_COLORS = [
-  '#4f8cff',
-  '#f45d8f',
-  '#8b5cf6',
-  '#10b981',
-  '#f59e0b',
-  '#06b6d4',
-  '#ef4444',
-  '#84cc16',
-  '#ec4899',
-  '#6366f1',
+const AUTO_SERVICE_COLORS = [
+  '#58A6FF',
+  '#F472B6',
+  '#A78BFA',
+  '#34D399',
+  '#FBBF24',
+  '#22D3EE',
+  '#FB7185',
+  '#60A5FA',
+  '#C084FC',
+  '#2DD4BF',
 ];
+
+const HOUR_HEIGHT = 44;
+const FALLBACK_START_HOUR = 8;
+const FALLBACK_END_HOUR = 22;
 
 function pageBg(light: boolean) {
   return light ? 'bg-[#f4f4f2]' : 'bg-[#090909]';
@@ -141,6 +126,15 @@ function buttonBase(light: boolean, active = false) {
   );
 }
 
+function iconButtonBase(light: boolean) {
+  return cn(
+    'inline-flex size-8 shrink-0 items-center justify-center rounded-[9px] border text-[12px] transition-[background,border-color,color,transform] duration-150 active:scale-[0.965]',
+    light
+      ? 'border-black/[0.08] bg-white text-black/54 hover:border-black/[0.14] hover:bg-black/[0.035] hover:text-black'
+      : 'border-white/[0.08] bg-white/[0.04] text-white/54 hover:border-white/[0.14] hover:bg-white/[0.07] hover:text-white',
+  );
+}
+
 function accentPillStyle(
   color: string,
   light: boolean,
@@ -168,20 +162,19 @@ function accentPillStyle(
   };
 }
 
-function bookingBlockStyle(color: string, light: boolean): CSSProperties {
+function bookingCardStyle(color: string, light: boolean, active = false): CSSProperties {
   return {
     background: light
-      ? `linear-gradient(180deg, color-mix(in srgb, ${color} 13%, #ffffff), color-mix(in srgb, ${color} 7%, #ffffff))`
-      : `linear-gradient(180deg, color-mix(in srgb, ${color} 28%, #151515), color-mix(in srgb, ${color} 16%, #111111))`,
+      ? `linear-gradient(135deg, color-mix(in srgb, ${color} 13%, #ffffff), color-mix(in srgb, ${color} 6%, #ffffff))`
+      : `linear-gradient(135deg, color-mix(in srgb, ${color} 24%, #141414), color-mix(in srgb, ${color} 10%, #101010))`,
     borderColor: light
-      ? `color-mix(in srgb, ${color} 42%, rgba(0,0,0,0.1))`
-      : `color-mix(in srgb, ${color} 50%, rgba(255,255,255,0.12))`,
-    color: light
-      ? `color-mix(in srgb, ${color} 68%, #0e0e0e)`
-      : `color-mix(in srgb, ${color} 14%, #ffffff)`,
-    boxShadow: light
-      ? `0 10px 24px color-mix(in srgb, ${color} 10%, transparent)`
-      : `0 14px 32px color-mix(in srgb, ${color} 14%, transparent)`,
+      ? `color-mix(in srgb, ${color} 36%, rgba(0,0,0,0.08))`
+      : `color-mix(in srgb, ${color} 42%, rgba(255,255,255,0.08))`,
+    boxShadow: active
+      ? light
+        ? `0 12px 30px color-mix(in srgb, ${color} 16%, transparent), inset 0 0 0 1px color-mix(in srgb, ${color} 16%, transparent)`
+        : `0 12px 30px color-mix(in srgb, ${color} 18%, transparent), inset 0 0 0 1px color-mix(in srgb, ${color} 18%, transparent)`
+      : undefined,
   };
 }
 
@@ -190,23 +183,9 @@ function toLocalIsoDate(date: Date) {
   return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 10);
 }
 
-function startOfDay(date: Date) {
-  const copy = new Date(date);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
-}
-
-function startOfWeekMonday(date: Date) {
-  const copy = startOfDay(date);
-  const weekday = (copy.getDay() + 6) % 7;
-  copy.setDate(copy.getDate() - weekday);
-  return copy;
-}
-
-function startOfMonth(date: Date) {
-  const copy = startOfDay(date);
-  copy.setDate(1);
-  return copy;
+function parseIsoDate(iso: string) {
+  const date = new Date(`${iso}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? new Date() : date;
 }
 
 function addDays(date: Date, amount: number) {
@@ -221,8 +200,19 @@ function addMonths(date: Date, amount: number) {
   return copy;
 }
 
-function isSameDay(left: Date, right: Date) {
-  return toLocalIsoDate(left) === toLocalIsoDate(right);
+function startOfWeekMonday(date: Date) {
+  const copy = new Date(date);
+  const weekday = (copy.getDay() + 6) % 7;
+  copy.setHours(0, 0, 0, 0);
+  copy.setDate(copy.getDate() - weekday);
+  return copy;
+}
+
+function startOfMonth(date: Date) {
+  const copy = new Date(date);
+  copy.setDate(1);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
 }
 
 function parseTimeToMinutes(time: string) {
@@ -237,7 +227,7 @@ function parseTimeToMinutes(time: string) {
 }
 
 function formatMinutesAsTime(totalMinutes: number) {
-  const normalized = Math.max(0, Math.min(24 * 60, totalMinutes));
+  const normalized = Math.max(0, Math.min(24 * 60 - 1, totalMinutes));
   const hours = Math.floor(normalized / 60)
     .toString()
     .padStart(2, '0');
@@ -246,61 +236,38 @@ function formatMinutesAsTime(totalMinutes: number) {
   return `${hours}:${minutes}`;
 }
 
-function formatCurrencyCompact(value: number, locale: 'ru' | 'en') {
-  try {
-    return new Intl.NumberFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
-      style: 'currency',
-      currency: 'RUB',
-      maximumFractionDigits: 0,
-    }).format(value);
-  } catch {
-    return `${Math.round(value)} ₽`;
-  }
-}
-
-function formatShortDate(date: Date, locale: 'ru' | 'en') {
+function formatCompactDate(date: Date, locale: 'ru' | 'en') {
   try {
     return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
       day: 'numeric',
       month: 'short',
-    }).format(date);
+    })
+      .format(date)
+      .replace('.', '');
   } catch {
     return toLocalIsoDate(date);
   }
 }
 
-function formatWeekday(date: Date, locale: 'ru' | 'en') {
-  try {
-    return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
-      weekday: 'short',
-    })
-      .format(date)
-      .replace('.', '')
-      .replace(/^[a-zа-яё]/i, (char) => char.toUpperCase());
-  } catch {
-    return ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][(date.getDay() + 6) % 7] ?? '';
-  }
-}
-
-function formatFullDate(date: Date, locale: 'ru' | 'en') {
+function formatLongDate(date: Date, locale: 'ru' | 'en') {
   try {
     return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
       day: 'numeric',
       month: 'long',
-      year: 'numeric',
+      weekday: 'long',
     }).format(date);
   } catch {
     return toLocalIsoDate(date);
   }
 }
 
-function formatCalendarRange(view: CalendarViewMode, selectedDate: Date, locale: 'ru' | 'en') {
-  if (view === 'day') return formatFullDate(selectedDate, locale);
+function formatRangeTitle(view: CalendarView, selectedDate: Date, locale: 'ru' | 'en') {
+  if (view === 'day') return formatLongDate(selectedDate, locale);
 
   if (view === 'week') {
     const start = startOfWeekMonday(selectedDate);
     const end = addDays(start, 6);
-    return `${formatShortDate(start, locale)} — ${formatShortDate(end, locale)}`;
+    return `${formatCompactDate(start, locale)} — ${formatCompactDate(end, locale)}`;
   }
 
   try {
@@ -309,43 +276,47 @@ function formatCalendarRange(view: CalendarViewMode, selectedDate: Date, locale:
       year: 'numeric',
     }).format(selectedDate);
   } catch {
-    return selectedDate.toISOString().slice(0, 7);
+    return selectedDate.toLocaleDateString();
   }
 }
 
-function getRangeDates(view: CalendarViewMode, selectedDate: Date) {
-  if (view === 'day') return [startOfDay(selectedDate)];
-
-  if (view === 'week') {
-    const start = startOfWeekMonday(selectedDate);
-    return Array.from({ length: 7 }, (_, index) => addDays(start, index));
+function getShortWeekday(date: Date, locale: 'ru' | 'en') {
+  try {
+    return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
+      weekday: 'short',
+    })
+      .format(date)
+      .replace('.', '')
+      .replace(/^[a-zа-яё]/i, (char) => char.toUpperCase());
+  } catch {
+    return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][(date.getDay() + 6) % 7] ?? '';
   }
-
-  const firstVisibleDay = startOfWeekMonday(startOfMonth(selectedDate));
-  return Array.from({ length: 42 }, (_, index) => addDays(firstVisibleDay, index));
 }
 
-function getRangeIsoBounds(view: CalendarViewMode, selectedDate: Date) {
-  if (view === 'day') {
-    const iso = toLocalIsoDate(selectedDate);
-    return { startIso: iso, endIso: iso };
+function formatCurrencyCompact(value: number, locale: 'ru' | 'en') {
+  try {
+    return new Intl.NumberFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
+      style: 'currency',
+      currency: 'RUB',
+      maximumFractionDigits: value >= 1000 ? 0 : 2,
+    }).format(value);
+  } catch {
+    return `${Math.round(value)} ₽`;
   }
+}
 
-  if (view === 'week') {
-    const start = startOfWeekMonday(selectedDate);
-    return {
-      startIso: toLocalIsoDate(start),
-      endIso: toLocalIsoDate(addDays(start, 6)),
-    };
-  }
+function isActiveBooking(booking: Booking) {
+  return booking.status !== 'cancelled' && booking.status !== 'no_show';
+}
 
-  const monthStart = startOfMonth(selectedDate);
-  const monthEnd = addDays(addMonths(monthStart, 1), -1);
+function isDoneBooking(booking: Booking) {
+  return booking.status === 'completed';
+}
 
-  return {
-    startIso: toLocalIsoDate(monthStart),
-    endIso: toLocalIsoDate(monthEnd),
-  };
+function getBookingAmount(booking: Booking) {
+  return typeof booking.priceAmount === 'number' && Number.isFinite(booking.priceAmount)
+    ? booking.priceAmount
+    : 0;
 }
 
 function hashString(value: string) {
@@ -357,58 +328,124 @@ function hashString(value: string) {
   return Math.abs(hash);
 }
 
-function isCssColor(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0;
+function getObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function getStringFromRecord(record: Record<string, unknown> | null, keys: string[]) {
+  if (!record) return undefined;
+
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+
+  return undefined;
+}
+
+function normalizeColor(value: unknown) {
+  if (typeof value !== 'string') return undefined;
+  const color = value.trim();
+  if (!color) return undefined;
+
+  if (
+    /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(color) ||
+    /^rgba?\(/i.test(color) ||
+    /^hsla?\(/i.test(color)
+  ) {
+    return color;
+  }
+
+  return undefined;
+}
+
+function buildServiceMap(datasetServices: unknown, workspaceServices: unknown) {
+  const source = Array.isArray(workspaceServices)
+    ? workspaceServices
+    : Array.isArray(datasetServices)
+      ? datasetServices
+      : [];
+
+  const map = new Map<string, Record<string, unknown>>();
+
+  for (const item of source) {
+    const record = getObject(item);
+    if (!record) continue;
+
+    const name = getStringFromRecord(record, ['name', 'title', 'label']);
+    if (name) map.set(name, record);
+  }
+
+  return map;
 }
 
 function getServiceColor(
   booking: Booking,
-  serviceMap: Map<string, ServiceLike>,
+  serviceMap: Map<string, Record<string, unknown>>,
   accentColor: string,
+  publicAccentColor: string,
 ) {
-  const metadata = booking.metadata && typeof booking.metadata === 'object'
-    ? booking.metadata as Record<string, unknown>
-    : null;
+  const metadata = getObject(booking.metadata);
+  const metadataColor = normalizeColor(
+    getStringFromRecord(metadata, ['color', 'serviceColor', 'calendarColor', 'accentColor']),
+  );
+
+  if (metadataColor) return metadataColor;
+
   const service = serviceMap.get(booking.service);
-  const fromData =
-    metadata?.bookingColor ??
-    metadata?.color ??
-    metadata?.serviceColor ??
-    metadata?.accentColor ??
-    service?.color;
+  const serviceColor = normalizeColor(
+    getStringFromRecord(service ?? null, ['color', 'serviceColor', 'accentColor', 'calendarColor']),
+  );
 
-  if (isCssColor(fromData)) return fromData;
+  if (serviceColor) return serviceColor;
 
-  const seed = service?.category ? `${service.category}:${booking.service}` : booking.service;
-  return SERVICE_COLORS[hashString(seed || accentColor) % SERVICE_COLORS.length] ?? accentColor;
+  if (booking.status === 'new') return publicAccentColor;
+  if (booking.status === 'confirmed') return accentColor;
+
+  const index = hashString(booking.service || booking.id) % AUTO_SERVICE_COLORS.length;
+  return AUTO_SERVICE_COLORS[index] ?? accentColor;
 }
 
-function sourceLabel(booking: Booking, locale: 'ru' | 'en') {
-  const raw = String(booking.source ?? booking.channel ?? '').toLowerCase();
+function getServiceDuration(
+  booking: Booking,
+  serviceMap: Map<string, Record<string, unknown>>,
+) {
+  if (
+    typeof booking.durationMinutes === 'number' &&
+    Number.isFinite(booking.durationMinutes) &&
+    booking.durationMinutes > 0
+  ) {
+    return booking.durationMinutes;
+  }
 
-  if (!raw) return locale === 'ru' ? 'Сайт' : 'Web';
-  if (raw.includes('tg') || raw.includes('telegram') || raw.includes('тг')) return locale === 'ru' ? 'Телеграм' : 'Telegram';
-  if (raw.includes('vk') || raw.includes('вк')) return locale === 'ru' ? 'ВК' : 'VK';
-  if (raw.includes('inst')) return locale === 'ru' ? 'Инстаграм' : 'Instagram';
+  const service = serviceMap.get(booking.service);
+  const duration = service?.duration;
 
-  return String(booking.source ?? booking.channel ?? 'Web');
+  if (typeof duration === 'number' && Number.isFinite(duration) && duration > 0) {
+    return duration;
+  }
+
+  return 60;
 }
 
 function mapBookingToCalendarBooking(
   booking: Booking,
-  serviceMap: Map<string, ServiceLike>,
+  serviceMap: Map<string, Record<string, unknown>>,
   accentColor: string,
-  locale: 'ru' | 'en',
+  publicAccentColor: string,
 ): CalendarBooking {
-  const service = serviceMap.get(booking.service);
   const startMinutes = parseTimeToMinutes(booking.time);
-  const durationMinutes = Math.max(15, booking.durationMinutes ?? service?.duration ?? 60);
+  const durationMinutes = getServiceDuration(booking, serviceMap);
   const endMinutes = startMinutes + durationMinutes;
 
   return {
     id: booking.id,
-    clientName: booking.clientName || (locale === 'ru' ? 'Клиент' : 'Client'),
-    service: booking.service || (locale === 'ru' ? 'Услуга' : 'Service'),
+    source: booking,
+    clientName: booking.clientName,
+    service: booking.service,
+    phone: booking.clientPhone,
     date: booking.date,
     start: booking.time,
     end: formatMinutesAsTime(endMinutes),
@@ -416,94 +453,158 @@ function mapBookingToCalendarBooking(
     endMinutes,
     durationMinutes,
     status: booking.status,
-    phone: booking.clientPhone,
     note: booking.comment || undefined,
-    source: sourceLabel(booking, locale),
-    color: getServiceColor(booking, serviceMap, accentColor),
-    amount: typeof booking.priceAmount === 'number' && Number.isFinite(booking.priceAmount)
-      ? booking.priceAmount
-      : 0,
-    raw: booking,
+    sourceLabel: booking.source ?? booking.channel,
+    amount: getBookingAmount(booking),
+    color: getServiceColor(booking, serviceMap, accentColor, publicAccentColor),
   };
 }
 
-function isBookingActive(booking: CalendarBooking | Booking) {
-  return booking.status !== 'cancelled' && booking.status !== 'no_show';
-}
+function getVisibleDates(view: CalendarView, selectedDate: Date) {
+  if (view === 'day') return [selectedDate];
 
-function deriveWorkWindow(bookings: CalendarBooking[]): WorkWindow {
-  const starts = bookings.map((booking) => booking.startMinutes);
-  const ends = bookings.map((booking) => booking.endMinutes);
-  const earliest = starts.length ? Math.min(...starts) : DEFAULT_WORK_START;
-  const latest = ends.length ? Math.max(...ends) : DEFAULT_WORK_END;
-
-  const startMinutes = Math.max(0, Math.min(DEFAULT_WORK_START, Math.floor(earliest / 60) * 60));
-  const endMinutes = Math.min(24 * 60, Math.max(DEFAULT_WORK_END, Math.ceil(latest / 60) * 60));
-  const hours: number[] = [];
-
-  for (let minute = startMinutes; minute <= endMinutes; minute += 60) {
-    hours.push(minute);
+  if (view === 'week') {
+    const start = startOfWeekMonday(selectedDate);
+    return Array.from({ length: 7 }, (_, index) => addDays(start, index));
   }
 
-  return { startMinutes, endMinutes, hours };
+  const monthStart = startOfMonth(selectedDate);
+  const gridStart = startOfWeekMonday(monthStart);
+  return Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
 }
 
-function layoutBookings(bookings: CalendarBooking[]): LaidOutBooking[] {
-  const sorted = [...bookings].sort((left, right) => {
-    if (left.startMinutes !== right.startMinutes) return left.startMinutes - right.startMinutes;
-    return right.endMinutes - left.endMinutes;
+function getHoursRange(items: CalendarBooking[]) {
+  if (!items.length) {
+    return { startHour: FALLBACK_START_HOUR, endHour: FALLBACK_END_HOUR };
+  }
+
+  const minStart = Math.min(...items.map((item) => item.startMinutes));
+  const maxEnd = Math.max(...items.map((item) => item.endMinutes));
+
+  return {
+    startHour: Math.max(0, Math.min(FALLBACK_START_HOUR, Math.floor(minStart / 60))),
+    endHour: Math.min(24, Math.max(FALLBACK_END_HOUR, Math.ceil(maxEnd / 60))),
+  };
+}
+
+function layoutOverlaps(items: CalendarBooking[]): LaidOutBooking[] {
+  const sorted = [...items].sort((left, right) => {
+    if (left.startMinutes === right.startMinutes) return right.endMinutes - left.endMinutes;
+    return left.startMinutes - right.startMinutes;
   });
 
-  const laneEnds: number[] = [];
-  const result: Array<CalendarBooking & { lane: number }> = [];
+  const result: LaidOutBooking[] = [];
+  let group: CalendarBooking[] = [];
+  let groupEnd = -1;
 
-  for (const booking of sorted) {
-    let lane = laneEnds.findIndex((end) => end <= booking.startMinutes);
+  function flushGroup() {
+    if (!group.length) return;
 
-    if (lane < 0) {
-      lane = laneEnds.length;
-      laneEnds.push(booking.endMinutes);
-    } else {
-      laneEnds[lane] = booking.endMinutes;
+    const laneEnds: number[] = [];
+    const groupResult: LaidOutBooking[] = [];
+
+    for (const item of group) {
+      let lane = laneEnds.findIndex((end) => end <= item.startMinutes);
+      if (lane === -1) {
+        lane = laneEnds.length;
+        laneEnds.push(item.endMinutes);
+      } else {
+        laneEnds[lane] = item.endMinutes;
+      }
+
+      groupResult.push({
+        ...item,
+        lane,
+        laneCount: 1,
+      });
     }
 
-    result.push({ ...booking, lane });
+    const laneCount = Math.max(1, laneEnds.length);
+    result.push(...groupResult.map((item) => ({ ...item, laneCount })));
+    group = [];
+    groupEnd = -1;
   }
 
-  const lanes = Math.max(1, laneEnds.length);
-  return result.map((booking) => ({ ...booking, lanes }));
-}
+  for (const item of sorted) {
+    if (!group.length) {
+      group = [item];
+      groupEnd = item.endMinutes;
+      continue;
+    }
 
-function groupByDate(bookings: CalendarBooking[]) {
-  const map = new Map<string, CalendarBooking[]>();
+    if (item.startMinutes < groupEnd) {
+      group.push(item);
+      groupEnd = Math.max(groupEnd, item.endMinutes);
+      continue;
+    }
 
-  for (const booking of bookings) {
-    const current = map.get(booking.date) ?? [];
-    current.push(booking);
-    map.set(booking.date, current);
+    flushGroup();
+    group = [item];
+    groupEnd = item.endMinutes;
   }
 
-  for (const [key, value] of map) {
-    map.set(key, value.sort((left, right) => left.startMinutes - right.startMinutes));
-  }
-
-  return map;
+  flushGroup();
+  return result;
 }
 
 function bookingStatusLabel(status: BookingStatus, locale: 'ru' | 'en') {
   if (locale === 'ru') {
     if (status === 'new') return 'Новая';
     if (status === 'confirmed') return 'Подтверждена';
-    if (status === 'completed') return 'Завершена';
+    if (status === 'completed') return 'Пришёл';
     if (status === 'no_show') return 'Не пришёл';
-    return 'Отменена';
+    if (status === 'cancelled') return 'Отменена';
   }
 
   if (status === 'new') return 'New';
   if (status === 'confirmed') return 'Confirmed';
-  if (status === 'completed') return 'Completed';
+  if (status === 'completed') return 'Arrived';
   if (status === 'no_show') return 'No-show';
-  return 'Cancelled';
+  if (status === 'cancelled') return 'Cancelled';
+
+  return status;
+}
+
+function bookingStatusHint(status: BookingStatus, locale: 'ru' | 'en') {
+  if (locale === 'ru') {
+    if (status === 'new') return 'ожидает';
+    if (status === 'confirmed') return 'в графике';
+    if (status === 'completed') return 'закрыта';
+    if (status === 'no_show') return 'пропуск';
+    if (status === 'cancelled') return 'снята';
+  }
+
+  if (status === 'new') return 'waiting';
+  if (status === 'confirmed') return 'scheduled';
+  if (status === 'completed') return 'closed';
+  if (status === 'no_show') return 'missed';
+  if (status === 'cancelled') return 'cancelled';
+
+  return 'status';
+}
+
+function statusTone(status: BookingStatus, color: string, light: boolean) {
+  if (status === 'completed') return light ? 'rgba(0,0,0,0.32)' : 'rgba(255,255,255,0.34)';
+  if (status === 'no_show' || status === 'cancelled') return light ? '#B64A4A' : '#FF8585';
+  return color;
+}
+
+function PageAction({
+  href,
+  children,
+  light,
+  active,
+}: {
+  href: string;
+  children: ReactNode;
+  light: boolean;
+  active?: boolean;
+}) {
+  return (
+    <Button asChild className={buttonBase(light, active)}>
+      <Link href={href}>{children}</Link>
+    </Button>
+  );
 }
 
 function Card({
@@ -536,7 +637,7 @@ function CardTitle({
   return (
     <div
       className={cn(
-        'flex min-h-[58px] items-center justify-between gap-4 border-b px-4 py-3',
+        'flex min-h-[56px] items-center justify-between gap-4 border-b px-4 py-3',
         borderTone(light),
       )}
     >
@@ -634,102 +735,6 @@ function StatusDot({
   );
 }
 
-function StatTile({
-  label,
-  value,
-  hint,
-  icon,
-  light,
-}: {
-  label: string;
-  value: string;
-  hint: string;
-  icon: ReactNode;
-  light: boolean;
-}) {
-  return (
-    <div className="min-w-0 p-4 md:p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className={cn('text-[11px] font-medium', mutedText(light))}>
-            {label}
-          </div>
-
-          <div
-            className={cn(
-              'mt-2 truncate text-[25px] font-semibold tracking-[-0.065em]',
-              pageText(light),
-            )}
-          >
-            {value}
-          </div>
-
-          <div className={cn('mt-1 truncate text-[11px]', faintText(light))}>
-            {hint}
-          </div>
-        </div>
-
-        <div
-          className={cn(
-            'inline-flex size-8 shrink-0 items-center justify-center rounded-[9px] border',
-            light
-              ? 'border-black/[0.07] bg-black/[0.025] text-black/38'
-              : 'border-white/[0.07] bg-white/[0.035] text-white/38',
-          )}
-        >
-          {icon}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function HeroStat({
-  label,
-  value,
-  hint,
-  light,
-}: {
-  label: string;
-  value: string | number;
-  hint?: string;
-  light: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        'min-w-0 rounded-[10px] border px-3.5 py-3 transition-colors duration-150',
-        light
-          ? 'border-black/[0.07] bg-white hover:bg-black/[0.018]'
-          : 'border-white/[0.07] bg-white/[0.035] hover:bg-white/[0.055]',
-      )}
-    >
-      <div className="grid min-h-[34px] grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
-        <div className="min-w-0">
-          <div className={cn('truncate text-[10.5px] font-medium', mutedText(light))}>
-            {label}
-          </div>
-
-          {hint ? (
-            <div className={cn('mt-0.5 truncate text-[10px]', faintText(light))}>
-              {hint}
-            </div>
-          ) : null}
-        </div>
-
-        <div
-          className={cn(
-            'min-w-[54px] max-w-[170px] truncate text-right text-[18px] font-semibold leading-none tracking-[-0.055em] tabular-nums',
-            pageText(light),
-          )}
-        >
-          {value}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function ControlGroup({
   children,
   light,
@@ -760,19 +765,22 @@ function FilterChip({
   onClick,
   light,
   accentColor,
+  compact,
 }: {
   label: string;
   active: boolean;
   onClick: () => void;
   light: boolean;
   accentColor: string;
+  compact?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        'group relative inline-flex h-10 min-w-[72px] shrink-0 items-center justify-center border-r px-4 text-[11px] font-semibold tracking-[-0.015em] transition-colors duration-150 last:border-r-0 active:scale-[0.985]',
+        'group relative inline-flex shrink-0 items-center justify-center border-r text-[11px] font-semibold tracking-[-0.015em] transition-colors duration-150 last:border-r-0 active:scale-[0.985]',
+        compact ? 'h-8 min-w-[48px] px-3' : 'h-10 min-w-[72px] px-4',
         light ? 'border-black/[0.07]' : 'border-white/[0.07]',
         active
           ? light
@@ -800,113 +808,167 @@ function FilterChip({
   );
 }
 
-function IconButton({
-  children,
-  onClick,
-  light,
+function MetricTile({
   label,
-}: {
-  children: ReactNode;
-  onClick: () => void;
-  light: boolean;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      onClick={onClick}
-      className={cn(
-        'inline-flex size-10 items-center justify-center border-r text-[11px] font-semibold transition-colors duration-150 last:border-r-0 active:scale-[0.985]',
-        light
-          ? 'border-black/[0.07] text-black/45 hover:bg-black/[0.025] hover:text-black/72'
-          : 'border-white/[0.07] text-white/42 hover:bg-white/[0.04] hover:text-white/72',
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
-function CalendarEmptyOverlay({
+  value,
+  hint,
   light,
-  title,
-  text,
 }: {
+  label: string;
+  value: string | number;
+  hint?: string;
   light: boolean;
-  title: string;
-  text: string;
 }) {
   return (
     <div
       className={cn(
-        'pointer-events-none absolute left-1/2 top-16 z-20 w-[min(420px,calc(100%-32px))] -translate-x-1/2 rounded-[10px] border px-4 py-4 text-center shadow-sm backdrop-blur-xl',
+        'min-w-0 rounded-[10px] border px-3 py-2.5 transition-colors duration-150',
         light
-          ? 'border-black/[0.08] bg-white/88 text-black'
-          : 'border-white/[0.08] bg-[#101010]/88 text-white',
+          ? 'border-black/[0.07] bg-white hover:bg-black/[0.018]'
+          : 'border-white/[0.07] bg-white/[0.035] hover:bg-white/[0.055]',
       )}
     >
-      <div className="text-[13px] font-semibold tracking-[-0.018em]">{title}</div>
-      <div className={cn('mt-1 text-[11px] leading-5', mutedText(light))}>{text}</div>
+      <div className={cn('truncate text-[10.5px] font-medium', mutedText(light))}>
+        {label}
+      </div>
+      <div
+        className={cn(
+          'mt-1.5 truncate text-[18px] font-semibold leading-none tracking-[-0.055em] tabular-nums',
+          pageText(light),
+        )}
+      >
+        {value}
+      </div>
+      {hint ? (
+        <div className={cn('mt-1 truncate text-[10px]', faintText(light))}>{hint}</div>
+      ) : null}
+    </div>
+  );
+}
+
+function EmptyState({
+  children,
+  light,
+  className,
+}: {
+  children: ReactNode;
+  light: boolean;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        'rounded-[10px] border px-4 py-5 text-[12px]',
+        insetTone(light),
+        mutedText(light),
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+function TimeGrid({
+  startHour,
+  endHour,
+  light,
+}: {
+  startHour: number;
+  endHour: number;
+  light: boolean;
+}) {
+  return (
+    <div className="pointer-events-none absolute inset-0">
+      {Array.from({ length: endHour - startHour + 1 }, (_, index) => {
+        const hour = startHour + index;
+
+        return (
+          <div
+            key={hour}
+            className={cn('absolute left-0 right-0 border-t', borderTone(light))}
+            style={{ top: index * HOUR_HEIGHT }}
+          >
+            <div
+              className={cn(
+                'absolute -left-[62px] -top-[7px] w-12 text-right text-[10.5px] font-medium tabular-nums',
+                faintText(light),
+              )}
+            >
+              {hour.toString().padStart(2, '0')}:00
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 function BookingBlock({
   booking,
+  top,
+  height,
   light,
-  workWindow,
-  hourHeight,
-  onSelect,
+  locale,
   compact,
+  active,
+  onClick,
+  style,
 }: {
-  booking: LaidOutBooking;
+  booking: CalendarBooking;
+  top: number;
+  height: number;
   light: boolean;
-  workWindow: WorkWindow;
-  hourHeight: number;
-  onSelect: (booking: CalendarBooking) => void;
+  locale: 'ru' | 'en';
   compact?: boolean;
+  active?: boolean;
+  onClick: () => void;
+  style?: CSSProperties;
 }) {
-  const top = ((booking.startMinutes - workWindow.startMinutes) / 60) * hourHeight + 4;
-  const height = Math.max(42, ((booking.endMinutes - booking.startMinutes) / 60) * hourHeight - 8);
-  const gap = 5;
-  const width = `calc(${100 / booking.lanes}% - ${gap}px)`;
-  const left = `calc(${(booking.lane * 100) / booking.lanes}% + ${booking.lane ? gap / 2 : 0}px)`;
-  const inactive = booking.status === 'cancelled' || booking.status === 'no_show';
-  const done = booking.status === 'completed';
+  const statusColor = statusTone(booking.status, booking.color, light);
 
   return (
     <button
       type="button"
-      onClick={() => onSelect(booking)}
+      onClick={onClick}
       style={{
-        ...bookingBlockStyle(booking.color, light),
         top,
-        height,
-        left,
-        width,
+        height: Math.max(compact ? 28 : 34, height - 4),
+        ...bookingCardStyle(booking.color, light, active),
+        ...style,
       }}
       className={cn(
-        'absolute z-10 overflow-hidden rounded-[10px] border px-2.5 py-2 text-left transition-[box-shadow,transform,opacity,filter] duration-150 hover:-translate-y-0.5 active:scale-[0.99]',
-        inactive && 'opacity-50 saturate-50',
-        done && 'opacity-72',
+        'absolute overflow-hidden rounded-[9px] border px-2.5 py-1.5 text-left transition-[box-shadow,transform,filter] duration-150 hover:-translate-y-px',
+        active && 'z-20',
       )}
     >
       <span
-        style={{ background: booking.color }}
-        className="absolute left-0 top-0 h-full w-[3px]"
+        style={{ background: statusColor }}
+        className="absolute inset-y-1.5 left-1 w-1 rounded-full"
       />
 
-      <div className="min-w-0 pl-1.5">
-        <div className="truncate text-[11.5px] font-semibold leading-tight tracking-[-0.018em]">
+      <div className="min-w-0 pl-2">
+        <div
+          className={cn(
+            'truncate font-semibold tracking-[-0.018em]',
+            compact ? 'text-[10.5px]' : 'text-[11.5px]',
+            pageText(light),
+          )}
+        >
           {booking.clientName}
         </div>
-        <div className="mt-1 truncate text-[10px] font-medium opacity-80">
-          {booking.service}
+        <div
+          className={cn(
+            'mt-0.5 truncate font-medium',
+            compact ? 'text-[9.5px]' : 'text-[10px]',
+            light ? 'text-black/52' : 'text-white/52',
+          )}
+        >
+          {booking.start} · {booking.service}
         </div>
-        {!compact || height > 56 ? (
-          <div className="mt-1.5 truncate text-[9.5px] font-semibold opacity-60">
-            {booking.start}–{booking.end}
+        {!compact && height >= 54 ? (
+          <div className={cn('mt-1 truncate text-[9.5px]', faintText(light))}>
+            {bookingStatusLabel(booking.status, locale)}
           </div>
         ) : null}
       </div>
@@ -914,544 +976,623 @@ function BookingBlock({
   );
 }
 
+function StatusBadge({
+  booking,
+  locale,
+  light,
+}: {
+  booking: CalendarBooking;
+  locale: 'ru' | 'en';
+  light: boolean;
+}) {
+  const color = statusTone(booking.status, booking.color, light);
+
+  return (
+    <MicroLabel light={light} active accentColor={color}>
+      <StatusDot light={light} active accentColor={color} />
+      {bookingStatusLabel(booking.status, locale)}
+    </MicroLabel>
+  );
+}
+
 function DayCalendar({
-  date,
-  bookings,
-  workWindow,
-  now,
+  items,
+  selectedId,
+  selectedDate,
+  nowMinutes,
+  todayIso,
+  startHour,
+  endHour,
   light,
   locale,
   onSelect,
 }: {
-  date: Date;
-  bookings: CalendarBooking[];
-  workWindow: WorkWindow;
-  now: Date;
+  items: CalendarBooking[];
+  selectedId: string | null;
+  selectedDate: Date;
+  nowMinutes: number;
+  todayIso: string;
+  startHour: number;
+  endHour: number;
   light: boolean;
   locale: 'ru' | 'en';
   onSelect: (booking: CalendarBooking) => void;
 }) {
-  const dayBookings = layoutBookings(bookings.filter((booking) => booking.date === toLocalIsoDate(date)));
-  const height = ((workWindow.endMinutes - workWindow.startMinutes) / 60) * DAY_HOUR_HEIGHT;
-  const showNow = isSameDay(date, now);
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  const nowTop = ((nowMinutes - workWindow.startMinutes) / 60) * DAY_HOUR_HEIGHT;
+  const iso = toLocalIsoDate(selectedDate);
+  const dayItems = useMemo(
+    () => layoutOverlaps(items.filter((item) => item.date === iso)),
+    [iso, items],
+  );
+
+  const height = (endHour - startHour) * HOUR_HEIGHT;
+  const offset = startHour * 60;
+  const showNow = iso === todayIso && nowMinutes >= offset && nowMinutes <= endHour * 60;
 
   return (
-    <div className="overflow-x-auto">
-      <div className="min-w-[760px]">
-        <div
-          className={cn(
-            'grid grid-cols-[82px_minmax(0,1fr)] overflow-hidden rounded-[10px] border',
-            light ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.025]',
-          )}
-        >
-          <div className={cn('border-r', borderTone(light))} style={{ height }}>
-            <div className="relative h-full">
-              {workWindow.hours.map((hour) => (
-                <div
-                  key={hour}
-                  style={{ top: ((hour - workWindow.startMinutes) / 60) * DAY_HOUR_HEIGHT - 7 }}
-                  className={cn('absolute right-3 text-[11px] font-medium tabular-nums', mutedText(light))}
-                >
-                  {formatMinutesAsTime(hour)}
-                </div>
-              ))}
-            </div>
+    <Panel light={light} className="overflow-hidden">
+      <div className="flex items-center justify-between gap-3 border-b px-4 py-3 md:px-5">
+        <div className="min-w-0">
+          <div className={cn('text-[13px] font-semibold tracking-[-0.018em]', pageText(light))}>
+            {formatCompactDate(selectedDate, locale)}
           </div>
+          <div className={cn('mt-0.5 text-[11px]', mutedText(light))}>
+            {dayItems.length
+              ? locale === 'ru'
+                ? `${dayItems.length} записей`
+                : `${dayItems.length} bookings`
+              : locale === 'ru'
+                ? 'свободный день'
+                : 'free day'}
+          </div>
+        </div>
+        <MicroLabel light={light}>
+          <Clock3 className="size-3.5" />
+          {formatMinutesAsTime(startHour * 60)}–{formatMinutesAsTime(endHour * 60)}
+        </MicroLabel>
+      </div>
 
-          <div
-            className="relative"
-            style={{
-              height,
-              backgroundImage: light
-                ? 'linear-gradient(to bottom, rgba(0,0,0,.064) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,.032) 1px, transparent 1px)'
-                : 'linear-gradient(to bottom, rgba(255,255,255,.07) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.032) 1px, transparent 1px)',
-              backgroundSize: `100% ${DAY_HOUR_HEIGHT}px, 100% ${DAY_HOUR_HEIGHT / 2}px`,
-            }}
-          >
-            {showNow && nowMinutes >= workWindow.startMinutes && nowMinutes <= workWindow.endMinutes ? (
+      <div className="overflow-x-auto">
+        <div className="min-w-[680px] px-4 pb-4 pl-[82px] pr-3 pt-3 md:px-5 md:pl-[88px]">
+          <div className="relative" style={{ height }}>
+            <TimeGrid startHour={startHour} endHour={endHour} light={light} />
+
+            {showNow ? (
               <div
-                style={{ top: nowTop }}
-                className="pointer-events-none absolute left-0 right-0 z-30 flex items-center"
+                className="pointer-events-none absolute left-0 right-0 z-10"
+                style={{ top: ((nowMinutes - offset) / 60) * HOUR_HEIGHT }}
               >
-                <span className="size-2 rounded-full bg-red-500" />
-                <span className="h-px flex-1 bg-red-500/80" />
-                <span className="mr-2 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white">
-                  {locale === 'ru' ? 'Сейчас' : 'Now'}
-                </span>
+                <div className="relative h-px bg-current text-current">
+                  <span className="absolute -left-1 -top-[3px] size-1.5 rounded-full bg-current" />
+                </div>
               </div>
             ) : null}
 
-            {dayBookings.map((booking) => (
-              <BookingBlock
-                key={booking.id}
-                booking={booking}
-                light={light}
-                workWindow={workWindow}
-                hourHeight={DAY_HOUR_HEIGHT}
-                onSelect={onSelect}
-              />
-            ))}
+            <div className="absolute inset-0">
+              {dayItems.map((booking) => {
+                const top = ((booking.startMinutes - offset) / 60) * HOUR_HEIGHT;
+                const heightPx = ((booking.endMinutes - booking.startMinutes) / 60) * HOUR_HEIGHT;
+                const gap = 6;
+                const width = `calc(${100 / booking.laneCount}% - ${gap}px)`;
+                const left = `calc(${(100 / booking.laneCount) * booking.lane}% + ${gap / 2}px)`;
 
-            {!dayBookings.length ? (
-              <CalendarEmptyOverlay
-                light={light}
-                title={locale === 'ru' ? 'Записей на этот день нет' : 'No bookings for this day'}
-                text={locale === 'ru' ? 'Свободный день. Новые заявки появятся здесь автоматически.' : 'Free day. New requests will appear here automatically.'}
-              />
-            ) : null}
+                return (
+                  <BookingBlock
+                    key={booking.id}
+                    booking={booking}
+                    top={top}
+                    height={heightPx}
+                    light={light}
+                    locale={locale}
+                    active={selectedId === booking.id}
+                    onClick={() => onSelect(booking)}
+                    style={{ left, width }}
+                  />
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {!dayItems.length ? (
+        <div className="px-4 pb-4 md:px-5">
+          <EmptyState light={light}>
+            {locale === 'ru'
+              ? 'На выбранный день пока нет записей.'
+              : 'No bookings for the selected day yet.'}
+          </EmptyState>
+        </div>
+      ) : null}
+    </Panel>
   );
 }
 
 function WeekCalendar({
-  dates,
-  bookingsByDate,
-  workWindow,
-  now,
-  todayIso,
+  items,
+  selectedId,
   selectedDate,
+  nowMinutes,
+  todayIso,
+  startHour,
+  endHour,
   light,
   locale,
   onSelect,
-  onDateSelect,
+  onSelectDate,
 }: {
-  dates: Date[];
-  bookingsByDate: Map<string, CalendarBooking[]>;
-  workWindow: WorkWindow;
-  now: Date;
-  todayIso: string;
+  items: CalendarBooking[];
+  selectedId: string | null;
   selectedDate: Date;
+  nowMinutes: number;
+  todayIso: string;
+  startHour: number;
+  endHour: number;
   light: boolean;
   locale: 'ru' | 'en';
   onSelect: (booking: CalendarBooking) => void;
-  onDateSelect: (date: Date) => void;
+  onSelectDate: (date: Date) => void;
 }) {
-  const height = ((workWindow.endMinutes - workWindow.startMinutes) / 60) * WEEK_HOUR_HEIGHT;
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  const nowTop = ((nowMinutes - workWindow.startMinutes) / 60) * WEEK_HOUR_HEIGHT;
+  const days = useMemo(() => {
+    const start = startOfWeekMonday(selectedDate);
+    return Array.from({ length: 7 }, (_, index) => addDays(start, index));
+  }, [selectedDate]);
+
+  const itemsByDate = useMemo(() => {
+    const map = new Map<string, CalendarBooking[]>();
+    for (const item of items) {
+      const current = map.get(item.date) ?? [];
+      current.push(item);
+      map.set(item.date, current);
+    }
+    return map;
+  }, [items]);
+
+  const height = (endHour - startHour) * HOUR_HEIGHT;
+  const offset = startHour * 60;
 
   return (
-    <div className="overflow-x-auto">
-      <div className="min-w-[1080px]">
-        <div
-          className={cn(
-            'overflow-hidden rounded-[10px] border',
-            light ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.025]',
-          )}
-        >
+    <Panel light={light} className="overflow-hidden">
+      <div className="overflow-x-auto">
+        <div className="min-w-[940px]">
           <div
             className={cn(
-              'sticky top-0 z-40 grid grid-cols-[74px_repeat(7,minmax(132px,1fr))] border-b backdrop-blur-xl',
+              'grid border-b',
               borderTone(light),
-              light ? 'bg-white/92' : 'bg-[#101010]/92',
             )}
+            style={{ gridTemplateColumns: '70px repeat(7, minmax(116px, 1fr))' }}
           >
-            <div className={cn('border-r px-3 py-3 text-[11px] font-medium', borderTone(light), mutedText(light))}>
+            <div className={cn('px-3 py-3 text-[10.5px] font-medium', mutedText(light))}>
               {locale === 'ru' ? 'Время' : 'Time'}
             </div>
-            {dates.map((date) => {
+
+            {days.map((date) => {
               const iso = toLocalIsoDate(date);
               const isToday = iso === todayIso;
-              const isSelected = isSameDay(date, selectedDate);
+              const count = itemsByDate.get(iso)?.length ?? 0;
 
               return (
                 <button
                   key={iso}
                   type="button"
-                  onClick={() => onDateSelect(date)}
+                  onClick={() => onSelectDate(date)}
                   className={cn(
-                    'border-r px-2 py-2 text-left transition-colors last:border-r-0',
+                    'border-l px-2 py-2 text-left transition-colors',
                     borderTone(light),
-                    isSelected
+                    isToday
                       ? light
-                        ? 'bg-black/[0.045]'
-                        : 'bg-white/[0.06]'
+                        ? 'bg-black/[0.025]'
+                        : 'bg-white/[0.035]'
                       : light
-                        ? 'hover:bg-black/[0.025]'
-                        : 'hover:bg-white/[0.04]',
+                        ? 'hover:bg-black/[0.018]'
+                        : 'hover:bg-white/[0.026]',
                   )}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className={cn('text-[11px] font-semibold', pageText(light))}>
-                      {formatWeekday(date, locale)}
+                      {getShortWeekday(date, locale)}
                     </span>
                     <span
                       className={cn(
-                        'grid size-7 place-items-center rounded-[9px] text-[11px] font-semibold',
+                        'grid size-6 place-items-center rounded-[8px] text-[11px] font-semibold',
                         isToday
-                          ? 'cb-neutral-primary cb-neutral-primary-dark text-white'
-                          : light
-                            ? 'bg-black/[0.035] text-black/58'
-                            : 'bg-white/[0.05] text-white/58',
+                          ? light
+                            ? 'bg-black text-white'
+                            : 'bg-white text-black'
+                          : mutedText(light),
                       )}
                     >
                       {date.getDate()}
                     </span>
+                  </div>
+                  <div className={cn('mt-1 text-[10px]', faintText(light))}>
+                    {count
+                      ? locale === 'ru'
+                        ? `${count} зап.`
+                        : `${count} bk.`
+                      : '—'}
                   </div>
                 </button>
               );
             })}
           </div>
 
-          <div className="grid grid-cols-[74px_repeat(7,minmax(132px,1fr))]">
-            <div className={cn('relative border-r', borderTone(light))} style={{ height }}>
-              {workWindow.hours.map((hour) => (
-                <div
-                  key={hour}
-                  style={{ top: ((hour - workWindow.startMinutes) / 60) * WEEK_HOUR_HEIGHT - 7 }}
-                  className={cn('absolute right-3 text-[11px] font-medium tabular-nums', mutedText(light))}
-                >
-                  {formatMinutesAsTime(hour)}
-                </div>
-              ))}
+          <div
+            className="grid"
+            style={{ gridTemplateColumns: '70px repeat(7, minmax(116px, 1fr))' }}
+          >
+            <div className="relative" style={{ height }}>
+              {Array.from({ length: endHour - startHour + 1 }, (_, index) => {
+                const hour = startHour + index;
+
+                return (
+                  <div
+                    key={hour}
+                    className={cn(
+                      'absolute left-0 right-0 border-t px-3 text-[10.5px] font-medium tabular-nums',
+                      borderTone(light),
+                      faintText(light),
+                    )}
+                    style={{ top: index * HOUR_HEIGHT }}
+                  >
+                    <span className="relative -top-[7px]">
+                      {hour.toString().padStart(2, '0')}:00
+                    </span>
+                  </div>
+                );
+              })}
             </div>
 
-            {dates.map((date) => {
+            {days.map((date) => {
               const iso = toLocalIsoDate(date);
-              const dayBookings = layoutBookings(bookingsByDate.get(iso) ?? []);
-              const showNow = iso === todayIso && nowMinutes >= workWindow.startMinutes && nowMinutes <= workWindow.endMinutes;
+              const dayItems = layoutOverlaps(itemsByDate.get(iso) ?? []);
+              const showNow =
+                iso === todayIso && nowMinutes >= offset && nowMinutes <= endHour * 60;
 
               return (
                 <div
                   key={iso}
-                  className={cn('relative border-r last:border-r-0', borderTone(light))}
-                  style={{
-                    height,
-                    backgroundImage: light
-                      ? 'linear-gradient(to bottom, rgba(0,0,0,.064) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,.032) 1px, transparent 1px)'
-                      : 'linear-gradient(to bottom, rgba(255,255,255,.07) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.032) 1px, transparent 1px)',
-                    backgroundSize: `100% ${WEEK_HOUR_HEIGHT}px, 100% ${WEEK_HOUR_HEIGHT / 2}px`,
-                  }}
+                  className={cn('relative border-l', borderTone(light))}
+                  style={{ height }}
                 >
-                  {showNow ? (
+                  {Array.from({ length: endHour - startHour + 1 }, (_, index) => (
                     <div
-                      style={{ top: nowTop }}
-                      className="pointer-events-none absolute left-0 right-0 z-30 flex items-center"
-                    >
-                      <span className="h-px flex-1 bg-red-500/80" />
-                    </div>
-                  ) : null}
-
-                  {dayBookings.map((booking) => (
-                    <BookingBlock
-                      key={booking.id}
-                      booking={booking}
-                      light={light}
-                      workWindow={workWindow}
-                      hourHeight={WEEK_HOUR_HEIGHT}
-                      onSelect={onSelect}
-                      compact
+                      key={index}
+                      className={cn('absolute left-0 right-0 border-t', borderTone(light))}
+                      style={{ top: index * HOUR_HEIGHT }}
                     />
                   ))}
+
+                  {showNow ? (
+                    <div
+                      className="pointer-events-none absolute left-0 right-0 z-10 h-px bg-current text-current"
+                      style={{ top: ((nowMinutes - offset) / 60) * HOUR_HEIGHT }}
+                    />
+                  ) : null}
+
+                  {dayItems.map((booking) => {
+                    const top = ((booking.startMinutes - offset) / 60) * HOUR_HEIGHT;
+                    const heightPx = ((booking.endMinutes - booking.startMinutes) / 60) * HOUR_HEIGHT;
+                    const gap = 4;
+                    const width = `calc(${100 / booking.laneCount}% - ${gap}px)`;
+                    const left = `calc(${(100 / booking.laneCount) * booking.lane}% + ${gap / 2}px)`;
+
+                    return (
+                      <BookingBlock
+                        key={booking.id}
+                        booking={booking}
+                        top={top}
+                        height={heightPx}
+                        light={light}
+                        locale={locale}
+                        compact
+                        active={selectedId === booking.id}
+                        onClick={() => onSelect(booking)}
+                        style={{ left, width }}
+                      />
+                    );
+                  })}
                 </div>
               );
             })}
           </div>
         </div>
       </div>
-    </div>
+    </Panel>
   );
 }
 
 function MonthCalendar({
-  dates,
+  items,
   selectedDate,
+  selectedId,
   todayIso,
-  bookingsByDate,
   light,
   locale,
-  onDateSelect,
   onSelect,
+  onSelectDate,
 }: {
-  dates: Date[];
+  items: CalendarBooking[];
   selectedDate: Date;
+  selectedId: string | null;
   todayIso: string;
-  bookingsByDate: Map<string, CalendarBooking[]>;
   light: boolean;
   locale: 'ru' | 'en';
-  onDateSelect: (date: Date) => void;
   onSelect: (booking: CalendarBooking) => void;
+  onSelectDate: (date: Date) => void;
 }) {
-  const currentMonth = selectedDate.getMonth();
-  const weekdays = Array.from({ length: 7 }, (_, index) => addDays(startOfWeekMonday(new Date(2024, 0, 1)), index));
+  const days = useMemo(() => getVisibleDates('month', selectedDate), [selectedDate]);
+  const monthKey = toLocalIsoDate(selectedDate).slice(0, 7);
+
+  const itemsByDate = useMemo(() => {
+    const map = new Map<string, CalendarBooking[]>();
+    for (const item of items) {
+      const current = map.get(item.date) ?? [];
+      current.push(item);
+      map.set(item.date, current.sort((left, right) => left.start.localeCompare(right.start)));
+    }
+    return map;
+  }, [items]);
 
   return (
-    <div
-      className={cn(
-        'overflow-hidden rounded-[10px] border',
-        light ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.025]',
-      )}
-    >
-      <div className={cn('grid grid-cols-7 border-b', borderTone(light))}>
-        {weekdays.map((date) => (
-          <div
-            key={date.getDay()}
-            className={cn('border-r px-3 py-2 text-[11px] font-medium last:border-r-0', borderTone(light), mutedText(light))}
-          >
-            {formatWeekday(date, locale)}
-          </div>
-        ))}
+    <Panel light={light} className="overflow-hidden">
+      <div className="grid grid-cols-7 border-b">
+        {Array.from({ length: 7 }, (_, index) => {
+          const date = addDays(startOfWeekMonday(new Date()), index);
+          return (
+            <div
+              key={index}
+              className={cn(
+                'border-r px-2.5 py-2 text-[10.5px] font-semibold last:border-r-0',
+                borderTone(light),
+                mutedText(light),
+              )}
+            >
+              {getShortWeekday(date, locale)}
+            </div>
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-7">
-        {dates.map((date) => {
+        {days.map((date) => {
           const iso = toLocalIsoDate(date);
-          const dayBookings = bookingsByDate.get(iso) ?? [];
-          const outside = date.getMonth() !== currentMonth;
-          const selected = isSameDay(date, selectedDate);
-          const today = iso === todayIso;
-          const visible = dayBookings.slice(0, 3);
-          const hidden = Math.max(0, dayBookings.length - visible.length);
+          const dayItems = itemsByDate.get(iso) ?? [];
+          const inMonth = iso.startsWith(monthKey);
+          const isToday = iso === todayIso;
 
           return (
-            <div
+            <button
               key={iso}
-              role="button"
-              tabIndex={0}
-              onClick={() => onDateSelect(date)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  onDateSelect(date);
-                }
-              }}
+              type="button"
+              onClick={() => onSelectDate(date)}
               className={cn(
-                'min-h-[138px] border-r border-b p-2.5 text-left transition-colors last:border-r-0',
+                'min-h-[112px] border-r border-t p-2 text-left transition-colors last:border-r-0',
                 borderTone(light),
-                selected
+                inMonth
                   ? light
-                    ? 'bg-black/[0.04]'
-                    : 'bg-white/[0.055]'
+                    ? 'bg-white/50 hover:bg-black/[0.018]'
+                    : 'bg-white/[0.018] hover:bg-white/[0.032]'
                   : light
-                    ? 'hover:bg-black/[0.018]'
-                    : 'hover:bg-white/[0.035]',
-                outside && 'opacity-45',
+                    ? 'bg-black/[0.018] text-black/32'
+                    : 'bg-white/[0.012] text-white/28',
               )}
             >
               <div className="mb-2 flex items-center justify-between gap-2">
                 <span
                   className={cn(
-                    'grid size-7 place-items-center rounded-[9px] text-[11px] font-semibold',
-                    today
-                      ? 'cb-neutral-primary cb-neutral-primary-dark text-white'
-                      : selected
-                        ? light
-                          ? 'bg-black text-white'
-                          : 'bg-white text-black'
-                        : light
-                          ? 'bg-black/[0.035] text-black/58'
-                          : 'bg-white/[0.045] text-white/58',
+                    'grid size-6 place-items-center rounded-[8px] text-[11px] font-semibold',
+                    isToday
+                      ? light
+                        ? 'bg-black text-white'
+                        : 'bg-white text-black'
+                      : pageText(light),
                   )}
                 >
                   {date.getDate()}
                 </span>
-                {dayBookings.length ? (
-                  <span className={cn('text-[10px] font-medium', mutedText(light))}>
-                    {dayBookings.length}
+                {dayItems.length ? (
+                  <span className={cn('text-[10px] font-medium', faintText(light))}>
+                    {dayItems.length}
                   </span>
                 ) : null}
               </div>
 
-              <div className="space-y-1.5">
-                {visible.map((booking) => (
-                  <button
+              <div className="space-y-1">
+                {dayItems.slice(0, 3).map((booking) => (
+                  <span
                     key={booking.id}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     onClick={(event) => {
                       event.stopPropagation();
                       onSelect(booking);
                     }}
-                    style={accentPillStyle(booking.color, light, 'soft')}
-                    className="block w-full rounded-[9px] border px-2 py-1.5 text-left text-[10.5px] font-medium transition-transform duration-150 active:scale-[0.99]"
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onSelect(booking);
+                      }
+                    }}
+                    style={bookingCardStyle(booking.color, light, selectedId === booking.id)}
+                    className="block rounded-[7px] border px-1.5 py-1"
                   >
-                    <span className="block truncate">{booking.start} · {booking.clientName}</span>
-                    <span className="mt-0.5 block truncate text-[9.5px] opacity-72">{booking.service}</span>
-                  </button>
+                    <span className={cn('block truncate text-[10px] font-semibold', pageText(light))}>
+                      {booking.start} · {booking.clientName}
+                    </span>
+                  </span>
                 ))}
 
-                {hidden ? (
-                  <span className={cn('block px-1 pt-1 text-[10.5px] font-medium', mutedText(light))}>
-                    +{hidden}
+                {dayItems.length > 3 ? (
+                  <span className={cn('block pt-0.5 text-[10px] font-medium', mutedText(light))}>
+                    +{dayItems.length - 3}
                   </span>
                 ) : null}
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
-    </div>
+    </Panel>
   );
 }
 
-function InfoRow({
-  label,
-  value,
-  light,
-}: {
-  label: string;
-  value: string;
-  light: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        'flex min-h-10 items-center justify-between gap-3 rounded-[9px] border px-3',
-        light ? 'border-black/[0.07] bg-white' : 'border-white/[0.08] bg-white/[0.04]',
-      )}
-    >
-      <span className={cn('text-[11px] font-medium', mutedText(light))}>{label}</span>
-      <span className={cn('truncate text-right text-[11.5px] font-medium', pageText(light))}>{value}</span>
-    </div>
-  );
-}
-
-function BookingDialog({
+function BookingDetails({
   booking,
-  light,
   locale,
+  light,
   actionLoading,
   onClose,
   onStatusChange,
 }: {
-  booking: CalendarBooking | null;
-  light: boolean;
+  booking: CalendarBooking;
   locale: 'ru' | 'en';
+  light: boolean;
   actionLoading: BookingStatus | null;
   onClose: () => void;
   onStatusChange: (status: BookingStatus) => void;
 }) {
-  if (!booking) return null;
-
-  const canClose = booking.status !== 'completed' && booking.status !== 'cancelled' && booking.status !== 'no_show';
+  const statusColor = statusTone(booking.status, booking.color, light);
+  const isClosed =
+    booking.status === 'completed' ||
+    booking.status === 'no_show' ||
+    booking.status === 'cancelled';
 
   return (
-    <div
-      role="presentation"
-      onClick={onClose}
-      className="fixed inset-0 z-[90] bg-black/42 backdrop-blur-[6px]"
-    >
+    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/30 p-3 backdrop-blur-[2px] md:items-center">
+      <button
+        type="button"
+        aria-label={locale === 'ru' ? 'Закрыть' : 'Close'}
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+      />
+
       <div
-        role="dialog"
-        aria-modal="true"
-        onClick={(event) => event.stopPropagation()}
         className={cn(
-          'fixed bottom-0 left-0 right-0 rounded-t-[18px] border p-4 shadow-2xl sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2 sm:w-[430px] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-[14px] sm:p-5',
-          cardTone(light),
-          pageText(light),
+          'relative w-full max-w-[420px] overflow-hidden rounded-[18px] border shadow-[0_24px_90px_rgba(0,0,0,0.32)]',
+          light ? 'border-black/[0.08] bg-[#fbfbfa]' : 'border-white/[0.09] bg-[#101010]',
         )}
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <MicroLabel light={light} active accentColor={booking.color}>
-              <StatusDot light={light} active accentColor={booking.color} />
-              {booking.service}
-            </MicroLabel>
+        <div className="p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <MicroLabel light={light} active accentColor={statusColor}>
+                <StatusDot light={light} active accentColor={statusColor} />
+                {bookingStatusLabel(booking.status, locale)}
+              </MicroLabel>
 
-            <h2 className="mt-4 truncate text-[28px] font-semibold tracking-[-0.07em]">
-              {booking.clientName}
-            </h2>
+              <div
+                className={cn(
+                  'mt-3 truncate text-[24px] font-semibold tracking-[-0.065em]',
+                  pageText(light),
+                )}
+              >
+                {booking.clientName}
+              </div>
 
-            <p className={cn('mt-1 text-[12px]', mutedText(light))}>
-              {bookingStatusLabel(booking.status, locale)} · {booking.source}
-            </p>
+              <div className={cn('mt-1 truncate text-[12px]', mutedText(light))}>
+                {booking.service}
+              </div>
+            </div>
+
+            <button type="button" onClick={onClose} className={iconButtonBase(light)}>
+              <X className="size-4" />
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className={cn(
-              'inline-flex size-9 shrink-0 items-center justify-center rounded-[9px] border transition-colors',
-              light
-                ? 'border-black/[0.08] bg-white text-black/50 hover:text-black'
-                : 'border-white/[0.08] bg-white/[0.04] text-white/52 hover:text-white',
-            )}
-          >
-            <X className="size-4" />
-          </button>
-        </div>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <Panel light={light} className="p-3">
+              <div className={cn('text-[10.5px] font-medium', faintText(light))}>
+                {locale === 'ru' ? 'Время' : 'Time'}
+              </div>
+              <div className={cn('mt-1 text-[13px] font-semibold', pageText(light))}>
+                {booking.start}–{booking.end}
+              </div>
+            </Panel>
 
-        <div className="mt-5 grid gap-2">
-          <InfoRow
-            light={light}
-            label={locale === 'ru' ? 'Дата и время' : 'Date and time'}
-            value={`${booking.date} · ${booking.start}–${booking.end}`}
-          />
-          <InfoRow
-            light={light}
-            label={locale === 'ru' ? 'Длительность' : 'Duration'}
-            value={locale === 'ru' ? `${booking.durationMinutes} мин` : `${booking.durationMinutes} min`}
-          />
-          <InfoRow
-            light={light}
-            label={locale === 'ru' ? 'Телефон' : 'Phone'}
-            value={booking.phone || '—'}
-          />
-          <InfoRow
-            light={light}
-            label={locale === 'ru' ? 'Сумма' : 'Amount'}
-            value={booking.amount > 0 ? formatCurrencyCompact(booking.amount, locale) : '—'}
-          />
-        </div>
+            <Panel light={light} className="p-3">
+              <div className={cn('text-[10.5px] font-medium', faintText(light))}>
+                {locale === 'ru' ? 'Длительность' : 'Duration'}
+              </div>
+              <div className={cn('mt-1 text-[13px] font-semibold', pageText(light))}>
+                {booking.durationMinutes} {locale === 'ru' ? 'мин' : 'min'}
+              </div>
+            </Panel>
 
-        <Panel light={light} className="mt-3 p-4">
-          <div className={cn('text-[10.5px] font-medium', mutedText(light))}>
-            {locale === 'ru' ? 'Комментарий' : 'Note'}
+            <Panel light={light} className="p-3">
+              <div className={cn('text-[10.5px] font-medium', faintText(light))}>
+                {locale === 'ru' ? 'Сумма' : 'Amount'}
+              </div>
+              <div className={cn('mt-1 text-[13px] font-semibold', pageText(light))}>
+                {booking.amount ? formatCurrencyCompact(booking.amount, locale) : '—'}
+              </div>
+            </Panel>
+
+            <Panel light={light} className="p-3">
+              <div className={cn('text-[10.5px] font-medium', faintText(light))}>
+                {locale === 'ru' ? 'Источник' : 'Source'}
+              </div>
+              <div className={cn('mt-1 truncate text-[13px] font-semibold', pageText(light))}>
+                {booking.sourceLabel || 'Web'}
+              </div>
+            </Panel>
           </div>
-          <div className={cn('mt-2 text-[13px] leading-6', pageText(light))}>
-            {booking.note || '—'}
-          </div>
-        </Panel>
 
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <Button asChild className={cn('justify-start', buttonBase(light))}>
-            <Link href={`tel:${booking.phone}`}>
-              <PhoneCall className="size-3.5" />
-              {locale === 'ru' ? 'Позвонить' : 'Call'}
-            </Link>
-          </Button>
+          <Panel light={light} className="mt-2 p-3">
+            <div className={cn('text-[10.5px] font-medium', faintText(light))}>
+              {locale === 'ru' ? 'Комментарий' : 'Note'}
+            </div>
+            <div className={cn('mt-1 text-[12px] leading-5', pageText(light))}>
+              {booking.note || '—'}
+            </div>
+          </Panel>
 
-          <Button asChild className={cn('justify-start', buttonBase(light, true))}>
-            <Link href="/dashboard/chats">
-              <MessageCircleMore className="size-3.5" />
-              {locale === 'ru' ? 'Чат' : 'Chat'}
-            </Link>
-          </Button>
-
-          <Button asChild className={cn('justify-start', buttonBase(light))}>
-            <Link href="/dashboard/availability">
-              <CalendarClock className="size-3.5" />
-              {locale === 'ru' ? 'Перенести' : 'Reschedule'}
-            </Link>
-          </Button>
-
-          {canClose ? (
-            <Button
-              type="button"
-              className={cn('justify-start', buttonBase(light, true))}
-              onClick={() => onStatusChange('completed')}
-              disabled={actionLoading !== null}
-            >
-              <CheckCircle2 className="size-3.5" />
-              {actionLoading === 'completed' ? '…' : locale === 'ru' ? 'Завершить' : 'Complete'}
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <Button asChild className={cn('justify-start', buttonBase(light))}>
+              <Link href={`tel:${booking.phone}`}>
+                <PhoneCall className="size-3.5" />
+                {locale === 'ru' ? 'Позвонить' : 'Call'}
+              </Link>
             </Button>
-          ) : null}
 
-          {canClose ? (
-            <Button
-              type="button"
-              className={cn('col-span-2 justify-start', buttonBase(light))}
-              onClick={() => onStatusChange('no_show')}
-              disabled={actionLoading !== null}
-            >
-              <X className="size-3.5" />
-              {actionLoading === 'no_show' ? '…' : locale === 'ru' ? 'Клиент не пришёл' : 'Mark no-show'}
+            <Button asChild className={cn('justify-start', buttonBase(light, true))}>
+              <Link href="/dashboard/chats">
+                <MessageCircleMore className="size-3.5" />
+                {locale === 'ru' ? 'Чат' : 'Chat'}
+              </Link>
             </Button>
-          ) : null}
+
+            <Button asChild className={cn('justify-start', buttonBase(light))}>
+              <Link href="/dashboard/availability">
+                <CalendarClock className="size-3.5" />
+                {locale === 'ru' ? 'Перенести' : 'Reschedule'}
+              </Link>
+            </Button>
+
+            {!isClosed ? (
+              <Button
+                type="button"
+                className={cn('justify-start', buttonBase(light, true))}
+                onClick={() => onStatusChange('completed')}
+                disabled={actionLoading !== null}
+              >
+                <CheckCircle2 className="size-3.5" />
+                {actionLoading === 'completed' ? '…' : locale === 'ru' ? 'Пришёл' : 'Arrived'}
+              </Button>
+            ) : null}
+
+            {!isClosed ? (
+              <Button
+                type="button"
+                className={cn('col-span-2 justify-start', buttonBase(light))}
+                onClick={() => onStatusChange('no_show')}
+                disabled={actionLoading !== null}
+              >
+                <Ban className="size-3.5" />
+                {actionLoading === 'no_show' ? '…' : locale === 'ru' ? 'Не пришёл' : 'No-show'}
+              </Button>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>
@@ -1460,16 +1601,24 @@ function BookingDialog({
 
 export default function DashboardTodayPage() {
   const { updateBookingStatus } = useApp();
-  const { hasHydrated, ownedProfile, bookings, dataset, locale, demoMode } = useOwnedWorkspaceData();
+  const {
+    hasHydrated,
+    ownedProfile,
+    bookings,
+    dataset,
+    locale,
+    workspaceData,
+    demoMode,
+  } = useOwnedWorkspaceData();
   const { resolvedTheme } = useTheme();
   const { settings } = useAppearance();
 
   const [mounted, setMounted] = useState(false);
-  const [now, setNow] = useState(() => new Date());
-  const [viewMode, setViewMode] = useState<CalendarViewMode>('week');
-  const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
-  const [selectedBooking, setSelectedBooking] = useState<CalendarBooking | null>(null);
+  const [view, setView] = useState<CalendarView>('week');
+  const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<BookingStatus | null>(null);
+  const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
     setMounted(true);
@@ -1481,15 +1630,15 @@ export default function DashboardTodayPage() {
   }, []);
 
   useEffect(() => {
-    if (!selectedBooking) return;
+    if (!selectedBookingId) return;
 
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setSelectedBooking(null);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelectedBookingId(null);
     };
 
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [selectedBooking]);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedBookingId]);
 
   const currentTheme: ThemeMode = mounted
     ? resolvedTheme === 'light'
@@ -1498,134 +1647,177 @@ export default function DashboardTodayPage() {
     : 'dark';
 
   const isLight = currentTheme === 'light';
+
   const accentColor = accentPalette[settings.accentTone].solid;
   const publicAccentColor = accentPalette[settings.publicAccent].solid;
+
   const todayIso = useMemo(() => toLocalIsoDate(now), [now]);
+  const nowMinutes = useMemo(() => now.getHours() * 60 + now.getMinutes(), [now]);
 
-  const labels = locale === 'ru'
-    ? {
-        title: 'Записи на сегодня',
-        description: 'Профессиональный календарь мастера: день, неделя, месяц, статусы и быстрые действия.',
-        emptyTitle: 'Сначала настройте профиль мастера',
-        emptyDescription: 'Создайте профиль, чтобы открыть календарь, записи, чаты и быстрые действия.',
-        emptyAction: 'Создать профиль',
-        profileMissing: 'Профиль не настроен',
-        calendar: 'Календарь записей',
-        calendarDescription: 'Клик по записи открывает мини-карточку клиента с действиями.',
-        today: 'Сегодня',
-        previous: 'Назад',
-        next: 'Вперёд',
-        day: 'День',
-        week: 'Неделя',
-        month: 'Месяц',
-        bookings: 'Записей',
-        active: 'Активных',
-        completed: 'Завершено',
-        revenue: 'Выручка',
-        nearest: 'Ближайшая',
-        quiet: 'Пока пусто',
-        live: demoMode ? 'Демо-режим' : 'Рабочий календарь',
-        setupCards: {
-          calendar: 'Календарь',
-          calendarText: 'После создания профиля здесь появится рабочее расписание.',
-          chats: 'Чаты',
-          chatsText: 'Быстрый переход к перепискам и напоминаниям.',
-          public: 'Онлайн-запись',
-          publicText: 'Публичная ссылка для клиентов создаст новые записи.',
-        },
-      }
-    : {
-        title: 'Today bookings',
-        description: 'Professional master schedule: day, week, month, statuses, and quick actions.',
-        emptyTitle: 'Create the master profile first',
-        emptyDescription: 'Create a profile to unlock calendar, bookings, chats, and quick actions.',
-        emptyAction: 'Create profile',
-        profileMissing: 'Profile missing',
-        calendar: 'Booking calendar',
-        calendarDescription: 'Click a booking to open a compact client card with actions.',
-        today: 'Today',
-        previous: 'Previous',
-        next: 'Next',
-        day: 'Day',
-        week: 'Week',
-        month: 'Month',
-        bookings: 'Bookings',
-        active: 'Active',
-        completed: 'Completed',
-        revenue: 'Revenue',
-        nearest: 'Next up',
-        quiet: 'Quiet for now',
-        live: demoMode ? 'Demo mode' : 'Live calendar',
-        setupCards: {
-          calendar: 'Calendar',
-          calendarText: 'After profile setup, the work schedule will appear here.',
-          chats: 'Chats',
-          chatsText: 'Quick access to conversations and reminders.',
-          public: 'Online booking',
-          publicText: 'A public client link creates new bookings.',
-        },
-      };
-
-  const serviceMap = useMemo(() => {
-    const map = new Map<string, ServiceLike>();
-
-    for (const service of dataset?.services ?? []) {
-      const item = service as ServiceLike;
-      map.set(item.name, item);
-    }
-
-    return map;
-  }, [dataset]);
+  const serviceMap = useMemo(
+    () => buildServiceMap(dataset?.services, workspaceData?.services),
+    [dataset?.services, workspaceData?.services],
+  );
 
   const calendarBookings = useMemo(
-    () => bookings
-      .map((booking) => mapBookingToCalendarBooking(booking, serviceMap, accentColor, locale))
-      .sort((left, right) => `${left.date}T${left.start}`.localeCompare(`${right.date}T${right.start}`)),
-    [accentColor, bookings, locale, serviceMap],
+    () =>
+      bookings
+        .map((booking) =>
+          mapBookingToCalendarBooking(booking, serviceMap, accentColor, publicAccentColor),
+        )
+        .sort((left, right) => `${left.date}T${left.start}`.localeCompare(`${right.date}T${right.start}`)),
+    [accentColor, bookings, publicAccentColor, serviceMap],
   );
 
-  const rangeDates = useMemo(() => getRangeDates(viewMode, selectedDate), [selectedDate, viewMode]);
-  const { startIso, endIso } = useMemo(
-    () => getRangeIsoBounds(viewMode, selectedDate),
-    [selectedDate, viewMode],
+  const visibleDates = useMemo(() => getVisibleDates(view, selectedDate), [selectedDate, view]);
+  const visibleDateSet = useMemo(
+    () => new Set(visibleDates.map((date) => toLocalIsoDate(date))),
+    [visibleDates],
   );
 
-  const rangeBookings = useMemo(
-    () => calendarBookings.filter((booking) => booking.date >= startIso && booking.date <= endIso),
-    [calendarBookings, endIso, startIso],
+  const visibleBookings = useMemo(
+    () => calendarBookings.filter((booking) => visibleDateSet.has(booking.date)),
+    [calendarBookings, visibleDateSet],
   );
 
-  const bookingsByDate = useMemo(() => groupByDate(calendarBookings), [calendarBookings]);
-  const workWindow = useMemo(() => deriveWorkWindow(rangeBookings), [rangeBookings]);
-
-  const nearestBooking = useMemo(
-    () => calendarBookings.find((booking) => isBookingActive(booking) && `${booking.date}T${booking.start}` >= `${todayIso}T00:00`) ?? null,
-    [calendarBookings, todayIso],
+  const calendarWorkRange = useMemo(
+    () => getHoursRange(view === 'month' ? calendarBookings : visibleBookings),
+    [calendarBookings, view, visibleBookings],
   );
 
-  const stats = useMemo(() => {
-    const active = rangeBookings.filter(isBookingActive);
-    const completed = rangeBookings.filter((booking) => booking.status === 'completed');
-    const revenue = rangeBookings.reduce((sum, booking) => sum + booking.amount, 0);
+  const selectedBooking = useMemo(
+    () => calendarBookings.find((booking) => booking.id === selectedBookingId) ?? null,
+    [calendarBookings, selectedBookingId],
+  );
 
-    return {
-      total: rangeBookings.length,
-      active: active.length,
-      completed: completed.length,
-      revenue,
-    };
-  }, [rangeBookings]);
+  const rangeTitle = useMemo(
+    () => formatRangeTitle(view, selectedDate, locale),
+    [locale, selectedDate, view],
+  );
 
-  function shiftPeriod(direction: -1 | 1) {
-    setSelectedDate((date) => {
-      if (viewMode === 'day') return addDays(date, direction);
-      if (viewMode === 'week') return addDays(date, direction * 7);
-      return addMonths(date, direction);
+  const selectedDateIso = useMemo(() => toLocalIsoDate(selectedDate), [selectedDate]);
+
+  const nextBooking = useMemo(
+    () =>
+      calendarBookings.find(
+        (booking) =>
+          isActiveBooking(booking.source) &&
+          `${booking.date}T${booking.start}` >= `${todayIso}T${formatMinutesAsTime(nowMinutes)}`,
+      ) ?? null,
+    [calendarBookings, nowMinutes, todayIso],
+  );
+
+  const metrics = useMemo(() => {
+    const active = visibleBookings.filter((booking) => isActiveBooking(booking.source));
+    const done = visibleBookings.filter((booking) => isDoneBooking(booking.source));
+    const revenue = visibleBookings.reduce((sum, booking) => sum + booking.amount, 0);
+
+    return [
+      {
+        label: locale === 'ru' ? 'Записи' : 'Bookings',
+        value: active.length,
+        hint: locale === 'ru' ? 'в периоде' : 'in range',
+      },
+      {
+        label: locale === 'ru' ? 'Завершено' : 'Completed',
+        value: done.length,
+        hint: `${visibleBookings.filter((booking) => booking.status === 'no_show').length} ${
+          locale === 'ru' ? 'не пришли' : 'no-show'
+        }`,
+      },
+      {
+        label: locale === 'ru' ? 'Выручка' : 'Revenue',
+        value: formatCurrencyCompact(revenue, locale),
+        hint: locale === 'ru' ? 'по записям' : 'from bookings',
+      },
+      {
+        label: locale === 'ru' ? 'Ближайшая' : 'Next',
+        value: nextBooking?.start ?? '—',
+        hint: nextBooking ? `${nextBooking.clientName} · ${nextBooking.service}` : locale === 'ru' ? 'пока пусто' : 'empty',
+      },
+    ];
+  }, [locale, nextBooking, visibleBookings]);
+
+  const copy =
+    locale === 'ru'
+      ? {
+          title: 'Сегодня',
+          description: 'Компактный календарь записей: день, неделя, месяц и быстрые действия.',
+          createTitle: 'Сначала настройте профиль мастера',
+          createDescription:
+            'Создайте профиль, чтобы открыть календарь, записи, чаты и быстрые действия.',
+          createProfile: 'Создать профиль',
+          profileMissing: 'Профиль не настроен',
+          schedule: 'Календарь',
+          scheduleDescription: 'Нажмите на запись, чтобы открыть мини-карточку клиента.',
+          today: 'Сегодня',
+          day: 'День',
+          week: 'Неделя',
+          month: 'Месяц',
+          demo: 'Демо',
+          live: 'Рабочий режим',
+          setupCards: {
+            calendar: 'Календарь',
+            calendarText: 'После настройки здесь появится сетка записей мастера.',
+            clients: 'Клиенты',
+            clientsText: 'В карточке записи будут контакты, комментарии и статусы.',
+            public: 'Онлайн-запись',
+            publicText: 'Клиенты смогут записываться по публичной ссылке.',
+          },
+        }
+      : {
+          title: 'Today',
+          description: 'Compact booking calendar: day, week, month, and quick actions.',
+          createTitle: 'Create the master profile first',
+          createDescription:
+            'Create a profile to unlock calendar, bookings, chats, and quick actions.',
+          createProfile: 'Create profile',
+          profileMissing: 'Profile missing',
+          schedule: 'Calendar',
+          scheduleDescription: 'Click a booking to open a compact client card.',
+          today: 'Today',
+          day: 'Day',
+          week: 'Week',
+          month: 'Month',
+          demo: 'Demo',
+          live: 'Work mode',
+          setupCards: {
+            calendar: 'Calendar',
+            calendarText: 'After setup, the master booking grid will appear here.',
+            clients: 'Clients',
+            clientsText: 'The booking card will show contacts, notes, and statuses.',
+            public: 'Online booking',
+            publicText: 'Clients will be able to book through the public link.',
+          },
+        };
+
+  function goPrevious() {
+    setSelectedDate((current) => {
+      if (view === 'day') return addDays(current, -1);
+      if (view === 'week') return addDays(current, -7);
+      return addMonths(current, -1);
+    });
+  }
+
+  function goNext() {
+    setSelectedDate((current) => {
+      if (view === 'day') return addDays(current, 1);
+      if (view === 'week') return addDays(current, 7);
+      return addMonths(current, 1);
     });
   }
 
   function goToday() {
-    setSelectedDate(startOfDay(new Date()));
+    setSelectedDate(new Date());
+  }
+
+  function handleSelectDate(date: Date) {
+    setSelectedDate(date);
+    if (view === 'month') setView('day');
+  }
+
+  function handleSelectBooking(booking: CalendarBooking) {
+    setSelectedBookingId(booking.id);
   }
 
   async function handleStatusChange(status: BookingStatus) {
@@ -1635,7 +1827,6 @@ export default function DashboardTodayPage() {
 
     try {
       await updateBookingStatus(selectedBooking.id, status);
-      setSelectedBooking((current) => current ? { ...current, status } : current);
     } finally {
       setActionLoading(null);
     }
@@ -1644,12 +1835,6 @@ export default function DashboardTodayPage() {
   if (!hasHydrated || !mounted) return null;
 
   if (!ownedProfile) {
-    const setupCards: Array<[string, string, ReactNode]> = [
-      [labels.setupCards.calendar, labels.setupCards.calendarText, <CalendarDays key="calendar" className="size-3.5" />],
-      [labels.setupCards.chats, labels.setupCards.chatsText, <MessageCircleMore key="chats" className="size-3.5" />],
-      [labels.setupCards.public, labels.setupCards.publicText, <Globe2 key="public" className="size-3.5" />],
-    ];
-
     return (
       <WorkspaceShell>
         <main
@@ -1659,85 +1844,97 @@ export default function DashboardTodayPage() {
           )}
         >
           <div className="mx-auto w-full max-w-[var(--page-max-width)]">
-            <div className="mb-6 md:mb-7">
-              <div className="min-w-0">
-                <h1
-                  className={cn(
-                    'text-[31px] font-semibold tracking-[-0.075em] md:text-[42px]',
-                    pageText(isLight),
-                  )}
-                >
-                  {labels.title}
-                </h1>
+            <div className="mb-5 md:mb-6">
+              <h1
+                className={cn(
+                  'text-[28px] font-semibold tracking-[-0.075em] md:text-[36px]',
+                  pageText(isLight),
+                )}
+              >
+                {copy.title}
+              </h1>
 
-                <p
-                  className={cn(
-                    'mt-2 max-w-[760px] text-[13px] leading-5',
-                    mutedText(isLight),
-                  )}
-                >
-                  {labels.description}
-                </p>
-              </div>
+              <p className={cn('mt-2 max-w-[680px] text-[13px] leading-5', mutedText(isLight))}>
+                {copy.description}
+              </p>
             </div>
 
             <Card light={isLight} className="overflow-hidden">
-              <div className="grid min-h-[320px] place-items-center px-5 py-12 text-center">
-                <div className="mx-auto max-w-[520px]">
+              <div className="grid min-h-[300px] place-items-center px-5 py-10 text-center">
+                <div className="mx-auto max-w-[500px]">
                   <MicroLabel light={isLight}>
                     <StatusDot light={isLight} />
-                    {labels.profileMissing}
+                    {copy.profileMissing}
                   </MicroLabel>
 
                   <h2
                     className={cn(
-                      'mt-5 text-[28px] font-semibold tracking-[-0.065em] md:text-[36px]',
+                      'mt-5 text-[26px] font-semibold tracking-[-0.065em] md:text-[34px]',
                       pageText(isLight),
                     )}
                   >
-                    {labels.emptyTitle}
+                    {copy.createTitle}
                   </h2>
 
                   <p className={cn('mt-3 text-[13px] leading-5', mutedText(isLight))}>
-                    {labels.emptyDescription}
+                    {copy.createDescription}
                   </p>
 
                   <div className="mt-6 flex justify-center">
-                    <Button asChild className={buttonBase(isLight, true)}>
-                      <Link href="/create-profile">
-                        <SquarePen className="size-3.5" />
-                        {labels.emptyAction}
-                      </Link>
-                    </Button>
+                    <PageAction href="/create-profile" light={isLight} active>
+                      <SquarePen className="size-3.5" />
+                      {copy.createProfile}
+                    </PageAction>
                   </div>
                 </div>
               </div>
             </Card>
 
             <div className="mt-4 grid gap-4 md:grid-cols-3">
-              {setupCards.map(([title, text, icon]) => (
-                <Card key={title} light={isLight}>
-                  <div className="p-4">
-                    <MicroLabel light={isLight}>
-                      {icon}
-                      {title}
-                    </MicroLabel>
-
-                    <div
-                      className={cn(
-                        'mt-4 text-[13px] font-semibold tracking-[-0.018em]',
-                        pageText(isLight),
-                      )}
-                    >
-                      {title}
-                    </div>
-
-                    <p className={cn('mt-1 text-[11px] leading-4', mutedText(isLight))}>
-                      {text}
-                    </p>
+              <Card light={isLight}>
+                <div className="p-4">
+                  <MicroLabel light={isLight}>
+                    <CalendarClock className="size-3.5" />
+                    {copy.setupCards.calendar}
+                  </MicroLabel>
+                  <div className={cn('mt-4 text-[13px] font-semibold', pageText(isLight))}>
+                    {copy.schedule}
                   </div>
-                </Card>
-              ))}
+                  <p className={cn('mt-1 text-[11px] leading-4', mutedText(isLight))}>
+                    {copy.setupCards.calendarText}
+                  </p>
+                </div>
+              </Card>
+
+              <Card light={isLight}>
+                <div className="p-4">
+                  <MicroLabel light={isLight}>
+                    <MessageCircleMore className="size-3.5" />
+                    {copy.setupCards.clients}
+                  </MicroLabel>
+                  <div className={cn('mt-4 text-[13px] font-semibold', pageText(isLight))}>
+                    {locale === 'ru' ? 'Карточка записи' : 'Booking card'}
+                  </div>
+                  <p className={cn('mt-1 text-[11px] leading-4', mutedText(isLight))}>
+                    {copy.setupCards.clientsText}
+                  </p>
+                </div>
+              </Card>
+
+              <Card light={isLight}>
+                <div className="p-4">
+                  <MicroLabel light={isLight}>
+                    <Globe2 className="size-3.5" />
+                    {copy.setupCards.public}
+                  </MicroLabel>
+                  <div className={cn('mt-4 text-[13px] font-semibold', pageText(isLight))}>
+                    {locale === 'ru' ? 'Публичная страница' : 'Public page'}
+                  </div>
+                  <p className={cn('mt-1 text-[11px] leading-4', mutedText(isLight))}>
+                    {copy.setupCards.publicText}
+                  </p>
+                </div>
+              </Card>
             </div>
           </div>
         </main>
@@ -1754,262 +1951,200 @@ export default function DashboardTodayPage() {
         )}
       >
         <div className="mx-auto w-full max-w-[var(--page-max-width)]">
-          <div className="mb-6 md:mb-7">
+          <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <MicroLabel light={isLight} active accentColor={accentColor}>
+                  <StatusDot light={isLight} active accentColor={accentColor} />
+                  {demoMode ? copy.demo : copy.live}
+                </MicroLabel>
+
+                <MicroLabel light={isLight}>
+                  <Clock3 className="size-3.5" />
+                  {formatMinutesAsTime(nowMinutes)}
+                </MicroLabel>
+              </div>
+
               <h1
                 className={cn(
-                  'text-[31px] font-semibold tracking-[-0.075em] md:text-[42px]',
+                  'mt-3 text-[28px] font-semibold tracking-[-0.075em] md:text-[36px]',
                   pageText(isLight),
                 )}
               >
-                {labels.title}
+                {copy.title}
               </h1>
 
-              <p
-                className={cn(
-                  'mt-2 max-w-[760px] text-[13px] leading-5',
-                  mutedText(isLight),
-                )}
-              >
-                {labels.description}
+              <p className={cn('mt-1.5 max-w-[720px] text-[13px] leading-5', mutedText(isLight))}>
+                {copy.description}
               </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <ControlGroup light={isLight} className="h-9">
+                <FilterChip
+                  label={copy.day}
+                  active={view === 'day'}
+                  onClick={() => setView('day')}
+                  light={isLight}
+                  accentColor={accentColor}
+                  compact
+                />
+                <FilterChip
+                  label={copy.week}
+                  active={view === 'week'}
+                  onClick={() => setView('week')}
+                  light={isLight}
+                  accentColor={accentColor}
+                  compact
+                />
+                <FilterChip
+                  label={copy.month}
+                  active={view === 'month'}
+                  onClick={() => setView('month')}
+                  light={isLight}
+                  accentColor={accentColor}
+                  compact
+                />
+              </ControlGroup>
+
+              <div className="flex items-center gap-1.5">
+                <button type="button" onClick={goPrevious} className={iconButtonBase(isLight)}>
+                  <ChevronLeft className="size-4" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={goToday}
+                  className={cn(buttonBase(isLight), 'h-8')}
+                >
+                  {copy.today}
+                </button>
+
+                <button type="button" onClick={goNext} className={iconButtonBase(isLight)}>
+                  <ChevronRight className="size-4" />
+                </button>
+              </div>
             </div>
           </div>
 
           <div className="grid gap-4">
             <Card light={isLight} className="overflow-hidden">
-              <div className="p-5 md:p-6">
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+              <div className="p-4 md:p-5">
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <MicroLabel light={isLight} active accentColor={accentColor}>
-                        <StatusDot light={isLight} active accentColor={accentColor} />
-                        {labels.live}
-                      </MicroLabel>
-
-                      <MicroLabel light={isLight}>
-                        {formatCalendarRange(viewMode, selectedDate, locale)}
-                      </MicroLabel>
+                    <div className={cn('text-[11px] font-medium', mutedText(isLight))}>
+                      {view === 'day'
+                        ? locale === 'ru'
+                          ? 'Выбранный день'
+                          : 'Selected day'
+                        : view === 'week'
+                          ? locale === 'ru'
+                            ? 'Выбранная неделя'
+                            : 'Selected week'
+                          : locale === 'ru'
+                            ? 'Выбранный месяц'
+                            : 'Selected month'}
                     </div>
 
                     <div
                       className={cn(
-                        'mt-4 text-[28px] font-semibold tracking-[-0.075em] md:text-[38px]',
+                        'mt-1.5 text-[24px] font-semibold tracking-[-0.065em] md:text-[30px]',
                         pageText(isLight),
                       )}
                     >
-                      {nearestBooking
-                        ? `${nearestBooking.start} · ${nearestBooking.clientName}`
-                        : labels.quiet}
+                      {rangeTitle}
                     </div>
-
-                    <p
-                      className={cn(
-                        'mt-2 max-w-[780px] text-[12.5px] leading-6',
-                        mutedText(isLight),
-                      )}
-                    >
-                      {nearestBooking
-                        ? `${nearestBooking.service} · ${nearestBooking.date} · ${bookingStatusLabel(nearestBooking.status, locale)}`
-                        : locale === 'ru'
-                          ? 'Новые заявки сразу появятся в календаре и в карточках периода.'
-                          : 'New requests will appear in the calendar and period cards.'}
-                    </p>
                   </div>
 
-                  <div className="flex max-w-full flex-wrap items-center gap-2">
-                    <ControlGroup light={isLight}>
-                      <IconButton light={isLight} label={labels.previous} onClick={() => shiftPeriod(-1)}>
-                        <ChevronLeft className="size-4" />
-                      </IconButton>
-                      <button
-                        type="button"
-                        onClick={goToday}
-                        className={cn(
-                          'inline-flex h-10 items-center justify-center border-r px-4 text-[11px] font-semibold tracking-[-0.015em] transition-colors duration-150 active:scale-[0.985]',
-                          isLight
-                            ? 'border-black/[0.07] text-black/58 hover:bg-black/[0.025] hover:text-black'
-                            : 'border-white/[0.07] text-white/55 hover:bg-white/[0.04] hover:text-white',
-                        )}
-                      >
-                        {labels.today}
-                      </button>
-                      <IconButton light={isLight} label={labels.next} onClick={() => shiftPeriod(1)}>
-                        <ChevronRight className="size-4" />
-                      </IconButton>
-                    </ControlGroup>
-
-                    <ControlGroup light={isLight} className="overflow-x-auto">
-                      <FilterChip
-                        label={labels.day}
-                        active={viewMode === 'day'}
-                        onClick={() => setViewMode('day')}
+                  <div className="grid gap-2 sm:grid-cols-2 xl:w-[560px] xl:grid-cols-4">
+                    {metrics.map((metric) => (
+                      <MetricTile
+                        key={metric.label}
+                        label={metric.label}
+                        value={metric.value}
+                        hint={metric.hint}
                         light={isLight}
-                        accentColor={accentColor}
                       />
-                      <FilterChip
-                        label={labels.week}
-                        active={viewMode === 'week'}
-                        onClick={() => setViewMode('week')}
-                        light={isLight}
-                        accentColor={accentColor}
-                      />
-                      <FilterChip
-                        label={labels.month}
-                        active={viewMode === 'month'}
-                        onClick={() => setViewMode('month')}
-                        light={isLight}
-                        accentColor={accentColor}
-                      />
-                    </ControlGroup>
+                    ))}
                   </div>
-                </div>
-
-                <div className="mt-6 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                  <HeroStat
-                    label={labels.bookings}
-                    value={stats.total}
-                    hint={formatCalendarRange(viewMode, selectedDate, locale)}
-                    light={isLight}
-                  />
-
-                  <HeroStat
-                    label={labels.active}
-                    value={stats.active}
-                    hint={locale === 'ru' ? 'без отмен и неявок' : 'excluding missed'}
-                    light={isLight}
-                  />
-
-                  <HeroStat
-                    label={labels.completed}
-                    value={stats.completed}
-                    hint={locale === 'ru' ? 'закрытые визиты' : 'closed visits'}
-                    light={isLight}
-                  />
-
-                  <HeroStat
-                    label={labels.revenue}
-                    value={formatCurrencyCompact(stats.revenue, locale)}
-                    hint={locale === 'ru' ? 'по выбранному периоду' : 'selected period'}
-                    light={isLight}
-                  />
                 </div>
               </div>
             </Card>
 
             <Card light={isLight}>
               <CardTitle
-                title={labels.calendar}
-                description={labels.calendarDescription}
+                title={copy.schedule}
+                description={copy.scheduleDescription}
                 light={isLight}
                 action={
-                  <MicroLabel light={isLight} active accentColor={publicAccentColor}>
-                    {formatMinutesAsTime(workWindow.startMinutes)}–{formatMinutesAsTime(workWindow.endMinutes)}
+                  <MicroLabel light={isLight}>
+                    {view === 'day'
+                      ? selectedDateIso
+                      : `${formatMinutesAsTime(calendarWorkRange.startHour * 60)}–${formatMinutesAsTime(calendarWorkRange.endHour * 60)}`}
                   </MicroLabel>
                 }
               />
 
               <div className="p-3 md:p-4">
-                {viewMode === 'day' ? (
+                {view === 'day' ? (
                   <DayCalendar
-                    date={selectedDate}
-                    bookings={calendarBookings}
-                    workWindow={workWindow}
-                    now={now}
+                    items={calendarBookings}
+                    selectedId={selectedBookingId}
+                    selectedDate={selectedDate}
+                    nowMinutes={nowMinutes}
+                    todayIso={todayIso}
+                    startHour={calendarWorkRange.startHour}
+                    endHour={calendarWorkRange.endHour}
                     light={isLight}
                     locale={locale}
-                    onSelect={setSelectedBooking}
+                    onSelect={handleSelectBooking}
                   />
                 ) : null}
 
-                {viewMode === 'week' ? (
+                {view === 'week' ? (
                   <WeekCalendar
-                    dates={rangeDates.slice(0, 7)}
-                    bookingsByDate={bookingsByDate}
-                    workWindow={workWindow}
-                    now={now}
-                    todayIso={todayIso}
+                    items={calendarBookings}
+                    selectedId={selectedBookingId}
                     selectedDate={selectedDate}
+                    nowMinutes={nowMinutes}
+                    todayIso={todayIso}
+                    startHour={calendarWorkRange.startHour}
+                    endHour={calendarWorkRange.endHour}
                     light={isLight}
                     locale={locale}
-                    onSelect={setSelectedBooking}
-                    onDateSelect={(date) => setSelectedDate(startOfDay(date))}
+                    onSelect={handleSelectBooking}
+                    onSelectDate={handleSelectDate}
                   />
                 ) : null}
 
-                {viewMode === 'month' ? (
+                {view === 'month' ? (
                   <MonthCalendar
-                    dates={rangeDates}
+                    items={calendarBookings}
                     selectedDate={selectedDate}
+                    selectedId={selectedBookingId}
                     todayIso={todayIso}
-                    bookingsByDate={bookingsByDate}
                     light={isLight}
                     locale={locale}
-                    onDateSelect={(date) => {
-                      setSelectedDate(startOfDay(date));
-                      setViewMode('day');
-                    }}
-                    onSelect={setSelectedBooking}
+                    onSelect={handleSelectBooking}
+                    onSelectDate={handleSelectDate}
                   />
                 ) : null}
-              </div>
-            </Card>
-
-            <Card light={isLight}>
-              <CardTitle
-                title={locale === 'ru' ? 'Срез периода' : 'Period snapshot'}
-                description={locale === 'ru' ? 'Быстрые показатели в стиле рабочей панели.' : 'Quick metrics in the workspace style.'}
-                light={isLight}
-              />
-
-              <div
-                className={cn(
-                  'grid divide-y md:grid-cols-4 md:divide-x md:divide-y-0',
-                  divideTone(isLight),
-                )}
-              >
-                <StatTile
-                  label={labels.bookings}
-                  value={String(stats.total)}
-                  hint={formatCalendarRange(viewMode, selectedDate, locale)}
-                  icon={<CalendarClock className="size-4" />}
-                  light={isLight}
-                />
-                <StatTile
-                  label={labels.active}
-                  value={String(stats.active)}
-                  hint={locale === 'ru' ? 'активные записи' : 'active bookings'}
-                  icon={<UserRound className="size-4" />}
-                  light={isLight}
-                />
-                <StatTile
-                  label={labels.completed}
-                  value={String(stats.completed)}
-                  hint={locale === 'ru' ? 'завершённые визиты' : 'completed visits'}
-                  icon={<CheckCircle2 className="size-4" />}
-                  light={isLight}
-                />
-                <StatTile
-                  label={labels.revenue}
-                  value={formatCurrencyCompact(stats.revenue, locale)}
-                  hint={locale === 'ru' ? 'сумма записей' : 'booking amount'}
-                  icon={<Wallet className="size-4" />}
-                  light={isLight}
-                />
               </div>
             </Card>
           </div>
         </div>
-      </main>
 
-      <BookingDialog
-        booking={selectedBooking}
-        light={isLight}
-        locale={locale}
-        actionLoading={actionLoading}
-        onClose={() => setSelectedBooking(null)}
-        onStatusChange={(status) => void handleStatusChange(status)}
-      />
+        {selectedBooking ? (
+          <BookingDetails
+            booking={selectedBooking}
+            locale={locale}
+            light={isLight}
+            actionLoading={actionLoading}
+            onClose={() => setSelectedBookingId(null)}
+            onStatusChange={(status) => void handleStatusChange(status)}
+          />
+        ) : null}
+      </main>
     </WorkspaceShell>
   );
 }
