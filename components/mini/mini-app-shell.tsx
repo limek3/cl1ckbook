@@ -84,7 +84,7 @@ const introPaths = {
 
 function StaticIntroLogo() {
   return (
-    <svg viewBox="0 0 1523 422" role="img" aria-labelledby="clickbook-static-title clickbook-static-desc" style={{ width: '100%', maxWidth: 1200, height: 'auto' }}>
+    <svg viewBox="0 0 1523 422" role="img" aria-labelledby="clickbook-static-title clickbook-static-desc" style={{ width: '50%', maxWidth: 600, height: 'auto' }}>
       <title id="clickbook-static-title">КликБук — логотип</title>
       <desc id="clickbook-static-desc">Минималистичный чёрно-белый логотип КликБук.</desc>
       <rect width="100%" height="100%" fill={INTRO_WHITE} />
@@ -200,7 +200,7 @@ function ClickBookLogoIntro({ variant = 'ultra', onDone }: { variant?: IntroVari
         xmlns="http://www.w3.org/2000/svg"
         role="img"
         aria-labelledby={`${titleId} ${descId}`}
-        style={{ width: '100%', maxWidth: 1200, height: 'auto' }}
+        style={{ width: '50%', maxWidth: 600, height: 'auto' }}
         initial="hidden"
         animate="show"
       >
@@ -878,9 +878,8 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
         data-mini-mode={mode}
         initial={false}
         animate={{
-          opacity: showIntro ? 0.72 : 1,
-          scale: showIntro ? 0.985 : 1,
-          filter: showIntro ? 'blur(8px)' : 'blur(0px)',
+          opacity: showIntro ? 0.92 : 1,
+          scale: showIntro ? 0.995 : 1,
         }}
         transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
         style={{
