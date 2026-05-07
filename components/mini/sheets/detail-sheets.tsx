@@ -1,8 +1,8 @@
 'use client';
 
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import { useTheme } from '../theme';
-import { ActionSheet, BottomSheet, FieldLabel, Divider, Avatar, Icon, NeutralBtn, Toggle, Pill, ChannelTag, Card } from '../primitives/atoms';
+import { useTheme } from '@/components/mini/theme';
+import { ActionSheet, BottomSheet, FieldLabel, Divider, Avatar, Icon, NeutralBtn, Toggle, Pill, ChannelTag, Card } from '@/components/mini/primitives/atoms';
 import type { Appointment, Client, Service, Template } from '@/lib/mini-demo';
 
 function money(value: number) {

@@ -24,19 +24,19 @@ export function MiniBottomSheet({
     position: 'fixed',
     inset: 0,
     zIndex: 240,
-    background: dark ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.08)',
-    backdropFilter: 'blur(2px)',
-    WebkitBackdropFilter: 'blur(2px)',
+    background: dark ? 'rgba(0,0,0,0.20)' : 'rgba(10,10,10,0.10)',
+    backdropFilter: 'blur(6px)',
+    WebkitBackdropFilter: 'blur(6px)',
   };
 
   const shellStyle: CSSProperties = {
     position: 'fixed',
     left: '50%',
-    bottom: 'calc(86px + var(--miniapp-safe-bottom, 0px))',
+    bottom: 'calc(80px + var(--miniapp-safe-bottom, 0px))',
     transform: 'translateX(-50%)',
     width: '100%',
     maxWidth: 390,
-    padding: '0 18px',
+    padding: '0 12px',
     zIndex: 260,
     pointerEvents: 'none',
   };
@@ -47,33 +47,24 @@ export function MiniBottomSheet({
     width: '100%',
     maxHeight,
     overflow: 'hidden',
-    borderRadius: 26,
-    border: `1px solid ${dark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.065)'}`,
-    background: dark ? 'rgba(22,22,24,0.76)' : 'rgba(255,255,255,0.78)',
-    backdropFilter: 'blur(34px) saturate(2.15) brightness(1.02)',
-    WebkitBackdropFilter: 'blur(34px) saturate(2.15) brightness(1.02)',
+    borderRadius: 24,
+    border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(10,10,10,0.06)'}`,
+    background: dark ? 'rgba(20,20,22,0.84)' : 'rgba(255,255,255,0.88)',
+    backdropFilter: 'blur(26px) saturate(1.25)',
+    WebkitBackdropFilter: 'blur(26px) saturate(1.25)',
     boxShadow: dark
-      ? '0 26px 72px rgba(0,0,0,0.58), inset 0 1px 0 rgba(255,255,255,0.08)'
-      : '0 26px 72px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.9)',
+      ? '0 22px 54px rgba(0,0,0,0.56), inset 0 1px 0 rgba(255,255,255,0.05)'
+      : '0 18px 44px rgba(15,23,42,0.14), inset 0 1px 0 rgba(255,255,255,0.82)',
     color: T.text,
   };
 
-  const tailStyle: CSSProperties = {
-    position: 'absolute',
-    left: 34,
-    bottom: -10,
-    width: 24,
-    height: 24,
-    borderRadius: '0 0 7px 0',
-    transform: 'rotate(45deg)',
-    background: dark ? 'rgba(22,22,24,0.76)' : 'rgba(255,255,255,0.78)',
-    borderRight: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'}`,
-    borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'}`,
-    backdropFilter: 'blur(34px) saturate(2.15) brightness(1.02)',
-    WebkitBackdropFilter: 'blur(34px) saturate(2.15) brightness(1.02)',
-    boxShadow: dark
-      ? '10px 10px 24px rgba(0,0,0,0.24)'
-      : '10px 10px 24px rgba(0,0,0,0.08)',
+  const accentLineStyle: CSSProperties = {
+    height: 4,
+    width: 38,
+    borderRadius: 999,
+    background: dark ? 'rgba(255,255,255,0.18)' : 'rgba(10,10,10,0.12)',
+    margin: '10px auto 0',
+    opacity: tail ? 1 : 0.75,
   };
 
   return (
@@ -91,28 +82,31 @@ export function MiniBottomSheet({
 
           <motion.div
             style={shellStyle}
-            initial={{ opacity: 0, y: 22, scale: 0.975 }}
+            initial={{ opacity: 0, y: 18, scale: 0.985 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 24, scale: 0.975 }}
+            exit={{ opacity: 0, y: 20, scale: 0.985 }}
             transition={{
               type: 'spring',
-              stiffness: 460,
-              damping: 36,
-              mass: 0.72,
+              stiffness: 430,
+              damping: 34,
+              mass: 0.74,
             }}
           >
             <motion.div
               style={sheetStyle}
               onClick={(event) => event.stopPropagation()}
-              initial={{ filter: 'blur(8px)' }}
+              initial={{ filter: 'blur(6px)' }}
               animate={{ filter: 'blur(0px)' }}
-              exit={{ filter: 'blur(6px)' }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              exit={{ filter: 'blur(4px)' }}
+              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
             >
-              {children}
+              <div style={{ paddingBottom: 6 }}>
+                <div style={accentLineStyle} />
+              </div>
+              <div style={{ maxHeight, overflowY: 'auto', paddingBottom: 4 }}>
+                {children}
+              </div>
             </motion.div>
-
-            {tail && <div style={tailStyle} />}
           </motion.div>
         </>
       )}

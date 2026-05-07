@@ -1,37 +1,177 @@
 'use client';
 
-import type { ComponentType, CSSProperties, ReactNode } from 'react';
-import * as LucideIcons from 'lucide-react';
-import { useTheme } from '../theme';
+import { type CSSProperties, type ReactNode, useMemo } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  AlertCircle,
+  ArrowDownLeft,
+  ArrowDownRight,
+  ArrowLeft,
+  ArrowUpRight,
+  BadgeCheck,
+  BarChart3,
+  Bell,
+  BellCheck,
+  BookOpen,
+  Bot,
+  Calendar,
+  CalendarCheck,
+  CalendarClock,
+  CalendarDays,
+  CalendarPlus,
+  CalendarX,
+  Check,
+  CheckCheck,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Circle,
+  CircleOff,
+  Clock3,
+  Code2,
+  Copy,
+  CopyPlus,
+  CreditCard,
+  FileText,
+  Gauge,
+  Home,
+  Info,
+  List,
+  ListPlus,
+  LoaderCircle,
+  LogOut,
+  MailQuestion,
+  MapPin,
+  Megaphone,
+  Menu,
+  MessageCircle,
+  MessageSquare,
+  MessagesSquare,
+  Moon,
+  MoreHorizontal,
+  Palette,
+  Phone,
+  Plug,
+  Plus,
+  QrCode,
+  ReceiptText,
+  Reply,
+  Search,
+  SearchX,
+  Send,
+  Settings2,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  Sun,
+  Trash2,
+  User,
+  Users,
+  Wallet,
+  X,
+  XCircle,
+  Zap,
+  type LucideIcon,
+} from 'lucide-react';
 import { haptic } from '../bridge';
-import { MiniBottomSheet } from './mini-bottom-sheet';
+import { useTheme } from '../theme';
 
-type IconProps = {
+const ICONS: Record<string, LucideIcon> = {
+  'alert-circle': AlertCircle,
+  'arrow-down-left': ArrowDownLeft,
+  'arrow-down-right': ArrowDownRight,
+  'arrow-left': ArrowLeft,
+  'arrow-up-right': ArrowUpRight,
+  'badge-check': BadgeCheck,
+  'bar-chart-3': BarChart3,
+  bell: Bell,
+  'bell-check': BellCheck,
+  'book-open': BookOpen,
+  bot: Bot,
+  calendar: Calendar,
+  'calendar-check': CalendarCheck,
+  'calendar-clock': CalendarClock,
+  'calendar-days': CalendarDays,
+  'calendar-plus': CalendarPlus,
+  'calendar-x': CalendarX,
+  check: Check,
+  'check-check': CheckCheck,
+  'check-circle': CheckCircle2,
+  'chevron-left': ChevronLeft,
+  'chevron-right': ChevronRight,
+  'circle-off': CircleOff,
+  clock: Clock3,
+  code: Code2,
+  copy: Copy,
+  'copy-plus': CopyPlus,
+  'credit-card': CreditCard,
+  'file-text': FileText,
+  gauge: Gauge,
+  home: Home,
+  info: Info,
+  instagram: Circle,
+  list: List,
+  'list-plus': ListPlus,
+  'loader-circle': LoaderCircle,
+  'log-out': LogOut,
+  'mail-question': MailQuestion,
+  'map-pin': MapPin,
+  megaphone: Megaphone,
+  menu: Menu,
+  'message-circle': MessageCircle,
+  'message-square': MessageSquare,
+  'messages-square': MessagesSquare,
+  moon: Moon,
+  'more-horizontal': MoreHorizontal,
+  palette: Palette,
+  phone: Phone,
+  plug: Plug,
+  plus: Plus,
+  'qr-code': QrCode,
+  'receipt-text': ReceiptText,
+  reply: Reply,
+  search: Search,
+  'search-x': SearchX,
+  send: Send,
+  'settings-2': Settings2,
+  'shield-check': ShieldCheck,
+  sparkles: Sparkles,
+  star: Star,
+  sun: Sun,
+  'trash-2': Trash2,
+  user: User,
+  users: Users,
+  wallet: Wallet,
+  x: X,
+  'x-circle': XCircle,
+  zap: Zap,
+};
+
+function glassBg(mode: 'dark' | 'light', elevated = false) {
+  if (mode === 'dark') {
+    return elevated ? 'rgba(20,20,22,0.84)' : 'rgba(17,17,19,0.76)';
+  }
+  return elevated ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.84)';
+}
+
+function softBorder(mode: 'dark' | 'light') {
+  return mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(10,10,10,0.06)';
+}
+
+export function Icon({
+  name,
+  size = 16,
+  color,
+  stroke = 1.85,
+}: {
   name: string;
   size?: number;
   color?: string;
   stroke?: number;
-  style?: CSSProperties;
-};
-
-function toPascalIconName(name: string) {
-  return name
-    .split('-')
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join('');
-}
-
-export function Icon({ name, size = 18, color = 'currentColor', stroke = 1.8, style }: IconProps) {
-  const iconName = toPascalIconName(name);
-  const IconComp = (LucideIcons as unknown as Record<string, ComponentType<any>>)[iconName]
-    ?? (LucideIcons as unknown as Record<string, ComponentType<any>>).Circle;
-  return <IconComp size={size} color={color} strokeWidth={stroke} style={style} />;
-}
-
-export function Divider() {
+}) {
   const { T } = useTheme();
-  return <div style={{ height: 1, background: T.border, width: '100%' }} />;
+  const Lucide = ICONS[name] ?? Circle;
+  return <Lucide size={size} color={color ?? T.text2} strokeWidth={stroke} />;
 }
 
 export function Card({
@@ -52,12 +192,9 @@ export function Card({
       style={{
         background: T.card,
         border: `1px solid ${T.border}`,
-        borderRadius: 18,
+        borderRadius: 16,
         boxShadow: T.cardShadow,
-        padding: padded ? 18 : 0,
-        overflow: 'hidden',
-        color: T.text,
-        cursor: onClick ? 'pointer' : undefined,
+        padding: padded ? 16 : 0,
         ...style,
       }}
     >
@@ -66,17 +203,15 @@ export function Card({
   );
 }
 
+export function Divider({ style }: { style?: CSSProperties }) {
+  const { T } = useTheme();
+  return <div style={{ height: 1, background: T.border, width: '100%', ...style }} />;
+}
+
 export function FieldLabel({ children, style }: { children: ReactNode; style?: CSSProperties }) {
   const { T } = useTheme();
   return (
-    <div style={{
-      fontSize: 10,
-      fontWeight: 700,
-      letterSpacing: '0.08em',
-      textTransform: 'uppercase',
-      color: T.text3,
-      ...style,
-    }}>
+    <div style={{ fontSize: 10, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.08em', ...style }}>
       {children}
     </div>
   );
@@ -86,21 +221,19 @@ export function SectionTitle({
   title,
   subtitle,
   right,
-  style,
 }: {
   title: string;
   subtitle?: string;
   right?: ReactNode;
-  style?: CSSProperties;
 }) {
   const { T } = useTheme();
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, margin: '0 4px 10px', ...style }}>
+    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 17, fontWeight: 700, color: T.text, letterSpacing: '-0.025em' }}>{title}</div>
-        {subtitle && <div style={{ fontSize: 12, color: T.text3, marginTop: 4, lineHeight: 1.35 }}>{subtitle}</div>}
+        <div style={{ fontSize: 15, fontWeight: 600, color: T.text, letterSpacing: '-0.01em' }}>{title}</div>
+        {subtitle ? <div style={{ fontSize: 11, color: T.text3, marginTop: 3 }}>{subtitle}</div> : null}
       </div>
-      {right && <div style={{ flexShrink: 0 }}>{right}</div>}
+      {right ? <div style={{ flexShrink: 0 }}>{right}</div> : null}
     </div>
   );
 }
@@ -109,22 +242,20 @@ export function Avatar({
   name,
   src,
   size = 40,
-  radius = 14,
+  radius = 12,
 }: {
-  name?: string;
-  src?: string | null;
+  name: string;
+  src?: string;
   size?: number;
   radius?: number;
 }) {
   const { T, mode } = useTheme();
-  const initials = (name || 'К')
-    .trim()
-    .split(/\s+/)
-    .map((p) => p[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('')
-    .toUpperCase() || 'К';
+  const initials = useMemo(() => {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '•';
+    return parts.slice(0, 2).map((p) => p[0]?.toUpperCase() ?? '').join('') || '•';
+  }, [name]);
+
   return (
     <div style={{
       width: size,
@@ -132,129 +263,228 @@ export function Avatar({
       borderRadius: radius,
       overflow: 'hidden',
       flexShrink: 0,
+      background: mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(10,10,10,0.05)',
+      border: `1px solid ${T.border}`,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: mode === 'dark' ? 'rgba(255,255,255,0.07)' : 'rgba(10,10,10,0.055)',
-      border: `1px solid ${T.border}`,
       color: T.text,
-      fontWeight: 800,
-      fontSize: Math.max(11, Math.round(size * 0.32)),
+      fontWeight: 700,
       letterSpacing: '-0.04em',
+      userSelect: 'none',
     }}>
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-      ) : initials}
+        <img src={src} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+      ) : (
+        <span style={{ fontSize: Math.max(12, Math.round(size * 0.34)) }}>{initials}</span>
+      )}
     </div>
   );
 }
 
-export function NavBtn({
-  icon,
-  onClick,
-  children,
-  style,
-}: {
-  icon?: string;
-  onClick?: () => void;
-  children?: ReactNode;
-  style?: CSSProperties;
-}) {
+export function NavBtn({ icon, onClick }: { icon: string; onClick?: () => void }) {
   const { T, mode } = useTheme();
   return (
     <button
-      type="button"
       onClick={() => { haptic('light'); onClick?.(); }}
       style={{
-        width: children ? 'auto' : 40,
-        height: 40,
-        minWidth: 40,
-        borderRadius: 13,
+        width: 34,
+        height: 34,
+        borderRadius: 11,
         border: `1px solid ${T.border}`,
-        background: mode === 'dark' ? 'rgba(255,255,255,0.045)' : 'rgba(255,255,255,0.72)',
+        background: mode === 'dark' ? 'rgba(255,255,255,0.045)' : 'rgba(10,10,10,0.035)',
         color: T.text2,
+        cursor: 'pointer',
+        padding: 0,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 6,
-        padding: children ? '0 12px' : 0,
-        cursor: 'pointer',
-        fontFamily: 'inherit',
-        ...style,
+        flexShrink: 0,
       }}
     >
-      {icon && <Icon name={icon} size={17} />}
-      {children}
+      <Icon name={icon} size={16} />
     </button>
   );
 }
 
 export function NeutralBtn({
-  icon,
   children,
-  onClick,
+  icon,
   full,
-  disabled,
+  tone = 'default',
   style,
+  onClick,
 }: {
-  icon?: string;
   children: ReactNode;
-  onClick?: () => void;
+  icon?: string;
   full?: boolean;
-  disabled?: boolean;
+  tone?: 'default' | 'danger';
   style?: CSSProperties;
+  onClick?: () => void;
 }) {
-  const { T } = useTheme();
+  const { T, mode } = useTheme();
+  const danger = tone === 'danger';
   return (
     <button
-      type="button"
-      disabled={disabled}
-      onClick={() => { if (!disabled) { haptic('light'); onClick?.(); } }}
+      onClick={() => { haptic(danger ? 'warning' : 'light'); onClick?.(); }}
       style={{
-        width: full ? '100%' : 'auto',
-        border: `1px solid ${T.border}`,
-        background: T.cardElev,
-        color: disabled ? T.text3 : T.text,
-        borderRadius: 14,
+        width: full ? '100%' : undefined,
+        minHeight: 42,
         padding: '11px 14px',
-        display: 'flex',
+        borderRadius: 13,
+        border: `1px solid ${danger ? 'rgba(239,68,68,0.22)' : mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(10,10,10,0.07)'}`,
+        background: mode === 'dark' ? 'rgba(255,255,255,0.045)' : 'rgba(10,10,10,0.035)',
+        color: danger ? T.danger : T.text,
+        display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 8,
-        cursor: disabled ? 'default' : 'pointer',
+        cursor: 'pointer',
         fontFamily: 'inherit',
         fontSize: 13,
-        fontWeight: 650,
-        opacity: disabled ? 0.6 : 1,
+        fontWeight: 600,
         ...style,
       }}
     >
-      {icon && <Icon name={icon} size={15} />}
+      {icon ? <Icon name={icon} size={15} color={danger ? T.danger : T.text2} /> : null}
+      <span>{children}</span>
+    </button>
+  );
+}
+
+export function Toggle({
+  on,
+  onChange,
+  size = 'md',
+}: {
+  on: boolean;
+  onChange: (value: boolean) => void;
+  size?: 'sm' | 'md';
+}) {
+  const { T } = useTheme();
+  const width = size === 'sm' ? 34 : 40;
+  const height = size === 'sm' ? 20 : 24;
+  const knob = size === 'sm' ? 14 : 18;
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      onClick={() => onChange(!on)}
+      style={{
+        width,
+        height,
+        borderRadius: 999,
+        border: 'none',
+        padding: 0,
+        background: on ? T.accent : T.text3,
+        opacity: on ? 1 : 0.35,
+        cursor: 'pointer',
+        position: 'relative',
+        transition: 'background 0.15s ease',
+      }}
+    >
+      <span style={{
+        position: 'absolute',
+        top: (height - knob) / 2,
+        left: on ? width - knob - ((height - knob) / 2) : (height - knob) / 2,
+        width: knob,
+        height: knob,
+        borderRadius: '50%',
+        background: '#fff',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+        transition: 'left 0.16s ease',
+      }} />
+    </button>
+  );
+}
+
+export function Pill({
+  children,
+  active,
+  onClick,
+}: {
+  children: ReactNode;
+  active?: boolean;
+  onClick?: () => void;
+}) {
+  const { T, mode } = useTheme();
+  return (
+    <button
+      onClick={() => { haptic('light'); onClick?.(); }}
+      style={{
+        borderRadius: 999,
+        padding: '9px 12px',
+        border: `1px solid ${active ? T.accent : softBorder(mode)}`,
+        background: active ? T.accentSoft : (mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(10,10,10,0.03)'),
+        color: active ? T.accent : T.text2,
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+        fontSize: 12,
+        fontWeight: 600,
+        lineHeight: 1,
+      }}
+    >
       {children}
     </button>
   );
 }
 
-export function EmptyState({
-  icon,
-  title,
-  text,
-  action,
-}: {
-  icon?: string;
-  title: string;
-  text?: string;
-  action?: ReactNode;
-}) {
+export function StatusDot({ status }: { status?: string }) {
   const { T } = useTheme();
+  let bg = T.text3;
+  if (status === 'in-focus') bg = T.accent;
+  else if (status === 'scheduled') bg = T.warn;
+  else if (status === 'completed') bg = T.success;
+  else if (status === 'cancelled' || status === 'no_show') bg = T.danger;
+  return <span style={{ width: 8, height: 8, borderRadius: '50%', background: bg, flexShrink: 0 }} />;
+}
+
+export function ChannelTag({ channel }: { channel?: string }) {
+  const { T } = useTheme();
+  const text = channel || '—';
+  const upper = text.toUpperCase();
+  let bg = T.cardElev;
+  let color = T.text2;
+  let border = T.border;
+  if (upper === 'TG' || upper.includes('TELEGRAM')) {
+    bg = 'rgba(18,125,254,0.12)';
+    color = '#127dfe';
+    border = 'rgba(18,125,254,0.18)';
+  } else if (upper === 'ВК' || upper === 'VK') {
+    bg = 'rgba(39,135,245,0.10)';
+    color = '#2787f5';
+    border = 'rgba(39,135,245,0.16)';
+  } else if (upper === 'WEB' || upper.includes('САЙТ')) {
+    bg = 'rgba(16,185,129,0.10)';
+    color = '#10b981';
+    border = 'rgba(16,185,129,0.16)';
+  } else if (upper === 'IG' || upper.includes('INST')) {
+    bg = 'rgba(236,72,153,0.10)';
+    color = '#ec4899';
+    border = 'rgba(236,72,153,0.16)';
+  } else if (upper === 'VIP') {
+    bg = 'rgba(245,158,11,0.12)';
+    color = '#f59e0b';
+    border = 'rgba(245,158,11,0.18)';
+  }
   return (
-    <div style={{ padding: '28px 18px', textAlign: 'center', color: T.text2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-      {icon && <div style={{ width: 42, height: 42, borderRadius: 16, background: T.cardElev, border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.text3 }}><Icon name={icon} size={18} /></div>}
-      <div style={{ fontSize: 16, fontWeight: 700, color: T.text, letterSpacing: '-0.02em' }}>{title}</div>
-      {text && <div style={{ fontSize: 12, color: T.text3, lineHeight: 1.45, maxWidth: 260 }}>{text}</div>}
-      {action && <div style={{ marginTop: 4 }}>{action}</div>}
-    </div>
+    <span style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 6,
+      height: 20,
+      padding: '0 8px',
+      borderRadius: 999,
+      background: bg,
+      border: `1px solid ${border}`,
+      color,
+      fontSize: 10,
+      fontWeight: 700,
+      lineHeight: 1,
+      letterSpacing: '0.05em',
+      textTransform: 'uppercase',
+    }}>{text}</span>
   );
 }
 
@@ -270,17 +500,17 @@ export function SearchBox({
   const { T, mode } = useTheme();
   return (
     <div style={{
-      minHeight: 44,
-      borderRadius: 15,
-      background: mode === 'dark' ? 'rgba(255,255,255,0.055)' : 'rgba(10,10,10,0.035)',
-      border: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.07)' : 'rgba(10,10,10,0.06)'}`,
+      height: 44,
+      borderRadius: 14,
+      border: `1px solid ${softBorder(mode)}`,
+      background: mode === 'dark' ? 'rgba(255,255,255,0.045)' : 'rgba(255,255,255,0.92)',
       display: 'flex',
       alignItems: 'center',
-      gap: 8,
-      padding: '0 13px',
-      color: T.text3,
+      gap: 10,
+      padding: '0 12px',
+      boxShadow: mode === 'dark' ? 'inset 0 1px 0 rgba(255,255,255,0.025)' : '0 1px 1px rgba(15,23,42,0.03)',
     }}>
-      <Icon name="search" size={16} />
+      <Icon name="search" size={16} color={T.text3} />
       <input
         className="cb-mini-transparent cb-mini-input-reset"
         value={value}
@@ -289,128 +519,65 @@ export function SearchBox({
         style={{
           flex: 1,
           minWidth: 0,
-          border: 0,
-          outline: 0,
+          border: 'none',
+          outline: 'none',
           background: 'transparent',
           color: T.text,
-          WebkitTextFillColor: T.text,
           fontSize: 14,
           fontFamily: 'inherit',
+          padding: 0,
         }}
       />
-      {value && (
-        <button type="button" onClick={() => onChange('')} style={{ border: 0, background: 'transparent', color: T.text3, display: 'flex', padding: 0, cursor: 'pointer' }}>
-          <Icon name="x" size={14} />
+      {value ? (
+        <button onClick={() => onChange('')} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: T.text3, display: 'flex' }}>
+          <Icon name="x" size={14} color={T.text3} />
         </button>
-      )}
+      ) : null}
     </div>
   );
 }
 
-export function ScreenHeader({ title, subtitle, onBack, right }: { title: string; subtitle?: string; onBack?: () => void; right?: ReactNode }) {
-  const { T } = useTheme();
-  return (
-    <div style={{ padding: '18px 16px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
-      {onBack && <NavBtn icon="chevron-left" onClick={onBack} />}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 22, fontWeight: 700, color: T.text, letterSpacing: '-0.03em' }}>{title}</div>
-        {subtitle && <div style={{ fontSize: 12, color: T.text3, marginTop: 3, lineHeight: 1.35 }}>{subtitle}</div>}
-      </div>
-      {right}
-    </div>
-  );
-}
-
-export function ChannelTag({ channel }: { channel?: string }) {
-  const { T } = useTheme();
-  const text = channel || '—';
-  return (
-    <span style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      minHeight: 18,
-      padding: '2px 7px',
-      borderRadius: 999,
-      background: T.cardElev,
-      border: `1px solid ${T.border}`,
-      color: T.text3,
-      fontSize: 9,
-      fontWeight: 700,
-      letterSpacing: '0.06em',
-      textTransform: 'uppercase',
-      whiteSpace: 'nowrap',
-    }}>
-      {text}
-    </span>
-  );
-}
-
-export function Pill({
-  children,
-  active,
-  onClick,
-  style,
+export function EmptyState({
+  icon,
+  title,
+  text,
+  action,
 }: {
-  children: ReactNode;
-  active?: boolean;
-  onClick?: () => void;
-  style?: CSSProperties;
+  icon: string;
+  title: string;
+  text?: string;
+  action?: ReactNode;
 }) {
-  const { T } = useTheme();
+  const { T, mode } = useTheme();
   return (
-    <button
-      type="button"
-      onClick={() => { haptic('light'); onClick?.(); }}
-      style={{
-        border: `1px solid ${active ? T.accent : T.border}`,
-        background: active ? T.accent : T.cardElev,
-        color: active ? '#fff' : T.text2,
-        borderRadius: 999,
-        padding: '7px 11px',
-        fontSize: 12,
-        fontWeight: 700,
-        cursor: 'pointer',
-        fontFamily: 'inherit',
-        whiteSpace: 'nowrap',
-        ...style,
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-export function Toggle({ on, onChange }: { on: boolean; onChange: (value: boolean) => void }) {
-  const { T } = useTheme();
-  return (
-    <button
-      type="button"
-      onClick={() => { haptic('light'); onChange(!on); }}
-      style={{
-        width: 46,
-        height: 28,
-        borderRadius: 999,
-        border: `1px solid ${on ? T.accent : T.border}`,
-        background: on ? T.accent : T.cardElev,
-        padding: 3,
-        cursor: 'pointer',
+    <div style={{
+      padding: '28px 18px',
+      borderRadius: 18,
+      border: `1px dashed ${softBorder(mode)}`,
+      background: mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.58)',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      textAlign: 'center',
+      gap: 10,
+    }}>
+      <div style={{
+        width: 44,
+        height: 44,
+        borderRadius: 14,
         display: 'flex',
-        justifyContent: on ? 'flex-end' : 'flex-start',
-        transition: 'background 0.18s ease, border-color 0.18s ease',
-      }}
-    >
-      <span style={{ width: 20, height: 20, borderRadius: 999, background: '#fff', display: 'block', boxShadow: '0 2px 6px rgba(0,0,0,0.16)' }} />
-    </button>
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(10,10,10,0.04)',
+        border: `1px solid ${softBorder(mode)}`,
+      }}>
+        <Icon name={icon} size={19} color={T.text2} />
+      </div>
+      <div style={{ fontSize: 15, fontWeight: 600, color: T.text }}>{title}</div>
+      {text ? <div style={{ maxWidth: 260, fontSize: 12, lineHeight: 1.55, color: T.text2 }}>{text}</div> : null}
+      {action ? <div style={{ marginTop: 2 }}>{action}</div> : null}
+    </div>
   );
-}
-
-export function StatusDot({ status }: { status?: string }) {
-  const { T } = useTheme();
-  const color = status === 'completed' || status === 'confirmed' ? T.success
-    : status === 'cancelled' || status === 'no_show' ? T.danger
-    : status === 'in-focus' ? T.accent
-    : T.warn;
-  return <span style={{ width: 10, height: 10, borderRadius: 999, background: color, display: 'inline-block', boxShadow: `0 0 0 4px ${color}22` }} />;
 }
 
 export function ListRow({
@@ -428,44 +595,172 @@ export function ListRow({
   accent?: boolean;
   onClick?: () => void;
 }) {
-  const { T } = useTheme();
-  const color = danger ? T.danger : accent ? T.accent : T.text;
+  const { T, mode } = useTheme();
   return (
-    <button
-      type="button"
+    <div
       onClick={() => { haptic(danger ? 'warning' : 'light'); onClick?.(); }}
-      style={{
-        width: '100%',
-        border: 0,
-        background: 'transparent',
-        color,
-        padding: '14px 18px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-        fontFamily: 'inherit',
-        textAlign: 'left',
-        cursor: onClick ? 'pointer' : 'default',
-      }}
+      style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12, cursor: onClick ? 'pointer' : 'default' }}
     >
-      {icon && <div style={{ width: 34, height: 34, borderRadius: 12, background: accent ? T.accentSoft : T.cardElev, border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color }}><Icon name={icon} size={16} /></div>}
+      {icon ? (
+        <div style={{
+          width: 34,
+          height: 34,
+          borderRadius: 11,
+          border: `1px solid ${softBorder(mode)}`,
+          background: danger
+            ? 'rgba(239,68,68,0.08)'
+            : accent
+              ? T.accentSoft
+              : (mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(10,10,10,0.035)'),
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: danger ? T.danger : accent ? T.accent : T.text2,
+          flexShrink: 0,
+        }}>
+          <Icon name={icon} size={15} color={danger ? T.danger : accent ? T.accent : T.text2} />
+        </div>
+      ) : null}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 650, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div>
-        {sub && <div style={{ fontSize: 11, color: T.text3, marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</div>}
+        <div style={{ fontSize: 14, color: danger ? T.danger : T.text }}>{label}</div>
+        {sub ? <div style={{ fontSize: 11, color: T.text3, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</div> : null}
       </div>
       <Icon name="chevron-right" size={15} color={T.text3} />
-    </button>
+    </div>
   );
 }
 
-export type ActionSheetAction = {
+export function ScreenHeader({
+  title,
+  subtitle,
+  onBack,
+}: {
+  title: string;
+  subtitle?: string;
+  onBack?: () => void;
+}) {
+  const { T } = useTheme();
+  return (
+    <div style={{ padding: '16px 16px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+      {onBack ? <NavBtn icon="chevron-left" onClick={onBack} /> : null}
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ fontSize: 22, fontWeight: 600, color: T.text, letterSpacing: '-0.02em' }}>{title}</div>
+        {subtitle ? <div style={{ fontSize: 13, color: T.text2, marginTop: 2 }}>{subtitle}</div> : null}
+      </div>
+    </div>
+  );
+}
+
+interface BottomSheetProps {
+  open: boolean;
+  onClose: () => void;
+  title?: ReactNode;
+  subtitle?: ReactNode;
+  footer?: ReactNode;
+  children: ReactNode;
+  maxHeight?: string;
+}
+
+export function BottomSheet({
+  open,
+  onClose,
+  title,
+  subtitle,
+  footer,
+  children,
+  maxHeight = 'min(78vh, calc(100dvh - 112px))',
+}: BottomSheetProps) {
+  const { T, mode } = useTheme();
+
+  const panelBg = glassBg(mode, true);
+  const border = softBorder(mode);
+
+  return (
+    <AnimatePresence>
+      {open ? (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            onClick={onClose}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 240,
+              background: mode === 'dark' ? 'rgba(0,0,0,0.42)' : 'rgba(10,10,10,0.18)',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+            }}
+          />
+
+          <motion.div
+            initial={{ y: 36, opacity: 0.96 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 36, opacity: 0.98 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 34, mass: 0.78 }}
+            style={{
+              position: 'fixed',
+              left: '50%',
+              bottom: 0,
+              transform: 'translateX(-50%)',
+              width: '100%',
+              maxWidth: 390,
+              padding: '0 8px calc(8px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
+              zIndex: 260,
+              pointerEvents: 'none',
+            }}
+          >
+            <div
+              onClick={(event) => event.stopPropagation()}
+              style={{
+                pointerEvents: 'auto',
+                width: '100%',
+                borderRadius: 26,
+                border: `1px solid ${border}`,
+                background: panelBg,
+                backdropFilter: 'blur(28px) saturate(1.28)',
+                WebkitBackdropFilter: 'blur(28px) saturate(1.28)',
+                boxShadow: mode === 'dark'
+                  ? '0 -12px 42px rgba(0,0,0,0.52), inset 0 1px 0 rgba(255,255,255,0.05)'
+                  : '0 -10px 36px rgba(15,23,42,0.12), inset 0 1px 0 rgba(255,255,255,0.82)',
+                overflow: 'hidden',
+              }}
+            >
+              <div style={{ padding: '10px 16px 12px', borderBottom: title || subtitle ? `1px solid ${T.border}` : 'none' }}>
+                <div style={{ width: 40, height: 4, borderRadius: 999, background: T.text3, opacity: 0.35, margin: '0 auto 10px' }} />
+                {(title || subtitle) ? (
+                  <div style={{ textAlign: 'center', padding: '0 12px' }}>
+                    {title ? <div style={{ fontSize: 17, fontWeight: 700, color: T.text, letterSpacing: '-0.02em' }}>{title}</div> : null}
+                    {subtitle ? <div style={{ fontSize: 12, lineHeight: 1.45, color: T.text2, marginTop: 5 }}>{subtitle}</div> : null}
+                  </div>
+                ) : null}
+              </div>
+
+              <div style={{ maxHeight, overflowY: 'auto', padding: '16px 0 10px' }}>{children}</div>
+
+              {footer ? (
+                <div style={{ padding: '12px 16px 16px', borderTop: `1px solid ${T.border}`, background: mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.3)' }}>
+                  {footer}
+                </div>
+              ) : null}
+            </div>
+          </motion.div>
+        </>
+      ) : null}
+    </AnimatePresence>
+  );
+}
+
+interface ActionItem {
   id: string;
   label: string;
   sub?: string;
   icon?: string;
-  tone?: 'primary' | 'danger' | 'success' | 'default' | string;
+  tone?: 'primary' | 'danger';
   onClick: () => void;
-};
+}
 
 export function ActionSheet({
   open,
@@ -476,93 +771,72 @@ export function ActionSheet({
 }: {
   open: boolean;
   onClose: () => void;
-  title?: string;
-  subtitle?: ReactNode;
-  actions: ActionSheetAction[];
+  title: string;
+  subtitle?: string;
+  actions: ActionItem[];
 }) {
-  const { T } = useTheme();
+  const { T, mode } = useTheme();
   return (
-    <MiniBottomSheet open={open} onClose={onClose} maxHeight="min(70vh, 460px)" tail>
-      <div style={{ padding: '18px 18px 20px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
-          <div style={{ minWidth: 0 }}>
-            {title && <div style={{ fontSize: 18, fontWeight: 800, color: T.text, letterSpacing: '-0.025em' }}>{title}</div>}
-            {subtitle && <div style={{ fontSize: 12, color: T.text3, marginTop: 5, lineHeight: 1.45 }}>{subtitle}</div>}
-          </div>
-          <button type="button" onClick={onClose} style={{ width: 32, height: 32, borderRadius: 11, border: `1px solid ${T.border}`, background: T.cardElev, color: T.text2, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}>
-            <Icon name="x" size={15} />
-          </button>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {actions.map((action) => {
-            const danger = action.tone === 'danger';
-            const primary = action.tone === 'primary';
-            return (
-              <button
-                type="button"
-                key={action.id}
-                onClick={() => { haptic(danger ? 'warning' : 'light'); action.onClick(); }}
-                style={{
-                  width: '100%',
-                  borderRadius: 15,
-                  border: `1px solid ${danger ? 'rgba(239,68,68,0.28)' : primary ? T.accent : T.border}`,
-                  background: danger ? 'rgba(239,68,68,0.12)' : primary ? T.accent : T.cardElev,
-                  color: danger ? T.danger : primary ? '#fff' : T.text,
-                  padding: '13px 14px',
-                  fontFamily: 'inherit',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  textAlign: 'left',
-                }}
-              >
-                {action.icon && <Icon name={action.icon} size={17} />}
-                <span style={{ minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: 14, fontWeight: 750 }}>{action.label}</span>
-                  {action.sub && <span style={{ display: 'block', marginTop: 3, fontSize: 11, color: primary ? 'rgba(255,255,255,0.75)' : T.text3 }}>{action.sub}</span>}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </MiniBottomSheet>
-  );
-}
-
-export function BottomSheet({
-  open,
-  onClose,
-  title,
-  subtitle,
-  children,
-}: {
-  open: boolean;
-  onClose: () => void;
-  title?: ReactNode;
-  subtitle?: ReactNode;
-  children: ReactNode;
-}) {
-  const { T } = useTheme();
-  return (
-    <MiniBottomSheet open={open} onClose={onClose} maxHeight="min(78vh, 680px)" tail>
-      <div style={{ padding: '18px 0 20px' }}>
-        {(title || subtitle) && (
-          <div style={{ padding: '0 20px 16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-            <div style={{ minWidth: 0 }}>
-              {title && <div style={{ fontSize: 18, color: T.text, fontWeight: 800, letterSpacing: '-0.025em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</div>}
-              {subtitle && <div style={{ fontSize: 12, color: T.text3, marginTop: 5, lineHeight: 1.45 }}>{subtitle}</div>}
-            </div>
-            <button type="button" onClick={onClose} style={{ width: 32, height: 32, borderRadius: 11, border: `1px solid ${T.border}`, background: T.cardElev, color: T.text2, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}>
-              <Icon name="x" size={15} />
+    <BottomSheet
+      open={open}
+      onClose={onClose}
+      title={title}
+      subtitle={subtitle}
+      maxHeight="min(58vh, calc(100dvh - 140px))"
+      footer={<NeutralBtn full onClick={onClose}>Отмена</NeutralBtn>}
+    >
+      <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {actions.map((action) => {
+          const danger = action.tone === 'danger';
+          const primary = action.tone === 'primary';
+          return (
+            <button
+              key={action.id}
+              onClick={() => { haptic(danger ? 'warning' : 'medium'); action.onClick(); }}
+              style={{
+                width: '100%',
+                textAlign: 'left',
+                padding: '14px 14px',
+                borderRadius: 16,
+                border: `1px solid ${danger ? 'rgba(239,68,68,0.18)' : primary ? T.accentSoft : softBorder(mode)}`,
+                background: danger
+                  ? 'rgba(239,68,68,0.07)'
+                  : primary
+                    ? T.accentSoft
+                    : (mode === 'dark' ? 'rgba(255,255,255,0.045)' : 'rgba(255,255,255,0.72)'),
+                color: danger ? T.danger : primary ? T.accent : T.text,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                fontFamily: 'inherit',
+              }}
+            >
+              <div style={{
+                width: 36,
+                height: 36,
+                borderRadius: 12,
+                background: danger
+                  ? 'rgba(239,68,68,0.10)'
+                  : primary
+                    ? 'rgba(18,125,254,0.10)'
+                    : (mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(10,10,10,0.04)'),
+                border: `1px solid ${danger ? 'rgba(239,68,68,0.16)' : primary ? 'rgba(18,125,254,0.16)' : softBorder(mode)}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}>
+                {action.icon ? <Icon name={action.icon} size={16} color={danger ? T.danger : primary ? T.accent : T.text2} /> : <Icon name="check" size={16} color={danger ? T.danger : primary ? T.accent : T.text2} />}
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{action.label}</div>
+                {action.sub ? <div style={{ fontSize: 11, color: danger ? `${T.danger}cc` : T.text3, marginTop: 3, lineHeight: 1.45 }}>{action.sub}</div> : null}
+              </div>
             </button>
-          </div>
-        )}
-        <div style={{ maxHeight: 'calc(min(78vh, 680px) - 72px)', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          {children}
-        </div>
+          );
+        })}
       </div>
-    </MiniBottomSheet>
+    </BottomSheet>
   );
 }
