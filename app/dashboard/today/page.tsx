@@ -12,15 +12,18 @@ import {
 import { useTheme } from 'next-themes';
 import {
   CalendarClock,
+  CalendarDays,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
-  Globe2,
   MessageCircleMore,
   PhoneCall,
   Sparkles,
   SquarePen,
-  TrendingUp,
+  UserRound,
   Wallet,
+  X,
 } from 'lucide-react';
 
 import { WorkspaceShell } from '@/components/shared/workspace-shell';
@@ -31,38 +34,64 @@ import { useAppearance } from '@/lib/appearance-context';
 import { accentPalette } from '@/lib/appearance-palette';
 import type { Booking, BookingStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { useMobile } from '@/hooks/use-mobile';
 
 type ThemeMode = 'light' | 'dark';
-type TimelineStage = 'next' | 'queue' | 'done' | 'new' | 'no_show';
-type TimelinePeriod = 'morning' | 'day' | 'evening';
-type TimelineFilter = 'all' | TimelinePeriod;
-type SummaryRange = 'day' | 'week' | 'month';
-type TimelineSource = 'booking';
+type CalendarViewMode = 'day' | 'week' | 'month';
 
-interface TimelineItem {
+type ServiceLike = {
+  name: string;
+  duration?: number;
+  color?: string;
+  category?: string;
+};
+
+interface CalendarBooking {
   id: string;
-  date: string;
-  dateLabel: string;
-  time: string;
-  timeMinutes: number;
   clientName: string;
   service: string;
+  date: string;
+  start: string;
+  end: string;
+  startMinutes: number;
+  endMinutes: number;
+  durationMinutes: number;
+  status: BookingStatus;
   phone: string;
-  stage: TimelineStage;
-  period: TimelinePeriod;
   note?: string;
-  durationLabel: string;
-  source: TimelineSource;
-  bookingStatus?: BookingStatus;
+  source?: string;
+  color: string;
+  amount: number;
+  raw: Booking;
 }
 
-interface DayInsight {
-  nextUp?: TimelineItem;
-  busiestPeriod: TimelinePeriod;
-  freeWindowLabel: string;
-  completionLabel: string;
+interface LaidOutBooking extends CalendarBooking {
+  lane: number;
+  lanes: number;
 }
+
+interface WorkWindow {
+  startMinutes: number;
+  endMinutes: number;
+  hours: number[];
+}
+
+const DEFAULT_WORK_START = 8 * 60;
+const DEFAULT_WORK_END = 22 * 60;
+const DAY_HOUR_HEIGHT = 78;
+const WEEK_HOUR_HEIGHT = 66;
+
+const SERVICE_COLORS = [
+  '#4f8cff',
+  '#f45d8f',
+  '#8b5cf6',
+  '#10b981',
+  '#f59e0b',
+  '#06b6d4',
+  '#ef4444',
+  '#84cc16',
+  '#ec4899',
+  '#6366f1',
+];
 
 function pageBg(light: boolean) {
   return light ? 'bg-[#f4f4f2]' : 'bg-[#090909]';
@@ -73,19 +102,15 @@ function pageText(light: boolean) {
 }
 
 function mutedText(light: boolean) {
-  return light ? 'text-black/48' : 'text-white/42';
+  return light ? 'text-black/50' : 'text-white/46';
 }
 
 function faintText(light: boolean) {
-  return light ? 'text-black/32' : 'text-white/26';
+  return light ? 'text-black/34' : 'text-white/30';
 }
 
 function borderTone(light: boolean) {
   return light ? 'border-black/[0.08]' : 'border-white/[0.08]';
-}
-
-function divideTone(light: boolean) {
-  return light ? 'divide-black/[0.08]' : 'divide-white/[0.08]';
 }
 
 function cardTone(light: boolean) {
@@ -102,14 +127,14 @@ function insetTone(light: boolean) {
 
 function buttonBase(light: boolean, active = false) {
   return cn(
-    'inline-flex h-8 items-center justify-center gap-2 rounded-[9px] border px-3 text-[12px] font-medium shadow-none transition-[background,border-color,color,opacity,transform] duration-150 active:scale-[0.985]',
+    'inline-flex h-9 items-center justify-center gap-2 rounded-[10px] border px-3 text-[12px] font-semibold shadow-none transition-[background,border-color,color,opacity,transform] duration-150 active:scale-[0.985]',
     active
       ? light
         ? 'cb-neutral-primary cb-neutral-primary-light hover:opacity-[0.98]'
         : 'cb-neutral-primary cb-neutral-primary-dark hover:opacity-[0.98]'
       : light
-        ? 'border-black/[0.08] bg-white text-black/58 hover:border-black/[0.14] hover:bg-black/[0.035] hover:text-black'
-        : 'border-white/[0.08] bg-white/[0.04] text-white/55 hover:border-white/[0.14] hover:bg-white/[0.07] hover:text-white',
+        ? 'border-black/[0.08] bg-white text-black/62 hover:border-black/[0.14] hover:bg-black/[0.035] hover:text-black'
+        : 'border-white/[0.08] bg-white/[0.04] text-white/62 hover:border-white/[0.14] hover:bg-white/[0.07] hover:text-white',
   );
 }
 
@@ -129,20 +154,73 @@ function accentPillStyle(
       ? `color-mix(in srgb, ${color} ${borderAmount}%, rgba(0,0,0,0.1))`
       : `color-mix(in srgb, ${color} ${borderAmount}%, rgba(255,255,255,0.1))`,
     color: light
-      ? `color-mix(in srgb, ${color} 70%, #101010)`
-      : `color-mix(in srgb, ${color} 18%, #ffffff)`,
+      ? `color-mix(in srgb, ${color} 74%, #111111)`
+      : `color-mix(in srgb, ${color} 16%, #ffffff)`,
     boxShadow:
       strength === 'strong'
         ? light
-          ? `0 0 0 1px color-mix(in srgb, ${color} 10%, transparent)`
-          : `0 0 0 1px color-mix(in srgb, ${color} 14%, transparent)`
+          ? `0 10px 28px color-mix(in srgb, ${color} 12%, transparent)`
+          : `0 14px 34px color-mix(in srgb, ${color} 18%, transparent)`
         : undefined,
   };
 }
 
+function bookingCardStyle(color: string, light: boolean): CSSProperties {
+  return {
+    background: light
+      ? `linear-gradient(180deg, color-mix(in srgb, ${color} 16%, #ffffff), color-mix(in srgb, ${color} 8%, #ffffff))`
+      : `linear-gradient(180deg, color-mix(in srgb, ${color} 30%, #151515), color-mix(in srgb, ${color} 18%, #111111))`,
+    borderColor: light
+      ? `color-mix(in srgb, ${color} 42%, rgba(0,0,0,.12))`
+      : `color-mix(in srgb, ${color} 54%, rgba(255,255,255,.16))`,
+    color: light
+      ? `color-mix(in srgb, ${color} 70%, #080808)`
+      : `color-mix(in srgb, ${color} 10%, #ffffff)`,
+    boxShadow: light
+      ? `0 12px 30px color-mix(in srgb, ${color} 12%, transparent)`
+      : `0 18px 42px color-mix(in srgb, ${color} 18%, transparent)`,
+  };
+}
+
 function toLocalIsoDate(date: Date) {
-  const timezoneOffset = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 10);
+  const copy = new Date(date);
+  const timezoneOffset = copy.getTimezoneOffset() * 60000;
+  return new Date(copy.getTime() - timezoneOffset).toISOString().slice(0, 10);
+}
+
+function startOfDay(date: Date) {
+  const copy = new Date(date);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+}
+
+function startOfWeekMonday(date: Date) {
+  const copy = startOfDay(date);
+  const weekday = (copy.getDay() + 6) % 7;
+  copy.setDate(copy.getDate() - weekday);
+  return copy;
+}
+
+function startOfMonth(date: Date) {
+  const copy = startOfDay(date);
+  copy.setDate(1);
+  return copy;
+}
+
+function addDays(date: Date, amount: number) {
+  const copy = new Date(date);
+  copy.setDate(copy.getDate() + amount);
+  return copy;
+}
+
+function addMonths(date: Date, amount: number) {
+  const copy = new Date(date);
+  copy.setMonth(copy.getMonth() + amount);
+  return copy;
+}
+
+function isSameDay(left: Date, right: Date) {
+  return toLocalIsoDate(left) === toLocalIsoDate(right);
 }
 
 function parseTimeToMinutes(time: string) {
@@ -157,7 +235,7 @@ function parseTimeToMinutes(time: string) {
 }
 
 function formatMinutesAsTime(totalMinutes: number) {
-  const normalized = Math.max(0, totalMinutes);
+  const normalized = Math.max(0, Math.min(24 * 60, totalMinutes));
   const hours = Math.floor(normalized / 60)
     .toString()
     .padStart(2, '0');
@@ -166,168 +244,30 @@ function formatMinutesAsTime(totalMinutes: number) {
   return `${hours}:${minutes}`;
 }
 
-function getTimelinePeriod(timeMinutes: number): TimelinePeriod {
-  if (timeMinutes < 12 * 60) return 'morning';
-  if (timeMinutes < 17 * 60) return 'day';
-  return 'evening';
-}
-
-function mapBookingToTimelineItem(
-  booking: Booking,
-  now: Date,
-  locale: 'ru' | 'en',
-): TimelineItem {
-  let dateLabel = booking.date;
-  try {
-    dateLabel = new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', { day: 'numeric', month: 'short' }).format(new Date(`${booking.date}T${booking.time}:00`));
-  } catch {
-    dateLabel = booking.date;
-  }
-  const bookingDateTime = new Date(`${booking.date}T${booking.time}:00`);
-  const diff = bookingDateTime.getTime() - now.getTime();
-  const timeMinutes = parseTimeToMinutes(booking.time);
-
-  const stage: TimelineStage =
-    booking.status === 'completed'
-      ? 'done'
-      : booking.status === 'no_show' || booking.status === 'cancelled'
-        ? 'no_show'
-        : diff <= 45 * 60 * 1000
-          ? 'next'
-          : 'queue';
-
-  return {
-    id: booking.id,
-    date: booking.date,
-    dateLabel,
-    time: booking.time,
-    timeMinutes,
-    clientName: booking.clientName,
-    service: booking.service,
-    phone: booking.clientPhone,
-    stage,
-    period: getTimelinePeriod(timeMinutes),
-    note: booking.comment || undefined,
-    durationLabel: locale === 'ru' ? '60 мин' : '60 min',
-    source: 'booking',
-    bookingStatus: booking.status,
-  };
-}
-
-function buildDayInsight(items: TimelineItem[], locale: 'ru' | 'en'): DayInsight {
-  const counts = items.reduce<Record<TimelineFilter, number>>(
-    (accumulator, item) => {
-      accumulator.all += 1;
-      accumulator[item.period] += 1;
-      return accumulator;
-    },
-    { all: 0, morning: 0, day: 0, evening: 0 },
-  );
-
-  const busiestPeriod =
-    (
-      Object.entries(counts).filter(([key]) => key !== 'all') as [
-        TimelinePeriod,
-        number,
-      ][]
-    ).sort((left, right) => right[1] - left[1])[0]?.[0] ?? 'day';
-
-  const nextUp = items.find(
-    (item) => item.stage === 'next' || item.stage === 'queue' || item.stage === 'new',
-  );
-
-  const completionRate = items.length
-    ? Math.round((items.filter((item) => item.stage === 'done').length / items.length) * 100)
-    : 0;
-
-  const freeWindowLabel = (() => {
-    if (items.length < 2) {
-      return locale === 'ru'
-        ? 'Свободные окна появятся после первых записей'
-        : 'Free windows appear after the first bookings';
-    }
-
-    const sorted = [...items].sort(
-      (left, right) => left.timeMinutes - right.timeMinutes,
-    );
-
-    let bestGap = 0;
-
-    for (let index = 1; index < sorted.length; index += 1) {
-      const previous = sorted[index - 1];
-      const current = sorted[index];
-      bestGap = Math.max(bestGap, current.timeMinutes - previous.timeMinutes - 60);
-    }
-
-    if (bestGap <= 0) {
-      return locale === 'ru'
-        ? 'День плотный, свободных окон почти нет'
-        : 'Packed day, almost no free windows';
-    }
-
-    const hours = Math.floor(bestGap / 60);
-    const minutes = bestGap % 60;
-
-    if (locale === 'ru') {
-      return hours > 0
-        ? `${hours} ч ${minutes} мин до следующего плотного блока`
-        : `${minutes} мин между визитами`;
-    }
-
-    return hours > 0
-      ? `${hours}h ${minutes}m before the next dense block`
-      : `${minutes}m between visits`;
-  })();
-
-  return {
-    nextUp,
-    busiestPeriod,
-    freeWindowLabel,
-    completionLabel:
-      locale === 'ru'
-        ? `${completionRate}% дня уже закрыто`
-        : `${completionRate}% of the day completed`,
-  };
-}
-
-
-function startOfWeekMonday(date: Date) {
-  const copy = new Date(date);
-  const weekday = (copy.getDay() + 6) % 7;
-  copy.setHours(0, 0, 0, 0);
-  copy.setDate(copy.getDate() - weekday);
-  return copy;
-}
-
-function addDays(date: Date, amount: number) {
-  const copy = new Date(date);
-  copy.setDate(copy.getDate() + amount);
-  return copy;
-}
-
-function isBookingActiveForSummary(booking: Booking) {
-  return booking.status !== 'cancelled' && booking.status !== 'no_show';
-}
-
-function getBookingAmount(booking: Booking) {
-  return typeof booking.priceAmount === 'number' && Number.isFinite(booking.priceAmount)
-    ? booking.priceAmount
-    : 0;
-}
-
-function formatCurrencyCompact(value: number, locale: 'ru' | 'en') {
+function formatMoney(value: number, locale: 'ru' | 'en') {
   try {
     return new Intl.NumberFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
       style: 'currency',
       currency: 'RUB',
-      maximumFractionDigits: value >= 1000 ? 0 : 2,
+      maximumFractionDigits: 0,
     }).format(value);
   } catch {
     return `${Math.round(value)} ₽`;
   }
 }
 
-function getShortWeekday(date: Date, locale: 'ru' | 'en') {
+function formatShortDate(date: Date, locale: 'ru' | 'en') {
+  try {
+    return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
+      day: 'numeric',
+      month: 'short',
+    }).format(date);
+  } catch {
+    return toLocalIsoDate(date);
+  }
+}
+
+function formatWeekday(date: Date, locale: 'ru' | 'en') {
   try {
     return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
       weekday: 'short',
@@ -340,90 +280,218 @@ function getShortWeekday(date: Date, locale: 'ru' | 'en') {
   }
 }
 
-function getRangeTitle(range: SummaryRange, locale: 'ru' | 'en') {
-  if (locale === 'ru') {
-    if (range === 'day') return 'за день';
-    if (range === 'week') return 'за неделю';
-    return 'за месяц';
+function formatFullDate(date: Date, locale: 'ru' | 'en') {
+  try {
+    return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(date);
+  } catch {
+    return toLocalIsoDate(date);
   }
-
-  if (range === 'day') return 'for the day';
-  if (range === 'week') return 'for the week';
-  return 'for the month';
 }
 
-function getSummaryDescription(
-  range: SummaryRange,
-  hasBookings: boolean,
-  locale: 'ru' | 'en',
-) {
-  if (locale === 'ru') {
-    if (!hasBookings) {
-      if (range === 'day') return 'На сегодня пока нет записей. Как только клиент отправит заявку, она появится здесь автоматически.';
-      if (range === 'week') return 'На этой неделе пока мало данных. Здесь будут видны загрузка, ближайшие визиты и ритм недели.';
-      return 'За текущий месяц пока мало данных. Секция покажет загрузку, выручку и общую динамику.';
-    }
+function formatCalendarRange(view: CalendarViewMode, selectedDate: Date, locale: 'ru' | 'en') {
+  if (view === 'day') return formatFullDate(selectedDate, locale);
 
-    if (range === 'day') return 'Ближайшие визиты, загрузка дня и быстрые сигналы в одном экране.';
-    if (range === 'week') return 'Компактный обзор недели: где плотные дни, где есть окна и сколько записей уже закрыто.';
-    return 'Обзор месяца: активность, выручка и динамика по текущему периоду.';
+  if (view === 'week') {
+    const start = startOfWeekMonday(selectedDate);
+    const end = addDays(start, 6);
+    return `${formatShortDate(start, locale)} — ${formatShortDate(end, locale)}`;
   }
 
-  if (!hasBookings) {
-    if (range === 'day') return 'No bookings for today yet. New requests will appear here automatically.';
-    if (range === 'week') return 'There is not enough data for this week yet. Load, upcoming visits, and weekly rhythm will appear here.';
-    return 'There is not enough data for this month yet. This section will show activity, revenue, and momentum.';
+  try {
+    return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
+      month: 'long',
+      year: 'numeric',
+    }).format(selectedDate);
+  } catch {
+    return selectedDate.toISOString().slice(0, 7);
   }
-
-  if (range === 'day') return 'Upcoming visits, day load, and quick signals in one calm overview.';
-  if (range === 'week') return 'A compact weekly overview: dense days, free windows, and completion across the week.';
-  return 'A monthly overview of activity, revenue, and overall momentum.';
 }
 
-function getNowMarkerIndex(items: TimelineItem[], nowMinutes: number) {
-  if (!items.length) return null;
-  if (nowMinutes <= items[0].timeMinutes) return 0;
-
-  for (let index = 1; index < items.length; index += 1) {
-    if (nowMinutes <= items[index].timeMinutes) {
-      return index;
-    }
+function getRangeDates(view: CalendarViewMode, selectedDate: Date) {
+  if (view === 'day') return [startOfDay(selectedDate)];
+  if (view === 'week') {
+    const start = startOfWeekMonday(selectedDate);
+    return Array.from({ length: 7 }, (_, index) => addDays(start, index));
   }
 
-  return nowMinutes <= items[items.length - 1].timeMinutes + 60
-    ? items.length
-    : null;
+  const first = startOfWeekMonday(startOfMonth(selectedDate));
+  return Array.from({ length: 42 }, (_, index) => addDays(first, index));
 }
 
-function stageColor(
-  stage: TimelineStage,
+function getRangeIsoBounds(view: CalendarViewMode, selectedDate: Date) {
+  if (view === 'day') {
+    const iso = toLocalIsoDate(selectedDate);
+    return { startIso: iso, endIso: iso };
+  }
+
+  if (view === 'week') {
+    const start = startOfWeekMonday(selectedDate);
+    return {
+      startIso: toLocalIsoDate(start),
+      endIso: toLocalIsoDate(addDays(start, 6)),
+    };
+  }
+
+  const monthStart = startOfMonth(selectedDate);
+  const monthEnd = addDays(addMonths(monthStart, 1), -1);
+  return {
+    startIso: toLocalIsoDate(monthStart),
+    endIso: toLocalIsoDate(monthEnd),
+  };
+}
+
+function hashString(value: string) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash << 5) - hash + value.charCodeAt(index);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function isCssColor(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function getServiceColor(
+  booking: Booking,
+  serviceMap: Map<string, ServiceLike>,
   accentColor: string,
-  publicAccentColor: string,
-  light: boolean,
 ) {
-  if (stage === 'next') return accentColor;
-  if (stage === 'new') return publicAccentColor;
-  if (stage === 'queue') return light ? 'rgba(0,0,0,0.42)' : 'rgba(255,255,255,0.46)';
-  if (stage === 'no_show') return light ? 'rgba(120,40,40,0.72)' : 'rgba(255,130,130,0.72)';
-  return light ? 'rgba(0,0,0,0.26)' : 'rgba(255,255,255,0.28)';
+  const metadata = booking.metadata && typeof booking.metadata === 'object'
+    ? booking.metadata as Record<string, unknown>
+    : null;
+  const service = serviceMap.get(booking.service);
+  const fromData = metadata?.color ?? metadata?.serviceColor ?? service?.color;
+
+  if (isCssColor(fromData)) return fromData;
+
+  const seed = service?.category ? `${service.category}:${booking.service}` : booking.service;
+  return SERVICE_COLORS[hashString(seed || accentColor) % SERVICE_COLORS.length] ?? accentColor;
 }
 
-function PageAction({
-  href,
-  children,
-  light,
-  active,
-}: {
-  href: string;
-  children: ReactNode;
-  light: boolean;
-  active?: boolean;
-}) {
-  return (
-    <Button asChild className={buttonBase(light, active)}>
-      <Link href={href}>{children}</Link>
-    </Button>
-  );
+function sourceLabel(booking: Booking, locale: 'ru' | 'en') {
+  const raw = String(booking.source ?? booking.channel ?? '').toLowerCase();
+  if (!raw) return locale === 'ru' ? 'Сайт' : 'Web';
+  if (raw.includes('tg') || raw.includes('telegram') || raw.includes('тг')) return locale === 'ru' ? 'Телеграм' : 'Telegram';
+  if (raw.includes('vk') || raw.includes('вк')) return locale === 'ru' ? 'ВК' : 'VK';
+  if (raw.includes('inst')) return locale === 'ru' ? 'Инстаграм' : 'Instagram';
+  return String(booking.source ?? booking.channel ?? 'Web');
+}
+
+function mapBookingToCalendarBooking(
+  booking: Booking,
+  serviceMap: Map<string, ServiceLike>,
+  accentColor: string,
+  locale: 'ru' | 'en',
+): CalendarBooking {
+  const service = serviceMap.get(booking.service);
+  const startMinutes = parseTimeToMinutes(booking.time);
+  const durationMinutes = Math.max(15, booking.durationMinutes ?? service?.duration ?? 60);
+  const endMinutes = startMinutes + durationMinutes;
+
+  return {
+    id: booking.id,
+    clientName: booking.clientName || (locale === 'ru' ? 'Клиент' : 'Client'),
+    service: booking.service || (locale === 'ru' ? 'Услуга' : 'Service'),
+    date: booking.date,
+    start: booking.time,
+    end: formatMinutesAsTime(endMinutes),
+    startMinutes,
+    endMinutes,
+    durationMinutes,
+    status: booking.status,
+    phone: booking.clientPhone,
+    note: booking.comment || undefined,
+    source: sourceLabel(booking, locale),
+    color: getServiceColor(booking, serviceMap, accentColor),
+    amount: typeof booking.priceAmount === 'number' && Number.isFinite(booking.priceAmount)
+      ? booking.priceAmount
+      : 0,
+    raw: booking,
+  };
+}
+
+function activeBooking(booking: Booking | CalendarBooking) {
+  const status = 'raw' in booking ? booking.status : booking.status;
+  return status !== 'cancelled' && status !== 'no_show';
+}
+
+function deriveWorkWindow(bookings: CalendarBooking[]): WorkWindow {
+  const starts = bookings.map((booking) => booking.startMinutes);
+  const ends = bookings.map((booking) => booking.endMinutes);
+  const earliest = starts.length ? Math.min(...starts) : DEFAULT_WORK_START;
+  const latest = ends.length ? Math.max(...ends) : DEFAULT_WORK_END;
+
+  const startMinutes = Math.max(0, Math.min(DEFAULT_WORK_START, Math.floor(earliest / 60) * 60));
+  const endMinutes = Math.min(24 * 60, Math.max(DEFAULT_WORK_END, Math.ceil(latest / 60) * 60));
+
+  const hours: number[] = [];
+  for (let minute = startMinutes; minute <= endMinutes; minute += 60) {
+    hours.push(minute);
+  }
+
+  return { startMinutes, endMinutes, hours };
+}
+
+function layoutBookings(bookings: CalendarBooking[]): LaidOutBooking[] {
+  const sorted = [...bookings].sort((left, right) => {
+    if (left.startMinutes !== right.startMinutes) return left.startMinutes - right.startMinutes;
+    return right.endMinutes - left.endMinutes;
+  });
+
+  const laneEnds: number[] = [];
+  const result: Array<CalendarBooking & { lane: number }> = [];
+
+  for (const booking of sorted) {
+    let lane = laneEnds.findIndex((end) => end <= booking.startMinutes);
+    if (lane < 0) {
+      lane = laneEnds.length;
+      laneEnds.push(booking.endMinutes);
+    } else {
+      laneEnds[lane] = booking.endMinutes;
+    }
+
+    result.push({ ...booking, lane });
+  }
+
+  const lanes = Math.max(1, laneEnds.length);
+  return result.map((booking) => ({ ...booking, lanes }));
+}
+
+function groupByDate(bookings: CalendarBooking[]) {
+  const map = new Map<string, CalendarBooking[]>();
+  for (const booking of bookings) {
+    const current = map.get(booking.date) ?? [];
+    current.push(booking);
+    map.set(booking.date, current);
+  }
+
+  for (const [key, value] of map) {
+    map.set(key, value.sort((left, right) => left.startMinutes - right.startMinutes));
+  }
+
+  return map;
+}
+
+function statusLabel(status: BookingStatus, locale: 'ru' | 'en') {
+  if (locale === 'ru') {
+    if (status === 'new') return 'Новая';
+    if (status === 'confirmed') return 'Подтверждена';
+    if (status === 'completed') return 'Завершена';
+    if (status === 'no_show') return 'Не пришёл';
+    return 'Отменена';
+  }
+
+  if (status === 'new') return 'New';
+  if (status === 'confirmed') return 'Confirmed';
+  if (status === 'completed') return 'Completed';
+  if (status === 'no_show') return 'No-show';
+  return 'Cancelled';
 }
 
 function Card({
@@ -436,61 +504,9 @@ function Card({
   className?: string;
 }) {
   return (
-    <section className={cn('rounded-[11px] border', cardTone(light), className)}>
+    <section className={cn('rounded-[18px] border', cardTone(light), className)}>
       {children}
     </section>
-  );
-}
-
-function CardTitle({
-  title,
-  description,
-  light,
-}: {
-  title: string;
-  description?: string;
-  light: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        'flex min-h-[58px] items-center justify-between gap-4 border-b px-4 py-3',
-        borderTone(light),
-      )}
-    >
-      <div className="min-w-0">
-        <h2
-          className={cn(
-            'truncate text-[13px] font-semibold tracking-[-0.018em]',
-            pageText(light),
-          )}
-        >
-          {title}
-        </h2>
-
-        {description ? (
-          <p className={cn('mt-1 truncate text-[11px]', mutedText(light))}>
-            {description}
-          </p>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function Panel({
-  children,
-  light,
-  className,
-}: {
-  children: ReactNode;
-  light: boolean;
-  className?: string;
-}) {
-  return (
-    <div className={cn('rounded-[10px] border', insetTone(light), className)}>
-      {children}
-    </div>
   );
 }
 
@@ -498,28 +514,28 @@ function MicroLabel({
   children,
   light,
   active,
-  accentColor,
+  color,
   className,
 }: {
   children: ReactNode;
   light: boolean;
   active?: boolean;
-  accentColor?: string;
+  color?: string;
   className?: string;
 }) {
   return (
     <span
-      style={active && accentColor ? accentPillStyle(accentColor, light, 'soft') : undefined}
+      style={active && color ? accentPillStyle(color, light, 'soft') : undefined}
       className={cn(
-        'inline-flex h-7 items-center gap-1.5 rounded-[9px] border px-2.5 text-[10.5px] font-medium',
-        active && !accentColor
+        'inline-flex h-7 items-center gap-1.5 rounded-[9px] border px-2.5 text-[10.5px] font-semibold',
+        active && !color
           ? light
-            ? 'border-black/[0.1] bg-black/[0.045] text-black/62'
-            : 'border-white/[0.11] bg-white/[0.075] text-white/68'
+            ? 'border-black/[0.1] bg-black/[0.045] text-black/68'
+            : 'border-white/[0.11] bg-white/[0.075] text-white/72'
           : !active
             ? light
-              ? 'border-black/[0.08] bg-white text-black/50'
-              : 'border-white/[0.08] bg-white/[0.04] text-white/42'
+              ? 'border-black/[0.08] bg-white text-black/52'
+              : 'border-white/[0.08] bg-white/[0.04] text-white/48'
             : '',
         className,
       )}
@@ -529,299 +545,37 @@ function MicroLabel({
   );
 }
 
-function StatusDot({
-  light,
-  active,
-  accentColor,
-}: {
-  light: boolean;
-  active?: boolean;
-  accentColor?: string;
-}) {
-  return (
-    <span
-      style={active && accentColor ? { background: accentColor } : undefined}
-      className={cn(
-        'size-1.5 shrink-0 rounded-full',
-        !(active && accentColor) &&
-          (active ? 'bg-current' : light ? 'bg-black/24' : 'bg-white/22'),
-      )}
-    />
-  );
+function StatusDot({ color }: { color: string }) {
+  return <span style={{ background: color }} className="size-1.5 shrink-0 rounded-full" />;
 }
 
-function StatTile({
-  label,
-  value,
-  hint,
-  icon,
-  light,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  icon: ReactNode;
-  light: boolean;
-}) {
-  return (
-    <div className="min-w-0 p-4 md:p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className={cn('text-[11px] font-medium', mutedText(light))}>
-            {label}
-          </div>
-
-          <div
-            className={cn(
-              'mt-2 truncate text-[25px] font-semibold tracking-[-0.065em]',
-              pageText(light),
-            )}
-          >
-            {value}
-          </div>
-
-          {hint ? (
-            <div className={cn('mt-1 truncate text-[11px]', faintText(light))}>
-              {hint}
-            </div>
-          ) : null}
-        </div>
-
-        <div
-          className={cn(
-            'inline-flex size-8 shrink-0 items-center justify-center rounded-[9px] border',
-            light
-              ? 'border-black/[0.07] bg-black/[0.025] text-black/38'
-              : 'border-white/[0.07] bg-white/[0.035] text-white/38',
-          )}
-        >
-          {icon}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function HeroStat({
-  label,
-  value,
-  hint,
-  light,
-}: {
-  label: string;
-  value: string | number;
-  hint?: string;
-  light: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        'min-w-0 rounded-[10px] border px-3.5 py-3 transition-colors duration-150',
-        light
-          ? 'border-black/[0.07] bg-white hover:bg-black/[0.018]'
-          : 'border-white/[0.07] bg-white/[0.035] hover:bg-white/[0.055]',
-      )}
-    >
-      <div className="grid min-h-[34px] grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
-        <div className="min-w-0">
-          <div className={cn('truncate text-[10.5px] font-medium', mutedText(light))}>
-            {label}
-          </div>
-
-          {hint ? (
-            <div className={cn('mt-0.5 truncate text-[10px]', faintText(light))}>
-              {hint}
-            </div>
-          ) : null}
-        </div>
-
-        <div
-          className={cn(
-            'min-w-[54px] max-w-[170px] truncate text-right text-[18px] font-semibold leading-none tracking-[-0.055em] tabular-nums',
-            pageText(light),
-          )}
-        >
-          {value}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ListBox({
+function IconButton({
   children,
-  light,
-  className,
-}: {
-  children: ReactNode;
-  light: boolean;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        'overflow-hidden rounded-[10px] border divide-y',
-        insetTone(light),
-        divideTone(light),
-        className,
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
-function ListRow({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  return <div className={cn('px-4 py-3.5', className)}>{children}</div>;
-}
-
-function KeyValue({
-  label,
-  value,
-  light,
-}: {
-  label: string;
-  value: string;
-  light: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        'flex min-h-10 items-center justify-between gap-3 rounded-[9px] border px-3',
-        insetTone(light),
-      )}
-    >
-      <span className={cn('text-[11px] font-medium', mutedText(light))}>
-        {label}
-      </span>
-
-      <span
-        className={cn(
-          'truncate text-right text-[11.5px] font-medium',
-          pageText(light),
-        )}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
-
-function EmptyState({
-  children,
-  light,
-}: {
-  children: ReactNode;
-  light: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        'rounded-[10px] border px-4 py-5 text-[12px]',
-        insetTone(light),
-        mutedText(light),
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
-function ControlGroup({
-  children,
-  light,
-  className,
-}: {
-  children: ReactNode;
-  light: boolean;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        'inline-flex max-w-full shrink-0 items-center overflow-hidden rounded-[12px] border p-0',
-        light
-          ? 'border-black/[0.08] bg-white'
-          : 'border-white/[0.08] bg-white/[0.045]',
-        className,
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
-function FilterChip({
-  label,
-  count,
-  active,
   onClick,
   light,
-  accentColor,
+  label,
 }: {
-  label: string;
-  count?: number;
-  active: boolean;
+  children: ReactNode;
   onClick: () => void;
   light: boolean;
-  accentColor: string;
+  label: string;
 }) {
   return (
     <button
       type="button"
+      aria-label={label}
       onClick={onClick}
       className={cn(
-        'group relative inline-flex h-10 min-w-[72px] shrink-0 items-center justify-center gap-2 border-r px-4 text-[11px] font-semibold tracking-[-0.015em] transition-colors duration-150 last:border-r-0 active:scale-[0.985]',
-        light ? 'border-black/[0.07]' : 'border-white/[0.07]',
-        active
-          ? light
-            ? 'text-black'
-            : 'text-white'
-          : light
-            ? 'text-black/40 hover:text-black/70'
-            : 'text-white/36 hover:text-white/70',
+        'inline-flex size-9 items-center justify-center rounded-[10px] border transition-all duration-150 active:scale-[0.97]',
+        light
+          ? 'border-black/[0.08] bg-white text-black/62 hover:bg-black/[0.035] hover:text-black'
+          : 'border-white/[0.08] bg-white/[0.04] text-white/62 hover:bg-white/[0.07] hover:text-white',
       )}
     >
-      <span className="relative z-10">{label}</span>
-
-      {typeof count === 'number' ? (
-        <span
-          className={cn(
-            'relative z-10 rounded-[6px] px-1.5 py-0.5 text-[10px] font-semibold',
-            active
-              ? light
-                ? 'bg-black/[0.06] text-black/60'
-                : 'bg-white/[0.075] text-white/62'
-              : light
-                ? 'bg-black/[0.035] text-black/34'
-                : 'bg-white/[0.045] text-white/34',
-          )}
-        >
-          {count}
-        </span>
-      ) : null}
-
-      <span
-        style={active ? { background: accentColor } : undefined}
-        className={cn(
-          'absolute bottom-1.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full transition-all duration-200',
-          active
-            ? 'opacity-100'
-            : light
-              ? 'bg-black/0 opacity-0 group-hover:bg-black/18 group-hover:opacity-100'
-              : 'bg-white/0 opacity-0 group-hover:bg-white/18 group-hover:opacity-100',
-        )}
-      />
+      {children}
     </button>
   );
 }
-
 
 function SegmentButton({
   label,
@@ -841,7 +595,7 @@ function SegmentButton({
       type="button"
       onClick={onClick}
       className={cn(
-        'relative inline-flex h-9 items-center justify-center rounded-[10px] px-3.5 text-[11px] font-semibold tracking-[-0.015em] transition-all duration-150 active:scale-[0.985]',
+        'relative inline-flex h-9 min-w-[78px] items-center justify-center rounded-[10px] px-3 text-[11px] font-semibold tracking-[-0.015em] transition-all duration-150 active:scale-[0.985]',
         active
           ? light
             ? 'text-black'
@@ -857,180 +611,726 @@ function SegmentButton({
           className="absolute inset-0 rounded-[10px] border"
         />
       ) : null}
-
       <span className="relative z-10">{label}</span>
     </button>
   );
 }
 
-function SummaryMetricCard({
+function StatCard({
   label,
   value,
   hint,
+  icon,
   light,
 }: {
   label: string;
   value: string | number;
   hint?: string;
+  icon: ReactNode;
   light: boolean;
 }) {
   return (
     <div
       className={cn(
-        'min-w-0 rounded-[11px] border px-3.5 py-3.5',
+        'min-w-0 rounded-[14px] border px-4 py-3.5',
         light ? 'border-black/[0.07] bg-white' : 'border-white/[0.07] bg-white/[0.04]',
       )}
     >
-      <div className={cn('truncate text-[10.5px] font-medium', mutedText(light))}>
-        {label}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className={cn('truncate text-[10.5px] font-semibold', mutedText(light))}>
+            {label}
+          </div>
+          <div
+            className={cn(
+              'mt-2 truncate text-[24px] font-semibold leading-none tracking-[-0.065em]',
+              pageText(light),
+            )}
+          >
+            {value}
+          </div>
+          {hint ? (
+            <div className={cn('mt-1.5 truncate text-[10.5px]', faintText(light))}>
+              {hint}
+            </div>
+          ) : null}
+        </div>
+        <div
+          className={cn(
+            'inline-flex size-9 shrink-0 items-center justify-center rounded-[11px] border',
+            light
+              ? 'border-black/[0.07] bg-black/[0.025] text-black/38'
+              : 'border-white/[0.07] bg-white/[0.035] text-white/38',
+          )}
+        >
+          {icon}
+        </div>
       </div>
-      <div
-        className={cn(
-          'mt-2 truncate text-[22px] font-semibold leading-none tracking-[-0.06em]',
-          pageText(light),
-        )}
-      >
-        {value}
-      </div>
-      {hint ? (
-        <div className={cn('mt-1.5 truncate text-[10.5px]', faintText(light))}>{hint}</div>
-      ) : null}
     </div>
   );
 }
 
-function SummaryBoardBooking({
-  item,
+function BookingBlock({
+  booking,
   light,
+  workWindow,
+  hourHeight,
+  onSelect,
+  compact,
 }: {
-  item: TimelineItem;
+  booking: LaidOutBooking;
   light: boolean;
+  workWindow: WorkWindow;
+  hourHeight: number;
+  onSelect: (booking: CalendarBooking) => void;
+  compact?: boolean;
 }) {
-  const colorMap: Record<TimelinePeriod, string> = {
-    morning: '#54a7ff',
-    day: '#f5b326',
-    evening: '#45d19a',
-  };
-  const tint = colorMap[item.period] ?? '#7c8aa0';
+  const top = ((booking.startMinutes - workWindow.startMinutes) / 60) * hourHeight + 4;
+  const height = Math.max(46, ((booking.endMinutes - booking.startMinutes) / 60) * hourHeight - 8);
+  const gap = 4;
+  const width = `calc(${100 / booking.lanes}% - ${gap}px)`;
+  const left = `calc(${(booking.lane * 100) / booking.lanes}% + ${booking.lane ? gap / 2 : 0}px)`;
+  const inactive = booking.status === 'cancelled' || booking.status === 'no_show';
+  const done = booking.status === 'completed';
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(booking)}
+      style={{
+        ...bookingCardStyle(booking.color, light),
+        top,
+        height,
+        left,
+        width,
+      }}
+      className={cn(
+        'absolute z-10 overflow-hidden rounded-[13px] border px-2.5 py-2 text-left transition-all duration-150 hover:-translate-y-0.5 hover:shadow-xl active:scale-[0.99]',
+        inactive && 'opacity-55 saturate-50',
+        done && 'opacity-72',
+      )}
+    >
+      <span
+        style={{ background: booking.color }}
+        className="absolute left-0 top-0 h-full w-[3px]"
+      />
+      <span
+        style={{ background: booking.color }}
+        className="absolute right-2 top-2 size-1.5 rounded-full opacity-80"
+      />
+
+      <div className="min-w-0 pl-1.5">
+        <div className="truncate text-[12px] font-bold leading-tight tracking-[-0.02em]">
+          {booking.clientName}
+        </div>
+        <div className="mt-1 truncate text-[10.5px] font-semibold opacity-78">
+          {booking.service}
+        </div>
+        {!compact || height > 58 ? (
+          <div className="mt-1.5 truncate text-[10px] font-semibold opacity-62">
+            {booking.start}–{booking.end}
+          </div>
+        ) : null}
+      </div>
+    </button>
+  );
+}
+
+function EmptyCalendarState({
+  light,
+  title,
+  text,
+}: {
+  light: boolean;
+  title: string;
+  text: string;
+}) {
+  return (
+    <div
+      className={cn(
+        'pointer-events-none absolute left-1/2 top-16 z-20 w-[min(420px,calc(100%-32px))] -translate-x-1/2 rounded-[16px] border px-4 py-4 text-center shadow-sm',
+        light
+          ? 'border-black/[0.08] bg-white/88 text-black backdrop-blur-xl'
+          : 'border-white/[0.08] bg-[#111]/88 text-white backdrop-blur-xl',
+      )}
+    >
+      <div className="text-[13px] font-semibold tracking-[-0.018em]">{title}</div>
+      <div className={cn('mt-1 text-[11px] leading-5', mutedText(light))}>{text}</div>
+    </div>
+  );
+}
+
+function DayCalendar({
+  date,
+  bookings,
+  workWindow,
+  now,
+  light,
+  locale,
+  onSelect,
+}: {
+  date: Date;
+  bookings: CalendarBooking[];
+  workWindow: WorkWindow;
+  now: Date;
+  light: boolean;
+  locale: 'ru' | 'en';
+  onSelect: (booking: CalendarBooking) => void;
+}) {
+  const dayBookings = layoutBookings(bookings.filter((booking) => booking.date === toLocalIsoDate(date)));
+  const height = ((workWindow.endMinutes - workWindow.startMinutes) / 60) * DAY_HOUR_HEIGHT;
+  const showNow = isSameDay(date, now);
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const nowTop = ((nowMinutes - workWindow.startMinutes) / 60) * DAY_HOUR_HEIGHT;
+
+  return (
+    <div className="overflow-x-auto">
+      <div className="min-w-[760px]">
+        <div
+          className={cn(
+            'grid grid-cols-[82px_minmax(0,1fr)] overflow-hidden rounded-[16px] border',
+            light ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.025]',
+          )}
+        >
+          <div className={cn('border-r', borderTone(light))} style={{ height }}>
+            <div className="relative h-full">
+              {workWindow.hours.map((hour) => (
+                <div
+                  key={hour}
+                  style={{ top: ((hour - workWindow.startMinutes) / 60) * DAY_HOUR_HEIGHT - 7 }}
+                  className={cn('absolute right-3 text-[11px] font-semibold tabular-nums', mutedText(light))}
+                >
+                  {formatMinutesAsTime(hour)}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div
+            className="relative"
+            style={{
+              height,
+              backgroundImage: light
+                ? 'linear-gradient(to bottom, rgba(0,0,0,.07) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,.035) 1px, transparent 1px)'
+                : 'linear-gradient(to bottom, rgba(255,255,255,.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.035) 1px, transparent 1px)',
+              backgroundSize: `100% ${DAY_HOUR_HEIGHT}px, 100% ${DAY_HOUR_HEIGHT / 2}px`,
+            }}
+          >
+            {showNow && nowMinutes >= workWindow.startMinutes && nowMinutes <= workWindow.endMinutes ? (
+              <div
+                style={{ top: nowTop }}
+                className="pointer-events-none absolute left-0 right-0 z-30 flex items-center"
+              >
+                <span className="size-2 rounded-full bg-red-500" />
+                <span className="h-px flex-1 bg-red-500/80" />
+                <span className="mr-2 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold text-white">
+                  {locale === 'ru' ? 'Сейчас' : 'Now'}
+                </span>
+              </div>
+            ) : null}
+
+            {dayBookings.map((booking) => (
+              <BookingBlock
+                key={booking.id}
+                booking={booking}
+                light={light}
+                workWindow={workWindow}
+                hourHeight={DAY_HOUR_HEIGHT}
+                onSelect={onSelect}
+              />
+            ))}
+
+            {!dayBookings.length ? (
+              <EmptyCalendarState
+                light={light}
+                title={locale === 'ru' ? 'Записей на этот день нет' : 'No bookings for this day'}
+                text={locale === 'ru' ? 'Свободный день. Новые заявки появятся здесь автоматически.' : 'Free day. New requests will appear here automatically.'}
+              />
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WeekCalendar({
+  dates,
+  bookingsByDate,
+  workWindow,
+  now,
+  todayIso,
+  selectedDate,
+  light,
+  locale,
+  onSelect,
+  onDateSelect,
+}: {
+  dates: Date[];
+  bookingsByDate: Map<string, CalendarBooking[]>;
+  workWindow: WorkWindow;
+  now: Date;
+  todayIso: string;
+  selectedDate: Date;
+  light: boolean;
+  locale: 'ru' | 'en';
+  onSelect: (booking: CalendarBooking) => void;
+  onDateSelect: (date: Date) => void;
+}) {
+  const height = ((workWindow.endMinutes - workWindow.startMinutes) / 60) * WEEK_HOUR_HEIGHT;
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const nowTop = ((nowMinutes - workWindow.startMinutes) / 60) * WEEK_HOUR_HEIGHT;
+
+  return (
+    <div className="overflow-x-auto">
+      <div className="min-w-[1080px]">
+        <div
+          className={cn(
+            'overflow-hidden rounded-[16px] border',
+            light ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.025]',
+          )}
+        >
+          <div
+            className={cn(
+              'sticky top-0 z-40 grid grid-cols-[74px_repeat(7,minmax(132px,1fr))] border-b backdrop-blur-xl',
+              borderTone(light),
+              light ? 'bg-white/92' : 'bg-[#101010]/92',
+            )}
+          >
+            <div className={cn('border-r px-3 py-3 text-[11px] font-semibold', borderTone(light), mutedText(light))}>
+              {locale === 'ru' ? 'Время' : 'Time'}
+            </div>
+            {dates.map((date) => {
+              const iso = toLocalIsoDate(date);
+              const isToday = iso === todayIso;
+              const isSelected = isSameDay(date, selectedDate);
+              return (
+                <button
+                  key={iso}
+                  type="button"
+                  onClick={() => onDateSelect(date)}
+                  className={cn(
+                    'border-r px-2 py-2 text-left transition-colors last:border-r-0',
+                    borderTone(light),
+                    isSelected
+                      ? light
+                        ? 'bg-black/[0.045]'
+                        : 'bg-white/[0.06]'
+                      : light
+                        ? 'hover:bg-black/[0.025]'
+                        : 'hover:bg-white/[0.04]',
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={cn('text-[11px] font-semibold', pageText(light))}>
+                      {formatWeekday(date, locale)}
+                    </span>
+                    <span
+                      className={cn(
+                        'grid size-7 place-items-center rounded-[9px] text-[11px] font-bold',
+                        isToday
+                          ? 'bg-red-500 text-white'
+                          : light
+                            ? 'bg-black/[0.035] text-black/60'
+                            : 'bg-white/[0.05] text-white/60',
+                      )}
+                    >
+                      {date.getDate()}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="grid grid-cols-[74px_repeat(7,minmax(132px,1fr))]">
+            <div className={cn('relative border-r', borderTone(light))} style={{ height }}>
+              {workWindow.hours.map((hour) => (
+                <div
+                  key={hour}
+                  style={{ top: ((hour - workWindow.startMinutes) / 60) * WEEK_HOUR_HEIGHT - 7 }}
+                  className={cn('absolute right-3 text-[11px] font-semibold tabular-nums', mutedText(light))}
+                >
+                  {formatMinutesAsTime(hour)}
+                </div>
+              ))}
+            </div>
+
+            {dates.map((date) => {
+              const iso = toLocalIsoDate(date);
+              const dayBookings = layoutBookings(bookingsByDate.get(iso) ?? []);
+              const showNow = iso === todayIso && nowMinutes >= workWindow.startMinutes && nowMinutes <= workWindow.endMinutes;
+
+              return (
+                <div
+                  key={iso}
+                  className={cn('relative border-r last:border-r-0', borderTone(light))}
+                  style={{
+                    height,
+                    backgroundImage: light
+                      ? 'linear-gradient(to bottom, rgba(0,0,0,.07) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,.035) 1px, transparent 1px)'
+                      : 'linear-gradient(to bottom, rgba(255,255,255,.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.035) 1px, transparent 1px)',
+                    backgroundSize: `100% ${WEEK_HOUR_HEIGHT}px, 100% ${WEEK_HOUR_HEIGHT / 2}px`,
+                  }}
+                >
+                  {showNow ? (
+                    <div
+                      style={{ top: nowTop }}
+                      className="pointer-events-none absolute left-0 right-0 z-30 flex items-center"
+                    >
+                      <span className="h-px flex-1 bg-red-500/80" />
+                    </div>
+                  ) : null}
+
+                  {dayBookings.map((booking) => (
+                    <BookingBlock
+                      key={booking.id}
+                      booking={booking}
+                      light={light}
+                      workWindow={workWindow}
+                      hourHeight={WEEK_HOUR_HEIGHT}
+                      onSelect={onSelect}
+                      compact
+                    />
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MonthCalendar({
+  dates,
+  selectedDate,
+  bookingsByDate,
+  light,
+  locale,
+  onDateSelect,
+  onSelect,
+}: {
+  dates: Date[];
+  selectedDate: Date;
+  bookingsByDate: Map<string, CalendarBooking[]>;
+  light: boolean;
+  locale: 'ru' | 'en';
+  onDateSelect: (date: Date) => void;
+  onSelect: (booking: CalendarBooking) => void;
+}) {
+  const currentMonth = selectedDate.getMonth();
+  const weekdays = Array.from({ length: 7 }, (_, index) => addDays(startOfWeekMonday(new Date(2024, 0, 1)), index));
 
   return (
     <div
-      style={accentPillStyle(tint, light, 'soft')}
-      className="rounded-[14px] border px-2.5 py-2 shadow-[0_6px_18px_rgba(0,0,0,0.04)]"
+      className={cn(
+        'overflow-hidden rounded-[16px] border',
+        light ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.025]',
+      )}
     >
-      <div className="truncate text-[11px] font-semibold tracking-[-0.015em]">{item.clientName}</div>
-      <div className="mt-0.5 truncate text-[10px] opacity-80">{item.service}</div>
-    </div>
-  );
-}
-
-function TimelineStatus({
-  stage,
-  label,
-  hint,
-  light,
-  accentColor,
-  publicAccentColor,
-  className,
-}: {
-  stage: TimelineStage;
-  label: string;
-  hint: string;
-  light: boolean;
-  accentColor: string;
-  publicAccentColor: string;
-  className?: string;
-}) {
-  const color = stageColor(stage, accentColor, publicAccentColor, light);
-
-  return (
-    <div className={cn('flex min-w-[128px] items-center justify-end gap-2', className)}>
-      <div className="min-w-0 text-right">
-        <div
-          className={cn(
-            'text-[11.5px] font-semibold leading-none tracking-[-0.018em]',
-            light ? 'text-black/72' : 'text-white/74',
-          )}
-        >
-          {label}
-        </div>
-
-        <div
-          className={cn(
-            'mt-1 text-[9.5px] font-medium uppercase tracking-[0.12em]',
-            light ? 'text-black/32' : 'text-white/28',
-          )}
-        >
-          {hint}
-        </div>
+      <div className="grid grid-cols-7 border-b">
+        {weekdays.map((date) => (
+          <div
+            key={date.getDay()}
+            className={cn('border-r px-3 py-2 text-[11px] font-semibold last:border-r-0', borderTone(light), mutedText(light))}
+          >
+            {formatWeekday(date, locale)}
+          </div>
+        ))}
       </div>
 
-      <span
-        style={{
-          background: color,
-          boxShadow: `0 0 0 3px color-mix(in srgb, ${color} 14%, transparent)`,
-        }}
-        className="size-2 shrink-0 rounded-full"
-      />
+      <div className="grid grid-cols-7">
+        {dates.map((date) => {
+          const iso = toLocalIsoDate(date);
+          const dayBookings = bookingsByDate.get(iso) ?? [];
+          const outside = date.getMonth() !== currentMonth;
+          const selected = isSameDay(date, selectedDate);
+          const visible = dayBookings.slice(0, 3);
+          const hidden = Math.max(0, dayBookings.length - visible.length);
+
+          return (
+            <button
+              key={iso}
+              type="button"
+              onClick={() => onDateSelect(date)}
+              className={cn(
+                'min-h-[138px] border-r border-b p-2.5 text-left transition-colors last:border-r-0',
+                borderTone(light),
+                selected
+                  ? light
+                    ? 'bg-black/[0.04]'
+                    : 'bg-white/[0.055]'
+                  : light
+                    ? 'hover:bg-black/[0.018]'
+                    : 'hover:bg-white/[0.035]',
+                outside && 'opacity-45',
+              )}
+            >
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span
+                  className={cn(
+                    'grid size-7 place-items-center rounded-[9px] text-[11px] font-bold',
+                    selected
+                      ? light
+                        ? 'bg-black text-white'
+                        : 'bg-white text-black'
+                      : light
+                        ? 'bg-black/[0.035] text-black/58'
+                        : 'bg-white/[0.045] text-white/58',
+                  )}
+                >
+                  {date.getDate()}
+                </span>
+                {dayBookings.length ? (
+                  <span className={cn('text-[10px] font-semibold', mutedText(light))}>
+                    {dayBookings.length}
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="space-y-1.5">
+                {visible.map((booking) => (
+                  <span
+                    key={booking.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onSelect(booking);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onSelect(booking);
+                      }
+                    }}
+                    style={accentPillStyle(booking.color, light, 'soft')}
+                    className="block rounded-[9px] border px-2 py-1.5 text-[10.5px] font-semibold"
+                  >
+                    <span className="block truncate">{booking.start} · {booking.clientName}</span>
+                    <span className="mt-0.5 block truncate text-[9.5px] opacity-72">{booking.service}</span>
+                  </span>
+                ))}
+
+                {hidden ? (
+                  <span className={cn('block px-1 pt-1 text-[10.5px] font-semibold', mutedText(light))}>
+                    +{hidden}
+                  </span>
+                ) : null}
+              </div>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-function TimeRangeCell({
-  start,
-  end,
+function BookingDialog({
+  booking,
+  light,
+  locale,
+  actionLoading,
+  onClose,
+  onStatusChange,
+}: {
+  booking: CalendarBooking | null;
+  light: boolean;
+  locale: 'ru' | 'en';
+  actionLoading: BookingStatus | null;
+  onClose: () => void;
+  onStatusChange: (status: BookingStatus) => void;
+}) {
+  if (!booking) return null;
+
+  const canClose = booking.status !== 'completed' && booking.status !== 'cancelled' && booking.status !== 'no_show';
+
+  return (
+    <div
+      role="presentation"
+      onClick={onClose}
+      className="fixed inset-0 z-[90] bg-black/45 backdrop-blur-[6px]"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        onClick={(event) => event.stopPropagation()}
+        className={cn(
+          'fixed bottom-0 left-0 right-0 rounded-t-[24px] border p-4 shadow-2xl sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2 sm:w-[420px] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-[22px] sm:p-5',
+          light
+            ? 'border-black/[0.08] bg-[#fbfbfa] text-black'
+            : 'border-white/[0.1] bg-[#101010] text-white',
+        )}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <MicroLabel light={light} active color={booking.color}>
+              <StatusDot color={booking.color} />
+              {booking.service}
+            </MicroLabel>
+            <h2 className="mt-4 truncate text-[28px] font-semibold tracking-[-0.07em]">
+              {booking.clientName}
+            </h2>
+            <p className={cn('mt-1 text-[12px]', mutedText(light))}>
+              {statusLabel(booking.status, locale)} · {booking.source}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className={cn(
+              'inline-flex size-9 shrink-0 items-center justify-center rounded-[11px] border transition-colors',
+              light
+                ? 'border-black/[0.08] bg-white text-black/50 hover:text-black'
+                : 'border-white/[0.08] bg-white/[0.04] text-white/52 hover:text-white',
+            )}
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-2">
+          <InfoRow
+            light={light}
+            label={locale === 'ru' ? 'Дата и время' : 'Date and time'}
+            value={`${booking.date} · ${booking.start}–${booking.end}`}
+          />
+          <InfoRow
+            light={light}
+            label={locale === 'ru' ? 'Длительность' : 'Duration'}
+            value={locale === 'ru' ? `${booking.durationMinutes} мин` : `${booking.durationMinutes} min`}
+          />
+          <InfoRow
+            light={light}
+            label={locale === 'ru' ? 'Телефон' : 'Phone'}
+            value={booking.phone || '—'}
+          />
+          <InfoRow
+            light={light}
+            label={locale === 'ru' ? 'Сумма' : 'Amount'}
+            value={booking.amount > 0 ? formatMoney(booking.amount, locale) : '—'}
+          />
+        </div>
+
+        <div
+          className={cn(
+            'mt-3 rounded-[14px] border px-3.5 py-3',
+            light ? 'border-black/[0.07] bg-white' : 'border-white/[0.08] bg-white/[0.04]',
+          )}
+        >
+          <div className={cn('text-[10.5px] font-semibold', mutedText(light))}>
+            {locale === 'ru' ? 'Комментарий' : 'Note'}
+          </div>
+          <div className="mt-1.5 text-[13px] leading-5">
+            {booking.note || '—'}
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <Button asChild className={cn('justify-start', buttonBase(light))}>
+            <Link href={`tel:${booking.phone}`}>
+              <PhoneCall className="size-3.5" />
+              {locale === 'ru' ? 'Позвонить' : 'Call'}
+            </Link>
+          </Button>
+          <Button asChild className={cn('justify-start', buttonBase(light, true))}>
+            <Link href="/dashboard/chats">
+              <MessageCircleMore className="size-3.5" />
+              {locale === 'ru' ? 'Чат' : 'Chat'}
+            </Link>
+          </Button>
+          <Button asChild className={cn('justify-start', buttonBase(light))}>
+            <Link href="/dashboard/availability">
+              <CalendarClock className="size-3.5" />
+              {locale === 'ru' ? 'Перенести' : 'Reschedule'}
+            </Link>
+          </Button>
+          {canClose ? (
+            <Button
+              type="button"
+              className={cn('justify-start', buttonBase(light, true))}
+              onClick={() => onStatusChange('completed')}
+              disabled={actionLoading !== null}
+            >
+              <CheckCircle2 className="size-3.5" />
+              {actionLoading === 'completed' ? '…' : locale === 'ru' ? 'Завершить' : 'Complete'}
+            </Button>
+          ) : null}
+          {canClose ? (
+            <Button
+              type="button"
+              className={cn('col-span-2 justify-start', buttonBase(light))}
+              onClick={() => onStatusChange('no_show')}
+              disabled={actionLoading !== null}
+            >
+              <X className="size-3.5" />
+              {actionLoading === 'no_show' ? '…' : locale === 'ru' ? 'Клиент не пришёл' : 'Mark no-show'}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InfoRow({
+  label,
+  value,
   light,
 }: {
-  start: string;
-  end: string;
+  label: string;
+  value: string;
   light: boolean;
 }) {
   return (
     <div
       className={cn(
-        'grid min-w-[150px] grid-cols-[46px_12px_46px] items-center justify-end text-[11.5px] font-medium tabular-nums',
-        light ? 'text-black/48' : 'text-white/42',
+        'flex min-h-10 items-center justify-between gap-3 rounded-[12px] border px-3',
+        light ? 'border-black/[0.07] bg-white' : 'border-white/[0.08] bg-white/[0.04]',
       )}
     >
-      <span className="truncate text-right">{start}</span>
-
-      <span className={cn('text-center', light ? 'text-black/22' : 'text-white/18')}>
-        —
-      </span>
-
-      <span className="text-left">{end}</span>
+      <span className={cn('text-[11px] font-semibold', mutedText(light))}>{label}</span>
+      <span className="truncate text-right text-[11.5px] font-semibold">{value}</span>
     </div>
   );
 }
 
 export default function DashboardTodayPage() {
   const { updateBookingStatus } = useApp();
-  const { hasHydrated, ownedProfile, bookings, locale, demoMode } =
-    useOwnedWorkspaceData();
+  const { hasHydrated, ownedProfile, bookings, dataset, locale, demoMode } = useOwnedWorkspaceData();
   const { resolvedTheme } = useTheme();
   const { settings } = useAppearance();
-  const isMobile = useMobile();
 
   const [mounted, setMounted] = useState(false);
-  const [selectedFilter, setSelectedFilter] = useState<TimelineFilter>('all');
-  const [summaryRange, setSummaryRange] = useState<SummaryRange>('day');
-  const [activeItemId, setActiveItemId] = useState<string | null>(null);
-  const [actionLoading, setActionLoading] = useState<BookingStatus | null>(null);
   const [now, setNow] = useState(() => new Date());
+  const [viewMode, setViewMode] = useState<CalendarViewMode>('week');
+  const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
+  const [selectedBooking, setSelectedBooking] = useState<CalendarBooking | null>(null);
+  const [actionLoading, setActionLoading] = useState<BookingStatus | null>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      setNow(new Date());
-    }, 60_000);
-
-    return () => {
-      window.clearInterval(timer);
-    };
+    const timer = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!selectedBooking) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelectedBooking(null);
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectedBooking]);
 
   const currentTheme: ThemeMode = mounted
     ? resolvedTheme === 'light'
@@ -1039,461 +1339,137 @@ export default function DashboardTodayPage() {
     : 'dark';
 
   const isLight = currentTheme === 'light';
-
   const accentColor = accentPalette[settings.accentTone].solid;
-  const publicAccentColor = accentPalette[settings.publicAccent].solid;
-
   const todayIso = useMemo(() => toLocalIsoDate(now), [now]);
-  const nowMinutes = useMemo(() => now.getHours() * 60 + now.getMinutes(), [now]);
 
-  const todayBookings = useMemo(
-    () =>
-      bookings
-        .filter((booking) => booking.date === todayIso)
-        .sort((left, right) => left.time.localeCompare(right.time)),
-    [bookings, todayIso],
-  );
-
-  const hasRealBookings = todayBookings.length > 0;
-
-  const upcomingBookings = useMemo(
-    () =>
-      bookings
-        .filter((booking) => booking.date > todayIso && booking.status !== 'cancelled' && booking.status !== 'no_show')
-        .sort((left, right) => (left.date + 'T' + left.time).localeCompare(right.date + 'T' + right.time))
-        .slice(0, 5),
-    [bookings, todayIso],
-  );
-
-  const timelineBookings = todayBookings.length ? todayBookings : upcomingBookings;
-
-  const todayItems = useMemo(
-    () => timelineBookings.map((booking) => mapBookingToTimelineItem(booking, now, locale)),
-    [locale, now, timelineBookings],
-  );
-
-  const filteredItems = useMemo(() => {
-    if (selectedFilter === 'all') return todayItems;
-    return todayItems.filter((item) => item.period === selectedFilter);
-  }, [selectedFilter, todayItems]);
-
-  const dayInsight = useMemo(
-    () => buildDayInsight(todayItems, locale),
-    [locale, todayItems],
-  );
-
-  const nowMarkerIndex = useMemo(
-    () => getNowMarkerIndex(filteredItems, nowMinutes),
-    [filteredItems, nowMinutes],
-  );
-
-  useEffect(() => {
-    if (!filteredItems.length) {
-      setActiveItemId(null);
-      return;
-    }
-
-    if (!activeItemId || !filteredItems.some((item) => item.id === activeItemId)) {
-      const preferred =
-        filteredItems.find((item) => item.stage === 'next' || item.stage === 'new') ??
-        filteredItems[0];
-
-      setActiveItemId(preferred.id);
-    }
-  }, [activeItemId, filteredItems]);
-
-  const labels =
-    locale === 'ru'
-      ? {
-          title: 'Записи на сегодня',
-          description:
-            'Рабочий день мастера: таймлайн, статусы, быстрые действия и карточка клиента.',
-          emptyTitle: 'Сначала настройте профиль мастера',
-          emptyDescription:
-            'Создайте профиль, чтобы открыть рабочий день, ленту записей, чаты и быстрые действия.',
-          emptyAction: 'Создать профиль',
-          preview: demoMode ? 'Демо-режим' : 'Рабочий день',
-          overviewTitle: 'Сводка',
-          overviewDescription: hasRealBookings
-            ? 'Ближайшие визиты, статусы и ритм дня в одном спокойном экране.'
-            : 'На сегодня пока нет записей. Когда клиент отправит заявку, она появится здесь автоматически.',
-          timelineTitle: 'Таймлайн дня',
-          timelineDescription:
-            'Список визитов сверху вниз: видно, кто следующий, где плотный блок и где есть окно.',
-          callClient: 'Позвонить',
-          openChat: 'Открыть чат',
-          metrics: {
-            total: 'На сегодня',
-            next: 'Ближайшие',
-            newRequests: 'Запланировано',
-            done: 'Завершено',
-          },
-          stages: {
-            next: 'Скоро',
-            queue: 'В очереди',
-            done: 'Пришёл',
-            no_show: 'Не пришёл',
-            new: 'Запланирована',
-          },
-          stageHints: {
-            next: 'следующая',
-            queue: 'ожидает',
-            done: 'пришёл',
-            no_show: 'не пришёл',
-            new: 'ожидает визита',
-          },
-          filters: {
-            all: 'Весь день',
-            morning: 'Утро',
-            day: 'День',
-            evening: 'Вечер',
-          },
-          busiest: 'Самый плотный блок',
-          nextUp: 'Следующий визит',
-          freeWindow: 'Свободные окна',
-          completion: 'Прогресс дня',
-          liveDay: 'Карточка визита',
-          liveDayText: 'Контакт, заметка и статус выбранной записи.',
-          sampleBadge: 'Пока нет записей',
-          complete: 'Клиент пришёл',
-          noShow: 'Клиент не пришёл',
-          activeBooking: 'Активная запись',
-          sampleCopy: 'Выберите реальную запись из ленты, когда она появится.',
-          note: 'Комментарий',
-          phone: 'Телефон',
-          time: 'Время',
-          dayState: 'Статус',
-          currentMoment: 'Текущий момент дня',
-          now: 'Сейчас',
-          emptyFilter: 'В этом фильтре пока пусто.',
-          selectBooking: 'Выберите запись из ленты.',
-          setupCards: {
-            timeline: 'Таймлайн',
-            timelineText: 'После создания профиля здесь появятся записи на день.',
-            chats: 'Чаты',
-            chatsText: 'Быстрый переход к перепискам и напоминаниям клиентам.',
-            public: 'Публичная',
-            publicText: 'Профиль создаст ссылку, которую можно отправлять клиентам.',
-          },
-        }
-      : {
-          title: 'Today bookings',
-          description:
-            'A clean workday view: timeline, statuses, quick actions, and client card.',
-          emptyTitle: 'Create the master profile first',
-          emptyDescription:
-            'Create a profile to unlock the day flow, booking timeline, chats, and quick actions.',
-          emptyAction: 'Create profile',
-          preview: demoMode ? 'Demo mode' : 'Workday',
-          overviewTitle: 'Summary',
-          overviewDescription: hasRealBookings
-            ? 'Upcoming visits, statuses, and the whole day rhythm in one calm screen.'
-            : 'No bookings for today yet. Once a client submits a request, it will appear here automatically.',
-          timelineTitle: 'Day timeline',
-          timelineDescription:
-            'A top-to-bottom visit list: next client, dense blocks, and free windows stay visible.',
-          callClient: 'Call',
-          openChat: 'Open chat',
-          metrics: {
-            total: 'Today',
-            next: 'Next up',
-            newRequests: 'Scheduled',
-            done: 'Completed',
-          },
-          stages: {
-            next: 'Soon',
-            queue: 'In queue',
-            done: 'Arrived',
-            no_show: 'No-show',
-            new: 'Scheduled',
-          },
-          stageHints: {
-            next: 'next',
-            queue: 'waiting',
-            done: 'arrived',
-            no_show: 'no-show',
-            new: 'waiting visit',
-          },
-          filters: {
-            all: 'All day',
-            morning: 'Morning',
-            day: 'Day',
-            evening: 'Evening',
-          },
-          busiest: 'Busiest block',
-          nextUp: 'Next visit',
-          freeWindow: 'Free windows',
-          completion: 'Day progress',
-          liveDay: 'Visit card',
-          liveDayText: 'Contact, note, and current status for the selected booking.',
-          sampleBadge: 'No bookings yet',
-          complete: 'Client arrived',
-          noShow: 'Client no-show',
-          activeBooking: 'Active booking',
-          sampleCopy: 'Select a real booking from the timeline when it appears.',
-          note: 'Note',
-          phone: 'Phone',
-          time: 'Time',
-          dayState: 'Status',
-          currentMoment: 'Current moment of the day',
-          now: 'Now',
-          emptyFilter: 'Nothing in this filter yet.',
-          selectBooking: 'Select a visit from the timeline.',
-          setupCards: {
-            timeline: 'Timeline',
-            timelineText: 'After profile setup, daily bookings will appear here.',
-            chats: 'Chats',
-            chatsText: 'Quick access to conversations and client reminders.',
-            public: 'Public',
-            publicText: 'The profile creates a public booking link for clients.',
-          },
-        };
-
-  const metrics = {
-    total: todayItems.length,
-    next: todayItems.filter((item) => item.stage === 'next' || item.stage === 'queue')
-      .length,
-    newRequests: todayItems.filter((item) => item.stage === 'new' || item.stage === 'queue' || item.stage === 'next').length,
-    done: todayItems.filter((item) => item.stage === 'done').length,
-  };
-
-  const weekStart = useMemo(() => startOfWeekMonday(now), [now]);
-  const weekDates = useMemo(
-    () => Array.from({ length: 6 }, (_, index) => addDays(weekStart, index)),
-    [weekStart],
-  );
-  const weekDateMap = useMemo(
-    () => new Map(weekDates.map((date) => [toLocalIsoDate(date), date])),
-    [weekDates],
-  );
-  const summarySourceBookings = useMemo(() => {
-    const currentMonthKey = todayIso.slice(0, 7);
-    if (summaryRange === 'day') {
-      return bookings.filter((booking) => booking.date === todayIso);
-    }
-
-    if (summaryRange === 'week') {
-      return bookings.filter((booking) => weekDateMap.has(booking.date));
-    }
-
-    return bookings.filter((booking) => booking.date.startsWith(currentMonthKey));
-  }, [bookings, summaryRange, todayIso, weekDateMap]);
-
-  const summaryActiveBookings = useMemo(
-    () => summarySourceBookings.filter(isBookingActiveForSummary),
-    [summarySourceBookings],
-  );
-
-  const summaryCompleted = useMemo(
-    () => summarySourceBookings.filter((booking) => booking.status === 'completed').length,
-    [summarySourceBookings],
-  );
-  const summaryNoShow = useMemo(
-    () => summarySourceBookings.filter((booking) => booking.status === 'no_show' || booking.status === 'cancelled').length,
-    [summarySourceBookings],
-  );
-  const summaryRevenue = useMemo(
-    () => summarySourceBookings.reduce((sum, booking) => sum + getBookingAmount(booking), 0),
-    [summarySourceBookings],
-  );
-  const summaryUpcoming = useMemo(
-    () =>
-      [...summaryActiveBookings]
-        .filter((booking) => `${booking.date}T${booking.time}` >= `${todayIso}T00:00`)
-        .sort((left, right) => `${left.date}T${left.time}`.localeCompare(`${right.date}T${right.time}`))[0] ?? null,
-    [summaryActiveBookings, todayIso],
-  );
-
-  const summaryDescription = getSummaryDescription(
-    summaryRange,
-    summarySourceBookings.length > 0,
-    locale,
-  );
-
-  const summaryMetrics = [
-    {
-      label:
-        locale === 'ru'
-          ? summaryRange === 'day'
-            ? 'Записей на день'
-            : summaryRange === 'week'
-              ? 'Записей за неделю'
-              : 'Записей за месяц'
-          : summaryRange === 'day'
-            ? 'Bookings today'
-            : summaryRange === 'week'
-              ? 'Bookings this week'
-              : 'Bookings this month',
-      value: summaryActiveBookings.length,
-      hint: getRangeTitle(summaryRange, locale),
-    },
-    {
-      label: locale === 'ru' ? 'Завершено' : 'Completed',
-      value: summaryCompleted,
-      hint:
-        locale === 'ru'
-          ? `${summaryNoShow} не дошли / отменены`
-          : `${summaryNoShow} missed / cancelled`,
-    },
-    {
-      label: locale === 'ru' ? 'Выручка' : 'Revenue',
-      value: formatCurrencyCompact(summaryRevenue, locale),
-      hint:
-        summaryRevenue > 0
-          ? locale === 'ru'
-            ? 'по записям периода'
-            : 'from period bookings'
-          : locale === 'ru'
-            ? 'цены появятся здесь'
-            : 'amounts appear here',
-    },
-    {
-      label: locale === 'ru' ? 'Следующий визит' : 'Next visit',
-      value: summaryUpcoming ? `${summaryUpcoming.time}` : '—',
-      hint: summaryUpcoming ? `${summaryUpcoming.clientName} · ${summaryUpcoming.service}` : locale === 'ru' ? 'пока пусто' : 'nothing yet',
-    },
-  ];
-
-  const weekBoardRows = useMemo(() => {
-    const rows = new Set<string>();
-    for (const booking of bookings) {
-      if (weekDateMap.has(booking.date)) {
-        rows.add(`${booking.time.slice(0, 2)}:00`);
+  const labels = locale === 'ru'
+    ? {
+        title: 'Расписание',
+        description: 'День, неделя и месяц в одном календаре. Цвет записи зависит от услуги.',
+        emptyTitle: 'Сначала настройте профиль мастера',
+        emptyDescription: 'Создайте профиль, чтобы открыть календарь, записи, чаты и быстрые действия.',
+        emptyAction: 'Создать профиль',
+        profileMissing: 'Профиль не настроен',
+        calendar: 'Календарь записей',
+        today: 'Сегодня',
+        previous: 'Назад',
+        next: 'Вперёд',
+        day: 'День',
+        week: 'Неделя',
+        month: 'Месяц',
+        bookings: 'Записей',
+        confirmed: 'Активных',
+        completed: 'Завершено',
+        revenue: 'Выручка',
+        nearest: 'Ближайшая',
+        quiet: 'Пока пусто',
+        live: demoMode ? 'Демо-режим' : 'Рабочий календарь',
+        setupTimeline: 'Календарь',
+        setupTimelineText: 'После создания профиля здесь появится рабочее расписание.',
+        setupChats: 'Чаты',
+        setupChatsText: 'Быстрый переход к перепискам и напоминаниям.',
+        setupPublic: 'Онлайн-запись',
+        setupPublicText: 'Публичная ссылка для клиентов создаст новые записи.',
       }
+    : {
+        title: 'Schedule',
+        description: 'Day, week, and month in one calendar. Booking color follows the service.',
+        emptyTitle: 'Create the master profile first',
+        emptyDescription: 'Create a profile to unlock calendar, bookings, chats, and quick actions.',
+        emptyAction: 'Create profile',
+        profileMissing: 'Profile missing',
+        calendar: 'Booking calendar',
+        today: 'Today',
+        previous: 'Previous',
+        next: 'Next',
+        day: 'Day',
+        week: 'Week',
+        month: 'Month',
+        bookings: 'Bookings',
+        confirmed: 'Active',
+        completed: 'Completed',
+        revenue: 'Revenue',
+        nearest: 'Next up',
+        quiet: 'Quiet for now',
+        live: demoMode ? 'Demo mode' : 'Live calendar',
+        setupTimeline: 'Calendar',
+        setupTimelineText: 'After profile setup, the work schedule will appear here.',
+        setupChats: 'Chats',
+        setupChatsText: 'Quick access to conversations and reminders.',
+        setupPublic: 'Online booking',
+        setupPublicText: 'A public client link creates new bookings.',
+      };
+
+  const serviceMap = useMemo(() => {
+    const map = new Map<string, ServiceLike>();
+    for (const service of dataset?.services ?? []) {
+      const item = service as ServiceLike;
+      map.set(item.name, item);
     }
+    return map;
+  }, [dataset]);
 
-    if (!rows.size) {
-      ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00'].forEach((time) => rows.add(time));
-    }
+  const calendarBookings = useMemo(
+    () => bookings
+      .map((booking) => mapBookingToCalendarBooking(booking, serviceMap, accentColor, locale))
+      .sort((left, right) => `${left.date}T${left.start}`.localeCompare(`${right.date}T${right.start}`)),
+    [accentColor, bookings, locale, serviceMap],
+  );
 
-    return [...rows]
-      .sort((left, right) => parseTimeToMinutes(left) - parseTimeToMinutes(right))
-      .slice(0, 6);
-  }, [bookings, weekDateMap]);
+  const rangeDates = useMemo(() => getRangeDates(viewMode, selectedDate), [selectedDate, viewMode]);
+  const { startIso, endIso } = useMemo(
+    () => getRangeIsoBounds(viewMode, selectedDate),
+    [selectedDate, viewMode],
+  );
 
-  const weekBoardCells = useMemo(() => {
-    const board = new Map<string, TimelineItem[]>();
-    const weekBookings = bookings
-      .filter((booking) => weekDateMap.has(booking.date) && isBookingActiveForSummary(booking))
-      .sort((left, right) => `${left.date}T${left.time}`.localeCompare(`${right.date}T${right.time}`));
+  const rangeBookings = useMemo(
+    () => calendarBookings.filter((booking) => booking.date >= startIso && booking.date <= endIso),
+    [calendarBookings, endIso, startIso],
+  );
 
-    for (const booking of weekBookings) {
-      const row = `${booking.time.slice(0, 2)}:00`;
-      if (!weekBoardRows.includes(row)) continue;
-      const key = `${booking.date}-${row}`;
-      const current = board.get(key) ?? [];
-      current.push(mapBookingToTimelineItem(booking, now, locale));
-      board.set(key, current.slice(0, 2));
-    }
+  const bookingsByDate = useMemo(() => groupByDate(calendarBookings), [calendarBookings]);
+  const workWindow = useMemo(() => deriveWorkWindow(rangeBookings), [rangeBookings]);
 
-    return board;
-  }, [bookings, locale, now, weekBoardRows, weekDateMap]);
+  const nearestBooking = useMemo(
+    () => calendarBookings.find((booking) => activeBooking(booking) && `${booking.date}T${booking.start}` >= `${todayIso}T00:00`) ?? null,
+    [calendarBookings, todayIso],
+  );
 
-  const weekBoardInsight = useMemo(() => {
-    const denseDay = weekDates
-      .map((date) => {
-        const iso = toLocalIsoDate(date);
-        return {
-          iso,
-          count: bookings.filter((booking) => booking.date === iso && isBookingActiveForSummary(booking)).length,
-          date,
-        };
-      })
-      .sort((left, right) => right.count - left.count)[0];
+  const stats = useMemo(() => {
+    const active = rangeBookings.filter(activeBooking);
+    const completed = rangeBookings.filter((booking) => booking.status === 'completed');
+    const revenue = rangeBookings.reduce((sum, booking) => sum + booking.amount, 0);
 
-    return denseDay;
-  }, [bookings, weekDates]);
+    return {
+      total: rangeBookings.length,
+      active: active.length,
+      completed: completed.length,
+      revenue,
+    };
+  }, [rangeBookings]);
 
-  const summaryItems = [
-    {
-      label: labels.nextUp,
-      value: dayInsight.nextUp ? dayInsight.nextUp.time : '—',
-      hint: dayInsight.nextUp
-        ? `${dayInsight.nextUp.clientName} · ${dayInsight.nextUp.service}`
-        : locale === 'ru'
-          ? 'Нет ближайшей записи'
-          : 'No upcoming visit',
-      icon: <Clock3 className="size-4" />,
-    },
-    {
-      label: labels.busiest,
-      value: labels.filters[dayInsight.busiestPeriod],
-      hint: dayInsight.freeWindowLabel,
-      icon: <CalendarClock className="size-4" />,
-    },
-    {
-      label: labels.freeWindow,
-      value:
-        todayItems.length > 1
-          ? locale === 'ru'
-            ? 'Есть окно'
-            : 'Window found'
-          : locale === 'ru'
-            ? 'Пока пусто'
-            : 'Not enough data',
-      hint: dayInsight.freeWindowLabel,
-      icon: <Sparkles className="size-4" />,
-    },
-    {
-      label: labels.completion,
-      value: dayInsight.completionLabel,
-      hint: `${metrics.done}/${metrics.total}`,
-      icon: <CheckCircle2 className="size-4" />,
-    },
-  ];
+  function shiftPeriod(direction: -1 | 1) {
+    setSelectedDate((date) => {
+      if (viewMode === 'day') return addDays(date, direction);
+      if (viewMode === 'week') return addDays(date, direction * 7);
+      return addMonths(date, direction);
+    });
+  }
 
-  const activeItem =
-    filteredItems.find((item) => item.id === activeItemId) ?? filteredItems[0] ?? null;
-
-  const activeBooking =
-    activeItem?.source === 'booking'
-      ? timelineBookings.find((booking) => booking.id === activeItem.id) ?? null
-      : null;
+  function goToday() {
+    setSelectedDate(startOfDay(new Date()));
+  }
 
   async function handleStatusChange(status: BookingStatus) {
-    if (!activeBooking) return;
+    if (!selectedBooking) return;
 
     setActionLoading(status);
-
     try {
-      await updateBookingStatus(activeBooking.id, status);
+      await updateBookingStatus(selectedBooking.id, status);
+      setSelectedBooking((current) => current ? { ...current, status } : current);
     } finally {
       setActionLoading(null);
     }
-  }
-
-  function renderNowMarker(key: string) {
-    return (
-      <ListRow
-        key={key}
-        className={cn(
-          'px-4 py-2',
-          isLight ? 'bg-black/[0.012]' : 'bg-white/[0.018]',
-        )}
-      >
-        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_170px_150px] md:items-center">
-          <div className={cn('text-[11px] font-medium', mutedText(isLight))}>
-            {labels.currentMoment}
-          </div>
-
-          <TimeRangeCell
-            start={formatMinutesAsTime(nowMinutes)}
-            end={formatMinutesAsTime(nowMinutes)}
-            light={isLight}
-          />
-
-          <TimelineStatus
-            stage="queue"
-            label={labels.now}
-            hint={locale === 'ru' ? 'момент' : 'moment'}
-            light={isLight}
-            accentColor={accentColor}
-            publicAccentColor={publicAccentColor}
-            className="md:justify-self-end"
-          />
-        </div>
-      </ListRow>
-    );
   }
 
   if (!hasHydrated || !mounted) return null;
@@ -1501,132 +1477,55 @@ export default function DashboardTodayPage() {
   if (!ownedProfile) {
     return (
       <WorkspaceShell>
-        <main
-          className={cn(
-            'min-h-[calc(100dvh-68px)] px-4 pb-12 pt-5 md:px-7 md:pt-6',
-            pageBg(isLight),
-          )}
-        >
+        <main className={cn('min-h-[calc(100dvh-68px)] px-4 pb-12 pt-5 md:px-7 md:pt-6', pageBg(isLight))}>
           <div className="mx-auto w-full max-w-[var(--page-max-width)]">
             <div className="mb-6 md:mb-7">
-              <div className="min-w-0">
-                <h1
-                  className={cn(
-                    'text-[31px] font-semibold tracking-[-0.075em] md:text-[42px]',
-                    pageText(isLight),
-                  )}
-                >
-                  {labels.title}
-                </h1>
-
-                <p
-                  className={cn(
-                    'mt-2 max-w-[760px] text-[13px] leading-5',
-                    mutedText(isLight),
-                  )}
-                >
-                  {labels.description}
-                </p>
-              </div>
+              <h1 className={cn('text-[31px] font-semibold tracking-[-0.075em] md:text-[42px]', pageText(isLight))}>
+                {labels.title}
+              </h1>
+              <p className={cn('mt-2 max-w-[760px] text-[13px] leading-5', mutedText(isLight))}>
+                {labels.description}
+              </p>
             </div>
 
             <Card light={isLight} className="overflow-hidden">
               <div className="grid min-h-[320px] place-items-center px-5 py-12 text-center">
                 <div className="mx-auto max-w-[520px]">
                   <MicroLabel light={isLight}>
-                    <StatusDot light={isLight} />
-                    {locale === 'ru' ? 'Профиль не настроен' : 'Profile missing'}
+                    <StatusDot color={accentColor} />
+                    {labels.profileMissing}
                   </MicroLabel>
-
-                  <h2
-                    className={cn(
-                      'mt-5 text-[28px] font-semibold tracking-[-0.065em] md:text-[36px]',
-                      pageText(isLight),
-                    )}
-                  >
+                  <h2 className={cn('mt-5 text-[28px] font-semibold tracking-[-0.065em] md:text-[36px]', pageText(isLight))}>
                     {labels.emptyTitle}
                   </h2>
-
                   <p className={cn('mt-3 text-[13px] leading-5', mutedText(isLight))}>
                     {labels.emptyDescription}
                   </p>
-
                   <div className="mt-6 flex justify-center">
-                    <PageAction href="/create-profile" light={isLight} active>
-                      <SquarePen className="size-3.5" />
-                      {labels.emptyAction}
-                    </PageAction>
+                    <Button asChild className={buttonBase(isLight, true)}>
+                      <Link href="/create-profile">
+                        <SquarePen className="size-3.5" />
+                        {labels.emptyAction}
+                      </Link>
+                    </Button>
                   </div>
                 </div>
               </div>
             </Card>
 
             <div className="mt-4 grid gap-4 md:grid-cols-3">
-              <Card light={isLight}>
-                <div className="p-4">
-                  <MicroLabel light={isLight}>
-                    <CalendarClock className="size-3.5" />
-                    {labels.setupCards.timeline}
-                  </MicroLabel>
-
-                  <div
-                    className={cn(
-                      'mt-4 text-[13px] font-semibold tracking-[-0.018em]',
-                      pageText(isLight),
-                    )}
-                  >
-                    {locale === 'ru' ? 'Рабочий день' : 'Workday'}
+              {[
+                [labels.setupTimeline, labels.setupTimelineText, <CalendarDays key="calendar" className="size-3.5" />],
+                [labels.setupChats, labels.setupChatsText, <MessageCircleMore key="chat" className="size-3.5" />],
+                [labels.setupPublic, labels.setupPublicText, <Sparkles key="public" className="size-3.5" />],
+              ].map(([title, text, icon]) => (
+                <Card key={String(title)} light={isLight}>
+                  <div className="p-4">
+                    <MicroLabel light={isLight}>{icon}{title}</MicroLabel>
+                    <p className={cn('mt-4 text-[12px] leading-5', mutedText(isLight))}>{text}</p>
                   </div>
-
-                  <p className={cn('mt-1 text-[11px] leading-4', mutedText(isLight))}>
-                    {labels.setupCards.timelineText}
-                  </p>
-                </div>
-              </Card>
-
-              <Card light={isLight}>
-                <div className="p-4">
-                  <MicroLabel light={isLight}>
-                    <MessageCircleMore className="size-3.5" />
-                    {labels.setupCards.chats}
-                  </MicroLabel>
-
-                  <div
-                    className={cn(
-                      'mt-4 text-[13px] font-semibold tracking-[-0.018em]',
-                      pageText(isLight),
-                    )}
-                  >
-                    {locale === 'ru' ? 'Связь с клиентами' : 'Client communication'}
-                  </div>
-
-                  <p className={cn('mt-1 text-[11px] leading-4', mutedText(isLight))}>
-                    {labels.setupCards.chatsText}
-                  </p>
-                </div>
-              </Card>
-
-              <Card light={isLight}>
-                <div className="p-4">
-                  <MicroLabel light={isLight}>
-                    <Globe2 className="size-3.5" />
-                    {labels.setupCards.public}
-                  </MicroLabel>
-
-                  <div
-                    className={cn(
-                      'mt-4 text-[13px] font-semibold tracking-[-0.018em]',
-                      pageText(isLight),
-                    )}
-                  >
-                    {locale === 'ru' ? 'Онлайн-запись' : 'Online booking'}
-                  </div>
-
-                  <p className={cn('mt-1 text-[11px] leading-4', mutedText(isLight))}>
-                    {labels.setupCards.publicText}
-                  </p>
-                </div>
-              </Card>
+                </Card>
+              ))}
             </div>
           </div>
         </main>
@@ -1636,553 +1535,126 @@ export default function DashboardTodayPage() {
 
   return (
     <WorkspaceShell>
-      <main
-        className={cn(
-          'min-h-[calc(100dvh-68px)] px-4 pb-12 pt-5 md:px-7 md:pt-6',
-          pageBg(isLight),
-        )}
-      >
+      <main className={cn('min-h-[calc(100dvh-68px)] px-4 pb-12 pt-5 md:px-7 md:pt-6', pageBg(isLight))}>
         <div className="mx-auto w-full max-w-[var(--page-max-width)]">
-          <div className="mb-6 md:mb-7">
+          <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div className="min-w-0">
-              <h1
-                className={cn(
-                  'text-[31px] font-semibold tracking-[-0.075em] md:text-[42px]',
-                  pageText(isLight),
-                )}
-              >
+              <div className="flex flex-wrap items-center gap-2">
+                <MicroLabel light={isLight} active color={accentColor}>
+                  <StatusDot color={accentColor} />
+                  {labels.live}
+                </MicroLabel>
+                <MicroLabel light={isLight}>{formatCalendarRange(viewMode, selectedDate, locale)}</MicroLabel>
+              </div>
+              <h1 className={cn('mt-4 text-[32px] font-semibold tracking-[-0.078em] md:text-[44px]', pageText(isLight))}>
                 {labels.title}
               </h1>
-
-              <p
-                className={cn(
-                  'mt-2 max-w-[760px] text-[13px] leading-5',
-                  mutedText(isLight),
-                )}
-              >
+              <p className={cn('mt-2 max-w-[760px] text-[13px] leading-5', mutedText(isLight))}>
                 {labels.description}
               </p>
             </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className={cn('inline-flex items-center gap-1 rounded-[12px] border p-1', isLight ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.045]')}>
+                <IconButton light={isLight} label={labels.previous} onClick={() => shiftPeriod(-1)}>
+                  <ChevronLeft className="size-4" />
+                </IconButton>
+                <Button type="button" onClick={goToday} className={buttonBase(isLight)}>
+                  {labels.today}
+                </Button>
+                <IconButton light={isLight} label={labels.next} onClick={() => shiftPeriod(1)}>
+                  <ChevronRight className="size-4" />
+                </IconButton>
+              </div>
+
+              <div className={cn('inline-flex max-w-full items-center gap-1 rounded-[12px] border p-1', isLight ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.045]')}>
+                <SegmentButton label={labels.day} active={viewMode === 'day'} onClick={() => setViewMode('day')} light={isLight} accentColor={accentColor} />
+                <SegmentButton label={labels.week} active={viewMode === 'week'} onClick={() => setViewMode('week')} light={isLight} accentColor={accentColor} />
+                <SegmentButton label={labels.month} active={viewMode === 'month'} onClick={() => setViewMode('month')} light={isLight} accentColor={accentColor} />
+              </div>
+            </div>
           </div>
 
-          <div className="grid gap-4">
-            <Card light={isLight} className="overflow-hidden">
-              <div className="p-5 md:p-6">
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <MicroLabel light={isLight} active accentColor={accentColor}>
-                        <StatusDot light={isLight} active accentColor={accentColor} />
-                        {labels.overviewTitle}
-                      </MicroLabel>
-
-                      <MicroLabel light={isLight}>
-                        {summaryRange === 'day'
-                          ? locale === 'ru'
-                            ? 'актуально сегодня'
-                            : 'live today'
-                          : summaryRange === 'week'
-                            ? locale === 'ru'
-                              ? 'текущая неделя'
-                              : 'current week'
-                            : locale === 'ru'
-                              ? 'текущий месяц'
-                              : 'current month'}
-                      </MicroLabel>
-                    </div>
-
-                    <div
-                      className={cn(
-                        'mt-4 text-[28px] font-semibold tracking-[-0.075em] md:text-[38px]',
-                        pageText(isLight),
-                      )}
-                    >
-                      {summaryUpcoming
-                        ? `${summaryUpcoming.time} · ${summaryUpcoming.clientName}`
-                        : labels.overviewTitle}
-                    </div>
-
-                    <p
-                      className={cn(
-                        'mt-2 max-w-[780px] text-[12.5px] leading-6',
-                        mutedText(isLight),
-                      )}
-                    >
-                      {summaryDescription}
-                    </p>
-                  </div>
-
-                  <ControlGroup light={isLight} className="w-fit self-start p-1">
-                    <SegmentButton
-                      label={locale === 'ru' ? 'День' : 'Day'}
-                      active={summaryRange === 'day'}
-                      onClick={() => setSummaryRange('day')}
-                      light={isLight}
-                      accentColor={accentColor}
-                    />
-                    <SegmentButton
-                      label={locale === 'ru' ? 'Неделя' : 'Week'}
-                      active={summaryRange === 'week'}
-                      onClick={() => setSummaryRange('week')}
-                      light={isLight}
-                      accentColor={accentColor}
-                    />
-                    <SegmentButton
-                      label={locale === 'ru' ? 'Месяц' : 'Month'}
-                      active={summaryRange === 'month'}
-                      onClick={() => setSummaryRange('month')}
-                      light={isLight}
-                      accentColor={accentColor}
-                    />
-                  </ControlGroup>
-                </div>
-
-                <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                  {summaryMetrics.map((item) => (
-                    <SummaryMetricCard
-                      key={item.label}
-                      label={item.label}
-                      value={item.value}
-                      hint={item.hint}
-                      light={isLight}
-                    />
-                  ))}
-                </div>
-
-                <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_320px]">
-                  <div
-                    className={cn(
-                      'overflow-hidden rounded-[18px] border p-3 md:p-4',
-                      isLight ? 'border-black/[0.07] bg-black/[0.02]' : 'border-white/[0.08] bg-white/[0.03]',
-                    )}
-                  >
-                    <div className="overflow-x-auto">
-                      <div className="min-w-[720px]">
-                        <div className="grid grid-cols-[86px_repeat(6,minmax(0,1fr))]">
-                          <div className={cn('px-3 pb-2 text-[11px] font-medium', mutedText(isLight))}>
-                            {locale === 'ru' ? 'Время' : 'Time'}
-                          </div>
-                          {weekDates.map((date) => {
-                            const iso = toLocalIsoDate(date);
-                            const isTodayColumn = iso === todayIso;
-                            return (
-                              <div key={iso} className="px-2 pb-2">
-                                <div className={cn('flex items-center justify-between rounded-[10px] px-2 py-1.5', isTodayColumn ? (isLight ? 'bg-black/[0.05]' : 'bg-white/[0.06]') : '')}>
-                                  <span className={cn('text-[11px] font-medium', pageText(isLight))}>
-                                    {getShortWeekday(date, locale)}
-                                  </span>
-                                  <span className={cn('text-[11px]', mutedText(isLight))}>
-                                    {date.getDate()}
-                                  </span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        <div className={cn('grid grid-cols-[86px_repeat(6,minmax(0,1fr))] border-t', borderTone(isLight))}>
-                          {weekBoardRows.flatMap((row) => [
-                            <div key={`label-${row}`} className={cn('border-r px-3 py-4 text-[11px] font-medium', borderTone(isLight), mutedText(isLight))}>
-                              {row}
-                            </div>,
-                            ...weekDates.map((date) => {
-                              const iso = toLocalIsoDate(date);
-                              const key = `${iso}-${row}`;
-                              const items = weekBoardCells.get(key) ?? [];
-                              return (
-                                <div
-                                  key={key}
-                                  className={cn(
-                                    'min-h-[58px] border-r border-t px-1.5 py-1.5',
-                                    borderTone(isLight),
-                                  )}
-                                >
-                                  <div className="space-y-1">
-                                    {items.length ? items.map((item) => (
-                                      <SummaryBoardBooking key={item.id} item={item} light={isLight} />
-                                    )) : null}
-                                  </div>
-                                </div>
-                              );
-                            }),
-                          ])}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <Panel light={isLight} className="p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className={cn('text-[11px] font-medium', mutedText(isLight))}>
-                            {locale === 'ru' ? 'Инсайт периода' : 'Period insight'}
-                          </div>
-                          <div className={cn('mt-2 text-[24px] font-semibold tracking-[-0.05em]', pageText(isLight))}>
-                            {weekBoardInsight && weekBoardInsight.count > 0
-                              ? `${getShortWeekday(weekBoardInsight.date, locale)} · ${weekBoardInsight.count}`
-                              : locale === 'ru'
-                                ? 'Пока спокойно'
-                                : 'Quiet for now'}
-                          </div>
-                          <div className={cn('mt-2 text-[11.5px] leading-5', mutedText(isLight))}>
-                            {weekBoardInsight && weekBoardInsight.count > 0
-                              ? locale === 'ru'
-                                ? `Самый плотный день недели — ${getShortWeekday(weekBoardInsight.date, locale)}. Можно заранее держать окно рядом для переносов.`
-                                : `The densest day this week is ${getShortWeekday(weekBoardInsight.date, locale)}. Keep a nearby slot ready for reschedules.`
-                              : locale === 'ru'
-                                ? 'Как только появятся записи, здесь будет краткий вывод по загрузке.'
-                                : 'As bookings appear, this area will show a short load insight.'}
-                          </div>
-                        </div>
-
-                        <div
-                          className={cn(
-                            'inline-flex size-10 items-center justify-center rounded-[12px] border',
-                            isLight
-                              ? 'border-black/[0.07] bg-white text-black/50'
-                              : 'border-white/[0.07] bg-white/[0.04] text-white/50',
-                          )}
-                        >
-                          <TrendingUp className="size-4" />
-                        </div>
-                      </div>
-                    </Panel>
-
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                      {summaryItems.map((item) => (
-                        <Panel key={item.label} light={isLight} className="p-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className={cn('text-[11px] font-medium', mutedText(isLight))}>{item.label}</div>
-                              <div className={cn('mt-2 text-[23px] font-semibold tracking-[-0.05em]', pageText(isLight))}>{item.value}</div>
-                              <div className={cn('mt-1.5 text-[10.5px] leading-5', faintText(isLight))}>{item.hint}</div>
-                            </div>
-                            <div
-                              className={cn(
-                                'inline-flex size-9 shrink-0 items-center justify-center rounded-[11px] border',
-                                isLight
-                                  ? 'border-black/[0.07] bg-white text-black/42'
-                                  : 'border-white/[0.07] bg-white/[0.04] text-white/42',
-                              )}
-                            >
-                              {item.icon}
-                            </div>
-                          </div>
-                        </Panel>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
-
-            <Card light={isLight}>
-              <CardTitle
-                title={labels.timelineTitle}
-                description={labels.timelineDescription}
-                light={isLight}
-              />
-
-              <div className="space-y-4 p-4">
-                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                  <p
-                    className={cn(
-                      'max-w-[680px] text-[12px] leading-6',
-                      mutedText(isLight),
-                    )}
-                  >
-                    {locale === 'ru'
-                      ? todayBookings.length
-                        ? 'Клик по записи открывает карточку клиента. Таймлайн обновляется по времени и показывает текущий момент.'
-                        : 'Сегодня записей нет — ниже показаны ближайшие будущие визиты, чтобы мастер видел расписание вперёд.'
-                      : todayBookings.length
-                        ? 'Click a visit to open the client card. The timeline updates with time and shows the current moment.'
-                        : 'No bookings today — the nearest upcoming visits are shown below so the specialist sees the schedule ahead.'}
-                  </p>
-
-                  <ControlGroup light={isLight} className="max-w-full overflow-x-auto">
-                    {(['all', 'morning', 'day', 'evening'] as TimelineFilter[]).map(
-                      (filterKey) => {
-                        const count =
-                          filterKey === 'all'
-                            ? todayItems.length
-                            : todayItems.filter((item) => item.period === filterKey).length;
-
-                        return (
-                          <FilterChip
-                            key={filterKey}
-                            label={labels.filters[filterKey]}
-                            count={count}
-                            active={selectedFilter === filterKey}
-                            onClick={() => setSelectedFilter(filterKey)}
-                            light={isLight}
-                            accentColor={accentColor}
-                          />
-                        );
-                      },
-                    )}
-                  </ControlGroup>
-                </div>
-
-                <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_380px]">
-                  <div>
-                    {filteredItems.length ? (
-                      <ListBox light={isLight}>
-                        {filteredItems.map((item, index) => {
-                          const isActive = item.id === activeItemId;
-                          const showMarkerBefore = nowMarkerIndex === index;
-                          const color = stageColor(
-                            item.stage,
-                            accentColor,
-                            publicAccentColor,
-                            isLight,
-                          );
-
-                          return (
-                            <div key={item.id}>
-                              {showMarkerBefore ? renderNowMarker(`now-${item.id}`) : null}
-
-                              <ListRow
-                                className={cn(
-                                  'relative overflow-hidden px-0 py-0 transition-colors duration-150',
-                                  isActive
-                                    ? isLight
-                                      ? 'bg-black/[0.018]'
-                                      : 'bg-white/[0.032]'
-                                    : isLight
-                                      ? 'hover:bg-black/[0.018]'
-                                      : 'hover:bg-white/[0.028]',
-                                )}
-                              >
-                                <button
-                                  type="button"
-                                  onClick={() => setActiveItemId(item.id)}
-                                  className="grid min-h-[72px] w-full grid-cols-[4px_minmax(0,1fr)] text-left"
-                                >
-                                  <span
-                                    style={{ background: color }}
-                                    className={cn(
-                                      'h-full w-full',
-                                      item.stage === 'done' && 'opacity-50',
-                                    )}
-                                  />
-
-                                  <div className="grid gap-3 px-4 py-3.5 md:grid-cols-[minmax(0,1fr)_170px_150px] md:items-center">
-                                    <div className="min-w-0">
-                                      <div
-                                        className={cn(
-                                          'truncate text-[12.5px] font-semibold tracking-[-0.018em]',
-                                          pageText(isLight),
-                                        )}
-                                      >
-                                        {item.clientName}
-                                      </div>
-
-                                      <div
-                                        className={cn(
-                                          'mt-1.5 truncate text-[11px] leading-4',
-                                          mutedText(isLight),
-                                        )}
-                                      >
-                                        {todayBookings.length ? item.service : `${item.dateLabel} · ${item.service}`}
-                                        {item.note ? ` · ${item.note}` : ''}
-                                      </div>
-                                    </div>
-
-                                    <TimeRangeCell
-                                      start={item.time}
-                                      end={formatMinutesAsTime(item.timeMinutes + 60)}
-                                      light={isLight}
-                                    />
-
-                                    <TimelineStatus
-                                      stage={item.stage}
-                                      label={labels.stages[item.stage]}
-                                      hint={labels.stageHints[item.stage]}
-                                      light={isLight}
-                                      accentColor={accentColor}
-                                      publicAccentColor={publicAccentColor}
-                                      className="md:justify-self-end"
-                                    />
-                                  </div>
-                                </button>
-                              </ListRow>
-
-                              {index === filteredItems.length - 1 &&
-                              nowMarkerIndex === filteredItems.length
-                                ? renderNowMarker('now-end')
-                                : null}
-                            </div>
-                          );
-                        })}
-                      </ListBox>
-                    ) : upcomingBookings.length ? (
-                        <ListBox light={isLight}>
-                          {upcomingBookings.map((booking) => (
-                            <ListRow key={booking.id}>
-                              <div className="flex items-center justify-between gap-3">
-                                <div className="min-w-0">
-                                  <div className={cn('truncate text-[12.5px] font-semibold', pageText(isLight))}>{booking.clientName}</div>
-                                  <div className={cn('mt-1 truncate text-[11px]', mutedText(isLight))}>{booking.service}</div>
-                                </div>
-                                <div className={cn('shrink-0 text-right text-[11px] font-medium', mutedText(isLight))}>{booking.date} · {booking.time}</div>
-                              </div>
-                            </ListRow>
-                          ))}
-                        </ListBox>
-                    ) : (
-                      <EmptyState light={isLight}>{labels.emptyFilter}</EmptyState>
-                    )}
-                  </div>
-
-                  <Panel light={isLight} className="p-4">
-                    <div>
-                      <div
-                        className={cn(
-                          'text-[13px] font-semibold tracking-[-0.018em]',
-                          pageText(isLight),
-                        )}
-                      >
-                        {labels.liveDay}
-                      </div>
-
-                      <p className={cn('mt-1 text-[11px] leading-5', mutedText(isLight))}>
-                        {labels.liveDayText}
-                      </p>
-                    </div>
-
-                    {activeItem ? (
-                      <div className="mt-4 space-y-3">
-                        <Card light={isLight} className="p-4">
-                          <div className={cn('text-[10.5px] font-medium', mutedText(isLight))}>
-                            {labels.activeBooking}
-                          </div>
-
-                          <div
-                            className={cn(
-                              'mt-2 text-[21px] font-semibold tracking-[-0.045em]',
-                              pageText(isLight),
-                            )}
-                          >
-                            {activeItem.clientName}
-                          </div>
-
-                          <div className={cn('mt-1 text-[13px]', mutedText(isLight))}>
-                            {activeItem.service}
-                          </div>
-
-                          <div className="mt-3 flex flex-wrap gap-1.5">
-                            <MicroLabel light={isLight}>
-                              {activeItem.dateLabel}
-                            </MicroLabel>
-
-                            <MicroLabel light={isLight}>
-                              {activeItem.time}–
-                              {formatMinutesAsTime(activeItem.timeMinutes + 60)}
-                            </MicroLabel>
-
-                            <MicroLabel light={isLight}>
-                              {activeItem.durationLabel}
-                            </MicroLabel>
-
-                            <MicroLabel light={isLight}>
-                              {labels.filters[activeItem.period]}
-                            </MicroLabel>
-                          </div>
-                        </Card>
-
-                        <div className="grid gap-2">
-                          <KeyValue
-                            label={labels.time}
-                            value={`${activeItem.time}–${formatMinutesAsTime(
-                              activeItem.timeMinutes + 60,
-                            )}`}
-                            light={isLight}
-                          />
-
-                          <KeyValue
-                            label={labels.phone}
-                            value={activeItem.phone}
-                            light={isLight}
-                          />
-
-                          <KeyValue
-                            label={labels.dayState}
-                            value={labels.stages[activeItem.stage]}
-                            light={isLight}
-                          />
-                        </div>
-
-                        <Card light={isLight} className="p-4">
-                          <div className={cn('text-[10.5px] font-medium', mutedText(isLight))}>
-                            {labels.note}
-                          </div>
-
-                          <div className={cn('mt-2 text-[13px] leading-6', pageText(isLight))}>
-                            {activeItem.note ?? '—'}
-                          </div>
-                        </Card>
-
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          <Button asChild className={cn('justify-start', buttonBase(isLight))}>
-                            <Link href={`tel:${activeItem.phone}`}>
-                              <PhoneCall className="size-3.5" />
-                              {labels.callClient}
-                            </Link>
-                          </Button>
-
-                          <Button
-                            asChild
-                            className={cn('justify-start', buttonBase(isLight, true))}
-                          >
-                            <Link href="/dashboard/chats">
-                              <MessageCircleMore className="size-3.5" />
-                              {labels.openChat}
-                            </Link>
-                          </Button>
-                        </div>
-
-                        {activeBooking ? (
-                          <div className="grid gap-2">
-                            {activeBooking.status !== 'completed' && activeBooking.status !== 'no_show' && activeBooking.status !== 'cancelled' ? (
-                              <Button
-                                type="button"
-                                className={cn('justify-start', buttonBase(isLight, true))}
-                                onClick={() => void handleStatusChange('completed')}
-                                disabled={actionLoading !== null}
-                              >
-                                <CheckCircle2 className="size-3.5" />
-                                {actionLoading === 'completed' ? '…' : labels.complete}
-                              </Button>
-                            ) : null}
-
-                            {activeBooking.status !== 'completed' && activeBooking.status !== 'no_show' && activeBooking.status !== 'cancelled' ? (
-                              <Button
-                                type="button"
-                                className={cn('justify-start', buttonBase(isLight))}
-                                onClick={() => void handleStatusChange('no_show')}
-                                disabled={actionLoading !== null}
-                              >
-                                <CheckCircle2 className="size-3.5" />
-                                {actionLoading === 'no_show' ? '…' : labels.noShow}
-                              </Button>
-                            ) : null}
-                          </div>
-                        ) : (
-                          <EmptyState light={isLight}>{labels.sampleCopy}</EmptyState>
-                        )}
-                      </div>
-                    ) : (
-                      <EmptyState light={isLight}>{labels.selectBooking}</EmptyState>
-                    )}
-                  </Panel>
-                </div>
-              </div>
-            </Card>
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+            <StatCard label={labels.bookings} value={stats.total} hint={formatCalendarRange(viewMode, selectedDate, locale)} icon={<CalendarClock className="size-4" />} light={isLight} />
+            <StatCard label={labels.confirmed} value={stats.active} hint={locale === 'ru' ? 'без отмен и неявок' : 'excluding missed'} icon={<UserRound className="size-4" />} light={isLight} />
+            <StatCard label={labels.completed} value={stats.completed} hint={locale === 'ru' ? 'закрытые визиты' : 'closed visits'} icon={<CheckCircle2 className="size-4" />} light={isLight} />
+            <StatCard label={labels.revenue} value={formatMoney(stats.revenue, locale)} hint={locale === 'ru' ? 'по выбранному периоду' : 'selected period'} icon={<Wallet className="size-4" />} light={isLight} />
+            <StatCard label={labels.nearest} value={nearestBooking?.start ?? '—'} hint={nearestBooking ? `${nearestBooking.clientName} · ${nearestBooking.service}` : labels.quiet} icon={<Clock3 className="size-4" />} light={isLight} />
           </div>
+
+          <Card light={isLight} className="mt-4 overflow-hidden">
+            <div className={cn('flex min-h-[58px] flex-col gap-3 border-b px-4 py-3 md:flex-row md:items-center md:justify-between', borderTone(isLight))}>
+              <div className="min-w-0">
+                <h2 className={cn('truncate text-[14px] font-semibold tracking-[-0.018em]', pageText(isLight))}>
+                  {labels.calendar}
+                </h2>
+                <p className={cn('mt-1 text-[11px]', mutedText(isLight))}>
+                  {locale === 'ru'
+                    ? 'Клик по записи открывает мини-карточку с действиями.'
+                    : 'Click a booking to open a quick action card.'}
+                </p>
+              </div>
+              <MicroLabel light={isLight}>
+                {formatMinutesAsTime(workWindow.startMinutes)}–{formatMinutesAsTime(workWindow.endMinutes)}
+              </MicroLabel>
+            </div>
+
+            <div className="p-3 md:p-4">
+              {viewMode === 'day' ? (
+                <DayCalendar
+                  date={selectedDate}
+                  bookings={calendarBookings}
+                  workWindow={workWindow}
+                  now={now}
+                  light={isLight}
+                  locale={locale}
+                  onSelect={setSelectedBooking}
+                />
+              ) : null}
+
+              {viewMode === 'week' ? (
+                <WeekCalendar
+                  dates={rangeDates.slice(0, 7)}
+                  bookingsByDate={bookingsByDate}
+                  workWindow={workWindow}
+                  now={now}
+                  todayIso={todayIso}
+                  selectedDate={selectedDate}
+                  light={isLight}
+                  locale={locale}
+                  onSelect={setSelectedBooking}
+                  onDateSelect={(date) => setSelectedDate(startOfDay(date))}
+                />
+              ) : null}
+
+              {viewMode === 'month' ? (
+                <MonthCalendar
+                  dates={rangeDates}
+                  selectedDate={selectedDate}
+                  bookingsByDate={bookingsByDate}
+                  light={isLight}
+                  locale={locale}
+                  onDateSelect={(date) => {
+                    setSelectedDate(startOfDay(date));
+                    setViewMode('day');
+                  }}
+                  onSelect={setSelectedBooking}
+                />
+              ) : null}
+            </div>
+          </Card>
         </div>
       </main>
+
+      <BookingDialog
+        booking={selectedBooking}
+        light={isLight}
+        locale={locale}
+        actionLoading={actionLoading}
+        onClose={() => setSelectedBooking(null)}
+        onStatusChange={(status) => void handleStatusChange(status)}
+      />
     </WorkspaceShell>
   );
 }
