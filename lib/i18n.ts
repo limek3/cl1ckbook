@@ -234,7 +234,6 @@ export const messages = {
       new: 'Новая',
       confirmed: 'Запланирована',
       completed: 'Завершена',
-      no_show: 'Не пришёл',
       cancelled: 'Отменена',
     },
     validation: {
@@ -476,7 +475,6 @@ export const messages = {
       new: 'New',
       confirmed: 'Scheduled',
       completed: 'Completed',
-      no_show: 'No-show',
       cancelled: 'Cancelled',
     },
     validation: {

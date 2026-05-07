@@ -142,7 +142,7 @@ function ActiveDot({ className }: { className?: string }) {
     <span
       aria-hidden="true"
       className={cn(
-        'absolute bottom-[1px] left-1/2 h-[3px] w-[3px] -translate-x-1/2 rounded-full bg-current',
+        'absolute bottom-[1px] left-1/2 h-[3px] w-[3px] -translate-x-1/2 rounded-full bg-black dark:bg-white',
         className,
       )}
     />
@@ -302,7 +302,7 @@ function ModePanel({
                   className={cn(
                     'size-3.5 stroke-[1.8] transition',
                     active
-                      ? 'text-current'
+                      ? 'text-slate-950 dark:text-white'
                       : 'text-slate-400 group-hover:text-slate-700 dark:text-white/28 dark:group-hover:text-white/70',
                   )}
                 />
@@ -316,7 +316,7 @@ function ModePanel({
                 className={cn(
                   'mt-1 truncate text-[9.5px] leading-none',
                   active
-                    ? 'text-black/58 dark:text-black/58'
+                    ? 'text-slate-500 dark:text-white/38'
                     : 'text-slate-400 dark:text-white/24',
                 )}
               >
@@ -472,7 +472,7 @@ function PublicLink({
           <span
             className={cn(
               'mt-0.5 block truncate text-[10px]',
-              active ? 'text-black/58 dark:text-black/58' : 'text-slate-500 dark:text-white/30',
+              active ? 'text-current/68' : 'text-slate-500 dark:text-white/30',
             )}
           >
             {description}
@@ -1645,7 +1645,7 @@ function SidebarContent({
 }) {
   return (
     <div className="flex h-full flex-col">
-      <div className="cb-brand-halo shrink-0 px-4 pb-3 pt-4">
+      <div className="shrink-0 px-4 pb-3 pt-4">
         <Link
           href={withDashboardDemoParam('/dashboard', selectedMode === 'demo')}
           onClick={onNavigate}
@@ -2475,7 +2475,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
       </main>
 
       <nav
-        className="cb-mobile-bottom-nav fixed inset-x-0 bottom-0 z-40 border-t border-black/[0.07] bg-[#f7f6f2]/94 px-2 pb-[calc(env(safe-area-inset-bottom,0px)+8px)] pt-2 backdrop-blur-xl dark:border-white/[0.07] dark:bg-[#080808]/94 xl:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-black/[0.07] bg-[#f7f6f2]/94 px-2 pb-[calc(env(safe-area-inset-bottom,0px)+8px)] pt-2 backdrop-blur-xl dark:border-white/[0.07] dark:bg-[#080808]/94 xl:hidden"
         aria-label={labels.product}
       >
         <div className="mx-auto grid max-w-[430px] grid-cols-5 gap-1 rounded-[20px] border border-black/[0.07] bg-[#ffffff]/82 p-1 dark:border-white/[0.08] dark:bg-[#141414]/86">

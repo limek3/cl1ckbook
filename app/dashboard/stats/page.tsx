@@ -166,7 +166,7 @@ function Card({
   className?: string;
 }) {
   return (
-    <section className={cn('cb-card-lift rounded-[11px] border', cardTone(light), className)}>
+    <section className={cn('rounded-[11px] border', cardTone(light), className)}>
       {children}
     </section>
   );
@@ -661,78 +661,12 @@ function EmptyState({
   return (
     <div
       className={cn(
-        'cb-empty-state rounded-[10px] border px-4 py-5 text-[12px]',
+        'rounded-[10px] border px-4 py-5 text-[12px]',
         insetTone(light),
         mutedText(light),
       )}
     >
       {children}
-    </div>
-  );
-}
-
-function InsightStrip({
-  light,
-  accentColor,
-  revenueForecast,
-  cancellations,
-  popularService,
-  peakHour,
-  locale,
-}: {
-  light: boolean;
-  accentColor: string;
-  revenueForecast: string;
-  cancellations: number;
-  popularService?: string;
-  peakHour?: string;
-  locale: 'ru' | 'en';
-}) {
-  const items = [
-    {
-      label: locale === 'ru' ? 'Прогноз недели' : 'Week forecast',
-      value: revenueForecast,
-      hint: locale === 'ru' ? 'по текущему темпу' : 'based on current pace',
-      icon: <TrendingUp className="size-4" />,
-    },
-    {
-      label: locale === 'ru' ? 'Отмены / no-show' : 'Cancels / no-shows',
-      value: cancellations,
-      hint: cancellations > 0 ? (locale === 'ru' ? 'требуют внимания' : 'needs attention') : (locale === 'ru' ? 'рисков нет' : 'no risk'),
-      icon: <CalendarClock className="size-4" />,
-    },
-    {
-      label: locale === 'ru' ? 'Топ-услуга' : 'Top service',
-      value: popularService ?? '—',
-      hint: locale === 'ru' ? 'чаще всего выбирают' : 'most selected',
-      icon: <Sparkles className="size-4" />,
-    },
-    {
-      label: locale === 'ru' ? 'Пиковое время' : 'Peak hour',
-      value: peakHour ?? '—',
-      hint: locale === 'ru' ? 'лучшее окно для доп. записи' : 'best extra window',
-      icon: <LayoutDashboard className="size-4" />,
-    },
-  ];
-
-  return (
-    <div className="grid gap-2 md:grid-cols-4">
-      {items.map((item) => (
-        <div
-          key={item.label}
-          className={cn(
-            'cb-smart-action rounded-[12px] border p-4',
-            light ? 'border-[#e6e2da] bg-white/78' : 'border-white/[0.08] bg-white/[0.035]',
-          )}
-        >
-          <span className="inline-flex size-8 items-center justify-center rounded-[10px]" style={{ background: `color-mix(in srgb, ${accentColor} 12%, transparent)`, color: accentColor }}>
-            {item.icon}
-          </span>
-          <div className={cn('mt-3 text-[10.5px] font-medium', mutedText(light))}>{item.label}</div>
-          <div className={cn('mt-1 truncate text-[18px] font-semibold tracking-[-0.045em]', pageText(light))}>{item.value}</div>
-          <div className={cn('mt-1 text-[10px]', faintText(light))}>{item.hint}</div>
-        </div>
-      ))}
     </div>
   );
 }
@@ -1151,10 +1085,6 @@ export default function DashboardStatsPage() {
     },
   ];
 
-  const forecastBase = activitySlice.reduce((total, item) => total + item.revenue, 0);
-  const revenueForecast = formatCurrency(Math.round((forecastBase / Math.max(1, activitySlice.length)) * 7), locale);
-  const riskBookings = bookings.filter((booking) => booking.status === 'cancelled' || booking.status === 'no_show').length;
-
   return (
     <WorkspaceShell>
       <main
@@ -1187,17 +1117,7 @@ export default function DashboardStatsPage() {
           </div>
 
           <div className="grid gap-4">
-            <InsightStrip
-              light={isLight}
-              accentColor={accentColor}
-              revenueForecast={revenueForecast}
-              cancellations={riskBookings}
-              popularService={topServices[0]?.name}
-              peakHour={dataset.peakHours[0]?.hour}
-              locale={locale}
-            />
-
-            <Card light={isLight} className="cb-brand-halo overflow-hidden">
+            <Card light={isLight} className="overflow-hidden">
               <div className="p-5 md:p-6">
                 <div className="min-w-0">
                   <div

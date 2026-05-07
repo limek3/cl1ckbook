@@ -10,7 +10,6 @@ import {
   useState,
 } from 'react';
 import { useTheme } from 'next-themes';
-import { toast } from 'sonner';
 import {
   Area,
   AreaChart,
@@ -198,7 +197,7 @@ function Card({
   className?: string;
 }) {
   return (
-    <section className={cn('cb-card-lift rounded-[11px] border', cardTone(light), className)}>
+    <section className={cn('rounded-[11px] border', cardTone(light), className)}>
       {children}
     </section>
   );
@@ -666,136 +665,13 @@ function EmptyState({
   return (
     <div
       className={cn(
-        'cb-empty-state rounded-[10px] border px-4 py-5 text-[12px]',
+        'rounded-[10px] border px-4 py-5 text-[12px]',
         insetTone(light),
         mutedText(light),
       )}
     >
       {children}
     </div>
-  );
-}
-
-function OnboardingChecklist({
-  steps,
-  light,
-  accentColor,
-}: {
-  steps: Array<{ title: string; description: string; href: string; complete: boolean }>;
-  light: boolean;
-  accentColor: string;
-}) {
-  const completed = steps.filter((step) => step.complete).length;
-  const progress = Math.round((completed / Math.max(1, steps.length)) * 100);
-
-  return (
-    <Card light={light} className="cb-brand-halo overflow-hidden">
-      <div className="grid gap-4 p-4 md:grid-cols-[260px_minmax(0,1fr)] md:p-5">
-        <div className="min-w-0">
-          <MicroLabel light={light} active accentColor={accentColor}>
-            <Sparkles className="size-3.5" />
-            {completed}/{steps.length}
-          </MicroLabel>
-          <h2 className={cn('mt-4 text-[22px] font-semibold tracking-[-0.065em]', pageText(light))}>
-            {steps.length === completed ? 'Кабинет готов к работе' : 'Настройка кабинета'}
-          </h2>
-          <p className={cn('mt-2 text-[12px] leading-5', mutedText(light))}>
-            {steps.length === completed
-              ? 'Основные сценарии собраны: ссылка, услуги, график, клиенты и первые записи.'
-              : 'Пройдите короткий чеклист, чтобы публичная страница начала стабильно приводить записи.'}
-          </p>
-          <div className={cn('mt-4 h-1.5 overflow-hidden rounded-full', light ? 'bg-black/[0.055]' : 'bg-white/[0.07]')}>
-            <span className="block h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, background: accentColor }} />
-          </div>
-        </div>
-
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-          {steps.map((step, index) => (
-            <Link
-              key={step.title}
-              href={step.href}
-              className={cn(
-                'cb-onboarding-step cb-smart-action rounded-[12px] border p-3 text-left',
-                light
-                  ? 'border-[#e6e2da] bg-white/72 hover:border-[#d8d0c2]'
-                  : 'border-white/[0.08] bg-white/[0.035] hover:border-white/[0.12]',
-              )}
-              data-complete={step.complete ? 'true' : 'false'}
-            >
-              <span className="cb-onboarding-index grid size-7 place-items-center rounded-[9px] border border-current/10 text-[11px] font-bold">
-                {step.complete ? <Check className="size-3.5" /> : index + 1}
-              </span>
-              <span className={cn('mt-3 block text-[12px] font-semibold tracking-[-0.018em]', pageText(light))}>{step.title}</span>
-              <span className={cn('mt-1 block text-[10.5px] leading-4', mutedText(light))}>{step.description}</span>
-            </Link>
-          ))}
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-function SmartActionHub({
-  light,
-  accentColor,
-  publicUrl,
-  onCopy,
-  nextBooking,
-  todayRequests,
-  freeHint,
-}: {
-  light: boolean;
-  accentColor: string;
-  publicUrl: string;
-  onCopy: () => void;
-  nextBooking: { clientName: string; service: string; date: string; time: string } | null;
-  todayRequests: number;
-  freeHint: string;
-}) {
-  const actions = [
-    { href: '/dashboard/today', label: 'Открыть календарь', hint: nextBooking ? `${nextBooking.time} · ${nextBooking.clientName}` : 'Свободных записей нет', icon: <CalendarClock className="size-4" /> },
-    { href: '/dashboard/services', label: 'Настроить услуги', hint: 'Цены, длительность, категории', icon: <SquarePen className="size-4" /> },
-    { href: '/dashboard/availability', label: 'График', hint: freeHint, icon: <LayoutDashboard className="size-4" /> },
-  ];
-
-  return (
-    <Card light={light} className="overflow-hidden">
-      <div className="grid gap-3 p-4 md:grid-cols-[minmax(0,1fr)_320px] md:p-5">
-        <div className="grid gap-3 sm:grid-cols-3">
-          {actions.map((action) => (
-            <Link
-              key={action.href}
-              href={action.href}
-              className={cn(
-                'cb-smart-action rounded-[12px] border p-4',
-                light ? 'border-[#e6e2da] bg-white/72 hover:bg-[#fffdf9]' : 'border-white/[0.08] bg-white/[0.035] hover:bg-white/[0.055]',
-              )}
-            >
-              <span className="inline-flex size-9 items-center justify-center rounded-[11px]" style={{ background: `color-mix(in srgb, ${accentColor} 12%, transparent)`, color: accentColor }}>
-                {action.icon}
-              </span>
-              <span className={cn('mt-3 block text-[13px] font-semibold tracking-[-0.02em]', pageText(light))}>{action.label}</span>
-              <span className={cn('mt-1 block text-[11px] leading-4', mutedText(light))}>{action.hint}</span>
-            </Link>
-          ))}
-        </div>
-
-        <div className={cn('rounded-[12px] border p-4', light ? 'border-[#e6e2da] bg-[#fbfaf7]' : 'border-white/[0.08] bg-white/[0.035]')}>
-          <div className={cn('text-[10px] font-semibold uppercase tracking-[0.16em]', faintText(light))}>Быстрый рост</div>
-          <div className={cn('mt-2 text-[20px] font-semibold tracking-[-0.055em]', pageText(light))}>{todayRequests} заявок сегодня</div>
-          <p className={cn('mt-2 text-[11px] leading-5', mutedText(light))}>Скопируйте ссылку и отправьте её клиенту — это самый быстрый способ получить следующую запись.</p>
-          <div className="mt-3 flex min-w-0 gap-2">
-            <button type="button" onClick={onCopy} className={buttonBase(light, true)}>
-              <Copy className="size-3.5" />
-              Скопировать
-            </button>
-            <span className={cn('min-w-0 truncate rounded-[9px] border px-2.5 py-2 text-[10.5px]', light ? 'border-black/[0.07] bg-white text-black/45' : 'border-white/[0.08] bg-black/20 text-white/40')}>
-              {publicUrl}
-            </span>
-          </div>
-        </div>
-      </div>
-    </Card>
   );
 }
 
@@ -901,7 +777,7 @@ function ProgressLine({
 }
 
 export default function DashboardPage() {
-  const { hasHydrated, ownedProfile, bookings, dataset, locale, workspaceData } =
+  const { hasHydrated, ownedProfile, bookings, dataset, locale } =
     useOwnedWorkspaceData();
   const { resolvedTheme } = useTheme();
   const { settings } = useAppearance();
@@ -1066,12 +942,8 @@ export default function DashboardPage() {
       }
 
       setCopiedPublicLink(true);
-      toast.success(locale === 'ru' ? 'Ссылка скопирована' : 'Link copied', {
-        description: locale === 'ru' ? 'Можно отправить её клиенту или закрепить в соцсетях.' : 'You can send it to a client or pin it in socials.',
-      });
       window.setTimeout(() => setCopiedPublicLink(false), 1400);
     } catch {
-      toast.error(locale === 'ru' ? 'Не удалось скопировать ссылку' : 'Could not copy link');
       setCopiedPublicLink(false);
     }
   };
@@ -1398,38 +1270,6 @@ export default function DashboardPage() {
 
   const primaryBooking = upcomingBookings[0] ?? null;
   const secondaryBookings = primaryBooking ? upcomingBookings.slice(1, 5) : [];
-  const onboardingSteps = [
-    {
-      title: locale === 'ru' ? 'Профиль' : 'Profile',
-      description: locale === 'ru' ? 'Имя, описание, контакты' : 'Name, bio, contacts',
-      href: '/dashboard/profile',
-      complete: Boolean(ownedProfile?.name && ownedProfile?.bio),
-    },
-    {
-      title: locale === 'ru' ? 'Услуги' : 'Services',
-      description: locale === 'ru' ? 'Цены и длительность' : 'Prices and duration',
-      href: '/dashboard/services',
-      complete: Boolean(ownedProfile?.services?.length || topServices.length),
-    },
-    {
-      title: locale === 'ru' ? 'График' : 'Schedule',
-      description: locale === 'ru' ? 'Рабочие окна и перерывы' : 'Work windows and breaks',
-      href: '/dashboard/availability',
-      complete: Boolean((workspaceData.availability as unknown[] | undefined)?.length),
-    },
-    {
-      title: locale === 'ru' ? 'Витрина' : 'Public page',
-      description: locale === 'ru' ? 'Ссылка готова к отправке' : 'Link is ready to share',
-      href: publicHref,
-      complete: Boolean(ownedProfile?.slug),
-    },
-    {
-      title: locale === 'ru' ? 'Первая запись' : 'First booking',
-      description: locale === 'ru' ? 'Проверка заявки клиента' : 'Check a client request',
-      href: '/dashboard/today',
-      complete: bookings.length > 0,
-    },
-  ];
 
   return (
     <WorkspaceShell>
@@ -1463,19 +1303,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid gap-4">
-            <OnboardingChecklist steps={onboardingSteps} light={isLight} accentColor={accentColor} />
-
-            <SmartActionHub
-              light={isLight}
-              accentColor={accentColor}
-              publicUrl={publicUrl}
-              onCopy={() => void handleCopyPublicLink()}
-              nextBooking={primaryBooking}
-              todayRequests={todayActivity?.requests ?? 0}
-              freeHint={locale === 'ru' ? 'Проверьте свободные окна' : 'Check free windows'}
-            />
-
-            <Card light={isLight} className="cb-brand-halo overflow-hidden">
+            <Card light={isLight} className="overflow-hidden">
               <div className="p-5 md:p-6">
                 <div className="min-w-0">
                   <div className={cn('text-[11px] font-medium', mutedText(isLight))}>
