@@ -13,8 +13,8 @@ export interface MasterInfo {
   link: string;
   phone: string;
   bio: string;
-  socials: { tg: string; vk: string; ig: string };
   avatar?: string;
+  socials: { tg: string; vk: string; ig: string };
 }
 
 export const MASTER: MasterInfo = {
@@ -27,8 +27,8 @@ export const MASTER: MasterInfo = {
   link: '/m/admin',
   phone: '+7 916 117 22 04',
   bio: 'Маникюр и педикюр. Стерильно, аккуратно, без спешки. 8 лет опыта.',
-  socials: { tg: 'alina.nails', vk: 'alina.nails', ig: '@alina.nails' },
   avatar: '',
+  socials: { tg: 'alina.nails', vk: 'alina.nails', ig: '@alina.nails' },
 };
 
 export interface Service {

@@ -54,7 +54,7 @@ export function MoreScreen({ go }: { go: (kind: string) => void }) {
     <div style={{ padding: '20px 16px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
       <Card>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <Avatar name={MASTER.name} avatar={MASTER.avatar} size={52} radius={14} />
+          <Avatar name={MASTER.name} src={MASTER.avatar} size={52} radius={14} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 16, fontWeight: 500, color: T.text, letterSpacing: '-0.01em' }}>{MASTER.name}</div>
             <div style={{ fontSize: 12, color: T.text2, marginTop: 2 }}>{MASTER.username} · {MASTER.city}</div>

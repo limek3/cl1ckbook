@@ -151,8 +151,8 @@ export function adaptMaster(profile: MasterProfile | null, workspaceData?: Recor
       link: '/m/',
       phone: '',
       bio: '',
-      socials: { tg: '', vk: '', ig: '' },
       avatar: '',
+      socials: { tg: '', vk: '', ig: '' },
     };
   }
 
@@ -170,12 +170,12 @@ export function adaptMaster(profile: MasterProfile | null, workspaceData?: Recor
     link: `/m/${profile.slug}`,
     phone: profile.phone || '',
     bio: profile.bio || '',
+    avatar: profile.avatar || '',
     socials: {
       tg: profile.telegram || '',
       vk: cleanString(socialSource.vk),
       ig: cleanString(socialSource.ig),
     },
-    avatar: cleanString(profile.avatar),
   };
 }
 

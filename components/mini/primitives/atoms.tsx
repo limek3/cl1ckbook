@@ -83,19 +83,24 @@ export function Divider() {
   return <div style={{ height: 1, background: T.border, width: '100%' }} />;
 }
 
-export function Avatar({ name, avatar, size = 36, radius = 10 }: { name: string; avatar?: string; size?: number; radius?: number }) {
+export function Avatar({ name, src, size = 36, radius = 10 }: { name: string; src?: string; size?: number; radius?: number }) {
   const { T } = useTheme();
   const initials = (name || '').split(' ').map((s) => s[0]).filter(Boolean).slice(0, 2).join('');
-  const src = typeof avatar === 'string' ? avatar.trim() : '';
   return (
     <div style={{
-      width: size, height: size, borderRadius: radius, background: T.cardElev, overflow: 'hidden',
+      width: size, height: size, borderRadius: radius, background: T.cardElev,
       border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontSize: size * 0.34, color: T.text2, fontWeight: 500, flexShrink: 0,
-      letterSpacing: '0.02em',
+      letterSpacing: '0.02em', overflow: 'hidden',
+      boxShadow: '0 12px 28px rgba(0,0,0,0.22)',
     }}>
       {src ? (
-        <img src={src} alt={name} referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        <img
+          src={src}
+          alt={name || 'avatar'}
+          loading="lazy"
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
       ) : initials}
     </div>
   );

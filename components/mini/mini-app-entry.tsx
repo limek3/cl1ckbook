@@ -339,6 +339,16 @@ function getInitials(name?: string | null) {
     .toUpperCase();
 }
 
+function closeMiniApp() {
+  if (typeof window === 'undefined') return;
+  const tg = (window as any).Telegram?.WebApp as { close?: () => void } | undefined;
+  if (tg?.close) {
+    tg.close();
+    return;
+  }
+  window.history.length > 1 ? window.history.back() : window.location.assign('/');
+}
+
 function sortBookings(a: Booking, b: Booking) {
   return `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`);
 }
@@ -782,8 +792,8 @@ function MiniShell({
   accent: (typeof ACCENT_OPTIONS)[number];
 }) {
   const shellStyle = {
-    paddingTop: 'calc(var(--tg-safe-top, 0px) + 20px)',
-    paddingBottom: 'calc(var(--tg-safe-bottom, 0px) + 100px)',
+    paddingTop: 'calc(var(--tg-safe-top, 0px) + 12px)',
+    paddingBottom: 'calc(var(--tg-safe-bottom, 0px) + 104px)',
     '--mini-accent': accent.value,
     '--mini-accent-soft': accent.soft,
   } as CSSProperties & Record<string, string>;
@@ -793,10 +803,11 @@ function MiniShell({
     label: string;
     icon: ReactNode;
   }> = [
-    { id: 'today', label: 'Сегодня', icon: <CalendarClock className="size-4" /> },
-    { id: 'availability', label: 'График', icon: <Clock3 className="size-4" /> },
-    { id: 'chats', label: 'Чаты', icon: <MessageCircle className="size-4" /> },
-    { id: 'more', label: 'Ещё', icon: <MoreHorizontal className="size-4" /> },
+    { id: 'today', label: 'Главная', icon: <LayoutDashboard className="size-5" /> },
+    { id: 'availability', label: 'Записи', icon: <CalendarClock className="size-5" /> },
+    { id: 'chats', label: 'Чаты', icon: <MessageCircle className="size-5" /> },
+    { id: 'clients', label: 'Клиенты', icon: <Users2 className="size-5" /> },
+    { id: 'more', label: 'Ещё', icon: <MoreHorizontal className="size-5" /> },
   ];
 
   return (
@@ -805,48 +816,76 @@ function MiniShell({
       className="cb-mini-app-root min-h-screen bg-[#090909] px-3 text-white"
     >
       <div className="mx-auto w-full max-w-[430px]">
-        <header className="sticky top-[calc(var(--tg-safe-top,0px)+20px)] z-40 mb-4 flex items-center justify-between gap-3 rounded-[22px] border border-white/[0.08] bg-[#101010]/68 px-2.5 py-2 shadow-[0_14px_36px_rgba(0,0,0,0.24)] backdrop-blur-[24px] backdrop-saturate-[1.35]">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-[11px] border border-white/[0.08] bg-white/[0.055]">
-              {profile?.avatar ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={profile.avatar} alt="" className="size-full object-cover" />
-              ) : (
-                <span className="text-[10px] font-bold text-white">
-                  {getInitials(profile?.name)}
-                </span>
-              )}
+        <header className="sticky top-[calc(var(--tg-safe-top,0px)+10px)] z-40 mb-4 rounded-[22px] border border-white/[0.085] bg-[#111113]/75 px-3 py-3 shadow-[0_18px_44px_rgba(0,0,0,0.42)] backdrop-blur-[28px] backdrop-saturate-[1.35]">
+          <div className="flex min-h-[58px] items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-[16px] border border-white/[0.08] bg-white/[0.06] shadow-[0_14px_30px_rgba(0,0,0,0.28)]">
+                {profile?.avatar ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={profile.avatar} alt={profile.name || 'КликБук'} className="size-full object-cover" />
+                ) : (
+                  <span className="text-[18px] font-bold tracking-[-0.04em] text-white">
+                    {getInitials(profile?.name || 'КликБук').slice(0, 1)}
+                  </span>
+                )}
+              </div>
+
+              <div className="min-w-0">
+                <div className="truncate text-[18px] font-bold tracking-[-0.04em] text-white">
+                  КликБук
+                </div>
+                <div className="mt-1 truncate text-[12px] font-medium uppercase tracking-[0.02em] text-white/32">
+                  MINI APP
+                </div>
+              </div>
             </div>
 
-            <div className="min-w-0">
-              <div className="truncate text-[13px] font-semibold tracking-[-0.045em] text-white">
-                {profile?.name || 'КликБук'}
-              </div>
-              <div className="truncate text-[10px] font-semibold tracking-[-0.03em] text-white/35">
-                кабинет мастера
-              </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={onRefresh}
+                aria-label="Уведомления"
+                className="flex size-10 items-center justify-center rounded-[14px] border border-white/[0.085] bg-white/[0.055] text-white/52 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] active:scale-95"
+              >
+                <Bell className="size-[18px]" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setScreen('appearance')}
+                aria-label="Внешний вид"
+                className="flex size-10 items-center justify-center rounded-[14px] border border-white/[0.085] bg-white/[0.055] text-white/52 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] active:scale-95"
+              >
+                <Palette className="size-[18px]" />
+              </button>
+              <button
+                type="button"
+                onClick={closeMiniApp}
+                className="flex h-10 items-center rounded-[15px] border border-white/[0.085] bg-white/[0.055] px-4 text-[14px] font-semibold tracking-[-0.02em] text-white/52 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] active:scale-95"
+              >
+                Закрыть
+              </button>
+              <button
+                type="button"
+                onClick={() => setScreen('more')}
+                aria-label="Ещё"
+                className="flex size-10 items-center justify-center rounded-[14px] border border-white/[0.085] bg-white/[0.055] text-white/52 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)] active:scale-95"
+              >
+                <MoreHorizontal className="size-[18px]" />
+              </button>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={onRefresh}
-            className="flex size-8 items-center justify-center rounded-[11px] border border-white/[0.08] bg-white/[0.045] text-white/55 active:scale-95"
-          >
-            <RefreshCcw className="size-3.5" />
-          </button>
         </header>
 
         {children}
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-[430px] px-3 pb-[calc(var(--tg-safe-bottom,0px)+10px)]">
-        <div className="grid grid-cols-4 gap-1 rounded-[22px] border border-white/[0.10] bg-[#101010]/68 p-1.5 shadow-[0_-18px_54px_rgba(0,0,0,0.48)] backdrop-blur-[28px] backdrop-saturate-[1.35]">
+      <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-[430px] px-4 pb-[calc(var(--tg-safe-bottom,0px)+10px)]">
+        <div className="grid min-h-[70px] grid-cols-5 gap-1 rounded-[22px] border border-white/[0.095] bg-[#111113]/76 p-1.5 shadow-[0_-18px_44px_rgba(0,0,0,0.38)] backdrop-blur-[28px] backdrop-saturate-[1.35]">
           {navItems.map((item) => {
             const active =
               screen === item.id ||
               (item.id === 'more' &&
-                ['more', 'profile', 'services', 'analytics', 'appearance', 'settings', 'clients'].includes(screen));
+                ['more', 'profile', 'services', 'analytics', 'appearance', 'settings'].includes(screen));
 
             return (
               <button
@@ -854,20 +893,16 @@ function MiniShell({
                 type="button"
                 onClick={() => setScreen(item.id)}
                 className={cn(
-                  'flex h-12 flex-col items-center justify-center gap-1 rounded-[16px] text-[10px] font-semibold tracking-[-0.04em] transition active:scale-[0.98]',
+                  'flex h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-[16px] px-1 text-[10px] font-semibold tracking-[-0.04em] transition active:scale-[0.98]',
                   active
-                    ? 'bg-white/[0.08] text-white'
-                    : 'text-white/42 hover:bg-white/[0.04] hover:text-white/72',
+                    ? 'border border-white/[0.075] bg-white/[0.055] text-[var(--mini-accent)] shadow-[0_10px_24px_rgba(0,0,0,0.25)]'
+                    : 'border border-transparent text-white/34 hover:bg-white/[0.035] hover:text-white/62',
                 )}
               >
-                <span className={cn(active && 'text-[var(--mini-accent)]')}>{item.icon}</span>
-                {item.label}
-                {active ? (
-                  <span
-                    className="size-1 rounded-full"
-                    style={{ backgroundColor: 'var(--mini-accent)' }}
-                  />
-                ) : null}
+                <span className={cn(active ? 'text-[var(--mini-accent)] drop-shadow-[0_0_9px_var(--mini-accent-soft)]' : 'text-white/38')}>
+                  {item.icon}
+                </span>
+                <span className="max-w-full truncate">{item.label}</span>
               </button>
             );
           })}
