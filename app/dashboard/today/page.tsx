@@ -11,13 +11,11 @@ import {
 } from 'react';
 import { useTheme } from 'next-themes';
 import {
-  AlertCircle,
   Ban,
   CalendarClock,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Clock3,
   Globe2,
   MessageCircleMore,
   PhoneCall,
@@ -1685,7 +1683,6 @@ export default function DashboardTodayPage() {
     dataset,
     locale,
     workspaceData,
-    demoMode,
   } = useOwnedWorkspaceData();
   const { resolvedTheme } = useTheme();
   const { settings } = useAppearance();
@@ -1716,6 +1713,37 @@ export default function DashboardTodayPage() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedBookingId]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName?.toLowerCase();
+
+      if (tagName === 'input' || tagName === 'textarea' || target?.isContentEditable) return;
+
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        goPrevious();
+      }
+
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        goNext();
+      }
+
+      if (event.key.toLowerCase() === 't' || event.key.toLowerCase() === 'е') {
+        event.preventDefault();
+        goToday();
+      }
+
+      if (event.key === '1') setView('day');
+      if (event.key === '2') setView('week');
+      if (event.key === '3') setView('month');
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  });
 
   const currentTheme: ThemeMode = mounted
     ? resolvedTheme === 'light'
@@ -1777,7 +1805,6 @@ export default function DashboardTodayPage() {
     () => formatRangeTitle(view, selectedDate, locale),
     [locale, selectedDate, view],
   );
-  const selectedIso = useMemo(() => toLocalIsoDate(selectedDate), [selectedDate]);
   const metrics = useMemo(
     () => buildMetrics(visibleBookings, visiblePlans, todayIso, nowMinutes),
     [nowMinutes, todayIso, visibleBookings, visiblePlans],
@@ -2020,28 +2047,9 @@ export default function DashboardTodayPage() {
         <div className="mx-auto w-full max-w-[var(--page-max-width)]">
           <div className="mb-5 flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <MicroLabel light={isLight} active accentColor={accentColor}>
-                  <StatusDot light={isLight} active accentColor={accentColor} />
-                  {demoMode ? copy.demo : copy.live}
-                </MicroLabel>
-
-                <MicroLabel light={isLight}>
-                  <Clock3 className="size-3.5" />
-                  {formatTime(nowMinutes)}
-                </MicroLabel>
-
-                {availability.length === 0 ? (
-                  <MicroLabel light={isLight}>
-                    <AlertCircle className="size-3.5" />
-                    {locale === 'ru' ? 'график не заполнен' : 'availability empty'}
-                  </MicroLabel>
-                ) : null}
-              </div>
-
               <h1
                 className={cn(
-                  'mt-3 text-[28px] font-semibold tracking-[-0.075em] md:text-[36px]',
+                  'text-[28px] font-semibold tracking-[-0.075em] md:text-[36px]',
                   pageText(isLight),
                 )}
               >
@@ -2086,8 +2094,14 @@ export default function DashboardTodayPage() {
                   <ChevronLeft className="size-4" />
                 </button>
 
-                <button type="button" onClick={goToday} className={buttonBase(isLight)}>
-                  {copy.today}
+                <button
+                  type="button"
+                  onClick={goToday}
+                  className={iconButtonBase(isLight)}
+                  aria-label={locale === 'ru' ? 'Перейти к текущему периоду' : 'Go to current period'}
+                  title={locale === 'ru' ? 'Текущий период' : 'Current period'}
+                >
+                  <CalendarClock className="size-4" />
                 </button>
 
                 <button type="button" onClick={goNext} className={iconButtonBase(isLight)}>
@@ -2141,13 +2155,6 @@ export default function DashboardTodayPage() {
                 title={copy.calendar}
                 description={view === 'month' ? copy.monthHint : copy.calendarDescription}
                 light={isLight}
-                action={
-                  <MicroLabel light={isLight}>
-                    {view === 'day'
-                      ? selectedIso
-                      : `${metrics.busy}/${Math.max(1, metrics.slots)} · ${formatCurrencyCompact(metrics.revenue, locale)}`}
-                  </MicroLabel>
-                }
               />
 
               <div className="p-3 md:p-4">
