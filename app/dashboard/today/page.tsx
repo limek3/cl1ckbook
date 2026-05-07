@@ -30,6 +30,11 @@ import { useOwnedWorkspaceData } from '@/hooks/use-owned-workspace-data';
 import { useApp } from '@/lib/app-context';
 import { useAppearance } from '@/lib/appearance-context';
 import { accentPalette } from '@/lib/appearance-palette';
+import {
+  findAvailabilityDay,
+  normalizeAvailabilityDays,
+  type BookingAvailabilityDay,
+} from '@/lib/availability';
 import type { Booking, BookingStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -58,6 +63,15 @@ interface CalendarBooking {
 interface LaidOutBooking extends CalendarBooking {
   lane: number;
   laneCount: number;
+}
+
+interface TimeInterval {
+  start: number;
+  end: number;
+}
+
+interface SlotGuide extends TimeInterval {
+  label: string;
 }
 
 const AUTO_SERVICE_COLORS = [
@@ -234,6 +248,101 @@ function formatMinutesAsTime(totalMinutes: number) {
   const minutes = (normalized % 60).toString().padStart(2, '0');
 
   return `${hours}:${minutes}`;
+}
+
+function splitIntervalText(value: string) {
+  const normalized = value.replace(/—/g, '–').replace(/-/g, '–');
+  const [startRaw, endRaw] = normalized.split('–').map((item) => item.trim());
+
+  return {
+    start: startRaw || '',
+    end: endRaw || '',
+  };
+}
+
+function parseIntervalText(value: string): TimeInterval | null {
+  const { start, end } = splitIntervalText(value);
+  const startMinutes = parseTimeToMinutes(start);
+  const endMinutes = parseTimeToMinutes(end);
+
+  if (!start || !end || endMinutes <= startMinutes) return null;
+
+  return {
+    start: startMinutes,
+    end: endMinutes,
+  };
+}
+
+function getAvailabilityForDate(
+  availabilityDays: BookingAvailabilityDay[],
+  dateIso: string,
+) {
+  return findAvailabilityDay(availabilityDays, dateIso);
+}
+
+function getWorkIntervalsForDate(
+  availabilityDays: BookingAvailabilityDay[],
+  dateIso: string,
+): TimeInterval[] {
+  const day = getAvailabilityForDate(availabilityDays, dateIso);
+
+  if (!day) return [{ start: FALLBACK_START_HOUR * 60, end: FALLBACK_END_HOUR * 60 }];
+  if (day.status === 'day-off') return [];
+
+  const intervals = (day.slots ?? [])
+    .map(parseIntervalText)
+    .filter((item): item is TimeInterval => Boolean(item));
+
+  return intervals.length
+    ? intervals
+    : [{ start: FALLBACK_START_HOUR * 60, end: FALLBACK_END_HOUR * 60 }];
+}
+
+function getBreakIntervalsForDate(
+  availabilityDays: BookingAvailabilityDay[],
+  dateIso: string,
+): TimeInterval[] {
+  const day = getAvailabilityForDate(availabilityDays, dateIso);
+
+  if (!day || day.status === 'day-off') return [];
+
+  return (day.breaks ?? [])
+    .map(parseIntervalText)
+    .filter((item): item is TimeInterval => Boolean(item));
+}
+
+function buildSlotGuidesForDate(
+  availabilityDays: BookingAvailabilityDay[],
+  dateIso: string,
+): SlotGuide[] {
+  return getWorkIntervalsForDate(availabilityDays, dateIso).map((interval) => ({
+    ...interval,
+    label: `${formatMinutesAsTime(interval.start)}–${formatMinutesAsTime(interval.end)}`,
+  }));
+}
+
+function getAvailabilityRangeForDates(
+  dates: Date[],
+  availabilityDays: BookingAvailabilityDay[],
+) {
+  const intervals = dates.flatMap((date) =>
+    getWorkIntervalsForDate(availabilityDays, toLocalIsoDate(date)),
+  );
+
+  if (!intervals.length) return null;
+
+  return {
+    minStart: Math.min(...intervals.map((item) => item.start)),
+    maxEnd: Math.max(...intervals.map((item) => item.end)),
+  };
+}
+
+function intervalTop(interval: TimeInterval, offset: number) {
+  return ((interval.start - offset) / 60) * HOUR_HEIGHT;
+}
+
+function intervalHeight(interval: TimeInterval) {
+  return Math.max(8, ((interval.end - interval.start) / 60) * HOUR_HEIGHT);
 }
 
 function formatCompactDate(date: Date, locale: 'ru' | 'en') {
@@ -473,17 +582,27 @@ function getVisibleDates(view: CalendarView, selectedDate: Date) {
   return Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
 }
 
-function getHoursRange(items: CalendarBooking[]) {
-  if (!items.length) {
+function getHoursRange(
+  items: CalendarBooking[],
+  dates: Date[],
+  availabilityDays: BookingAvailabilityDay[],
+) {
+  const availabilityRange = getAvailabilityRangeForDates(dates, availabilityDays);
+  const values = [
+    ...(availabilityRange ? [availabilityRange.minStart, availabilityRange.maxEnd] : []),
+    ...items.flatMap((item) => [item.startMinutes, item.endMinutes]),
+  ];
+
+  if (!values.length) {
     return { startHour: FALLBACK_START_HOUR, endHour: FALLBACK_END_HOUR };
   }
 
-  const minStart = Math.min(...items.map((item) => item.startMinutes));
-  const maxEnd = Math.max(...items.map((item) => item.endMinutes));
+  const minStart = Math.min(...values);
+  const maxEnd = Math.max(...values);
 
   return {
-    startHour: Math.max(0, Math.min(FALLBACK_START_HOUR, Math.floor(minStart / 60))),
-    endHour: Math.min(24, Math.max(FALLBACK_END_HOUR, Math.ceil(maxEnd / 60))),
+    startHour: Math.max(0, Math.floor(minStart / 60)),
+    endHour: Math.min(24, Math.max(Math.ceil(maxEnd / 60), Math.floor(minStart / 60) + 1)),
   };
 }
 
@@ -904,6 +1023,71 @@ function TimeGrid({
   );
 }
 
+function SlotBackground({
+  slots,
+  breaks,
+  offset,
+  light,
+  compact,
+}: {
+  slots: SlotGuide[];
+  breaks: TimeInterval[];
+  offset: number;
+  light: boolean;
+  compact?: boolean;
+}) {
+  return (
+    <div className="pointer-events-none absolute inset-0">
+      {slots.map((slot, index) => {
+        const top = intervalTop(slot, offset);
+        const height = intervalHeight(slot);
+
+        return (
+          <div
+            key={`${slot.start}-${slot.end}-${index}`}
+            className={cn(
+              'absolute left-0 right-0 rounded-[8px] border',
+              light
+                ? 'border-black/[0.035] bg-white/60'
+                : 'border-white/[0.035] bg-white/[0.025]',
+            )}
+            style={{ top, height: Math.max(compact ? 16 : 20, height - 3) }}
+          >
+            {!compact && height >= 34 ? (
+              <span
+                className={cn(
+                  'absolute right-2 top-1 text-[9px] font-medium tabular-nums',
+                  light ? 'text-black/24' : 'text-white/22',
+                )}
+              >
+                {slot.label}
+              </span>
+            ) : null}
+          </div>
+        );
+      })}
+
+      {breaks.map((item, index) => {
+        const top = intervalTop(item, offset);
+        const height = intervalHeight(item);
+
+        return (
+          <div
+            key={`break-${item.start}-${item.end}-${index}`}
+            className={cn(
+              'absolute left-1 right-1 rounded-[8px] border border-dashed',
+              light
+                ? 'border-black/[0.08] bg-black/[0.025]'
+                : 'border-white/[0.08] bg-black/20',
+            )}
+            style={{ top, height: Math.max(12, height - 3) }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 function BookingBlock({
   booking,
   top,
@@ -1003,6 +1187,7 @@ function DayCalendar({
   todayIso,
   startHour,
   endHour,
+  availabilityDays,
   light,
   locale,
   onSelect,
@@ -1014,6 +1199,7 @@ function DayCalendar({
   todayIso: string;
   startHour: number;
   endHour: number;
+  availabilityDays: BookingAvailabilityDay[];
   light: boolean;
   locale: 'ru' | 'en';
   onSelect: (booking: CalendarBooking) => void;
@@ -1022,6 +1208,15 @@ function DayCalendar({
   const dayItems = useMemo(
     () => layoutOverlaps(items.filter((item) => item.date === iso)),
     [iso, items],
+  );
+
+  const slotGuides = useMemo(
+    () => buildSlotGuidesForDate(availabilityDays, iso),
+    [availabilityDays, iso],
+  );
+  const breakGuides = useMemo(
+    () => getBreakIntervalsForDate(availabilityDays, iso),
+    [availabilityDays, iso],
   );
 
   const height = (endHour - startHour) * HOUR_HEIGHT;
@@ -1040,9 +1235,13 @@ function DayCalendar({
               ? locale === 'ru'
                 ? `${dayItems.length} записей`
                 : `${dayItems.length} bookings`
-              : locale === 'ru'
-                ? 'свободный день'
-                : 'free day'}
+              : slotGuides.length
+                ? locale === 'ru'
+                  ? `${slotGuides.length} слотов`
+                  : `${slotGuides.length} slots`
+                : locale === 'ru'
+                  ? 'выходной'
+                  : 'day off'}
           </div>
         </div>
         <MicroLabel light={light}>
@@ -1055,6 +1254,12 @@ function DayCalendar({
         <div className="min-w-[680px] px-4 pb-4 pl-[82px] pr-3 pt-3 md:px-5 md:pl-[88px]">
           <div className="relative" style={{ height }}>
             <TimeGrid startHour={startHour} endHour={endHour} light={light} />
+            <SlotBackground
+              slots={slotGuides}
+              breaks={breakGuides}
+              offset={offset}
+              light={light}
+            />
 
             {showNow ? (
               <div
@@ -1115,6 +1320,7 @@ function WeekCalendar({
   todayIso,
   startHour,
   endHour,
+  availabilityDays,
   light,
   locale,
   onSelect,
@@ -1127,6 +1333,7 @@ function WeekCalendar({
   todayIso: string;
   startHour: number;
   endHour: number;
+  availabilityDays: BookingAvailabilityDay[];
   light: boolean;
   locale: 'ru' | 'en';
   onSelect: (booking: CalendarBooking) => void;
@@ -1169,6 +1376,7 @@ function WeekCalendar({
               const iso = toLocalIsoDate(date);
               const isToday = iso === todayIso;
               const count = itemsByDate.get(iso)?.length ?? 0;
+              const slotCount = buildSlotGuidesForDate(availabilityDays, iso).length;
 
               return (
                 <button
@@ -1209,7 +1417,11 @@ function WeekCalendar({
                       ? locale === 'ru'
                         ? `${count} зап.`
                         : `${count} bk.`
-                      : '—'}
+                      : slotCount
+                        ? locale === 'ru'
+                          ? `${slotCount} сл.`
+                          : `${slotCount} sl.`
+                        : '—'}
                   </div>
                 </button>
               );
@@ -1245,6 +1457,8 @@ function WeekCalendar({
             {days.map((date) => {
               const iso = toLocalIsoDate(date);
               const dayItems = layoutOverlaps(itemsByDate.get(iso) ?? []);
+              const slotGuides = buildSlotGuidesForDate(availabilityDays, iso);
+              const breakGuides = getBreakIntervalsForDate(availabilityDays, iso);
               const showNow =
                 iso === todayIso && nowMinutes >= offset && nowMinutes <= endHour * 60;
 
@@ -1261,6 +1475,14 @@ function WeekCalendar({
                       style={{ top: index * HOUR_HEIGHT }}
                     />
                   ))}
+
+                  <SlotBackground
+                    slots={slotGuides}
+                    breaks={breakGuides}
+                    offset={offset}
+                    light={light}
+                    compact
+                  />
 
                   {showNow ? (
                     <div
@@ -1306,6 +1528,7 @@ function MonthCalendar({
   selectedDate,
   selectedId,
   todayIso,
+  availabilityDays,
   light,
   locale,
   onSelect,
@@ -1315,6 +1538,7 @@ function MonthCalendar({
   selectedDate: Date;
   selectedId: string | null;
   todayIso: string;
+  availabilityDays: BookingAvailabilityDay[];
   light: boolean;
   locale: 'ru' | 'en';
   onSelect: (booking: CalendarBooking) => void;
@@ -1359,6 +1583,8 @@ function MonthCalendar({
           const dayItems = itemsByDate.get(iso) ?? [];
           const inMonth = iso.startsWith(monthKey);
           const isToday = iso === todayIso;
+          const slotGuides = buildSlotGuidesForDate(availabilityDays, iso);
+          const isDayOff = slotGuides.length === 0;
 
           return (
             <button
@@ -1369,9 +1595,13 @@ function MonthCalendar({
                 'min-h-[112px] border-r border-t p-2 text-left transition-colors last:border-r-0',
                 borderTone(light),
                 inMonth
-                  ? light
-                    ? 'bg-white/50 hover:bg-black/[0.018]'
-                    : 'bg-white/[0.018] hover:bg-white/[0.032]'
+                  ? isDayOff
+                    ? light
+                      ? 'bg-black/[0.018] hover:bg-black/[0.026]'
+                      : 'bg-white/[0.01] hover:bg-white/[0.02]'
+                    : light
+                      ? 'bg-white/50 hover:bg-black/[0.018]'
+                      : 'bg-white/[0.018] hover:bg-white/[0.032]'
                   : light
                     ? 'bg-black/[0.018] text-black/32'
                     : 'bg-white/[0.012] text-white/28',
@@ -1395,6 +1625,18 @@ function MonthCalendar({
                     {dayItems.length}
                   </span>
                 ) : null}
+              </div>
+
+              <div className="mb-1.5 flex h-1.5 gap-0.5 overflow-hidden rounded-full">
+                {slotGuides.slice(0, 5).map((slot) => (
+                  <span
+                    key={`${slot.start}-${slot.end}`}
+                    className={cn(
+                      'h-full flex-1 rounded-full',
+                      light ? 'bg-black/[0.12]' : 'bg-white/[0.14]',
+                    )}
+                  />
+                ))}
               </div>
 
               <div className="space-y-1">
@@ -1659,6 +1901,11 @@ export default function DashboardTodayPage() {
     [dataset?.services, workspaceData?.services],
   );
 
+  const availabilityDays = useMemo(
+    () => normalizeAvailabilityDays(workspaceData?.availability),
+    [workspaceData?.availability],
+  );
+
   const calendarBookings = useMemo(
     () =>
       bookings
@@ -1681,8 +1928,13 @@ export default function DashboardTodayPage() {
   );
 
   const calendarWorkRange = useMemo(
-    () => getHoursRange(view === 'month' ? calendarBookings : visibleBookings),
-    [calendarBookings, view, visibleBookings],
+    () =>
+      getHoursRange(
+        view === 'month' ? calendarBookings : visibleBookings,
+        view === 'month' ? getVisibleDates('month', selectedDate) : visibleDates,
+        availabilityDays,
+      ),
+    [availabilityDays, calendarBookings, selectedDate, view, visibleBookings, visibleDates],
   );
 
   const selectedBooking = useMemo(
@@ -2095,6 +2347,7 @@ export default function DashboardTodayPage() {
                     todayIso={todayIso}
                     startHour={calendarWorkRange.startHour}
                     endHour={calendarWorkRange.endHour}
+                    availabilityDays={availabilityDays}
                     light={isLight}
                     locale={locale}
                     onSelect={handleSelectBooking}
@@ -2110,6 +2363,7 @@ export default function DashboardTodayPage() {
                     todayIso={todayIso}
                     startHour={calendarWorkRange.startHour}
                     endHour={calendarWorkRange.endHour}
+                    availabilityDays={availabilityDays}
                     light={isLight}
                     locale={locale}
                     onSelect={handleSelectBooking}
@@ -2123,6 +2377,7 @@ export default function DashboardTodayPage() {
                     selectedDate={selectedDate}
                     selectedId={selectedBookingId}
                     todayIso={todayIso}
+                    availabilityDays={availabilityDays}
                     light={isLight}
                     locale={locale}
                     onSelect={handleSelectBooking}
