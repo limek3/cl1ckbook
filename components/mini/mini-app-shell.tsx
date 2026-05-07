@@ -76,27 +76,21 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
 
 function miniGlass(mode: ThemeMode, edge: 'top' | 'bottom' = 'top'): CSSProperties {
   const dark = mode === 'dark';
-  const verticalFade = edge === 'bottom' ? 'to top' : 'to bottom';
-
   return {
-    backgroundColor: dark ? 'rgba(12,12,14,0.72)' : 'rgba(248,248,252,0.78)',
-    backgroundImage: dark
-      ? `linear-gradient(${verticalFade}, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.01) 100%)`
-      : `linear-gradient(${verticalFade}, rgba(255,255,255,0.88) 0%, rgba(255,255,255,0.38) 100%)`,
-    backdropFilter: 'blur(28px) saturate(1.9) brightness(1.04)',
-    WebkitBackdropFilter: 'blur(28px) saturate(1.9) brightness(1.04)',
+    backgroundColor: dark ? 'rgba(10,10,13,0.86)' : 'rgba(250,250,254,0.86)',
+    backdropFilter: 'blur(44px) saturate(2.4) brightness(0.97)',
+    WebkitBackdropFilter: 'blur(44px) saturate(2.4) brightness(0.97)',
     boxShadow: edge === 'top'
-      ? (dark ? '0 1px 0 rgba(255,255,255,0.06), 0 4px 24px rgba(0,0,0,0.32)' : '0 1px 0 rgba(255,255,255,0.9), 0 4px 24px rgba(0,0,0,0.08)')
-      : (dark ? '0 -1px 0 rgba(255,255,255,0.06), 0 -8px 32px rgba(0,0,0,0.36)' : '0 -1px 0 rgba(255,255,255,0.9), 0 -8px 32px rgba(0,0,0,0.06)'),
+      ? (dark
+        ? 'inset 0 -1px 0 rgba(255,255,255,0.07), 0 12px 48px rgba(0,0,0,0.52)'
+        : 'inset 0 -1px 0 rgba(0,0,0,0.06), 0 12px 48px rgba(0,0,0,0.07)')
+      : (dark
+        ? 'inset 0 1px 0 rgba(255,255,255,0.07), 0 -24px 64px rgba(0,0,0,0.56)'
+        : 'inset 0 1px 0 rgba(0,0,0,0.06), 0 -24px 64px rgba(0,0,0,0.05)'),
     transform: 'translate3d(0,0,0)',
     willChange: 'backdrop-filter',
     isolation: 'isolate',
-    overflow: 'hidden',
   };
-}
-
-function glassBorder(mode: ThemeMode) {
-  return mode === 'dark' ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.07)';
 }
 
 interface SubRoute {
@@ -111,42 +105,43 @@ function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) 
   return (
     <div style={{
       ...miniGlass(mode, 'bottom'),
-      borderTop: `1px solid ${glassBorder(mode)}`,
-      paddingTop: 8,
-      paddingLeft: 8,
-      paddingRight: 8,
-      paddingBottom: 'calc(10px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
-      display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 0,
+      paddingTop: 10,
+      paddingLeft: 4,
+      paddingRight: 4,
+      paddingBottom: 'calc(12px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
+      display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)',
       flexShrink: 0,
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      bottom: 0,
       zIndex: 80,
     }}>
       {TABS.map((t) => {
         const isActive = active === t.id;
         return (
           <button key={t.id} onClick={() => { haptic('light'); onChange(t.id); }} style={{
-            background: 'transparent', border: 'none', cursor: 'pointer',
-            padding: '6px 4px 4px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-            color: isActive ? T.accent : T.text3, fontFamily: 'inherit',
-            transition: 'transform 0.13s ease, color 0.16s ease',
+            background: 'none', border: 'none', cursor: 'pointer',
+            padding: '0 2px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+            fontFamily: 'inherit',
             WebkitTapHighlightColor: 'transparent',
-            position: 'relative',
+            transition: 'opacity 0.12s ease',
           }}>
             <div style={{
-              width: 40, height: 28, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 44, height: 30, borderRadius: 12,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: isActive
-                ? (dark ? 'rgba(18,125,254,0.16)' : 'rgba(18,125,254,0.10)')
+                ? (dark ? 'rgba(18,125,254,0.18)' : 'rgba(18,125,254,0.11)')
                 : 'transparent',
-              transition: 'background 0.18s ease',
+              transition: 'background 0.22s cubic-bezier(.2,.8,.2,1)',
+              color: isActive ? T.accent : T.text3,
+              filter: isActive ? `drop-shadow(0 0 7px ${T.accent}60)` : 'none',
+              transitionProperty: 'background, filter, color',
             }}>
-              <Icon name={t.icon} size={20} stroke={isActive ? 2 : 1.5} />
+              <Icon name={t.icon} size={19} stroke={isActive ? 2.1 : 1.5} />
             </div>
             <span style={{
-              fontSize: 10, fontWeight: isActive ? 600 : 400, letterSpacing: '-0.01em',
-              transition: 'font-weight 0.16s ease',
+              fontSize: 10, lineHeight: 1,
+              fontWeight: isActive ? 600 : 400,
+              color: isActive ? T.accent : T.text3,
+              letterSpacing: isActive ? '-0.02em' : '0em',
+              transition: 'color 0.22s ease, font-weight 0.22s ease',
             }}>{t.label}</span>
           </button>
         );
@@ -159,75 +154,67 @@ function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) 
 function TgHeader({ onToggleTheme, onNotifications, notificationCount = 0 }: { onToggleTheme: () => void; onNotifications: () => void; notificationCount?: number }) {
   const { T, mode } = useTheme();
   const dark = mode === 'dark';
-  const btnBg = dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)';
-  const btnBorder = dark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)';
+  const iconBtn: CSSProperties = {
+    width: 34, height: 34,
+    background: dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.04)',
+    border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
+    borderRadius: 11, cursor: 'pointer', color: T.text2, padding: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  };
   return (
     <div style={{
       ...miniGlass(mode, 'top'),
       flexShrink: 0,
       paddingTop: 'calc(var(--miniapp-header-top-offset, 12px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))))',
       paddingLeft: 16,
-      paddingRight: 12,
-      paddingBottom: 10,
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      borderBottom: `1px solid ${glassBorder(mode)}`,
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      top: 0,
+      paddingRight: 14,
+      paddingBottom: 11,
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
       zIndex: 80,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      {/* Logo */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
         <div style={{
-          width: 32, height: 32, borderRadius: 10,
-          background: dark ? 'rgba(18,125,254,0.22)' : 'rgba(18,125,254,0.12)',
-          border: `1px solid ${dark ? 'rgba(18,125,254,0.35)' : 'rgba(18,125,254,0.20)'}`,
+          width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+          background: `linear-gradient(135deg, ${T.accent} 0%, #0a5fd4 100%)`,
+          boxShadow: `0 2px 12px ${T.accent}55`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 13, color: T.accent, fontWeight: 700, letterSpacing: '-0.02em',
+          fontSize: 13, color: '#fff', fontWeight: 800, letterSpacing: '-0.03em',
         }}>К</div>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: T.text, lineHeight: 1.15, letterSpacing: '-0.025em' }}>КликБук</div>
-          <div style={{ fontSize: 10, color: T.text3, marginTop: 1, letterSpacing: '0.01em' }}>mini app</div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: T.text, lineHeight: 1.1, letterSpacing: '-0.03em' }}>КликБук</div>
+          <div style={{ fontSize: 10, color: T.text3, marginTop: 1, letterSpacing: '0.02em', textTransform: 'uppercase' }}>mini app</div>
         </div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <button onClick={() => { haptic('light'); onNotifications(); }} aria-label="notifications" style={{
-          width: 34, height: 34,
-          background: btnBg,
-          border: `1px solid ${btnBorder}`,
-          borderRadius: 12, cursor: 'pointer', color: T.text2, padding: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
-          transition: 'background 0.14s ease',
-        }}>
+      {/* Actions */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+        <button onClick={() => { haptic('light'); onNotifications(); }} aria-label="notifications" style={{ ...iconBtn, position: 'relative' }}>
           <Icon name="bell" size={16} />
           {notificationCount > 0 && (
-            <span style={{
-              position: 'absolute', top: -4, right: -4, minWidth: 17, height: 17,
-              padding: '0 4px', borderRadius: 999, background: T.danger, color: '#fff',
-              border: `2px solid ${T.bg}`, fontSize: 9, fontWeight: 700,
+            <span className="notif-badge" style={{
+              position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16,
+              padding: '0 4px', borderRadius: 999,
+              background: T.danger, color: '#fff',
+              border: `2px solid ${T.bg}`,
+              fontSize: 8, fontWeight: 800,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontVariantNumeric: 'tabular-nums',
+              boxShadow: `0 2px 8px ${T.danger}66`,
             }}>{notificationCount > 9 ? '9+' : notificationCount}</span>
           )}
         </button>
-        <button onClick={onToggleTheme} aria-label="theme" style={{
-          width: 34, height: 34,
-          background: btnBg,
-          border: `1px solid ${btnBorder}`,
-          borderRadius: 12, cursor: 'pointer',
-          color: T.text2, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          transition: 'background 0.14s ease',
-        }}><Icon name={mode === 'dark' ? 'sun' : 'moon'} size={16} /></button>
+        <button onClick={onToggleTheme} aria-label="theme" style={iconBtn}>
+          <Icon name={mode === 'dark' ? 'sun' : 'moon'} size={15} />
+        </button>
         <button onClick={tgClose} style={{
-          background: btnBg,
-          border: `1px solid ${btnBorder}`,
-          borderRadius: 12,
-          color: T.text2, cursor: 'pointer',
-          paddingLeft: 12, paddingRight: 12,
           height: 34,
-          fontSize: 13, fontFamily: 'inherit', fontWeight: 500,
-          display: 'flex', alignItems: 'center',
-          transition: 'background 0.14s ease',
+          paddingLeft: 13, paddingRight: 13,
+          background: dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.04)',
+          border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
+          borderRadius: 11, cursor: 'pointer',
+          color: T.text2, fontSize: 13, fontFamily: 'inherit', fontWeight: 500,
+          display: 'flex', alignItems: 'center', letterSpacing: '-0.01em',
           whiteSpace: 'nowrap',
         }}>Закрыть</button>
       </div>
@@ -401,7 +388,10 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
         position: 'relative',
       } as CSSProperties}>
         <style>{`
-          .cb-miniapp, .cb-miniapp * { -webkit-tap-highlight-color: transparent; }
+          .cb-miniapp, .cb-miniapp * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+          .cb-miniapp button:active { opacity: 0.7; transform: scale(0.94); }
+          @keyframes badge-pop { 0% { transform: scale(0); } 70% { transform: scale(1.25); } 100% { transform: scale(1); } }
+          .cb-miniapp .notif-badge { animation: badge-pop 0.28s cubic-bezier(.2,.8,.2,1) both; }
           .cb-miniapp input, .cb-miniapp textarea, .cb-miniapp select {
             -webkit-appearance: none !important; appearance: none !important;
             background: var(--mini-input-bg, #0d0d0d) !important;
@@ -455,11 +445,10 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
           <div
             style={{
               flex: 1,
+              minHeight: 0,
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
-              position: 'relative',
-              paddingTop: 'calc(var(--miniapp-header-top-offset, 12px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 58px)',
             }}
           >
             {content}
@@ -470,12 +459,9 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
             className="scroll-area"
             style={{
               flex: 1,
+              minHeight: 0,
               overflowY: 'auto',
               overflowX: 'hidden',
-              position: 'relative',
-              paddingTop: 'calc(var(--miniapp-header-top-offset, 12px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 58px)',
-              paddingBottom: 'calc(88px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
-              scrollPaddingTop: 'calc(var(--miniapp-header-top-offset, 12px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 58px)',
             }}
           >
             {content}
