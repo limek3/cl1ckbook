@@ -108,17 +108,16 @@ function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) 
   return (
     <div
       style={{
-        position: 'sticky',
-        bottom: 0,
+        flexShrink: 0,
         zIndex: 80,
-        padding: '6px 10px calc(18px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
+        padding: '8px 10px calc(12px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
         background: 'transparent',
         pointerEvents: 'auto',
       }}
     >
       <div
         style={{
-          ...miniGlass(mode, 'top'),
+          ...miniGlass(mode, 'bottom'),
           minHeight: 58,
           borderRadius: 20,
           padding: 5,
@@ -223,10 +222,9 @@ function TgHeader({
   return (
     <div
       style={{
-        position: 'sticky',
-        top: 0,
+        flexShrink: 0,
         zIndex: 80,
-        padding: 'calc(var(--miniapp-header-top-offset, 10px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px)))) 10px 10px',
+        padding: 'calc(var(--miniapp-header-top-offset, 10px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px)))) 10px 8px',
         background: 'transparent',
         pointerEvents: 'auto',
       }}
@@ -379,14 +377,20 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
 
     const applyViewport = () => {
       try { tg?.ready?.(); tg?.expand?.(); } catch {}
-      const topInset = Number(tg?.contentSafeAreaInset?.top ?? tg?.safeAreaInset?.top ?? 0);
-      const bottomInset = Number(tg?.contentSafeAreaInset?.bottom ?? tg?.safeAreaInset?.bottom ?? 0);
+      const tgContentTop = Number(tg?.contentSafeAreaInset?.top ?? 0);
+      const tgContentBottom = Number(tg?.contentSafeAreaInset?.bottom ?? 0);
+      const tgSafeTop = Number(tg?.safeAreaInset?.top ?? 0);
+      const tgSafeBottom = Number(tg?.safeAreaInset?.bottom ?? 0);
+      const topInset = Math.max(Number.isFinite(tgContentTop) ? tgContentTop : 0, Number.isFinite(tgSafeTop) ? tgSafeTop : 0);
+      const bottomInset = Math.max(Number.isFinite(tgContentBottom) ? tgContentBottom : 0, Number.isFinite(tgSafeBottom) ? tgSafeBottom : 0);
       const viewportHeight = Number(tg?.viewportStableHeight ?? tg?.viewportHeight ?? window.innerHeight);
       const isTelegramRuntime = Boolean(tg);
+      const hasContentSafeArea = tgContentTop > 0;
+      const headerOffset = isTelegramRuntime ? (hasContentSafeArea ? 8 : 56) : 14;
 
-      document.documentElement.style.setProperty('--miniapp-header-top-offset', isTelegramRuntime ? '54px' : '22px');
-      if (Number.isFinite(topInset)) document.documentElement.style.setProperty('--miniapp-safe-top', `${Math.max(0, Math.round(topInset))}px`);
-      if (Number.isFinite(bottomInset)) document.documentElement.style.setProperty('--miniapp-safe-bottom', `${Math.max(0, Math.round(bottomInset))}px`);
+      document.documentElement.style.setProperty('--miniapp-header-top-offset', `${headerOffset}px`);
+      document.documentElement.style.setProperty('--miniapp-safe-top', `${Math.max(0, Math.round(topInset))}px`);
+      document.documentElement.style.setProperty('--miniapp-safe-bottom', `${Math.max(0, Math.round(bottomInset))}px`);
       if (Number.isFinite(viewportHeight) && viewportHeight > 0) {
         document.documentElement.style.setProperty('--miniapp-viewport-height', `${Math.round(viewportHeight)}px`);
       }
@@ -550,42 +554,41 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
           .cb-miniapp ::placeholder { color: ${T.text3}; opacity: 1; }
           .cb-miniapp { --miniapp-accent: ${T.accent}; }
         `}</style>
+        <TgHeader master={MASTER} onToggleTheme={toggle} onNotifications={() => setSub({ kind: 'notifications' })} notificationCount={notificationCount} />
         {isFullHeight ? (
-          <>
-            <TgHeader master={MASTER} onToggleTheme={toggle} onNotifications={() => setSub({ kind: 'notifications' })} notificationCount={notificationCount} />
-            <div
-              style={{
-                flex: 1,
-                minHeight: 0,
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-              }}
-            >
-              {content}
-            </div>
-          </>
-        ) : (
           <div
-            ref={scrollRef}
-            className="scroll-area"
             style={{
               flex: 1,
               minHeight: 0,
-              overflowY: 'auto',
-              overflowX: 'hidden',
-              overscrollBehavior: 'contain',
+              overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
             }}
           >
-            <TgHeader master={MASTER} onToggleTheme={toggle} onNotifications={() => setSub({ kind: 'notifications' })} notificationCount={notificationCount} />
-            <div style={{ flex: '1 0 auto', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-              {content}
-              <div aria-hidden style={{ height: 8, flexShrink: 0 }} />
+            {content}
+          </div>
+        ) : (
+          <>
+            <div
+              ref={scrollRef}
+              className="scroll-area"
+              style={{
+                flex: 1,
+                minHeight: 0,
+                overflowY: 'auto',
+                overflowX: 'hidden',
+                overscrollBehavior: 'contain',
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
+              <div style={{ flex: '1 0 auto', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+                {content}
+                <div aria-hidden style={{ height: 8, flexShrink: 0 }} />
+              </div>
             </div>
             <BottomNav active={tab} onChange={(id) => { setTab(id); setSub(null); }} />
-          </div>
+          </>
         )}
         <ToastHost items={toasts} />
       </div>
