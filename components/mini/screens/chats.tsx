@@ -322,7 +322,6 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
         {thread.phone ? (
           <a href={`tel:${thread.phone}`} style={{ display: 'flex', color: T.text2, textDecoration: 'none' }}><NavBtn icon="phone" /></a>
         ) : <NavBtn icon="phone" />}
-        <MiniIconButton active={showReschedule} icon="calendar-clock" onClick={() => setShowReschedule(true)} />
         <MiniIconButton active={showInfo} icon="info" onClick={() => setShowInfo((v) => !v)} />
         <MiniIconButton icon="trash-2" danger onClick={() => setShowDeleteConfirm(true)} />
       </div>
@@ -364,8 +363,9 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
         zIndex: 50,
       }}>
         <button
-          onClick={() => { haptic('light'); setShowTemplates((value) => !value); }}
+          onClick={() => { haptic('light'); setShowReschedule(false); setShowTemplates((value) => !value); }}
           title="Быстрые ответы"
+          aria-label="Быстрые ответы"
           style={{
             width: 40, height: 40, borderRadius: 13, flexShrink: 0,
             background: showTemplates ? T.accent : T.cardElev,
@@ -373,10 +373,27 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
             color: showTemplates ? '#fff' : T.text2,
             cursor: 'pointer', padding: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'background 0.15s ease, border-color 0.15s ease, color 0.15s ease',
+            transition: 'background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.12s ease',
           }}
         >
           <Icon name="zap" size={16} />
+        </button>
+
+        <button
+          onClick={() => { haptic('light'); setShowTemplates(false); setShowReschedule((value) => !value); }}
+          title="Организовать перенос"
+          aria-label="Организовать перенос"
+          style={{
+            width: 40, height: 40, borderRadius: 13, flexShrink: 0,
+            background: showReschedule ? T.accent : T.cardElev,
+            border: `1px solid ${showReschedule ? T.accent : T.border}`,
+            color: showReschedule ? '#fff' : T.text2,
+            cursor: 'pointer', padding: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.12s ease',
+          }}
+        >
+          <Icon name="calendar-clock" size={16} color={showReschedule ? '#fff' : T.text2} />
         </button>
 
         <div style={{
