@@ -926,6 +926,8 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
+              paddingTop: 'calc(54px + var(--miniapp-safe-top, var(--tg-content-safe-top, 0px)))',
+              background: T.bg,
             }}
           >
             {content}
