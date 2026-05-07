@@ -6,7 +6,7 @@ import {
   Avatar, Card, ChannelTag, Divider, EmptyState, Icon, NavBtn, ScreenHeader, SearchBox,
 } from '../primitives/atoms';
 import { MiniBottomSheet } from '../primitives/mini-bottom-sheet';
-import { haptic, selectionHaptic } from '../bridge';
+import { haptic, selectionHaptic, useMiniToast } from '../bridge';
 import type { Message, Thread } from '@/lib/mini-demo';
 import { useChats } from '@/hooks/use-chats';
 import { useMiniData } from '@/hooks/use-mini-data';
@@ -30,6 +30,31 @@ const FALLBACK_TEMPLATES = [
   { id: 'thanks', name: 'Благодарность', body: 'Спасибо за визит, {{имя}}! Буду рада вас снова.' },
   { id: 'reschedule', name: 'Перенос', body: 'Здравствуйте, {{имя}}. Нам нужно перенести встречу. Когда вам удобно?' },
 ];
+
+function localIsoDate(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function dateWithOffset(days: number) {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() + days);
+  return localIsoDate(date);
+}
+
+function formatHumanDate(dateIso: string) {
+  const date = new Date(`${dateIso}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return dateIso;
+  return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+}
+
+function defaultRescheduleDate(thread: Thread) {
+  return thread.bookingDate || thread.nextVisit || dateWithOffset(1);
+}
+
+function defaultRescheduleTime(thread: Thread) {
+  return thread.bookingTime || '12:30';
+}
 
 export function ChatsScreen({ openThread, back }: { openThread: (t: Thread) => void; back?: () => void }) {
   const { threads, loading } = useChats();
@@ -184,6 +209,7 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
   const { T, mode } = useTheme();
   const { threads, markRead, sendMessage, deleteThread } = useChats();
   const { TEMPLATES: workspaceTemplates } = useMiniData();
+  const { show } = useMiniToast();
 
   const thread = threads.find((t) => String(t.id) === String(threadProp.id)) ?? threadProp;
   const messages: Message[] = thread.messages ?? [];
@@ -192,13 +218,23 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
   const [draft, setDraft] = useState('');
   const [showTemplates, setShowTemplates] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  const [showReschedule, setShowReschedule] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState(() => defaultRescheduleDate(thread));
+  const [rescheduleTime, setRescheduleTime] = useState(() => defaultRescheduleTime(thread));
+  const [rescheduleNote, setRescheduleNote] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (thread.unread > 0) markRead(thread.id);
-  }, [thread.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [thread.id, thread.unread, markRead]);
+
+  useEffect(() => {
+    setRescheduleDate(defaultRescheduleDate(thread));
+    setRescheduleTime(defaultRescheduleTime(thread));
+    setRescheduleNote('');
+  }, [thread.id, thread.bookingDate, thread.bookingTime, thread.nextVisit]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -231,6 +267,39 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
     back();
   }
 
+  async function handleProposeReschedule() {
+    const date = rescheduleDate.trim();
+    const time = rescheduleTime.trim() || '12:30';
+    if (!date) {
+      show('Выбери дату переноса', 'error');
+      return;
+    }
+
+    const firstName = thread.name.split(' ')[0] ?? thread.name;
+    const dateLabel = formatHumanDate(date);
+    const note = rescheduleNote.trim();
+    const text = [
+      `Здравствуйте, ${firstName}!`,
+      '',
+      `Предлагаю перенести запись${thread.bookingService ? ` «${thread.bookingService}»` : ''} на ${dateLabel} в ${time}.`,
+      note ? `Причина: ${note}` : '',
+      '',
+      'Если время подходит — нажмите «Подтвердить перенос». Если нет — напишите удобное время.',
+    ].filter(Boolean).join('\n');
+
+    haptic('medium');
+    setShowReschedule(false);
+    setShowTemplates(false);
+    await sendMessage(thread.id, text, {
+      bookingId: thread.bookingId ?? undefined,
+      rescheduleProposal: thread.bookingId ? { date, time } : undefined,
+      viaBot: true,
+      deliveryState: 'queued',
+    });
+    markRead(thread.id);
+    show(thread.bookingId ? 'Перенос отправлен с кнопками подтверждения' : 'Сообщение о переносе отправлено', 'success');
+  }
+
   const nextVisitLabel = thread.nextVisit
     ? new Date(`${thread.nextVisit}T00:00:00`).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
     : null;
@@ -253,6 +322,7 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
         {thread.phone ? (
           <a href={`tel:${thread.phone}`} style={{ display: 'flex', color: T.text2, textDecoration: 'none' }}><NavBtn icon="phone" /></a>
         ) : <NavBtn icon="phone" />}
+        <MiniIconButton active={showReschedule} icon="calendar-clock" onClick={() => setShowReschedule(true)} />
         <MiniIconButton active={showInfo} icon="info" onClick={() => setShowInfo((v) => !v)} />
         <MiniIconButton icon="trash-2" danger onClick={() => setShowDeleteConfirm(true)} />
       </div>
@@ -405,6 +475,84 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
         </div>
       </MiniBottomSheet>
 
+      <MiniBottomSheet open={showReschedule} onClose={() => setShowReschedule(false)} maxHeight="min(72vh, 520px)" tail={false}>
+        <div style={{ padding: '14px 16px 18px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 17, fontWeight: 750, color: T.text, letterSpacing: '-0.025em' }}>Организовать перенос</div>
+              <div style={{ fontSize: 12, color: T.text3, marginTop: 4, lineHeight: 1.45 }}>
+                Отправлю клиенту аккуратное предложение. {thread.bookingId ? 'Кнопки подтверждения добавятся автоматически.' : 'Для этого чата нет привязанной записи — уйдёт обычное сообщение.'}
+              </div>
+            </div>
+            <button onClick={() => setShowReschedule(false)} style={{ width: 32, height: 32, borderRadius: 11, border: `1px solid ${T.border}`, background: T.cardElev, color: T.text2, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}>
+              <Icon name="x" size={15} />
+            </button>
+          </div>
+
+          <div style={{ padding: 12, borderRadius: 16, border: `1px solid ${T.border}`, background: mode === 'dark' ? 'rgba(255,255,255,0.035)' : 'rgba(10,10,10,0.025)', marginBottom: 12 }}>
+            <div style={{ fontSize: 10, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 7 }}>Текущая запись</div>
+            <div style={{ fontSize: 13, color: T.text, lineHeight: 1.45 }}>
+              {thread.bookingService || 'Услуга'}{thread.bookingDate ? ` · ${formatHumanDate(thread.bookingDate)}` : ''}{thread.bookingTime ? ` · ${thread.bookingTime}` : ''}
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 0.72fr', gap: 10, marginBottom: 10 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span style={{ fontSize: 10, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Новая дата</span>
+              <input
+                type="date"
+                value={rescheduleDate}
+                onChange={(event) => setRescheduleDate(event.target.value)}
+                style={{ height: 44, borderRadius: 14, border: `1px solid ${T.border}`, background: T.inputBg, color: T.text, padding: '0 12px', fontFamily: 'inherit', fontSize: 14 }}
+              />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span style={{ fontSize: 10, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Время</span>
+              <input
+                type="time"
+                value={rescheduleTime}
+                onChange={(event) => setRescheduleTime(event.target.value)}
+                style={{ height: 44, borderRadius: 14, border: `1px solid ${T.border}`, background: T.inputBg, color: T.text, padding: '0 12px', fontFamily: 'inherit', fontSize: 14 }}
+              />
+            </label>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2, marginBottom: 10 }}>
+            {[
+              ['Завтра', dateWithOffset(1)],
+              ['+2 дня', dateWithOffset(2)],
+              ['Через неделю', dateWithOffset(7)],
+            ].map(([label, date]) => (
+              <button
+                key={date}
+                onClick={() => { selectionHaptic(); setRescheduleDate(date); }}
+                style={{ border: `1px solid ${rescheduleDate === date ? T.accent : T.border}`, background: rescheduleDate === date ? T.accentSoft : T.cardElev, color: rescheduleDate === date ? T.accent : T.text2, borderRadius: 999, padding: '8px 11px', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+            <span style={{ fontSize: 10, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Причина, если нужно</span>
+            <input
+              value={rescheduleNote}
+              onChange={(event) => setRescheduleNote(event.target.value)}
+              placeholder="Например: освободился другой слот"
+              style={{ height: 44, borderRadius: 14, border: `1px solid ${T.border}`, background: T.inputBg, color: T.text, padding: '0 12px', fontFamily: 'inherit', fontSize: 14 }}
+            />
+          </label>
+
+          <button
+            onClick={() => void handleProposeReschedule()}
+            style={{ width: '100%', height: 46, borderRadius: 16, border: `1px solid ${T.accent}`, background: T.accent, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit', fontSize: 14, fontWeight: 800, boxShadow: `0 12px 30px ${T.accent}30` }}
+          >
+            <Icon name="calendar-clock" size={16} color="#fff" />
+            Отправить перенос
+          </button>
+        </div>
+      </MiniBottomSheet>
+
       <MiniBottomSheet open={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} maxHeight="320px" tail>
         <div style={{ padding: '18px 18px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
@@ -485,12 +633,15 @@ function isBotMessage(text: string) {
 }
 
 function Bubble({ m }: { m: Message }) {
-  const { T } = useTheme();
+  const { T, mode } = useTheme();
   const me = m.from === 'me';
   const bot = isBotMessage(m.text);
   const bg = bot ? T.cardElev : me ? T.accent : T.msgIn;
   const fg = bot ? T.text : me ? '#fff' : T.text;
-  const checkColor = bot ? T.accent : 'rgba(255,255,255,0.8)';
+  const checkColor = bot ? T.accent : 'rgba(255,255,255,0.82)';
+  const meGlow = mode === 'dark'
+    ? `0 10px 28px ${T.accent}2f, 0 0 18px ${T.accent}1c, inset 0 1px 0 rgba(255,255,255,0.12)`
+    : `0 10px 24px ${T.accent}24, inset 0 1px 0 rgba(255,255,255,0.35)`;
   return (
     <div style={{ display: 'flex', justifyContent: me ? 'flex-end' : 'flex-start', animation: 'mini-scale-in 0.16s ease both' }}>
       <div style={{
@@ -499,8 +650,8 @@ function Bubble({ m }: { m: Message }) {
         borderTopLeftRadius: me ? 14 : 4,
         background: bg,
         color: fg,
-        border: bot ? `1px solid ${T.accentSoft}` : '1px solid transparent',
-        boxShadow: bot ? `inset 3px 0 0 ${T.accent}` : 'none',
+        border: bot ? `1px solid ${T.accentSoft}` : me ? '1px solid rgba(255,255,255,0.13)' : '1px solid transparent',
+        boxShadow: bot ? `inset 3px 0 0 ${T.accent}` : me ? meGlow : 'none',
         fontSize: 13, lineHeight: 1.45,
       }}>
         {bot && (

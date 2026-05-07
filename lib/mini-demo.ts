@@ -103,6 +103,7 @@ export interface Thread {
   name: string;
   last: string;
   time: string;
+  lastMessageAtMs?: number;
   channel: 'TG' | 'ВК' | 'Web' | 'IG';
   unread: number;
   online?: boolean;
@@ -110,6 +111,10 @@ export interface Thread {
   // extended fields for full functionality
   phone?: string;
   nextVisit?: string | null;
+  bookingId?: string | null;
+  bookingDate?: string | null;
+  bookingTime?: string | null;
+  bookingService?: string | null;
   segment?: string;
   isPriority?: boolean;
   botConnected?: boolean;

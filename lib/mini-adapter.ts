@@ -317,6 +317,57 @@ function adaptChatChannel(ch: string): Thread['channel'] {
   return 'Web';
 }
 
+interface MiniThreadBookingContext {
+  id: string;
+  service?: string | null;
+  date?: string | null;
+  time?: string | null;
+}
+
+function readMiniThreadBookingContexts(metadata?: Record<string, unknown> | null): MiniThreadBookingContext[] {
+  const contexts: MiniThreadBookingContext[] = [];
+  const rawContexts = metadata?.bookingContexts;
+
+  if (Array.isArray(rawContexts)) {
+    rawContexts.forEach((item) => {
+      if (!item || typeof item !== 'object') return;
+      const row = item as Record<string, unknown>;
+      const id = typeof row.id === 'string' ? row.id : typeof row.bookingId === 'string' ? row.bookingId : '';
+      if (!id) return;
+      contexts.push({
+        id,
+        service: typeof row.service === 'string' ? row.service : null,
+        date: typeof row.date === 'string' ? row.date : typeof row.bookingDate === 'string' ? row.bookingDate : null,
+        time: typeof row.time === 'string' ? row.time : typeof row.bookingTime === 'string' ? row.bookingTime : null,
+      });
+    });
+  }
+
+  const bookingId = typeof metadata?.bookingId === 'string' ? metadata.bookingId : '';
+  if (bookingId && !contexts.some((context) => context.id === bookingId)) {
+    contexts.push({
+      id: bookingId,
+      service: typeof metadata?.service === 'string' ? metadata.service : null,
+      date: typeof metadata?.bookingDate === 'string' ? metadata.bookingDate : null,
+      time: typeof metadata?.bookingTime === 'string' ? metadata.bookingTime : null,
+    });
+  }
+
+  return contexts;
+}
+
+function activeMiniThreadBookingContext(metadata?: Record<string, unknown> | null) {
+  const contexts = readMiniThreadBookingContexts(metadata);
+  const activeBookingId = typeof metadata?.activeBookingId === 'string' ? metadata.activeBookingId : null;
+  const proposalBookingId = typeof metadata?.rescheduleProposalBookingId === 'string' ? metadata.rescheduleProposalBookingId : null;
+  return (
+    contexts.find((context) => context.id === activeBookingId) ??
+    contexts.find((context) => context.id === proposalBookingId) ??
+    contexts[0] ??
+    null
+  );
+}
+
 export function adaptMessages(records: ChatMessageRecord[]): Message[] {
   return records.map((m) => ({
     from: m.author === 'client' ? 'them' : 'me',
@@ -326,20 +377,28 @@ export function adaptMessages(records: ChatMessageRecord[]): Message[] {
 }
 
 export function adaptThreads(records: ChatThreadRecord[]): Thread[] {
-  return records.map((r) => ({
-    id: r.id,
-    name: r.clientName || 'Клиент',
-    last: r.lastMessagePreview ?? '',
-    time: adaptChatTime(r.lastMessageAt),
-    channel: adaptChatChannel(r.channel),
-    unread: r.unreadCount ?? 0,
-    messages: adaptMessages(r.messages ?? []),
-    phone: r.clientPhone || undefined,
-    nextVisit: r.nextVisit ?? null,
-    segment: r.segment,
-    isPriority: r.isPriority,
-    botConnected: r.botConnected,
-  }));
+  return records.map((r) => {
+    const bookingContext = activeMiniThreadBookingContext(r.metadata);
+    return {
+      id: r.id,
+      name: r.clientName || 'Клиент',
+      last: r.lastMessagePreview ?? '',
+      time: adaptChatTime(r.lastMessageAt),
+      lastMessageAtMs: new Date(r.lastMessageAt).getTime(),
+      channel: adaptChatChannel(r.channel),
+      unread: r.unreadCount ?? 0,
+      messages: adaptMessages(r.messages ?? []),
+      phone: r.clientPhone || undefined,
+      nextVisit: bookingContext?.date ?? r.nextVisit ?? null,
+      bookingId: bookingContext?.id ?? (typeof r.metadata?.bookingId === 'string' ? r.metadata.bookingId : null),
+      bookingDate: bookingContext?.date ?? r.nextVisit ?? null,
+      bookingTime: bookingContext?.time ?? null,
+      bookingService: bookingContext?.service ?? null,
+      segment: r.segment,
+      isPriority: r.isPriority,
+      botConnected: r.botConnected,
+    };
+  });
 }
 
 export const ADAPTED_THREADS: Thread[] = [];
