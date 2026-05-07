@@ -114,7 +114,7 @@ function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) 
         right: 0,
         bottom: 0,
         zIndex: 80,
-        padding: '8px 10px calc(12px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
+        padding: '8px 10px calc(6px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
         background: 'transparent',
         pointerEvents: 'auto',
       }}
@@ -393,7 +393,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
       const viewportHeight = Number(tg?.viewportStableHeight ?? tg?.viewportHeight ?? window.innerHeight);
       const isTelegramRuntime = Boolean(tg);
       const hasContentSafeArea = tgContentTop > 0;
-      const headerOffset = isTelegramRuntime ? (hasContentSafeArea ? 16 : 64) : 20;
+      const headerOffset = isTelegramRuntime ? (hasContentSafeArea ? 24 : 72) : 28;
 
       document.documentElement.style.setProperty('--miniapp-header-top-offset', `${headerOffset}px`);
       document.documentElement.style.setProperty('--miniapp-safe-top', `${Math.max(0, Math.round(topInset))}px`);
@@ -591,7 +591,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
                 display: 'flex',
                 flexDirection: 'column',
                 paddingTop: 'calc(var(--miniapp-header-top-offset, 10px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 64px + 16px)',
-                paddingBottom: 'calc(var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))) + 58px + 20px)',
+                paddingBottom: 'calc(var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))) + 58px + 14px)',
               }}
             >
               <div style={{ flex: '1 0 auto', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
