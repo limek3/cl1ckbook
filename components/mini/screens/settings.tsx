@@ -106,7 +106,7 @@ export function ProfileScreen({ back }: { back: () => void }) {
       <div style={{ padding: '0 16px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         <Card>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <Avatar name={form.name || MASTER.name} size={64} radius={16} />
+            <Avatar name={form.name || MASTER.name} avatar={MASTER.avatar} size={64} radius={16} />
             <div style={{ flex: 1 }}>
               <NeutralBtn icon="upload" full onClick={() => show('Загрузка аватара скоро будет доступна', 'info')}>Заменить аватар</NeutralBtn>
               <div style={{ fontSize: 11, color: T.text3, marginTop: 8 }}>Рекомендуем 400×400, JPG / PNG</div>

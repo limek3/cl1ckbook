@@ -83,16 +83,21 @@ export function Divider() {
   return <div style={{ height: 1, background: T.border, width: '100%' }} />;
 }
 
-export function Avatar({ name, size = 36, radius = 10 }: { name: string; size?: number; radius?: number }) {
+export function Avatar({ name, avatar, size = 36, radius = 10 }: { name: string; avatar?: string; size?: number; radius?: number }) {
   const { T } = useTheme();
   const initials = (name || '').split(' ').map((s) => s[0]).filter(Boolean).slice(0, 2).join('');
+  const src = typeof avatar === 'string' ? avatar.trim() : '';
   return (
     <div style={{
-      width: size, height: size, borderRadius: radius, background: T.cardElev,
+      width: size, height: size, borderRadius: radius, background: T.cardElev, overflow: 'hidden',
       border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontSize: size * 0.34, color: T.text2, fontWeight: 500, flexShrink: 0,
       letterSpacing: '0.02em',
-    }}>{initials}</div>
+    }}>
+      {src ? (
+        <img src={src} alt={name} referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+      ) : initials}
+    </div>
   );
 }
 

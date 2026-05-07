@@ -14,6 +14,7 @@ export interface MasterInfo {
   phone: string;
   bio: string;
   socials: { tg: string; vk: string; ig: string };
+  avatar?: string;
 }
 
 export const MASTER: MasterInfo = {
@@ -27,6 +28,7 @@ export const MASTER: MasterInfo = {
   phone: '+7 916 117 22 04',
   bio: 'Маникюр и педикюр. Стерильно, аккуратно, без спешки. 8 лет опыта.',
   socials: { tg: 'alina.nails', vk: 'alina.nails', ig: '@alina.nails' },
+  avatar: '',
 };
 
 export interface Service {

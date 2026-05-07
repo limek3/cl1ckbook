@@ -152,6 +152,7 @@ export function adaptMaster(profile: MasterProfile | null, workspaceData?: Recor
       phone: '',
       bio: '',
       socials: { tg: '', vk: '', ig: '' },
+      avatar: '',
     };
   }
 
@@ -174,6 +175,7 @@ export function adaptMaster(profile: MasterProfile | null, workspaceData?: Recor
       vk: cleanString(socialSource.vk),
       ig: cleanString(socialSource.ig),
     },
+    avatar: cleanString(profile.avatar),
   };
 }
 

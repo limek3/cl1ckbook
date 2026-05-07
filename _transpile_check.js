@@ -1,8 +1,4 @@
 
-import { SafeAreaView } from 'react-native';
-
-// Добавляем SafeAreaView вокруг верхней и нижней плашки
-
 const ts = require('typescript');
 const fs = require('fs');
 const files = process.argv.slice(2);
