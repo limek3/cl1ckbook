@@ -815,6 +815,8 @@ function MiniShell({
 
   return (
     <main
+      data-mini-theme="dark"
+      data-mini-mode="dark"
       style={shellStyle}
       className="cb-mini-app-root h-[var(--tg-viewport-height,100dvh)] min-h-[100svh] overflow-hidden bg-[#080808] text-white"
     >
@@ -1001,6 +1003,8 @@ function MiniOnboarding({
 
   return (
     <main
+      data-mini-theme="dark"
+      data-mini-mode="dark"
       className="cb-mini-app-root min-h-screen bg-[#090909] px-3 text-white"
       style={{
         paddingTop: 'calc(var(--tg-safe-top, 0px) + 10px)',

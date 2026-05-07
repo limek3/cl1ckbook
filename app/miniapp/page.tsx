@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { MiniApp } from '@/components/mini/mini-app-shell';
+import { TelegramMiniAppViewport } from '@/components/system/telegram-miniapp-viewport';
 
 declare global {
   interface Window {
@@ -10,6 +11,9 @@ declare global {
         initData: string;
         ready: () => void;
         expand: () => void;
+        setHeaderColor?: (color: string) => void;
+        setBackgroundColor?: (color: string) => void;
+        setBottomBarColor?: (color: string) => void;
         colorScheme?: 'light' | 'dark';
       };
     };
@@ -22,12 +26,24 @@ export default function MiniAppPage() {
     if (tg) {
       tg.ready();
       tg.expand();
+      try { tg.setHeaderColor?.('#0a0a0a'); } catch {}
+      try { tg.setBackgroundColor?.('#0a0a0a'); } catch {}
+      try { tg.setBottomBarColor?.('#0a0a0a'); } catch {}
     }
+    document.documentElement.dataset.tgMiniapp = 'true';
+    document.documentElement.style.backgroundColor = '#0a0a0a';
+    document.documentElement.style.colorScheme = 'dark';
+    document.body.style.backgroundColor = '#0a0a0a';
+    document.body.style.colorScheme = 'dark';
   }, []);
 
-  // Inherit Telegram color scheme on mount (fallback dark)
-  const initialMode = (typeof window !== 'undefined' && window.Telegram?.WebApp?.colorScheme === 'light')
-    ? 'light' : 'dark';
+  // Start dark by default to avoid Telegram/WebView native white chrome on first paint.
+  const initialMode = 'dark';
 
-  return <MiniApp mode={initialMode} />;
+  return (
+    <>
+      <TelegramMiniAppViewport />
+      <MiniApp mode={initialMode} />
+    </>
+  );
 }

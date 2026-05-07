@@ -6,6 +6,9 @@ type TelegramWebApp = {
   ready?: () => void;
   expand?: () => void;
   requestFullscreen?: () => void;
+  setHeaderColor?: (color: string) => void;
+  setBackgroundColor?: (color: string) => void;
+  setBottomBarColor?: (color: string) => void;
   disableVerticalSwipes?: () => void;
   viewportHeight?: number;
   viewportStableHeight?: number;
@@ -33,6 +36,32 @@ function setPx(name: string, value: unknown) {
   document.documentElement.style.setProperty(name, `${Math.max(0, Math.round(number))}px`);
 }
 
+function upsertThemeColor(color: string) {
+  if (typeof document === 'undefined') return;
+  let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.name = 'theme-color';
+    document.head.appendChild(meta);
+  }
+  meta.content = color;
+}
+
+function applyDarkMiniChrome(webApp?: TelegramWebApp) {
+  if (typeof document === 'undefined') return;
+  const bg = '#0a0a0a';
+  const root = document.documentElement;
+  root.dataset.tgMiniapp = 'true';
+  root.style.backgroundColor = bg;
+  root.style.colorScheme = 'dark';
+  document.body.style.backgroundColor = bg;
+  document.body.style.colorScheme = 'dark';
+  upsertThemeColor(bg);
+  safe(() => webApp?.setHeaderColor?.(bg));
+  safe(() => webApp?.setBackgroundColor?.(bg));
+  safe(() => webApp?.setBottomBarColor?.(bg));
+}
+
 export function TelegramMiniAppViewport() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -40,6 +69,8 @@ export function TelegramMiniAppViewport() {
     const webApp = (window as TelegramWindow).Telegram?.WebApp;
 
     const apply = () => {
+      applyDarkMiniChrome(webApp);
+
       const safeArea = webApp?.safeAreaInset ?? {};
       const contentSafeArea = webApp?.contentSafeAreaInset ?? {};
 

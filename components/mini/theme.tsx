@@ -121,6 +121,43 @@ function writeStoredAppearance(value: StoredMiniAppearance) {
   } catch {}
 }
 
+type MiniTelegramWindow = Window & {
+  Telegram?: {
+    WebApp?: {
+      setHeaderColor?: (color: string) => void;
+      setBackgroundColor?: (color: string) => void;
+      setBottomBarColor?: (color: string) => void;
+    };
+  };
+};
+
+function upsertMiniThemeColor(color: string) {
+  if (typeof document === 'undefined') return;
+  let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.name = 'theme-color';
+    document.head.appendChild(meta);
+  }
+  meta.content = color;
+}
+
+function syncMiniChrome(mode: ThemeMode, bg: string) {
+  if (typeof document === 'undefined') return;
+  const root = document.documentElement;
+  root.dataset.tgMiniapp = 'true';
+  root.style.backgroundColor = bg;
+  root.style.colorScheme = mode;
+  document.body.style.backgroundColor = bg;
+  document.body.style.colorScheme = mode;
+  upsertMiniThemeColor(bg);
+
+  const webApp = (window as MiniTelegramWindow).Telegram?.WebApp;
+  try { webApp?.setHeaderColor?.(bg); } catch {}
+  try { webApp?.setBackgroundColor?.(bg); } catch {}
+  try { webApp?.setBottomBarColor?.(bg); } catch {}
+}
+
 interface ThemeCtxValue {
   T: ThemeTokens;
   mode: ThemeMode;
@@ -162,7 +199,8 @@ export function ThemeProvider({ initialMode = 'dark', children }: { initialMode?
 
   useEffect(() => {
     writeStoredAppearance({ mode, accentTone, radius });
-  }, [mode, accentTone, radius]);
+    syncMiniChrome(mode, T.bg);
+  }, [mode, accentTone, radius, T.bg]);
 
   const transitionTheme = useCallback((update: () => void) => {
     // Telegram WebView can crash on the experimental View Transition API.

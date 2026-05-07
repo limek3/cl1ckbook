@@ -19,6 +19,8 @@ import {
   PhoneCall,
   Sparkles,
   SquarePen,
+  TrendingUp,
+  Wallet,
 } from 'lucide-react';
 
 import { WorkspaceShell } from '@/components/shared/workspace-shell';
@@ -35,6 +37,7 @@ type ThemeMode = 'light' | 'dark';
 type TimelineStage = 'next' | 'queue' | 'done' | 'new' | 'no_show';
 type TimelinePeriod = 'morning' | 'day' | 'evening';
 type TimelineFilter = 'all' | TimelinePeriod;
+type SummaryRange = 'day' | 'week' | 'month';
 type TimelineSource = 'booking';
 
 interface TimelineItem {
@@ -285,6 +288,96 @@ function buildDayInsight(items: TimelineItem[], locale: 'ru' | 'en'): DayInsight
         ? `${completionRate}% дня уже закрыто`
         : `${completionRate}% of the day completed`,
   };
+}
+
+
+function startOfWeekMonday(date: Date) {
+  const copy = new Date(date);
+  const weekday = (copy.getDay() + 6) % 7;
+  copy.setHours(0, 0, 0, 0);
+  copy.setDate(copy.getDate() - weekday);
+  return copy;
+}
+
+function addDays(date: Date, amount: number) {
+  const copy = new Date(date);
+  copy.setDate(copy.getDate() + amount);
+  return copy;
+}
+
+function isBookingActiveForSummary(booking: Booking) {
+  return booking.status !== 'cancelled' && booking.status !== 'no_show';
+}
+
+function getBookingAmount(booking: Booking) {
+  return typeof booking.priceAmount === 'number' && Number.isFinite(booking.priceAmount)
+    ? booking.priceAmount
+    : 0;
+}
+
+function formatCurrencyCompact(value: number, locale: 'ru' | 'en') {
+  try {
+    return new Intl.NumberFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
+      style: 'currency',
+      currency: 'RUB',
+      maximumFractionDigits: value >= 1000 ? 0 : 2,
+    }).format(value);
+  } catch {
+    return `${Math.round(value)} ₽`;
+  }
+}
+
+function getShortWeekday(date: Date, locale: 'ru' | 'en') {
+  try {
+    return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
+      weekday: 'short',
+    })
+      .format(date)
+      .replace('.', '')
+      .replace(/^[a-zа-яё]/i, (char) => char.toUpperCase());
+  } catch {
+    return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][(date.getDay() + 6) % 7] ?? '';
+  }
+}
+
+function getRangeTitle(range: SummaryRange, locale: 'ru' | 'en') {
+  if (locale === 'ru') {
+    if (range === 'day') return 'за день';
+    if (range === 'week') return 'за неделю';
+    return 'за месяц';
+  }
+
+  if (range === 'day') return 'for the day';
+  if (range === 'week') return 'for the week';
+  return 'for the month';
+}
+
+function getSummaryDescription(
+  range: SummaryRange,
+  hasBookings: boolean,
+  locale: 'ru' | 'en',
+) {
+  if (locale === 'ru') {
+    if (!hasBookings) {
+      if (range === 'day') return 'На сегодня пока нет записей. Как только клиент отправит заявку, она появится здесь автоматически.';
+      if (range === 'week') return 'На этой неделе пока мало данных. Здесь будут видны загрузка, ближайшие визиты и ритм недели.';
+      return 'За текущий месяц пока мало данных. Секция покажет загрузку, выручку и общую динамику.';
+    }
+
+    if (range === 'day') return 'Ближайшие визиты, загрузка дня и быстрые сигналы в одном экране.';
+    if (range === 'week') return 'Компактный обзор недели: где плотные дни, где есть окна и сколько записей уже закрыто.';
+    return 'Обзор месяца: активность, выручка и динамика по текущему периоду.';
+  }
+
+  if (!hasBookings) {
+    if (range === 'day') return 'No bookings for today yet. New requests will appear here automatically.';
+    if (range === 'week') return 'There is not enough data for this week yet. Load, upcoming visits, and weekly rhythm will appear here.';
+    return 'There is not enough data for this month yet. This section will show activity, revenue, and momentum.';
+  }
+
+  if (range === 'day') return 'Upcoming visits, day load, and quick signals in one calm overview.';
+  if (range === 'week') return 'A compact weekly overview: dense days, free windows, and completion across the week.';
+  return 'A monthly overview of activity, revenue, and overall momentum.';
 }
 
 function getNowMarkerIndex(items: TimelineItem[], nowMinutes: number) {
@@ -729,6 +822,108 @@ function FilterChip({
   );
 }
 
+
+function SegmentButton({
+  label,
+  active,
+  onClick,
+  light,
+  accentColor,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  light: boolean;
+  accentColor: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'relative inline-flex h-9 items-center justify-center rounded-[10px] px-3.5 text-[11px] font-semibold tracking-[-0.015em] transition-all duration-150 active:scale-[0.985]',
+        active
+          ? light
+            ? 'text-black'
+            : 'text-white'
+          : light
+            ? 'text-black/45 hover:text-black/72'
+            : 'text-white/42 hover:text-white/72',
+      )}
+    >
+      {active ? (
+        <span
+          style={accentPillStyle(accentColor, light, 'soft')}
+          className="absolute inset-0 rounded-[10px] border"
+        />
+      ) : null}
+
+      <span className="relative z-10">{label}</span>
+    </button>
+  );
+}
+
+function SummaryMetricCard({
+  label,
+  value,
+  hint,
+  light,
+}: {
+  label: string;
+  value: string | number;
+  hint?: string;
+  light: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        'min-w-0 rounded-[11px] border px-3.5 py-3.5',
+        light ? 'border-black/[0.07] bg-white' : 'border-white/[0.07] bg-white/[0.04]',
+      )}
+    >
+      <div className={cn('truncate text-[10.5px] font-medium', mutedText(light))}>
+        {label}
+      </div>
+      <div
+        className={cn(
+          'mt-2 truncate text-[22px] font-semibold leading-none tracking-[-0.06em]',
+          pageText(light),
+        )}
+      >
+        {value}
+      </div>
+      {hint ? (
+        <div className={cn('mt-1.5 truncate text-[10.5px]', faintText(light))}>{hint}</div>
+      ) : null}
+    </div>
+  );
+}
+
+function SummaryBoardBooking({
+  item,
+  light,
+}: {
+  item: TimelineItem;
+  light: boolean;
+}) {
+  const colorMap: Record<TimelinePeriod, string> = {
+    morning: '#54a7ff',
+    day: '#f5b326',
+    evening: '#45d19a',
+  };
+  const tint = colorMap[item.period] ?? '#7c8aa0';
+
+  return (
+    <div
+      style={accentPillStyle(tint, light, 'soft')}
+      className="rounded-[14px] border px-2.5 py-2 shadow-[0_6px_18px_rgba(0,0,0,0.04)]"
+    >
+      <div className="truncate text-[11px] font-semibold tracking-[-0.015em]">{item.clientName}</div>
+      <div className="mt-0.5 truncate text-[10px] opacity-80">{item.service}</div>
+    </div>
+  );
+}
+
 function TimelineStatus({
   stage,
   label,
@@ -818,6 +1013,7 @@ export default function DashboardTodayPage() {
 
   const [mounted, setMounted] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<TimelineFilter>('all');
+  const [summaryRange, setSummaryRange] = useState<SummaryRange>('day');
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<BookingStatus | null>(null);
   const [now, setNow] = useState(() => new Date());
@@ -917,7 +1113,7 @@ export default function DashboardTodayPage() {
             'Создайте профиль, чтобы открыть рабочий день, ленту записей, чаты и быстрые действия.',
           emptyAction: 'Создать профиль',
           preview: demoMode ? 'Демо-режим' : 'Рабочий день',
-          overviewTitle: 'Сводка дня',
+          overviewTitle: 'Сводка',
           overviewDescription: hasRealBookings
             ? 'Ближайшие визиты, статусы и ритм дня в одном спокойном экране.'
             : 'На сегодня пока нет записей. Когда клиент отправит заявку, она появится здесь автоматически.',
@@ -989,7 +1185,7 @@ export default function DashboardTodayPage() {
             'Create a profile to unlock the day flow, booking timeline, chats, and quick actions.',
           emptyAction: 'Create profile',
           preview: demoMode ? 'Demo mode' : 'Workday',
-          overviewTitle: 'Day summary',
+          overviewTitle: 'Summary',
           overviewDescription: hasRealBookings
             ? 'Upcoming visits, statuses, and the whole day rhythm in one calm screen.'
             : 'No bookings for today yet. Once a client submits a request, it will appear here automatically.',
@@ -1060,6 +1256,153 @@ export default function DashboardTodayPage() {
     newRequests: todayItems.filter((item) => item.stage === 'new' || item.stage === 'queue' || item.stage === 'next').length,
     done: todayItems.filter((item) => item.stage === 'done').length,
   };
+
+  const weekStart = useMemo(() => startOfWeekMonday(now), [now]);
+  const weekDates = useMemo(
+    () => Array.from({ length: 6 }, (_, index) => addDays(weekStart, index)),
+    [weekStart],
+  );
+  const weekDateMap = useMemo(
+    () => new Map(weekDates.map((date) => [toLocalIsoDate(date), date])),
+    [weekDates],
+  );
+  const summarySourceBookings = useMemo(() => {
+    const currentMonthKey = todayIso.slice(0, 7);
+    if (summaryRange === 'day') {
+      return bookings.filter((booking) => booking.date === todayIso);
+    }
+
+    if (summaryRange === 'week') {
+      return bookings.filter((booking) => weekDateMap.has(booking.date));
+    }
+
+    return bookings.filter((booking) => booking.date.startsWith(currentMonthKey));
+  }, [bookings, summaryRange, todayIso, weekDateMap]);
+
+  const summaryActiveBookings = useMemo(
+    () => summarySourceBookings.filter(isBookingActiveForSummary),
+    [summarySourceBookings],
+  );
+
+  const summaryCompleted = useMemo(
+    () => summarySourceBookings.filter((booking) => booking.status === 'completed').length,
+    [summarySourceBookings],
+  );
+  const summaryNoShow = useMemo(
+    () => summarySourceBookings.filter((booking) => booking.status === 'no_show' || booking.status === 'cancelled').length,
+    [summarySourceBookings],
+  );
+  const summaryRevenue = useMemo(
+    () => summarySourceBookings.reduce((sum, booking) => sum + getBookingAmount(booking), 0),
+    [summarySourceBookings],
+  );
+  const summaryUpcoming = useMemo(
+    () =>
+      [...summaryActiveBookings]
+        .filter((booking) => `${booking.date}T${booking.time}` >= `${todayIso}T00:00`)
+        .sort((left, right) => `${left.date}T${left.time}`.localeCompare(`${right.date}T${right.time}`))[0] ?? null,
+    [summaryActiveBookings, todayIso],
+  );
+
+  const summaryDescription = getSummaryDescription(
+    summaryRange,
+    summarySourceBookings.length > 0,
+    locale,
+  );
+
+  const summaryMetrics = [
+    {
+      label:
+        locale === 'ru'
+          ? summaryRange === 'day'
+            ? 'Записей на день'
+            : summaryRange === 'week'
+              ? 'Записей за неделю'
+              : 'Записей за месяц'
+          : summaryRange === 'day'
+            ? 'Bookings today'
+            : summaryRange === 'week'
+              ? 'Bookings this week'
+              : 'Bookings this month',
+      value: summaryActiveBookings.length,
+      hint: getRangeTitle(summaryRange, locale),
+    },
+    {
+      label: locale === 'ru' ? 'Завершено' : 'Completed',
+      value: summaryCompleted,
+      hint:
+        locale === 'ru'
+          ? `${summaryNoShow} не дошли / отменены`
+          : `${summaryNoShow} missed / cancelled`,
+    },
+    {
+      label: locale === 'ru' ? 'Выручка' : 'Revenue',
+      value: formatCurrencyCompact(summaryRevenue, locale),
+      hint:
+        summaryRevenue > 0
+          ? locale === 'ru'
+            ? 'по записям периода'
+            : 'from period bookings'
+          : locale === 'ru'
+            ? 'цены появятся здесь'
+            : 'amounts appear here',
+    },
+    {
+      label: locale === 'ru' ? 'Следующий визит' : 'Next visit',
+      value: summaryUpcoming ? `${summaryUpcoming.time}` : '—',
+      hint: summaryUpcoming ? `${summaryUpcoming.clientName} · ${summaryUpcoming.service}` : locale === 'ru' ? 'пока пусто' : 'nothing yet',
+    },
+  ];
+
+  const weekBoardRows = useMemo(() => {
+    const rows = new Set<string>();
+    for (const booking of bookings) {
+      if (weekDateMap.has(booking.date)) {
+        rows.add(`${booking.time.slice(0, 2)}:00`);
+      }
+    }
+
+    if (!rows.size) {
+      ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00'].forEach((time) => rows.add(time));
+    }
+
+    return [...rows]
+      .sort((left, right) => parseTimeToMinutes(left) - parseTimeToMinutes(right))
+      .slice(0, 6);
+  }, [bookings, weekDateMap]);
+
+  const weekBoardCells = useMemo(() => {
+    const board = new Map<string, TimelineItem[]>();
+    const weekBookings = bookings
+      .filter((booking) => weekDateMap.has(booking.date) && isBookingActiveForSummary(booking))
+      .sort((left, right) => `${left.date}T${left.time}`.localeCompare(`${right.date}T${right.time}`));
+
+    for (const booking of weekBookings) {
+      const row = `${booking.time.slice(0, 2)}:00`;
+      if (!weekBoardRows.includes(row)) continue;
+      const key = `${booking.date}-${row}`;
+      const current = board.get(key) ?? [];
+      current.push(mapBookingToTimelineItem(booking, now, locale));
+      board.set(key, current.slice(0, 2));
+    }
+
+    return board;
+  }, [bookings, locale, now, weekBoardRows, weekDateMap]);
+
+  const weekBoardInsight = useMemo(() => {
+    const denseDay = weekDates
+      .map((date) => {
+        const iso = toLocalIsoDate(date);
+        return {
+          iso,
+          count: bookings.filter((booking) => booking.date === iso && isBookingActiveForSummary(booking)).length,
+          date,
+        };
+      })
+      .sort((left, right) => right.count - left.count)[0];
+
+    return denseDay;
+  }, [bookings, weekDates]);
 
   const summaryItems = [
     {
@@ -1325,81 +1668,212 @@ export default function DashboardTodayPage() {
           <div className="grid gap-4">
             <Card light={isLight} className="overflow-hidden">
               <div className="p-5 md:p-6">
-                <div
-                  className={cn(
-                    'mt-2 text-[32px] font-semibold tracking-[-0.08em] md:text-[44px]',
-                    pageText(isLight),
-                  )}
-                >
-                  {dayInsight.nextUp
-                    ? `${dayInsight.nextUp.time} · ${dayInsight.nextUp.clientName}`
-                    : labels.overviewTitle}
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <MicroLabel light={isLight} active accentColor={accentColor}>
+                        <StatusDot light={isLight} active accentColor={accentColor} />
+                        {labels.overviewTitle}
+                      </MicroLabel>
+
+                      <MicroLabel light={isLight}>
+                        {summaryRange === 'day'
+                          ? locale === 'ru'
+                            ? 'актуально сегодня'
+                            : 'live today'
+                          : summaryRange === 'week'
+                            ? locale === 'ru'
+                              ? 'текущая неделя'
+                              : 'current week'
+                            : locale === 'ru'
+                              ? 'текущий месяц'
+                              : 'current month'}
+                      </MicroLabel>
+                    </div>
+
+                    <div
+                      className={cn(
+                        'mt-4 text-[28px] font-semibold tracking-[-0.075em] md:text-[38px]',
+                        pageText(isLight),
+                      )}
+                    >
+                      {summaryUpcoming
+                        ? `${summaryUpcoming.time} · ${summaryUpcoming.clientName}`
+                        : labels.overviewTitle}
+                    </div>
+
+                    <p
+                      className={cn(
+                        'mt-2 max-w-[780px] text-[12.5px] leading-6',
+                        mutedText(isLight),
+                      )}
+                    >
+                      {summaryDescription}
+                    </p>
+                  </div>
+
+                  <ControlGroup light={isLight} className="w-fit self-start p-1">
+                    <SegmentButton
+                      label={locale === 'ru' ? 'День' : 'Day'}
+                      active={summaryRange === 'day'}
+                      onClick={() => setSummaryRange('day')}
+                      light={isLight}
+                      accentColor={accentColor}
+                    />
+                    <SegmentButton
+                      label={locale === 'ru' ? 'Неделя' : 'Week'}
+                      active={summaryRange === 'week'}
+                      onClick={() => setSummaryRange('week')}
+                      light={isLight}
+                      accentColor={accentColor}
+                    />
+                    <SegmentButton
+                      label={locale === 'ru' ? 'Месяц' : 'Month'}
+                      active={summaryRange === 'month'}
+                      onClick={() => setSummaryRange('month')}
+                      light={isLight}
+                      accentColor={accentColor}
+                    />
+                  </ControlGroup>
                 </div>
 
-                <p
-                  className={cn(
-                    'mt-3 max-w-[760px] text-[12.5px] leading-6',
-                    mutedText(isLight),
-                  )}
-                >
-                  {labels.overviewDescription}
-                </p>
-
-                <div className="mt-6 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                  <HeroStat
-                    label={todayBookings.length ? labels.metrics.total : labels.metrics.next}
-                    value={metrics.total}
-                    hint={todayBookings.length ? labels.preview : locale === 'ru' ? 'ближайшие дни' : 'upcoming days'}
-                    light={isLight}
-                  />
-
-                  <HeroStat
-                    label={labels.metrics.next}
-                    value={metrics.next}
-                    hint={dayInsight.nextUp?.service ?? '—'}
-                    light={isLight}
-                  />
-
-                  <HeroStat
-                    label={labels.metrics.newRequests}
-                    value={metrics.newRequests}
-                    hint={labels.stages.new}
-                    light={isLight}
-                  />
-
-                  <HeroStat
-                    label={labels.metrics.done}
-                    value={metrics.done}
-                    hint={dayInsight.completionLabel}
-                    light={isLight}
-                  />
+                <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                  {summaryMetrics.map((item) => (
+                    <SummaryMetricCard
+                      key={item.label}
+                      label={item.label}
+                      value={item.value}
+                      hint={item.hint}
+                      light={isLight}
+                    />
+                  ))}
                 </div>
-              </div>
-            </Card>
 
-            <Card light={isLight}>
-              <CardTitle
-                title={labels.overviewTitle}
-                description={labels.overviewDescription}
-                light={isLight}
-              />
+                <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_320px]">
+                  <div
+                    className={cn(
+                      'overflow-hidden rounded-[18px] border p-3 md:p-4',
+                      isLight ? 'border-black/[0.07] bg-black/[0.02]' : 'border-white/[0.08] bg-white/[0.03]',
+                    )}
+                  >
+                    <div className="overflow-x-auto">
+                      <div className="min-w-[720px]">
+                        <div className="grid grid-cols-[86px_repeat(6,minmax(0,1fr))]">
+                          <div className={cn('px-3 pb-2 text-[11px] font-medium', mutedText(isLight))}>
+                            {locale === 'ru' ? 'Время' : 'Time'}
+                          </div>
+                          {weekDates.map((date) => {
+                            const iso = toLocalIsoDate(date);
+                            const isTodayColumn = iso === todayIso;
+                            return (
+                              <div key={iso} className="px-2 pb-2">
+                                <div className={cn('flex items-center justify-between rounded-[10px] px-2 py-1.5', isTodayColumn ? (isLight ? 'bg-black/[0.05]' : 'bg-white/[0.06]') : '')}>
+                                  <span className={cn('text-[11px] font-medium', pageText(isLight))}>
+                                    {getShortWeekday(date, locale)}
+                                  </span>
+                                  <span className={cn('text-[11px]', mutedText(isLight))}>
+                                    {date.getDate()}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
 
-              <div
-                className={cn(
-                  'grid divide-y md:grid-cols-4 md:divide-x md:divide-y-0',
-                  divideTone(isLight),
-                )}
-              >
-                {summaryItems.map((item) => (
-                  <StatTile
-                    key={item.label}
-                    label={item.label}
-                    value={item.value}
-                    hint={item.hint}
-                    icon={item.icon}
-                    light={isLight}
-                  />
-                ))}
+                        <div className={cn('grid grid-cols-[86px_repeat(6,minmax(0,1fr))] border-t', borderTone(isLight))}>
+                          {weekBoardRows.flatMap((row) => [
+                            <div key={`label-${row}`} className={cn('border-r px-3 py-4 text-[11px] font-medium', borderTone(isLight), mutedText(isLight))}>
+                              {row}
+                            </div>,
+                            ...weekDates.map((date) => {
+                              const iso = toLocalIsoDate(date);
+                              const key = `${iso}-${row}`;
+                              const items = weekBoardCells.get(key) ?? [];
+                              return (
+                                <div
+                                  key={key}
+                                  className={cn(
+                                    'min-h-[58px] border-r border-t px-1.5 py-1.5',
+                                    borderTone(isLight),
+                                  )}
+                                >
+                                  <div className="space-y-1">
+                                    {items.length ? items.map((item) => (
+                                      <SummaryBoardBooking key={item.id} item={item} light={isLight} />
+                                    )) : null}
+                                  </div>
+                                </div>
+                              );
+                            }),
+                          ])}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <Panel light={isLight} className="p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className={cn('text-[11px] font-medium', mutedText(isLight))}>
+                            {locale === 'ru' ? 'Инсайт периода' : 'Period insight'}
+                          </div>
+                          <div className={cn('mt-2 text-[24px] font-semibold tracking-[-0.05em]', pageText(isLight))}>
+                            {weekBoardInsight && weekBoardInsight.count > 0
+                              ? `${getShortWeekday(weekBoardInsight.date, locale)} · ${weekBoardInsight.count}`
+                              : locale === 'ru'
+                                ? 'Пока спокойно'
+                                : 'Quiet for now'}
+                          </div>
+                          <div className={cn('mt-2 text-[11.5px] leading-5', mutedText(isLight))}>
+                            {weekBoardInsight && weekBoardInsight.count > 0
+                              ? locale === 'ru'
+                                ? `Самый плотный день недели — ${getShortWeekday(weekBoardInsight.date, locale)}. Можно заранее держать окно рядом для переносов.`
+                                : `The densest day this week is ${getShortWeekday(weekBoardInsight.date, locale)}. Keep a nearby slot ready for reschedules.`
+                              : locale === 'ru'
+                                ? 'Как только появятся записи, здесь будет краткий вывод по загрузке.'
+                                : 'As bookings appear, this area will show a short load insight.'}
+                          </div>
+                        </div>
+
+                        <div
+                          className={cn(
+                            'inline-flex size-10 items-center justify-center rounded-[12px] border',
+                            isLight
+                              ? 'border-black/[0.07] bg-white text-black/50'
+                              : 'border-white/[0.07] bg-white/[0.04] text-white/50',
+                          )}
+                        >
+                          <TrendingUp className="size-4" />
+                        </div>
+                      </div>
+                    </Panel>
+
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                      {summaryItems.map((item) => (
+                        <Panel key={item.label} light={isLight} className="p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className={cn('text-[11px] font-medium', mutedText(isLight))}>{item.label}</div>
+                              <div className={cn('mt-2 text-[23px] font-semibold tracking-[-0.05em]', pageText(isLight))}>{item.value}</div>
+                              <div className={cn('mt-1.5 text-[10.5px] leading-5', faintText(isLight))}>{item.hint}</div>
+                            </div>
+                            <div
+                              className={cn(
+                                'inline-flex size-9 shrink-0 items-center justify-center rounded-[11px] border',
+                                isLight
+                                  ? 'border-black/[0.07] bg-white text-black/42'
+                                  : 'border-white/[0.07] bg-white/[0.04] text-white/42',
+                              )}
+                            >
+                              {item.icon}
+                            </div>
+                          </div>
+                        </Panel>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
             </Card>
 

@@ -11514,3 +11514,264 @@ html[data-tg-miniapp='true'] body {
   opacity: .62;
 }
 
+/* ClickBook miniapp v9 input fix HARD: native-white extermination.
+   Targets Telegram/Android WebView/WebKit white strips from color-scheme, autofill,
+   date/time/search/number pseudo-elements, scrollbars and page chrome. */
+html[data-tg-miniapp='true'],
+html[data-tg-miniapp='true'] body {
+  background: #0a0a0a !important;
+  background-color: #0a0a0a !important;
+  color-scheme: dark !important;
+  overscroll-behavior: none !important;
+}
+
+html[data-tg-miniapp='true'] {
+  scrollbar-color: rgba(255,255,255,0.14) transparent !important;
+}
+
+.cb-mini-app-root:not([data-mini-mode='light']),
+.cb-miniapp:not([data-mini-mode='light']) {
+  --mini-white-kill-bg: var(--mini-bg, #0a0a0a);
+  --mini-white-kill-input: var(--mini-input-bg, #0d0d0d);
+  --mini-white-kill-text: var(--mini-text, #fafafa);
+  --mini-white-kill-muted: var(--mini-text-muted, rgba(250,250,250,0.30));
+  background: var(--mini-white-kill-bg) !important;
+  background-color: var(--mini-white-kill-bg) !important;
+  color: var(--mini-white-kill-text) !important;
+  color-scheme: dark !important;
+  -webkit-font-smoothing: antialiased;
+}
+
+.cb-mini-app-root:not([data-mini-mode='light']) *,
+.cb-mini-app-root:not([data-mini-mode='light']) *::before,
+.cb-mini-app-root:not([data-mini-mode='light']) *::after,
+.cb-miniapp:not([data-mini-mode='light']) *,
+.cb-miniapp:not([data-mini-mode='light']) *::before,
+.cb-miniapp:not([data-mini-mode='light']) *::after {
+  color-scheme: dark !important;
+  -webkit-tap-highlight-color: transparent !important;
+  scrollbar-color: rgba(255,255,255,0.14) transparent !important;
+}
+
+.cb-mini-app-root:not([data-mini-mode='light']) *::-webkit-scrollbar,
+.cb-miniapp:not([data-mini-mode='light']) *::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+  background: transparent !important;
+}
+
+.cb-mini-app-root:not([data-mini-mode='light']) *::-webkit-scrollbar-track,
+.cb-mini-app-root:not([data-mini-mode='light']) *::-webkit-scrollbar-corner,
+.cb-mini-app-root:not([data-mini-mode='light']) *::-webkit-scrollbar-thumb,
+.cb-miniapp:not([data-mini-mode='light']) *::-webkit-scrollbar-track,
+.cb-miniapp:not([data-mini-mode='light']) *::-webkit-scrollbar-corner,
+.cb-miniapp:not([data-mini-mode='light']) *::-webkit-scrollbar-thumb {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.cb-mini-app-root:not([data-mini-mode='light']) input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+.cb-mini-app-root:not([data-mini-mode='light']) textarea,
+.cb-mini-app-root:not([data-mini-mode='light']) select,
+.cb-mini-app-root:not([data-mini-mode='light']) [contenteditable='true'],
+.cb-mini-app-root:not([data-mini-mode='light']) [role='textbox'],
+.cb-miniapp:not([data-mini-mode='light']) input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+.cb-miniapp:not([data-mini-mode='light']) textarea,
+.cb-miniapp:not([data-mini-mode='light']) select,
+.cb-miniapp:not([data-mini-mode='light']) [contenteditable='true'],
+.cb-miniapp:not([data-mini-mode='light']) [role='textbox'],
+.cb-mini-app-root:not([data-mini-mode='light']) .cb-mini-input,
+.cb-miniapp:not([data-mini-mode='light']) .cb-mini-input {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  background: var(--mini-white-kill-input) !important;
+  background-color: var(--mini-white-kill-input) !important;
+  background-image: none !important;
+  background-clip: padding-box !important;
+  -webkit-background-clip: padding-box !important;
+  border-color: var(--mini-control-border, rgba(255,255,255,0.08)) !important;
+  box-shadow: inset 0 0 0 9999px var(--mini-white-kill-input) !important;
+  -webkit-box-shadow: inset 0 0 0 9999px var(--mini-white-kill-input) !important;
+  color: var(--mini-white-kill-text) !important;
+  -webkit-text-fill-color: var(--mini-white-kill-text) !important;
+  caret-color: var(--mini-accent, var(--miniapp-accent, #127dfe)) !important;
+  outline: 0 !important;
+}
+
+.cb-mini-app-root:not([data-mini-mode='light']) input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):focus,
+.cb-mini-app-root:not([data-mini-mode='light']) input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):active,
+.cb-mini-app-root:not([data-mini-mode='light']) textarea:focus,
+.cb-mini-app-root:not([data-mini-mode='light']) textarea:active,
+.cb-mini-app-root:not([data-mini-mode='light']) select:focus,
+.cb-mini-app-root:not([data-mini-mode='light']) select:active,
+.cb-miniapp:not([data-mini-mode='light']) input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):focus,
+.cb-miniapp:not([data-mini-mode='light']) input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):active,
+.cb-miniapp:not([data-mini-mode='light']) textarea:focus,
+.cb-miniapp:not([data-mini-mode='light']) textarea:active,
+.cb-miniapp:not([data-mini-mode='light']) select:focus,
+.cb-miniapp:not([data-mini-mode='light']) select:active {
+  background: var(--mini-white-kill-input) !important;
+  background-color: var(--mini-white-kill-input) !important;
+  background-image: none !important;
+  box-shadow: inset 0 0 0 9999px var(--mini-white-kill-input) !important;
+  -webkit-box-shadow: inset 0 0 0 9999px var(--mini-white-kill-input) !important;
+  color: var(--mini-white-kill-text) !important;
+  -webkit-text-fill-color: var(--mini-white-kill-text) !important;
+}
+
+.cb-mini-app-root:not([data-mini-mode='light']) input.cb-mini-transparent,
+.cb-mini-app-root:not([data-mini-mode='light']) textarea.cb-mini-transparent,
+.cb-mini-app-root:not([data-mini-mode='light']) input.cb-mini-input-reset,
+.cb-mini-app-root:not([data-mini-mode='light']) textarea.cb-mini-input-reset,
+.cb-miniapp:not([data-mini-mode='light']) input.cb-mini-transparent,
+.cb-miniapp:not([data-mini-mode='light']) textarea.cb-mini-transparent,
+.cb-miniapp:not([data-mini-mode='light']) input.cb-mini-input-reset,
+.cb-miniapp:not([data-mini-mode='light']) textarea.cb-mini-input-reset {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  color: var(--mini-white-kill-text) !important;
+  -webkit-text-fill-color: var(--mini-white-kill-text) !important;
+}
+
+.cb-mini-app-root:not([data-mini-mode='light']) input::placeholder,
+.cb-mini-app-root:not([data-mini-mode='light']) textarea::placeholder,
+.cb-miniapp:not([data-mini-mode='light']) input::placeholder,
+.cb-miniapp:not([data-mini-mode='light']) textarea::placeholder,
+.cb-mini-app-root:not([data-mini-mode='light']) .cb-mini-input::placeholder,
+.cb-miniapp:not([data-mini-mode='light']) .cb-mini-input::placeholder {
+  color: var(--mini-white-kill-muted) !important;
+  -webkit-text-fill-color: var(--mini-white-kill-muted) !important;
+  opacity: 1 !important;
+}
+
+.cb-mini-app-root:not([data-mini-mode='light']) input:-webkit-autofill,
+.cb-mini-app-root:not([data-mini-mode='light']) input:-webkit-autofill:hover,
+.cb-mini-app-root:not([data-mini-mode='light']) input:-webkit-autofill:focus,
+.cb-mini-app-root:not([data-mini-mode='light']) textarea:-webkit-autofill,
+.cb-mini-app-root:not([data-mini-mode='light']) textarea:-webkit-autofill:hover,
+.cb-mini-app-root:not([data-mini-mode='light']) textarea:-webkit-autofill:focus,
+.cb-miniapp:not([data-mini-mode='light']) input:-webkit-autofill,
+.cb-miniapp:not([data-mini-mode='light']) input:-webkit-autofill:hover,
+.cb-miniapp:not([data-mini-mode='light']) input:-webkit-autofill:focus,
+.cb-miniapp:not([data-mini-mode='light']) textarea:-webkit-autofill,
+.cb-miniapp:not([data-mini-mode='light']) textarea:-webkit-autofill:hover,
+.cb-miniapp:not([data-mini-mode='light']) textarea:-webkit-autofill:focus {
+  -webkit-box-shadow: inset 0 0 0 9999px var(--mini-white-kill-input) !important;
+  box-shadow: inset 0 0 0 9999px var(--mini-white-kill-input) !important;
+  -webkit-text-fill-color: var(--mini-white-kill-text) !important;
+  caret-color: var(--mini-accent, var(--miniapp-accent, #127dfe)) !important;
+  transition: background-color 999999s ease-in-out 0s, color 999999s ease-in-out 0s !important;
+}
+
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='search']::-webkit-search-decoration,
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='search']::-webkit-search-cancel-button,
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='search']::-webkit-search-results-button,
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='search']::-webkit-search-results-decoration,
+.cb-miniapp:not([data-mini-mode='light']) input[type='search']::-webkit-search-decoration,
+.cb-miniapp:not([data-mini-mode='light']) input[type='search']::-webkit-search-cancel-button,
+.cb-miniapp:not([data-mini-mode='light']) input[type='search']::-webkit-search-results-button,
+.cb-miniapp:not([data-mini-mode='light']) input[type='search']::-webkit-search-results-decoration,
+.cb-mini-app-root:not([data-mini-mode='light']) input::-webkit-clear-button,
+.cb-mini-app-root:not([data-mini-mode='light']) input::-webkit-inner-spin-button,
+.cb-mini-app-root:not([data-mini-mode='light']) input::-webkit-outer-spin-button,
+.cb-miniapp:not([data-mini-mode='light']) input::-webkit-clear-button,
+.cb-miniapp:not([data-mini-mode='light']) input::-webkit-inner-spin-button,
+.cb-miniapp:not([data-mini-mode='light']) input::-webkit-outer-spin-button {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  display: none !important;
+  opacity: 0 !important;
+  background: transparent !important;
+}
+
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='date'],
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='time'],
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='datetime-local'],
+.cb-miniapp:not([data-mini-mode='light']) input[type='date'],
+.cb-miniapp:not([data-mini-mode='light']) input[type='time'],
+.cb-miniapp:not([data-mini-mode='light']) input[type='datetime-local'] {
+  color-scheme: dark !important;
+  position: relative;
+}
+
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='date']::-webkit-datetime-edit,
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='date']::-webkit-datetime-edit-fields-wrapper,
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='date']::-webkit-datetime-edit-text,
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='date']::-webkit-datetime-edit-month-field,
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='date']::-webkit-datetime-edit-day-field,
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='date']::-webkit-datetime-edit-year-field,
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='time']::-webkit-datetime-edit,
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='time']::-webkit-datetime-edit-fields-wrapper,
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='time']::-webkit-datetime-edit-text,
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='time']::-webkit-datetime-edit-hour-field,
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='time']::-webkit-datetime-edit-minute-field,
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='time']::-webkit-datetime-edit-ampm-field,
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='datetime-local']::-webkit-datetime-edit,
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='datetime-local']::-webkit-datetime-edit-fields-wrapper,
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='date']::-webkit-date-and-time-value,
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='time']::-webkit-date-and-time-value,
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='datetime-local']::-webkit-date-and-time-value,
+.cb-miniapp:not([data-mini-mode='light']) input[type='date']::-webkit-datetime-edit,
+.cb-miniapp:not([data-mini-mode='light']) input[type='date']::-webkit-datetime-edit-fields-wrapper,
+.cb-miniapp:not([data-mini-mode='light']) input[type='date']::-webkit-datetime-edit-text,
+.cb-miniapp:not([data-mini-mode='light']) input[type='date']::-webkit-datetime-edit-month-field,
+.cb-miniapp:not([data-mini-mode='light']) input[type='date']::-webkit-datetime-edit-day-field,
+.cb-miniapp:not([data-mini-mode='light']) input[type='date']::-webkit-datetime-edit-year-field,
+.cb-miniapp:not([data-mini-mode='light']) input[type='time']::-webkit-datetime-edit,
+.cb-miniapp:not([data-mini-mode='light']) input[type='time']::-webkit-datetime-edit-fields-wrapper,
+.cb-miniapp:not([data-mini-mode='light']) input[type='time']::-webkit-datetime-edit-text,
+.cb-miniapp:not([data-mini-mode='light']) input[type='time']::-webkit-datetime-edit-hour-field,
+.cb-miniapp:not([data-mini-mode='light']) input[type='time']::-webkit-datetime-edit-minute-field,
+.cb-miniapp:not([data-mini-mode='light']) input[type='time']::-webkit-datetime-edit-ampm-field,
+.cb-miniapp:not([data-mini-mode='light']) input[type='datetime-local']::-webkit-datetime-edit,
+.cb-miniapp:not([data-mini-mode='light']) input[type='datetime-local']::-webkit-datetime-edit-fields-wrapper,
+.cb-miniapp:not([data-mini-mode='light']) input[type='date']::-webkit-date-and-time-value,
+.cb-miniapp:not([data-mini-mode='light']) input[type='time']::-webkit-date-and-time-value,
+.cb-miniapp:not([data-mini-mode='light']) input[type='datetime-local']::-webkit-date-and-time-value {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: var(--mini-white-kill-text) !important;
+  -webkit-text-fill-color: var(--mini-white-kill-text) !important;
+}
+
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='date']::-webkit-calendar-picker-indicator,
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='time']::-webkit-calendar-picker-indicator,
+.cb-mini-app-root:not([data-mini-mode='light']) input[type='datetime-local']::-webkit-calendar-picker-indicator,
+.cb-miniapp:not([data-mini-mode='light']) input[type='date']::-webkit-calendar-picker-indicator,
+.cb-miniapp:not([data-mini-mode='light']) input[type='time']::-webkit-calendar-picker-indicator,
+.cb-miniapp:not([data-mini-mode='light']) input[type='datetime-local']::-webkit-calendar-picker-indicator {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  color: transparent !important;
+  filter: none !important;
+  opacity: 0 !important;
+}
+
+.cb-mini-app-root:not([data-mini-mode='light']) select,
+.cb-miniapp:not([data-mini-mode='light']) select,
+.cb-mini-app-root:not([data-mini-mode='light']) .cb-mini-select,
+.cb-miniapp:not([data-mini-mode='light']) .cb-mini-select {
+  color-scheme: dark !important;
+}
+
+.cb-mini-app-root:not([data-mini-mode='light']) select option,
+.cb-mini-app-root:not([data-mini-mode='light']) select optgroup,
+.cb-miniapp:not([data-mini-mode='light']) select option,
+.cb-miniapp:not([data-mini-mode='light']) select optgroup {
+  background: #0d0d0d !important;
+  background-color: #0d0d0d !important;
+  color: #fafafa !important;
+  -webkit-text-fill-color: #fafafa !important;
+}
+
