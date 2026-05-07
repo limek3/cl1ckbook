@@ -105,7 +105,7 @@ function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) 
   return (
     <div style={{
       flexShrink: 0,
-      padding: '8px 12px calc(10px + var(--miniapp-safe-bottom, var(--tg-content-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)))))',
+      padding: '6px 12px calc(2px + var(--miniapp-safe-bottom, var(--tg-content-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)))))',
       zIndex: 80,
     }}>
       <div style={{
@@ -181,7 +181,7 @@ function TgHeader({ onToggleTheme, onNotifications, notificationCount = 0 }: { o
   return (
     <div style={{
       flexShrink: 0,
-      padding: 'calc(12px + var(--miniapp-safe-top, var(--tg-content-safe-top, 0px))) 12px 16px',
+      padding: 'calc(28px + var(--miniapp-safe-top, var(--tg-content-safe-top, 0px))) 12px 6px',
       zIndex: 80,
     }}>
       <div style={{
