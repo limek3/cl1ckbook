@@ -77,20 +77,21 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
 function miniGlass(mode: ThemeMode, edge: 'top' | 'bottom' = 'top'): CSSProperties {
   const dark = mode === 'dark';
   return {
-    backgroundColor: dark ? 'rgba(22,22,24,0.72)' : 'rgba(255,255,255,0.74)',
-    backdropFilter: 'blur(30px) saturate(1.4)',
-    WebkitBackdropFilter: 'blur(30px) saturate(1.4)',
-    border: `1px solid ${dark ? 'rgba(255,255,255,0.07)' : 'rgba(12,12,12,0.06)'}`,
+    background: dark
+      ? 'linear-gradient(180deg, rgba(28,28,32,0.46) 0%, rgba(18,18,22,0.38) 100%)'
+      : 'linear-gradient(180deg, rgba(255,255,255,0.62) 0%, rgba(248,248,250,0.5) 100%)',
+    backdropFilter: 'blur(44px) saturate(1.8)',
+    WebkitBackdropFilter: 'blur(44px) saturate(1.8)',
+    border: 'none',
     boxShadow: edge === 'top'
       ? (dark
-        ? '0 14px 34px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.04)'
-        : '0 14px 34px rgba(20,20,20,0.08), inset 0 1px 0 rgba(255,255,255,0.6)')
+        ? '0 18px 40px -10px rgba(0,0,0,0.5), 0 2px 14px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.08), inset 0 0 0 1px rgba(255,255,255,0.035)'
+        : '0 18px 40px -10px rgba(20,20,30,0.18), 0 2px 14px rgba(20,20,30,0.06), inset 0 1px 0 rgba(255,255,255,0.85), inset 0 0 0 1px rgba(255,255,255,0.4)')
       : (dark
-        ? '0 -14px 34px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.04)'
-        : '0 -14px 34px rgba(20,20,20,0.08), inset 0 1px 0 rgba(255,255,255,0.6)'),
-    transform: 'translate3d(0,0,0)',
+        ? '0 -18px 40px -10px rgba(0,0,0,0.5), 0 -2px 14px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.08), inset 0 0 0 1px rgba(255,255,255,0.035)'
+        : '0 -18px 40px -10px rgba(20,20,30,0.18), 0 -2px 14px rgba(20,20,30,0.06), inset 0 1px 0 rgba(255,255,255,0.85), inset 0 0 0 1px rgba(255,255,255,0.4)')
+      ,
     willChange: 'backdrop-filter',
-    isolation: 'isolate',
   };
 }
 
@@ -108,7 +109,10 @@ function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) 
   return (
     <div
       style={{
-        flexShrink: 0,
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
         zIndex: 80,
         padding: '8px 10px calc(12px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
         background: 'transparent',
@@ -222,7 +226,10 @@ function TgHeader({
   return (
     <div
       style={{
-        flexShrink: 0,
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: 0,
         zIndex: 80,
         padding: 'calc(var(--miniapp-header-top-offset, 10px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px)))) 10px 8px',
         background: 'transparent',
@@ -386,7 +393,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
       const viewportHeight = Number(tg?.viewportStableHeight ?? tg?.viewportHeight ?? window.innerHeight);
       const isTelegramRuntime = Boolean(tg);
       const hasContentSafeArea = tgContentTop > 0;
-      const headerOffset = isTelegramRuntime ? (hasContentSafeArea ? 8 : 56) : 14;
+      const headerOffset = isTelegramRuntime ? (hasContentSafeArea ? 16 : 64) : 20;
 
       document.documentElement.style.setProperty('--miniapp-header-top-offset', `${headerOffset}px`);
       document.documentElement.style.setProperty('--miniapp-safe-top', `${Math.max(0, Math.round(topInset))}px`);
@@ -554,19 +561,22 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
           .cb-miniapp ::placeholder { color: ${T.text3}; opacity: 1; }
           .cb-miniapp { --miniapp-accent: ${T.accent}; }
         `}</style>
-        <TgHeader master={MASTER} onToggleTheme={toggle} onNotifications={() => setSub({ kind: 'notifications' })} notificationCount={notificationCount} />
         {isFullHeight ? (
-          <div
-            style={{
-              flex: 1,
-              minHeight: 0,
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-          >
-            {content}
-          </div>
+          <>
+            <TgHeader master={MASTER} onToggleTheme={toggle} onNotifications={() => setSub({ kind: 'notifications' })} notificationCount={notificationCount} />
+            <div
+              style={{
+                flex: 1,
+                minHeight: 0,
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+                paddingTop: 'calc(var(--miniapp-header-top-offset, 10px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 64px + 16px)',
+              }}
+            >
+              {content}
+            </div>
+          </>
         ) : (
           <>
             <div
@@ -580,6 +590,8 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
                 overscrollBehavior: 'contain',
                 display: 'flex',
                 flexDirection: 'column',
+                paddingTop: 'calc(var(--miniapp-header-top-offset, 10px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 64px + 16px)',
+                paddingBottom: 'calc(var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))) + 58px + 20px)',
               }}
             >
               <div style={{ flex: '1 0 auto', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
@@ -587,6 +599,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
                 <div aria-hidden style={{ height: 8, flexShrink: 0 }} />
               </div>
             </div>
+            <TgHeader master={MASTER} onToggleTheme={toggle} onNotifications={() => setSub({ kind: 'notifications' })} notificationCount={notificationCount} />
             <BottomNav active={tab} onChange={(id) => { setTab(id); setSub(null); }} />
           </>
         )}
