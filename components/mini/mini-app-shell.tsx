@@ -77,17 +77,17 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
 function miniGlass(mode: ThemeMode, edge: 'top' | 'bottom' = 'top'): CSSProperties {
   const dark = mode === 'dark';
   return {
-    backgroundColor: dark ? 'rgba(17,17,19,0.42)' : 'rgba(255,255,255,0.48)',
-    backdropFilter: 'blur(34px) saturate(1.4)',
-    WebkitBackdropFilter: 'blur(34px) saturate(1.4)',
-    border: `1px solid ${dark ? 'rgba(255,255,255,0.04)' : 'rgba(12,12,12,0.035)'}`,
+    backgroundColor: dark ? 'rgba(22,22,24,0.72)' : 'rgba(255,255,255,0.74)',
+    backdropFilter: 'blur(30px) saturate(1.4)',
+    WebkitBackdropFilter: 'blur(30px) saturate(1.4)',
+    border: `1px solid ${dark ? 'rgba(255,255,255,0.07)' : 'rgba(12,12,12,0.06)'}`,
     boxShadow: edge === 'top'
       ? (dark
-        ? '0 14px 32px rgba(0,0,0,0.28)'
-        : '0 14px 32px rgba(20,20,20,0.06)')
+        ? '0 14px 34px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.04)'
+        : '0 14px 34px rgba(20,20,20,0.08), inset 0 1px 0 rgba(255,255,255,0.6)')
       : (dark
-        ? '0 -14px 32px rgba(0,0,0,0.24)'
-        : '0 -14px 32px rgba(20,20,20,0.06)'),
+        ? '0 -14px 34px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.04)'
+        : '0 -14px 34px rgba(20,20,20,0.08), inset 0 1px 0 rgba(255,255,255,0.6)'),
     transform: 'translate3d(0,0,0)',
     willChange: 'backdrop-filter',
     isolation: 'isolate',
@@ -582,6 +582,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
             <TgHeader master={MASTER} onToggleTheme={toggle} onNotifications={() => setSub({ kind: 'notifications' })} notificationCount={notificationCount} />
             <div style={{ flex: '1 0 auto', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
               {content}
+              <div aria-hidden style={{ height: 8, flexShrink: 0 }} />
             </div>
             <BottomNav active={tab} onChange={(id) => { setTab(id); setSub(null); }} />
           </div>
