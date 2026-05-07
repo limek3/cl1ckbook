@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { ThemeProvider, useTheme, type ThemeMode } from './theme';
 import { Icon } from './primitives/atoms';
 import { useChats } from '@/hooks/use-chats';
@@ -8,11 +9,464 @@ import { useMiniData } from '@/hooks/use-mini-data';
 import { ToastCtx, haptic, tgClose, type ToastItem, type MiniToastCtxValue } from './bridge';
 import { buildMiniEventNotifications, unreadEventCount } from '@/lib/notification-events';
 
+const INTRO_BLACK = '#0b0b0b';
+const INTRO_WHITE = '#ffffff';
+const INTRO_SEEN_KEY = 'clickbook-mini-intro-seen';
+
+type IntroVariant = 'ultra' | 'startup';
+
+const introEase = {
+  smooth: [0.16, 1, 0.3, 1] as const,
+  cursor: [0.2, 1, 0.26, 1] as const,
+  press: [0.68, -0.08, 0.22, 1.08] as const,
+};
+
+const INTRO_MODES = {
+  ultra: {
+    total: 6.2,
+    startScale: 1.18,
+    slideDuration: 1.12,
+    wordDelay: 3.46,
+    wordDuration: 1.08,
+    bookSheenOpacity: 0.14,
+    wordSheenOpacity: 0.18,
+    clickRingOpacity: 0.28,
+    innerRippleOpacity: 0.1,
+    rayScale: 1.06,
+    baselineOpacity: 0.08,
+  },
+  startup: {
+    total: 5.8,
+    startScale: 1.28,
+    slideDuration: 0.94,
+    wordDelay: 3.26,
+    wordDuration: 0.92,
+    bookSheenOpacity: 0.22,
+    wordSheenOpacity: 0.28,
+    clickRingOpacity: 0.44,
+    innerRippleOpacity: 0.18,
+    rayScale: 1.16,
+    baselineOpacity: 0.16,
+  },
+} satisfies Record<IntroVariant, Record<string, number>>;
+
+const introTimeline = {
+  bookAppear: 0.08,
+  cursorIn: 1.7,
+  click: 2.78,
+  slideStart: 3.14,
+};
+
+const introPaths = {
+  book: `
+    M 59 63 L 49 79 L 49 82 L 46 90 L 46 306 L 52 324 L 56 330 L 67 341 L 76 346 L 85 349 L 90 349 L 91 350 L 166 350 L 167 351 L 179 352 L 195 358 L 205 365 L 206 367 L 215 375 L 222 375 L 227 372 L 234 364 L 241 359 L 258 352 L 270 351 L 271 350 L 339 350 L 347 347 L 350 347 L 356 344 L 369 334 L 375 326 L 378 320 L 382 306 L 382 91 L 381 90 L 381 86 L 379 79 L 375 71 L 370 64 L 364 58 L 355 52 L 353 52 L 348 49 L 341 47 L 335 47 L 334 46 L 269 46 L 268 47 L 245 48 L 235 51 L 227 55 L 221 60 L 219 60 L 213 55 L 205 51 L 195 48 L 189 48 L 188 47 L 175 47 L 174 46 L 94 46 L 93 47 L 87 47 L 73 52 Z
+    M 71 78 L 77 72 L 83 68 L 93 65 L 179 65 L 180 66 L 188 66 L 189 67 L 199 69 L 203 71 L 215 85 L 221 86 L 225 84 L 228 79 L 234 73 L 241 69 L 247 67 L 251 67 L 252 66 L 277 65 L 279 67 L 279 135 L 280 136 L 284 135 L 304 120 L 306 120 L 327 136 L 329 136 L 331 134 L 331 66 L 332 65 L 340 66 L 350 71 L 358 79 L 363 90 L 363 272 L 364 273 L 364 298 L 363 299 L 363 306 L 361 312 L 355 321 L 346 328 L 338 331 L 299 331 L 298 332 L 297 331 L 274 331 L 273 332 L 258 333 L 235 341 L 227 346 L 219 353 L 211 346 L 208 345 L 203 341 L 201 341 L 191 336 L 188 336 L 179 333 L 161 332 L 160 331 L 154 331 L 153 332 L 146 332 L 145 331 L 90 331 L 77 325 L 71 319 L 65 307 L 65 102 L 64 101 L 64 97 L 65 96 L 66 87 Z
+  `,
+  cursor: `
+    M 167 181 L 166 183 L 167 197 L 169 204 L 170 221 L 171 222 L 171 228 L 172 229 L 172 237 L 173 238 L 173 244 L 174 245 L 174 252 L 175 253 L 175 260 L 177 267 L 177 274 L 178 275 L 178 283 L 179 286 L 182 288 L 188 287 L 203 268 L 205 267 L 208 270 L 226 300 L 231 300 L 242 294 L 245 291 L 246 288 L 233 267 L 230 260 L 226 255 L 228 253 L 242 251 L 246 249 L 251 249 L 255 246 L 255 241 L 176 183 L 171 180 Z
+  `,
+  rays: [
+    `M 206 145 L 201 145 L 183 163 L 183 168 L 187 171 L 191 170 L 209 152 L 209 148 Z`,
+    `M 127 148 L 127 153 L 146 171 L 150 171 L 153 169 L 154 165 L 150 161 L 150 160 L 149 160 L 148 158 L 147 158 L 145 155 L 144 155 L 143 153 L 142 153 L 140 150 L 139 150 L 134 145 L 130 145 Z`,
+    `M 115 186 L 115 192 L 118 194 L 145 194 L 148 191 L 148 186 L 146 184 L 118 184 Z`,
+    `M 165 130 L 163 132 L 163 134 L 162 135 L 163 137 L 163 159 L 166 162 L 169 162 L 171 161 L 173 158 L 173 134 L 170 130 Z`,
+  ],
+  letters: [
+    `M 566 102 L 487 188 L 572 277 L 574 278 L 578 277 L 601 277 L 603 278 L 604 276 L 599 272 L 518 187 L 518 185 L 595 103 L 595 102 Z M 461 102 L 461 277 L 482 278 L 484 277 L 484 102 Z`,
+    `M 684 156 L 675 173 L 668 190 L 665 194 L 655 218 L 653 220 L 653 222 L 627 277 L 628 278 L 631 277 L 649 278 L 651 277 L 651 275 L 656 266 L 659 257 L 661 255 L 664 246 L 666 244 L 690 188 L 692 187 L 696 194 L 699 203 L 701 205 L 704 214 L 706 216 L 725 261 L 727 263 L 732 277 L 734 278 L 737 277 L 754 277 L 755 278 L 756 276 L 751 267 L 748 258 L 746 256 L 741 243 L 739 241 L 736 232 L 730 221 L 730 219 L 728 217 L 728 215 L 715 189 L 710 176 L 708 174 L 700 156 Z`,
+    `M 785 156 L 784 157 L 784 277 L 799 277 L 800 278 L 803 277 L 874 192 L 876 193 L 876 277 L 894 277 L 895 278 L 898 277 L 898 157 L 897 156 L 881 156 L 879 157 L 817 232 L 807 242 L 806 241 L 806 156 Z`,
+    `M 1013 156 L 974 198 L 959 212 L 959 215 L 972 227 L 1017 277 L 1020 278 L 1021 277 L 1043 277 L 1044 278 L 1045 276 L 1041 273 L 1035 265 L 987 214 L 987 212 L 1025 172 L 1038 157 L 1038 156 Z M 935 156 L 934 157 L 934 277 L 935 278 L 955 277 L 956 276 L 956 157 L 955 156 Z`,
+    `M 1189 102 L 1155 102 L 1150 101 L 1149 102 L 1077 102 L 1076 103 L 1076 276 L 1077 277 L 1083 277 L 1084 278 L 1102 278 L 1103 277 L 1147 277 L 1150 278 L 1151 277 L 1160 277 L 1171 274 L 1182 269 L 1196 255 L 1200 248 L 1203 239 L 1204 216 L 1199 200 L 1195 194 L 1185 184 L 1169 176 L 1153 173 L 1100 173 L 1099 172 L 1099 127 L 1100 126 L 1099 125 L 1101 123 L 1188 123 L 1189 121 Z M 1099 195 L 1100 194 L 1114 194 L 1115 193 L 1133 193 L 1134 194 L 1154 194 L 1166 198 L 1176 207 L 1180 216 L 1181 229 L 1176 243 L 1168 251 L 1160 255 L 1151 257 L 1101 257 L 1099 255 Z`,
+    `M 1343 156 L 1321 156 L 1280 249 L 1278 248 L 1240 158 L 1238 156 L 1216 156 L 1215 157 L 1268 275 L 1255 306 L 1246 324 L 1244 331 L 1266 331 L 1268 329 L 1314 222 L 1316 220 L 1321 206 L 1327 195 L 1335 175 L 1337 173 L 1342 159 L 1344 157 Z`,
+    `M 1444 156 L 1398 206 L 1390 212 L 1390 214 L 1413 237 L 1449 277 L 1470 277 L 1471 278 L 1474 277 L 1475 278 L 1476 276 L 1418 213 L 1470 157 L 1469 156 Z M 1366 156 L 1365 157 L 1365 277 L 1366 278 L 1387 277 L 1387 214 L 1388 213 L 1387 212 L 1387 157 L 1386 156 Z`,
+  ],
+};
+
+function StaticIntroLogo() {
+  return (
+    <svg viewBox="0 0 1523 422" role="img" aria-labelledby="clickbook-static-title clickbook-static-desc" style={{ width: '100%', maxWidth: 1200, height: 'auto' }}>
+      <title id="clickbook-static-title">КликБук — логотип</title>
+      <desc id="clickbook-static-desc">Минималистичный чёрно-белый логотип КликБук.</desc>
+      <rect width="100%" height="100%" fill={INTRO_WHITE} />
+      <g fill={INTRO_BLACK} fillRule="evenodd" clipRule="evenodd" shapeRendering="geometricPrecision">
+        <path d={introPaths.book} />
+        <path d={introPaths.cursor} />
+        {introPaths.rays.map((ray, index) => <path key={index} d={ray} />)}
+        {introPaths.letters.map((letter, index) => <path key={index} d={letter} />)}
+      </g>
+    </svg>
+  );
+}
+
+function ClickBookLogoIntro({ variant = 'ultra', onDone }: { variant?: IntroVariant; onDone?: () => void }) {
+  const [isSkipping, setIsSkipping] = useState(false);
+  const shouldReduceMotion = useReducedMotion();
+  const rawId = useId().replace(/:/g, '');
+  const mode = INTRO_MODES[variant];
+
+  const wordRevealId = `wordRevealClip-${rawId}`;
+  const wordStaticId = `wordStaticClip-${rawId}`;
+  const bookStaticId = `bookStaticClip-${rawId}`;
+  const sheenId = `whiteSheen-${rawId}`;
+  const titleId = `clickbook-intro-title-${rawId}`;
+  const descId = `clickbook-intro-desc-${rawId}`;
+
+  const slideStart = introTimeline.slideStart / mode.total;
+  const slideEnd = (introTimeline.slideStart + mode.slideDuration) / mode.total;
+  const iconTimes = [0, 0.1, 0.24, slideStart, slideEnd, 1];
+  const overlayDuration = shouldReduceMotion ? 0.9 : mode.total + 0.35;
+  const fadeStart = shouldReduceMotion ? 0.55 : mode.total / overlayDuration;
+
+  const finishIntro = useCallback(() => {
+    setIsSkipping(true);
+    window.setTimeout(() => onDone?.(), 180);
+  }, [onDone]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => finishIntro(), overlayDuration * 1000);
+    return () => window.clearTimeout(timer);
+  }, [finishIntro, overlayDuration]);
+
+  if (shouldReduceMotion) {
+    return (
+      <motion.div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 9999,
+          width: '100%',
+          maxWidth: 390,
+          height: 'var(--miniapp-viewport-height, 100dvh)',
+          margin: '0 auto',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: INTRO_WHITE,
+          padding: 32,
+          overflow: 'hidden',
+        }}
+        animate={{ opacity: isSkipping ? 0 : [1, 1, 0] }}
+        transition={isSkipping ? { duration: 0.18, ease: 'easeOut' } : { duration: overlayDuration, times: [0, fadeStart, 1], ease: 'easeOut' }}
+      >
+        <StaticIntroLogo />
+        <button
+          type="button"
+          onClick={finishIntro}
+          style={{
+            position: 'absolute',
+            right: 16,
+            bottom: 'calc(18px + var(--miniapp-safe-bottom, 0px))',
+            border: '1px solid rgba(0,0,0,0.08)',
+            background: 'rgba(0,0,0,0.045)',
+            color: INTRO_BLACK,
+            borderRadius: 999,
+            padding: '8px 12px',
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '-0.02em',
+            cursor: 'pointer',
+          }}
+        >
+          Пропустить
+        </button>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
+        width: '100%',
+        maxWidth: 390,
+        height: 'var(--miniapp-viewport-height, 100dvh)',
+        margin: '0 auto',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        background: INTRO_WHITE,
+        padding: 24,
+        pointerEvents: 'auto',
+      }}
+      animate={{ opacity: isSkipping ? 0 : [1, 1, 0] }}
+      transition={isSkipping ? { duration: 0.18, ease: 'easeOut' } : { duration: overlayDuration, times: [0, fadeStart, 1], ease: 'easeOut' }}
+      onClick={finishIntro}
+    >
+      <motion.svg
+        viewBox="0 0 1523 422"
+        xmlns="http://www.w3.org/2000/svg"
+        role="img"
+        aria-labelledby={`${titleId} ${descId}`}
+        style={{ width: '100%', maxWidth: 1200, height: 'auto' }}
+        initial="hidden"
+        animate="show"
+      >
+        <title id={titleId}>КликБук — premium UI brand logo animation</title>
+        <desc id={descId}>
+          Сначала крупным планом появляется только книга. Камера плавно отдаляется, затем курсор подъезжает справа снизу,
+          кликает по книге, книга прожимается как кнопка, отъезжает влево и справа появляется текст КликБук.
+        </desc>
+
+        <defs>
+          <clipPath id={wordRevealId}>
+            <motion.rect
+              x="432"
+              y="72"
+              height="300"
+              initial={{ width: 0 }}
+              animate={{ width: 1088 }}
+              transition={{ delay: mode.wordDelay, duration: mode.wordDuration, ease: introEase.smooth }}
+            />
+          </clipPath>
+
+          <clipPath id={wordStaticId}>
+            <rect x="432" y="72" width="1088" height="300" />
+          </clipPath>
+
+          <clipPath id={bookStaticId}>
+            <rect x="20" y="22" width="396" height="382" />
+          </clipPath>
+
+          <linearGradient id={sheenId} x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stopColor={INTRO_WHITE} stopOpacity="0" />
+            <stop offset="0.44" stopColor={INTRO_WHITE} stopOpacity="0" />
+            <stop offset="0.5" stopColor={INTRO_WHITE} stopOpacity="0.68" />
+            <stop offset="0.56" stopColor={INTRO_WHITE} stopOpacity="0" />
+            <stop offset="1" stopColor={INTRO_WHITE} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+
+        <rect width="100%" height="100%" fill={INTRO_WHITE} />
+
+        <motion.g
+          id="wordmark"
+          clipPath={`url(#${wordRevealId})`}
+          fill={INTRO_BLACK}
+          fillRule="evenodd"
+          clipRule="evenodd"
+          shapeRendering="geometricPrecision"
+          initial={{ opacity: 0, x: -22, y: 6, filter: 'blur(4px)' }}
+          animate={{ opacity: 1, x: 0, y: 0, filter: 'blur(0px)' }}
+          transition={{ delay: mode.wordDelay + 0.02, duration: variant === 'startup' ? 0.78 : 0.9, ease: introEase.smooth }}
+        >
+          {introPaths.letters.map((letter, index) => (
+            <motion.path
+              key={index}
+              d={letter}
+              initial={{ opacity: 0, x: variant === 'startup' ? 20 : 14 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{
+                delay: mode.wordDelay + 0.04 + index * (variant === 'startup' ? 0.026 : 0.032),
+                duration: variant === 'startup' ? 0.46 : 0.52,
+                ease: introEase.smooth,
+              }}
+            />
+          ))}
+        </motion.g>
+
+        <motion.rect
+          id="wordmark-final-shine"
+          x="330"
+          y="70"
+          width="180"
+          height="304"
+          fill={`url(#${sheenId})`}
+          clipPath={`url(#${wordStaticId})`}
+          initial={{ opacity: 0, x: 0, skewX: -16 }}
+          animate={{ opacity: [0, mode.wordSheenOpacity, 0], x: [0, 1020, 1110], skewX: -16 }}
+          transition={{ delay: mode.wordDelay + 1.08, duration: variant === 'startup' ? 0.86 : 1.0, times: [0, 0.48, 1], ease: introEase.smooth }}
+        />
+
+        <motion.rect
+          id="temporary-baseline-accent"
+          x="458"
+          y="315"
+          height="3"
+          rx="1.5"
+          fill={INTRO_BLACK}
+          initial={{ opacity: 0, width: 0 }}
+          animate={{ opacity: [0, mode.baselineOpacity, 0], width: [0, variant === 'startup' ? 600 : 460, variant === 'startup' ? 600 : 460] }}
+          transition={{ delay: mode.wordDelay + 1.22, duration: 0.74, ease: introEase.smooth }}
+        />
+
+        <motion.g
+          id="icon"
+          animate={{
+            x: [548, 548, 548, 548, 0, 0],
+            y: [0, 0, 0, 0, 0, 0],
+            scale: [mode.startScale, mode.startScale, 1, 1, 1, 1],
+          }}
+          transition={{ duration: mode.total, times: iconTimes, ease: introEase.smooth }}
+          style={{ transformOrigin: '214px 211px' }}
+        >
+          <motion.g
+            id="book-button"
+            initial={{ opacity: 0, scale: 0.965, y: 10 }}
+            animate={{
+              opacity: 1,
+              scale: [0.965, 1, 1, 0.94, variant === 'startup' ? 1.022 : 1.014, 1],
+              y: [10, 0, 0, 5, -1, 0],
+            }}
+            transition={{
+              opacity: { delay: introTimeline.bookAppear, duration: 0.38, ease: introEase.smooth },
+              scale: { delay: introTimeline.bookAppear, duration: 3.1, times: [0, 0.18, 0.77, 0.87, 0.95, 1], ease: introEase.press },
+              y: { delay: introTimeline.bookAppear, duration: 3.1, times: [0, 0.18, 0.77, 0.87, 0.95, 1], ease: introEase.press },
+            }}
+            style={{ transformOrigin: '214px 211px' }}
+          >
+            <rect x="20" y="22" width="396" height="382" fill={INTRO_WHITE} />
+            <path d={introPaths.book} fill={INTRO_BLACK} fillRule="evenodd" clipRule="evenodd" shapeRendering="geometricPrecision" />
+
+            <motion.rect
+              id="book-premium-sheen"
+              x="-110"
+              y="22"
+              width="120"
+              height="382"
+              fill={`url(#${sheenId})`}
+              clipPath={`url(#${bookStaticId})`}
+              initial={{ opacity: 0, x: 0, skewX: -16 }}
+              animate={{ opacity: [0, mode.bookSheenOpacity, 0], x: [0, 470, 520], skewX: -16 }}
+              transition={{ delay: 0.62, duration: variant === 'startup' ? 0.72 : 0.86, times: [0, 0.48, 1], ease: introEase.smooth }}
+            />
+          </motion.g>
+
+          <motion.path
+            id="cursor"
+            d={introPaths.cursor}
+            fill={INTRO_BLACK}
+            fillRule="evenodd"
+            clipRule="evenodd"
+            shapeRendering="geometricPrecision"
+            initial={{ opacity: 0, x: 320, y: 240, scale: 0.9, rotate: -4 }}
+            animate={{
+              opacity: [0, 0, 1, 1, 1, 1],
+              x: [320, 320, 142, 40, 0, 0],
+              y: [240, 240, 108, 30, 0, 0],
+              scale: [0.9, 0.9, 0.98, 1, 0.88, 1],
+              rotate: [-4, -4, -1.2, 0, 0, 0],
+            }}
+            transition={{ delay: introTimeline.cursorIn, duration: variant === 'startup' ? 1.22 : 1.36, times: [0, 0.08, 0.5, 0.74, 0.88, 1], ease: introEase.cursor }}
+            style={{ transformOrigin: '210px 248px' }}
+          />
+
+          <motion.circle
+            id="click-halo"
+            cx="166"
+            cy="185"
+            r="28"
+            fill="none"
+            stroke={INTRO_BLACK}
+            strokeWidth={variant === 'startup' ? 4.8 : 4}
+            initial={{ opacity: 0, scale: 0.45, pathLength: 0 }}
+            animate={{ opacity: [0, mode.clickRingOpacity, 0], scale: [0.45, variant === 'startup' ? 1.42 : 1.25, variant === 'startup' ? 1.72 : 1.48], pathLength: [0, 1, 1] }}
+            transition={{ delay: introTimeline.click + 0.04, duration: variant === 'startup' ? 0.64 : 0.58, times: [0, 0.48, 1], ease: introEase.cursor }}
+            style={{ transformOrigin: '166px 185px' }}
+          />
+
+          <motion.circle
+            id="inner-click-ripple"
+            cx="166"
+            cy="185"
+            r="9"
+            fill={INTRO_BLACK}
+            initial={{ opacity: 0, scale: 0.2 }}
+            animate={{ opacity: [0, mode.innerRippleOpacity, 0], scale: [0.2, variant === 'startup' ? 2.2 : 1.8, variant === 'startup' ? 2.8 : 2.4] }}
+            transition={{ delay: introTimeline.click + 0.02, duration: variant === 'startup' ? 0.52 : 0.46, times: [0, 0.36, 1], ease: introEase.cursor }}
+            style={{ transformOrigin: '166px 185px' }}
+          />
+
+          <motion.g
+            id="click-rays"
+            initial="hidden"
+            animate="show"
+            variants={{
+              hidden: {},
+              show: { transition: { delayChildren: introTimeline.click + 0.08, staggerChildren: variant === 'startup' ? 0.022 : 0.028 } },
+            }}
+          >
+            {introPaths.rays.map((ray, index) => (
+              <motion.path
+                key={index}
+                d={ray}
+                fill={INTRO_BLACK}
+                fillRule="evenodd"
+                clipRule="evenodd"
+                shapeRendering="geometricPrecision"
+                variants={{
+                  hidden: { opacity: 0, scale: 0.64, y: 1 },
+                  show: {
+                    opacity: [0, 1, 0],
+                    scale: [0.64, mode.rayScale, 0.98],
+                    y: [1, 0, 0],
+                    transition: { duration: variant === 'startup' ? 0.54 : 0.48, times: [0, 0.32, 1], ease: introEase.smooth },
+                  },
+                }}
+                style={{ transformOrigin: '166px 174px' }}
+              />
+            ))}
+          </motion.g>
+        </motion.g>
+      </motion.svg>
+
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          finishIntro();
+        }}
+        style={{
+          position: 'absolute',
+          right: 16,
+          bottom: 'calc(18px + var(--miniapp-safe-bottom, 0px))',
+          border: '1px solid rgba(0,0,0,0.08)',
+          background: 'rgba(0,0,0,0.045)',
+          color: INTRO_BLACK,
+          borderRadius: 999,
+          padding: '8px 12px',
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: '-0.02em',
+          cursor: 'pointer',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+        }}
+      >
+        Пропустить
+      </button>
+
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          left: 18,
+          right: 18,
+          bottom: 'calc(8px + var(--miniapp-safe-bottom, 0px))',
+          height: 2,
+          borderRadius: 999,
+          overflow: 'hidden',
+          background: 'rgba(0,0,0,0.08)',
+        }}
+      >
+        <motion.div
+          style={{ height: '100%', borderRadius: 999, background: INTRO_BLACK, transformOrigin: 'left center' }}
+          initial={{ scaleX: 0 }}
+          animate={{ scaleX: 1 }}
+          transition={{ duration: overlayDuration, ease: 'linear' }}
+        />
+      </div>
+    </motion.div>
+  );
+}
+
 function ToastHost({ items }: { items: ToastItem[] }) {
   const { T } = useTheme();
   return (
     <div style={{
-      position: 'absolute', left: 0, right: 0, bottom: 96, zIndex: 200,
+      position: 'fixed', left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 390, bottom: 96, zIndex: 200,
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, pointerEvents: 'none',
     }}>
       <style>{`@keyframes mini-toast-in { from { transform: translateY(8px) scale(.98); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }`}</style>
@@ -62,7 +516,6 @@ function readMiniNotificationIds(): string[] {
   }
 }
 
-
 // ─── Tab definitions ─────────────────────────
 type TabId = 'home' | 'appts' | 'chats' | 'clients' | 'more';
 
@@ -104,8 +557,12 @@ function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) 
   const dark = mode === 'dark';
   return (
     <div style={{
-      position: 'absolute',
-      left: 0, right: 0, bottom: 0,
+      position: 'fixed',
+      left: '50%',
+      bottom: 0,
+      transform: 'translateX(-50%)',
+      width: '100%',
+      maxWidth: 390,
       padding: '4px 10px calc(2px + var(--miniapp-safe-bottom, var(--tg-content-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)))))',
       zIndex: 80,
       pointerEvents: 'auto',
@@ -182,8 +639,12 @@ function TgHeader({ onToggleTheme, onNotifications, notificationCount = 0 }: { o
   };
   return (
     <div style={{
-      position: 'absolute',
-      top: 0, left: 0, right: 0,
+      position: 'fixed',
+      top: 0,
+      left: '50%',
+      transform: 'translateX(-50%)',
+      width: '100%',
+      maxWidth: 390,
       padding: 'calc(8px + var(--miniapp-safe-top, var(--tg-content-safe-top, 0px))) 10px 4px',
       zIndex: 80,
       pointerEvents: 'auto',
@@ -254,6 +715,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
   const [tab, setTab] = useState<TabId>(initialTab);
   const [sub, setSub] = useState<SubRoute | null>(initialSub);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [showIntro, setShowIntro] = useState(false);
   const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { threads } = useChats();
@@ -265,6 +727,20 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
     }))
   ), [APPOINTMENTS, threads, readNotificationIds]);
   const notificationCount = Math.min(99, unreadEventCount(notificationEvents));
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const alreadySeen = window.sessionStorage.getItem(INTRO_SEEN_KEY) === '1';
+    if (!alreadySeen) setShowIntro(true);
+  }, []);
+
+  const closeIntro = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem(INTRO_SEEN_KEY, '1');
+    }
+    setShowIntro(false);
+    haptic('success');
+  }, []);
 
   const toastApi = useMemo<MiniToastCtxValue>(() => ({
     show: (text, tone = 'info') => {
@@ -396,7 +872,18 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
 
   return (
     <ToastCtx.Provider value={toastApi}>
-      <div className="cb-miniapp cb-mini-app-root" data-mini-theme={mode} data-mini-mode={mode} style={{
+      <motion.div
+        className="cb-miniapp cb-mini-app-root"
+        data-mini-theme={mode}
+        data-mini-mode={mode}
+        initial={false}
+        animate={{
+          opacity: showIntro ? 0.72 : 1,
+          scale: showIntro ? 0.985 : 1,
+          filter: showIntro ? 'blur(8px)' : 'blur(0px)',
+        }}
+        transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+        style={{
         '--mini-bg': T.bg,
         '--mini-card': T.card,
         '--mini-input-bg': T.inputBg,
@@ -416,6 +903,13 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
         position: 'relative',
       } as CSSProperties}>
         <style>{`
+          html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            overscroll-behavior: none;
+          }
+
           .cb-miniapp, .cb-miniapp * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
           .cb-miniapp button:active { opacity: 0.7; transform: scale(0.94); }
           @keyframes badge-pop { 0% { transform: scale(0); } 70% { transform: scale(1.25); } 100% { transform: scale(1); } }
@@ -490,14 +984,18 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
               minHeight: 0,
               overflowY: 'auto',
               overflowX: 'hidden',
+              paddingTop: 'calc(72px + var(--miniapp-safe-top, 0px))',
+              paddingBottom: 'calc(76px + var(--miniapp-safe-bottom, 0px))',
+              WebkitOverflowScrolling: 'touch',
             }}
           >
             {content}
           </div>
         )}
         {!isFullHeight && <BottomNav active={tab} onChange={(id) => { setTab(id); setSub(null); }} />}
+        {showIntro && <ClickBookLogoIntro variant="ultra" onDone={closeIntro} />}
         <ToastHost items={toasts} />
-      </div>
+      </motion.div>
     </ToastCtx.Provider>
   );
 }
