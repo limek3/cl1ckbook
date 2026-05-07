@@ -505,7 +505,15 @@ interface SubRoute {
 }
 
 // ─── Bottom Nav ──────────────────────────────
-function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) => void }) {
+function BottomNav({
+  active,
+  onChange,
+  chatNotificationCount = 0,
+}: {
+  active: TabId;
+  onChange: (id: TabId) => void;
+  chatNotificationCount?: number;
+}) {
   const { T, mode } = useTheme();
   const dark = mode === 'dark';
   return (
@@ -535,6 +543,7 @@ function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) 
       }}>
         {TABS.map((t) => {
           const isActive = active === t.id;
+          const badgeCount = t.id === 'chats' ? Math.min(99, chatNotificationCount) : 0;
           return (
             <button key={t.id} onClick={() => { haptic('light'); onChange(t.id); }} style={{
               border: `1px solid ${isActive ? (dark ? 'rgba(255,255,255,0.075)' : 'rgba(0,0,0,0.06)') : 'transparent'}`,
@@ -556,8 +565,33 @@ function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) 
               color: isActive ? T.accent : T.text3,
               boxShadow: isActive ? 'inset 0 1px 0 rgba(255,255,255,0.05), 0 8px 22px rgba(0,0,0,0.24)' : 'none',
               transition: 'background 0.18s ease, color 0.18s ease, transform 0.12s ease, border-color 0.18s ease',
+              position: 'relative',
             }}>
               <Icon name={t.icon} size={17} stroke={isActive ? 2.05 : 1.6} />
+              {badgeCount > 0 && (
+                <span className="notif-badge" style={{
+                  position: 'absolute',
+                  top: 4,
+                  right: 'calc(50% - 22px)',
+                  minWidth: 15,
+                  height: 15,
+                  padding: '0 4px',
+                  borderRadius: 999,
+                  background: T.danger,
+                  color: '#fff',
+                  border: `2px solid ${dark ? 'rgba(17,17,17,0.92)' : 'rgba(255,255,255,0.95)'}`,
+                  fontSize: 8,
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontVariantNumeric: 'tabular-nums',
+                  boxShadow: `0 2px 6px ${T.danger}66`,
+                  lineHeight: 1,
+                }}>
+                  {badgeCount > 9 ? '9+' : badgeCount}
+                </span>
+              )}
               <span style={{
                 maxWidth: '100%',
                 overflow: 'hidden',
@@ -683,6 +717,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
     }))
   ), [APPOINTMENTS, threads, readNotificationIds]);
   const notificationCount = Math.min(99, unreadEventCount(notificationEvents));
+  const chatNotificationCount = Math.min(99, threads.reduce((sum, thread) => sum + Math.max(0, Number(thread.unread) || 0), 0));
 
   const closeIntro = useCallback(() => {
     if (typeof window !== 'undefined') {
@@ -949,7 +984,13 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
             {content}
           </div>
         )}
-        {!isFullHeight && <BottomNav active={tab} onChange={(id) => { setTab(id); setSub(null); }} />}
+        {!isFullHeight && (
+          <BottomNav
+            active={tab}
+            chatNotificationCount={chatNotificationCount}
+            onChange={(id) => { setTab(id); setSub(null); }}
+          />
+        )}
         {showIntro && <ClickBookLogoIntro variant="ultra" onDone={closeIntro} />}
         <ToastHost items={toasts} />
       </motion.div>

@@ -1,81 +1,32 @@
 'use client';
 
-import { type ComponentType, type CSSProperties, type InputHTMLAttributes, type ReactNode, Fragment } from 'react';
-import * as L from 'lucide-react';
+import type { ComponentType, CSSProperties, ReactNode } from 'react';
+import * as LucideIcons from 'lucide-react';
 import { useTheme } from '../theme';
-import { haptic, selectionHaptic } from '../bridge';
+import { haptic } from '../bridge';
+import { MiniBottomSheet } from './mini-bottom-sheet';
 
-function toPascal(s: string): string {
-  return s.split('-').map((w) => w[0]!.toUpperCase() + w.slice(1)).join('');
-}
-
-function tap(kind: 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error' | 'selection' = 'light') {
-  if (kind === 'selection') selectionHaptic();
-  else haptic(kind);
-}
-
-export function Icon({ name, size = 20, stroke = 1.5, color }: { name: string; size?: number; stroke?: number; color?: string }) {
-  const Comp = (L as any)[toPascal(name)] as ComponentType<any> | undefined;
-  if (!Comp) return null;
-  return <Comp size={size} strokeWidth={stroke} color={color || 'currentColor'} />;
-}
-
-interface CardProps {
-  children: ReactNode;
+type IconProps = {
+  name: string;
+  size?: number;
+  color?: string;
+  stroke?: number;
   style?: CSSProperties;
-  padded?: boolean;
-  onClick?: () => void;
+};
+
+function toPascalIconName(name: string) {
+  return name
+    .split('-')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join('');
 }
 
-export function Card({ children, style, padded = true, onClick }: CardProps) {
-  const { T } = useTheme();
-  return (
-    <div
-      onClick={onClick ? () => { tap('light'); onClick(); } : undefined}
-      style={{
-        background: T.card,
-        border: `1px solid ${T.border}`,
-        borderRadius: 16,
-        padding: padded ? 20 : 0,
-        boxShadow: T.cardShadow,
-        cursor: onClick ? 'pointer' : 'default',
-        transition: 'transform 0.14s ease, border-color 0.14s ease, background 0.14s ease, opacity 0.14s ease',
-        ...style,
-      }}
-    >{children}</div>
-  );
-}
-
-export function FieldLabel({ children, style }: { children: ReactNode; style?: CSSProperties }) {
-  const { T } = useTheme();
-  return (
-    <div style={{
-      fontSize: 10, fontWeight: 500, letterSpacing: '0.08em', textTransform: 'uppercase',
-      color: T.text3, ...style,
-    }}>{children}</div>
-  );
-}
-
-export function SectionTitle({ title, subtitle, right }: { title: string; subtitle?: string; right?: ReactNode }) {
-  const { T } = useTheme();
-  return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 12, padding: '0 4px', gap: 12 }}>
-      <div>
-        <div style={{ fontSize: 15, fontWeight: 500, color: T.text, letterSpacing: '-0.01em' }}>{title}</div>
-        {subtitle && <div style={{ fontSize: 12, color: T.text2, marginTop: 2 }}>{subtitle}</div>}
-      </div>
-      {right}
-    </div>
-  );
-}
-
-export function StatusDot({ status }: { status: 'in-focus' | 'scheduled' | 'completed' | 'cancelled' | string }) {
-  const { T } = useTheme();
-  const color = status === 'in-focus' ? T.accent
-    : status === 'completed' ? T.success
-    : status === 'cancelled' ? T.danger
-    : 'rgba(18,125,254,0.55)';
-  return <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />;
+export function Icon({ name, size = 18, color = 'currentColor', stroke = 1.8, style }: IconProps) {
+  const iconName = toPascalIconName(name);
+  const IconComp = (LucideIcons as unknown as Record<string, ComponentType<any>>)[iconName]
+    ?? (LucideIcons as unknown as Record<string, ComponentType<any>>).Circle;
+  return <IconComp size={size} color={color} strokeWidth={stroke} style={style} />;
 }
 
 export function Divider() {
@@ -83,15 +34,113 @@ export function Divider() {
   return <div style={{ height: 1, background: T.border, width: '100%' }} />;
 }
 
-export function Avatar({ name, src, size = 36, radius = 10 }: { name: string; src?: string; size?: number; radius?: number }) {
+export function Card({
+  children,
+  padded = true,
+  style,
+  onClick,
+}: {
+  children: ReactNode;
+  padded?: boolean;
+  style?: CSSProperties;
+  onClick?: () => void;
+}) {
   const { T } = useTheme();
-  const initials = (name || '').split(' ').map((s) => s[0]).filter(Boolean).slice(0, 2).join('');
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        background: T.card,
+        border: `1px solid ${T.border}`,
+        borderRadius: 18,
+        boxShadow: T.cardShadow,
+        padding: padded ? 18 : 0,
+        overflow: 'hidden',
+        color: T.text,
+        cursor: onClick ? 'pointer' : undefined,
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function FieldLabel({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+  const { T } = useTheme();
   return (
     <div style={{
-      width: size, height: size, borderRadius: radius, background: T.cardElev,
-      border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: size * 0.34, color: T.text2, fontWeight: 500, flexShrink: 0,
-      letterSpacing: '0.02em', overflow: 'hidden',
+      fontSize: 10,
+      fontWeight: 700,
+      letterSpacing: '0.08em',
+      textTransform: 'uppercase',
+      color: T.text3,
+      ...style,
+    }}>
+      {children}
+    </div>
+  );
+}
+
+export function SectionTitle({
+  title,
+  subtitle,
+  right,
+  style,
+}: {
+  title: string;
+  subtitle?: string;
+  right?: ReactNode;
+  style?: CSSProperties;
+}) {
+  const { T } = useTheme();
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, margin: '0 4px 10px', ...style }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 17, fontWeight: 700, color: T.text, letterSpacing: '-0.025em' }}>{title}</div>
+        {subtitle && <div style={{ fontSize: 12, color: T.text3, marginTop: 4, lineHeight: 1.35 }}>{subtitle}</div>}
+      </div>
+      {right && <div style={{ flexShrink: 0 }}>{right}</div>}
+    </div>
+  );
+}
+
+export function Avatar({
+  name,
+  src,
+  size = 40,
+  radius = 14,
+}: {
+  name?: string;
+  src?: string | null;
+  size?: number;
+  radius?: number;
+}) {
+  const { T, mode } = useTheme();
+  const initials = (name || 'К')
+    .trim()
+    .split(/\s+/)
+    .map((p) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || 'К';
+  return (
+    <div style={{
+      width: size,
+      height: size,
+      borderRadius: radius,
+      overflow: 'hidden',
+      flexShrink: 0,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: mode === 'dark' ? 'rgba(255,255,255,0.07)' : 'rgba(10,10,10,0.055)',
+      border: `1px solid ${T.border}`,
+      color: T.text,
+      fontWeight: 800,
+      fontSize: Math.max(11, Math.round(size * 0.32)),
+      letterSpacing: '-0.04em',
     }}>
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -101,148 +150,159 @@ export function Avatar({ name, src, size = 36, radius = 10 }: { name: string; sr
   );
 }
 
-export function Toggle({ on, onChange, size = 'md' }: { on: boolean; onChange: (next: boolean) => void; size?: 'sm' | 'md' }) {
-  const { T } = useTheme();
-  const w = size === 'sm' ? 36 : 42;
-  const h = size === 'sm' ? 22 : 26;
-  const knob = h - 6;
-  return (
-    <button onClick={() => { tap('selection'); onChange(!on); }} style={{
-      width: w, height: h, borderRadius: 999,
-      background: on ? T.accent : T.cardElev,
-      border: `1px solid ${on ? T.accent : T.borderStrong}`,
-      position: 'relative', cursor: 'pointer', padding: 0,
-      transition: 'background 0.16s ease, border-color 0.16s ease, transform 0.12s ease',
-      flexShrink: 0,
-    }}>
-      <span style={{
-        position: 'absolute', top: 2, left: on ? w - knob - 4 : 2,
-        width: knob, height: knob, borderRadius: '50%',
-        background: on ? '#fff' : T.text2,
-        boxShadow: '0 1px 2px rgba(0,0,0,0.18)',
-        transition: 'left 0.16s ease, background 0.16s ease',
-      }} />
-    </button>
-  );
-}
-
-export function Pill({ children, active, onClick, accent }: { children: ReactNode; active?: boolean; onClick?: () => void; accent?: boolean }) {
-  const { T } = useTheme();
-  return (
-    <button onClick={() => { tap('selection'); onClick?.(); }} style={{
-      padding: '8px 14px', borderRadius: 999,
-      background: active ? (accent ? T.accent : T.cardElev) : 'transparent',
-      border: `1px solid ${active ? (accent ? T.accent : T.borderStrong) : T.border}`,
-      color: active ? (accent ? '#fff' : T.text) : T.text2,
-      fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
-      whiteSpace: 'nowrap',
-      transition: 'background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.12s ease',
-    }}>{children}</button>
-  );
-}
-
-export function NavBtn({ icon, onClick, label }: { icon: string; onClick?: () => void; label?: string }) {
-  const { T } = useTheme();
-  return (
-    <button onClick={() => { tap('light'); onClick?.(); }} aria-label={label} style={{
-      width: 40, height: 40, borderRadius: 12, background: T.card,
-      border: `1px solid ${T.border}`, color: T.text2,
-      display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0,
-      transition: 'transform 0.12s ease, border-color 0.14s ease, background 0.14s ease',
-    }}>
-      <Icon name={icon} size={18} />
-    </button>
-  );
-}
-
-interface NeutralBtnProps {
-  children: ReactNode;
-  onClick?: () => void;
+export function NavBtn({
+  icon,
+  onClick,
+  children,
+  style,
+}: {
   icon?: string;
-  full?: boolean;
+  onClick?: () => void;
+  children?: ReactNode;
   style?: CSSProperties;
-  disabled?: boolean;
-  tone?: 'default' | 'primary' | 'danger' | 'success';
-}
-
-export function NeutralBtn({ children, onClick, icon, full, style, disabled, tone = 'default' }: NeutralBtnProps) {
-  const { T } = useTheme();
-  const isPrimary = tone === 'primary';
-  const isDanger = tone === 'danger';
-  const isSuccess = tone === 'success';
+}) {
+  const { T, mode } = useTheme();
   return (
     <button
-      disabled={disabled}
-      onClick={() => {
-        if (disabled) return;
-        tap(isDanger ? 'warning' : isSuccess ? 'success' : isPrimary ? 'medium' : 'light');
-        onClick?.();
-      }}
+      type="button"
+      onClick={() => { haptic('light'); onClick?.(); }}
       style={{
-        background: isPrimary ? T.accent : isSuccess ? 'rgba(34,197,94,0.12)' : 'transparent',
-        border: `1px solid ${isPrimary ? T.accent : isDanger ? 'rgba(239,68,68,0.28)' : isSuccess ? 'rgba(34,197,94,0.22)' : T.borderStrong}`,
-        borderRadius: 12,
-        padding: '12px 16px',
-        color: isPrimary ? '#fff' : isDanger ? T.danger : isSuccess ? T.success : T.text,
-        fontSize: 13,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.45 : 1,
-        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-        width: full ? '100%' : undefined,
+        width: children ? 'auto' : 40,
+        height: 40,
+        minWidth: 40,
+        borderRadius: 13,
+        border: `1px solid ${T.border}`,
+        background: mode === 'dark' ? 'rgba(255,255,255,0.045)' : 'rgba(255,255,255,0.72)',
+        color: T.text2,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        padding: children ? '0 12px' : 0,
+        cursor: 'pointer',
         fontFamily: 'inherit',
-        transition: 'border-color 0.15s ease, background 0.15s ease, color 0.15s ease, transform 0.12s ease, opacity 0.12s ease',
         ...style,
       }}
     >
-      {icon && <Icon name={icon} size={14} stroke={1.75} />}
+      {icon && <Icon name={icon} size={17} />}
       {children}
     </button>
   );
 }
 
-export function ChannelTag({ channel }: { channel: string }) {
+export function NeutralBtn({
+  icon,
+  children,
+  onClick,
+  full,
+  disabled,
+  style,
+}: {
+  icon?: string;
+  children: ReactNode;
+  onClick?: () => void;
+  full?: boolean;
+  disabled?: boolean;
+  style?: CSSProperties;
+}) {
   const { T } = useTheme();
   return (
-    <span style={{
-      fontSize: 9, padding: '2px 6px', borderRadius: 999,
-      border: `1px solid ${T.border}`, color: T.text3,
-      letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 500,
-      background: T.cardElev,
-    }}>{channel}</span>
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => { if (!disabled) { haptic('light'); onClick?.(); } }}
+      style={{
+        width: full ? '100%' : 'auto',
+        border: `1px solid ${T.border}`,
+        background: T.cardElev,
+        color: disabled ? T.text3 : T.text,
+        borderRadius: 14,
+        padding: '11px 14px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        cursor: disabled ? 'default' : 'pointer',
+        fontFamily: 'inherit',
+        fontSize: 13,
+        fontWeight: 650,
+        opacity: disabled ? 0.6 : 1,
+        ...style,
+      }}
+    >
+      {icon && <Icon name={icon} size={15} />}
+      {children}
+    </button>
   );
 }
 
-interface ListRowProps {
+export function EmptyState({
+  icon,
+  title,
+  text,
+  action,
+}: {
   icon?: string;
-  label: ReactNode;
-  sub?: ReactNode;
-  right?: ReactNode;
-  onClick?: () => void;
-  danger?: boolean;
-  accent?: boolean;
-}
-
-export function ListRow({ icon, label, sub, right, onClick, danger, accent }: ListRowProps) {
+  title: string;
+  text?: string;
+  action?: ReactNode;
+}) {
   const { T } = useTheme();
   return (
-    <div onClick={onClick ? () => { tap(danger ? 'warning' : 'light'); onClick(); } : undefined} style={{
-      padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14,
-      cursor: onClick ? 'pointer' : 'default',
-      transition: 'background 0.14s ease, transform 0.12s ease',
+    <div style={{ padding: '28px 18px', textAlign: 'center', color: T.text2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+      {icon && <div style={{ width: 42, height: 42, borderRadius: 16, background: T.cardElev, border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.text3 }}><Icon name={icon} size={18} /></div>}
+      <div style={{ fontSize: 16, fontWeight: 700, color: T.text, letterSpacing: '-0.02em' }}>{title}</div>
+      {text && <div style={{ fontSize: 12, color: T.text3, lineHeight: 1.45, maxWidth: 260 }}>{text}</div>}
+      {action && <div style={{ marginTop: 4 }}>{action}</div>}
+    </div>
+  );
+}
+
+export function SearchBox({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  const { T, mode } = useTheme();
+  return (
+    <div style={{
+      minHeight: 44,
+      borderRadius: 15,
+      background: mode === 'dark' ? 'rgba(255,255,255,0.055)' : 'rgba(10,10,10,0.035)',
+      border: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.07)' : 'rgba(10,10,10,0.06)'}`,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      padding: '0 13px',
+      color: T.text3,
     }}>
-      {icon && (
-        <div style={{ color: danger ? T.danger : T.text2, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20 }}>
-          <Icon name={icon} size={18} />
-        </div>
+      <Icon name="search" size={16} />
+      <input
+        className="cb-mini-transparent cb-mini-input-reset"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        style={{
+          flex: 1,
+          minWidth: 0,
+          border: 0,
+          outline: 0,
+          background: 'transparent',
+          color: T.text,
+          WebkitTextFillColor: T.text,
+          fontSize: 14,
+          fontFamily: 'inherit',
+        }}
+      />
+      {value && (
+        <button type="button" onClick={() => onChange('')} style={{ border: 0, background: 'transparent', color: T.text3, display: 'flex', padding: 0, cursor: 'pointer' }}>
+          <Icon name="x" size={14} />
+        </button>
       )}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, color: danger ? T.danger : T.text, display: 'flex', alignItems: 'center', gap: 8 }}>
-          {label}
-          {accent && <span style={{ width: 5, height: 5, borderRadius: '50%', background: T.accent }} />}
-        </div>
-        {sub && <div style={{ fontSize: 11, color: T.text3, marginTop: 2 }}>{sub}</div>}
-      </div>
-      {right !== undefined ? right : (onClick && <Icon name="chevron-right" size={16} color={T.text3} />)}
     </div>
   );
 }
@@ -250,294 +310,259 @@ export function ListRow({ icon, label, sub, right, onClick, danger, accent }: Li
 export function ScreenHeader({ title, subtitle, onBack, right }: { title: string; subtitle?: string; onBack?: () => void; right?: ReactNode }) {
   const { T } = useTheme();
   return (
-    <div style={{ padding: '16px 16px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        {onBack ? <NavBtn icon="chevron-left" onClick={onBack} /> : <span />}
-        {right || <span />}
+    <div style={{ padding: '18px 16px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+      {onBack && <NavBtn icon="chevron-left" onClick={onBack} />}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 22, fontWeight: 700, color: T.text, letterSpacing: '-0.03em' }}>{title}</div>
+        {subtitle && <div style={{ fontSize: 12, color: T.text3, marginTop: 3, lineHeight: 1.35 }}>{subtitle}</div>}
       </div>
-      <div>
-        <div style={{ fontSize: 22, fontWeight: 600, color: T.text, letterSpacing: '-0.02em' }}>{title}</div>
-        {subtitle && <div style={{ fontSize: 13, color: T.text2, marginTop: 2 }}>{subtitle}</div>}
-      </div>
+      {right}
     </div>
   );
 }
 
-export function EmptyState({
-  icon = 'inbox', title, text, action,
-}: { icon?: string; title: string; text?: string; action?: ReactNode }) {
+export function ChannelTag({ channel }: { channel?: string }) {
+  const { T } = useTheme();
+  const text = channel || '—';
+  return (
+    <span style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      minHeight: 18,
+      padding: '2px 7px',
+      borderRadius: 999,
+      background: T.cardElev,
+      border: `1px solid ${T.border}`,
+      color: T.text3,
+      fontSize: 9,
+      fontWeight: 700,
+      letterSpacing: '0.06em',
+      textTransform: 'uppercase',
+      whiteSpace: 'nowrap',
+    }}>
+      {text}
+    </span>
+  );
+}
+
+export function Pill({
+  children,
+  active,
+  onClick,
+  style,
+}: {
+  children: ReactNode;
+  active?: boolean;
+  onClick?: () => void;
+  style?: CSSProperties;
+}) {
   const { T } = useTheme();
   return (
-    <div style={{
-      padding: '28px 20px', border: `1px dashed ${T.border}`, borderRadius: 16,
-      textAlign: 'center', color: T.text3, fontSize: 13, lineHeight: 1.5,
-      background: T.card,
-    }}>
-      <div style={{ width: 44, height: 44, borderRadius: 16, border: `1px solid ${T.border}`, background: T.cardElev, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', color: T.text3 }}>
-        <Icon name={icon} size={20} />
-      </div>
-      <div style={{ color: T.text, fontSize: 14, fontWeight: 500 }}>{title}</div>
-      {text && <div style={{ marginTop: 6 }}>{text}</div>}
-      {action && <div style={{ marginTop: 14 }}>{action}</div>}
-    </div>
+    <button
+      type="button"
+      onClick={() => { haptic('light'); onClick?.(); }}
+      style={{
+        border: `1px solid ${active ? T.accent : T.border}`,
+        background: active ? T.accent : T.cardElev,
+        color: active ? '#fff' : T.text2,
+        borderRadius: 999,
+        padding: '7px 11px',
+        fontSize: 12,
+        fontWeight: 700,
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+        whiteSpace: 'nowrap',
+        ...style,
+      }}
+    >
+      {children}
+    </button>
   );
 }
 
-export function SearchBox({
-  value, onChange, placeholder,
-}: { value: string; onChange: (value: string) => void; placeholder: string }) {
-  const { T, mode } = useTheme();
-  const dark = mode === 'dark';
-  const shellBg = dark ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.58)';
-  const fieldBg = dark ? 'rgba(255,255,255,0.055)' : 'rgba(10,10,10,0.035)';
-  const fieldBorder = dark ? 'rgba(255,255,255,0.06)' : 'rgba(10,10,10,0.055)';
-
+export function Toggle({ on, onChange }: { on: boolean; onChange: (value: boolean) => void }) {
+  const { T } = useTheme();
   return (
-    <div style={{
-      background: shellBg,
-      border: `1px solid ${dark ? 'rgba(255,255,255,0.075)' : 'rgba(10,10,10,0.06)'}`,
-      borderRadius: 16,
-      boxShadow: dark ? 'inset 0 1px 0 rgba(255,255,255,0.035)' : '0 8px 24px rgba(15,23,42,0.04)',
-      backdropFilter: 'blur(16px) saturate(1.22)',
-      WebkitBackdropFilter: 'blur(16px) saturate(1.22)',
-      padding: '12px 14px',
-      display: 'flex', alignItems: 'center', gap: 10,
-      overflow: 'hidden',
-      transition: 'border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease',
-    }}>
-      <div style={{
-        flex: 1,
-        minWidth: 0,
+    <button
+      type="button"
+      onClick={() => { haptic('light'); onChange(!on); }}
+      style={{
+        width: 46,
+        height: 28,
+        borderRadius: 999,
+        border: `1px solid ${on ? T.accent : T.border}`,
+        background: on ? T.accent : T.cardElev,
+        padding: 3,
+        cursor: 'pointer',
+        display: 'flex',
+        justifyContent: on ? 'flex-end' : 'flex-start',
+        transition: 'background 0.18s ease, border-color 0.18s ease',
+      }}
+    >
+      <span style={{ width: 20, height: 20, borderRadius: 999, background: '#fff', display: 'block', boxShadow: '0 2px 6px rgba(0,0,0,0.16)' }} />
+    </button>
+  );
+}
+
+export function StatusDot({ status }: { status?: string }) {
+  const { T } = useTheme();
+  const color = status === 'completed' || status === 'confirmed' ? T.success
+    : status === 'cancelled' || status === 'no_show' ? T.danger
+    : status === 'in-focus' ? T.accent
+    : T.warn;
+  return <span style={{ width: 10, height: 10, borderRadius: 999, background: color, display: 'inline-block', boxShadow: `0 0 0 4px ${color}22` }} />;
+}
+
+export function ListRow({
+  icon,
+  label,
+  sub,
+  danger,
+  accent,
+  onClick,
+}: {
+  icon?: string;
+  label: string;
+  sub?: string;
+  danger?: boolean;
+  accent?: boolean;
+  onClick?: () => void;
+}) {
+  const { T } = useTheme();
+  const color = danger ? T.danger : accent ? T.accent : T.text;
+  return (
+    <button
+      type="button"
+      onClick={() => { haptic(danger ? 'warning' : 'light'); onClick?.(); }}
+      style={{
+        width: '100%',
+        border: 0,
+        background: 'transparent',
+        color,
+        padding: '14px 18px',
         display: 'flex',
         alignItems: 'center',
-        gap: 10,
-        padding: '0 12px',
-        minHeight: 44,
-        borderRadius: 12,
-        background: fieldBg,
-        border: `1px solid ${fieldBorder}`,
-        boxShadow: dark ? 'inset 0 1px 0 rgba(255,255,255,0.025)' : 'inset 0 1px 1px rgba(15,23,42,0.035)',
-        overflow: 'hidden',
-      }}>
-        <Icon name="search" size={16} color={T.text3} />
-        <input
-          type="text"
-          inputMode="search"
-          autoComplete="off"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className="cb-mini-transparent cb-mini-input-reset"
-          style={{
-            flex: 1,
-            minWidth: 0,
-            background: 'transparent',
-            backgroundColor: 'transparent',
-            WebkitAppearance: 'none',
-            appearance: 'none',
-            border: 'none',
-            outline: 'none',
-            boxShadow: 'none',
-            WebkitBoxShadow: 'none',
-            borderRadius: 0,
-            padding: 0,
-            color: T.text,
-            WebkitTextFillColor: T.text,
-            caretColor: T.accent,
-            fontSize: 16,
-            fontFamily: 'inherit',
-            colorScheme: mode,
-          }}
-        />
-        {value && (
-          <button onClick={() => { tap('selection'); onChange(''); }} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: T.text3, display: 'flex', flexShrink: 0 }}>
-            <Icon name="x" size={14} />
-          </button>
-        )}
+        gap: 12,
+        fontFamily: 'inherit',
+        textAlign: 'left',
+        cursor: onClick ? 'pointer' : 'default',
+      }}
+    >
+      {icon && <div style={{ width: 34, height: 34, borderRadius: 12, background: accent ? T.accentSoft : T.cardElev, border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color }}><Icon name={icon} size={16} /></div>}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 650, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div>
+        {sub && <div style={{ fontSize: 11, color: T.text3, marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</div>}
       </div>
-    </div>
+      <Icon name="chevron-right" size={15} color={T.text3} />
+    </button>
   );
 }
 
-export function FormField({
-  label, value, onChange, placeholder, multiline, type = 'text', inputMode,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  multiline?: boolean;
-  type?: string;
-  inputMode?: InputHTMLAttributes<HTMLInputElement>['inputMode'];
-}) {
-  const { T, mode } = useTheme();
-  const common: CSSProperties = {
-    width: '100%', marginTop: 8, padding: '8px 10px',
-    background: mode === 'dark' ? 'rgba(255,255,255,0.045)' : 'rgba(10,10,10,0.035)',
-    backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.045)' : 'rgba(10,10,10,0.035)',
-    border: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.055)' : 'rgba(10,10,10,0.055)'}`,
-    outline: 'none',
-    boxShadow: 'none',
-    WebkitBoxShadow: 'none',
-    borderRadius: 10, color: T.text, WebkitTextFillColor: T.text, caretColor: T.accent, fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5, WebkitAppearance: 'none', appearance: 'none', colorScheme: mode,
-  };
-  return (
-    <div style={{ background: T.cardElev, border: `1px solid ${T.border}`, borderRadius: 14, padding: '12px 14px' }}>
-      <FieldLabel style={{ fontSize: 9 }}>{label}</FieldLabel>
-      {multiline ? (
-        <textarea className="cb-mini-input cb-mini-input-reset" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} rows={4} style={{ ...common, resize: 'vertical' }} />
-      ) : (
-        <input className="cb-mini-input cb-mini-input-reset" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} type={type} inputMode={inputMode} style={common} />
-      )}
-    </div>
-  );
-}
-
-interface BottomSheetProps {
-  open: boolean;
-  onClose: () => void;
-  children: ReactNode;
-  title?: string;
-  subtitle?: ReactNode;
-  right?: ReactNode;
-  footer?: ReactNode;
-  maxHeight?: string;
-}
-
-export function BottomSheet({ open, onClose, children, title, subtitle, right, footer, maxHeight = '88%' }: BottomSheetProps) {
-  const { T, mode } = useTheme();
-  const sheetGlassBg = mode === 'dark' ? 'rgba(17,17,17,0.86)' : 'rgba(255,255,255,0.90)';
-  if (!open) return null;
-  return (
-    <div style={{ position: 'absolute', inset: 0, zIndex: 100, display: 'flex', alignItems: 'flex-end', animation: 'mini-fade-in 0.16s ease both' }}>
-      <style>{`
-        @keyframes mini-fade-in { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes mini-sheet-up { from { transform: translateY(18px); opacity: .9; } to { transform: translateY(0); opacity: 1; } }
-        @keyframes mini-scale-in { from { transform: scale(.98); opacity: .9; } to { transform: scale(1); opacity: 1; } }
-      `}</style>
-      <div
-        onClick={() => { tap('light'); onClose(); }}
-        style={{
-          position: 'absolute', inset: 0, background: T.overlayBg,
-          backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-        }}
-      />
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          position: 'relative',
-          width: '100%',
-          background: sheetGlassBg,
-          backdropFilter: 'blur(24px) saturate(1.32)',
-          WebkitBackdropFilter: 'blur(24px) saturate(1.32)',
-          borderTopLeftRadius: 24,
-          borderTopRightRadius: 24,
-          borderTop: `1px solid ${T.border}`,
-          boxShadow: mode === 'dark' ? '0 -18px 54px rgba(0,0,0,0.46)' : '0 -18px 42px rgba(15,23,42,0.14)',
-          maxHeight,
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          animation: 'mini-sheet-up 0.2s cubic-bezier(.2,.8,.2,1) both',
-        }}
-      >
-        <div style={{ padding: '10px 0 0', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
-          <div style={{ width: 36, height: 4, borderRadius: 999, background: T.borderStrong }} />
-        </div>
-        {(title || subtitle || right) && (
-          <div style={{ padding: '14px 20px 12px', display: 'flex', alignItems: 'flex-start', gap: 12, flexShrink: 0 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {title && <div style={{ fontSize: 18, fontWeight: 600, color: T.text, letterSpacing: '-0.02em' }}>{title}</div>}
-              {subtitle && <div style={{ fontSize: 12, color: T.text2, lineHeight: 1.5, marginTop: title ? 4 : 0 }}>{subtitle}</div>}
-            </div>
-            {right ?? (
-              <button
-                onClick={() => { tap('light'); onClose(); }}
-                aria-label="Закрыть"
-                style={{
-                  width: 32, height: 32, flexShrink: 0,
-                  borderRadius: 10, border: `1px solid ${T.border}`,
-                  background: T.cardElev, color: T.text2, cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
-                  transition: 'background 0.14s ease, border-color 0.14s ease',
-                }}
-              >
-                <Icon name="x" size={16} />
-              </button>
-            )}
-          </div>
-        )}
-        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: title || subtitle || right ? '0 0 18px' : '10px 0 20px' }}>
-          {children}
-        </div>
-        {footer && (
-          <div style={{ flexShrink: 0, padding: '14px 20px calc(14px + env(safe-area-inset-bottom, 0px))', borderTop: `1px solid ${T.border}`, background: sheetGlassBg, backdropFilter: 'blur(18px) saturate(1.25)', WebkitBackdropFilter: 'blur(18px) saturate(1.25)' }}>
-            {footer}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export interface SheetAction {
+export type ActionSheetAction = {
   id: string;
   label: string;
   sub?: string;
   icon?: string;
-  tone?: 'default' | 'primary' | 'danger' | 'success';
-  disabled?: boolean;
+  tone?: 'primary' | 'danger' | 'success' | 'default' | string;
   onClick: () => void;
-}
+};
 
 export function ActionSheet({
-  open, onClose, title, subtitle, actions,
+  open,
+  onClose,
+  title,
+  subtitle,
+  actions,
 }: {
   open: boolean;
   onClose: () => void;
-  title: string;
+  title?: string;
   subtitle?: ReactNode;
-  actions: SheetAction[];
+  actions: ActionSheetAction[];
 }) {
   const { T } = useTheme();
   return (
-    <BottomSheet open={open} onClose={onClose} title={title} subtitle={subtitle} maxHeight="72%">
-      <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {actions.map((action) => {
-          const danger = action.tone === 'danger';
-          const primary = action.tone === 'primary';
-          const success = action.tone === 'success';
-          return (
-            <button
-              key={action.id}
-              disabled={action.disabled}
-              onClick={() => {
-                if (action.disabled) return;
-                tap(danger ? 'warning' : success ? 'success' : primary ? 'medium' : 'light');
-                action.onClick();
-              }}
-              style={{
-                width: '100%', minHeight: 52, padding: '12px 14px', borderRadius: 14,
-                border: `1px solid ${primary ? T.accent : danger ? 'rgba(239,68,68,0.28)' : success ? 'rgba(34,197,94,0.22)' : T.border}`,
-                background: primary ? T.accent : success ? 'rgba(34,197,94,0.12)' : T.cardElev,
-                color: primary ? '#fff' : danger ? T.danger : success ? T.success : T.text,
-                cursor: action.disabled ? 'not-allowed' : 'pointer', opacity: action.disabled ? 0.45 : 1,
-                display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', fontFamily: 'inherit',
-                transition: 'background 0.14s ease, border-color 0.14s ease, transform 0.12s ease',
-              }}
-            >
-              {action.icon && <Icon name={action.icon} size={18} />}
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 14, fontWeight: 500 }}>{action.label}</span>
-                {action.sub && <span style={{ display: 'block', fontSize: 11, lineHeight: 1.4, marginTop: 2, color: primary ? 'rgba(255,255,255,0.72)' : danger ? 'rgba(239,68,68,0.72)' : T.text3 }}>{action.sub}</span>}
-              </span>
-            </button>
-          );
-        })}
-        <NeutralBtn full onClick={onClose}>Отмена</NeutralBtn>
+    <MiniBottomSheet open={open} onClose={onClose} maxHeight="min(70vh, 460px)" tail>
+      <div style={{ padding: '18px 18px 20px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
+          <div style={{ minWidth: 0 }}>
+            {title && <div style={{ fontSize: 18, fontWeight: 800, color: T.text, letterSpacing: '-0.025em' }}>{title}</div>}
+            {subtitle && <div style={{ fontSize: 12, color: T.text3, marginTop: 5, lineHeight: 1.45 }}>{subtitle}</div>}
+          </div>
+          <button type="button" onClick={onClose} style={{ width: 32, height: 32, borderRadius: 11, border: `1px solid ${T.border}`, background: T.cardElev, color: T.text2, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}>
+            <Icon name="x" size={15} />
+          </button>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {actions.map((action) => {
+            const danger = action.tone === 'danger';
+            const primary = action.tone === 'primary';
+            return (
+              <button
+                type="button"
+                key={action.id}
+                onClick={() => { haptic(danger ? 'warning' : 'light'); action.onClick(); }}
+                style={{
+                  width: '100%',
+                  borderRadius: 15,
+                  border: `1px solid ${danger ? 'rgba(239,68,68,0.28)' : primary ? T.accent : T.border}`,
+                  background: danger ? 'rgba(239,68,68,0.12)' : primary ? T.accent : T.cardElev,
+                  color: danger ? T.danger : primary ? '#fff' : T.text,
+                  padding: '13px 14px',
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  textAlign: 'left',
+                }}
+              >
+                {action.icon && <Icon name={action.icon} size={17} />}
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 14, fontWeight: 750 }}>{action.label}</span>
+                  {action.sub && <span style={{ display: 'block', marginTop: 3, fontSize: 11, color: primary ? 'rgba(255,255,255,0.75)' : T.text3 }}>{action.sub}</span>}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
-    </BottomSheet>
+    </MiniBottomSheet>
   );
 }
 
-export { Fragment };
+export function BottomSheet({
+  open,
+  onClose,
+  title,
+  subtitle,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title?: ReactNode;
+  subtitle?: ReactNode;
+  children: ReactNode;
+}) {
+  const { T } = useTheme();
+  return (
+    <MiniBottomSheet open={open} onClose={onClose} maxHeight="min(78vh, 680px)" tail>
+      <div style={{ padding: '18px 0 20px' }}>
+        {(title || subtitle) && (
+          <div style={{ padding: '0 20px 16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ minWidth: 0 }}>
+              {title && <div style={{ fontSize: 18, color: T.text, fontWeight: 800, letterSpacing: '-0.025em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</div>}
+              {subtitle && <div style={{ fontSize: 12, color: T.text3, marginTop: 5, lineHeight: 1.45 }}>{subtitle}</div>}
+            </div>
+            <button type="button" onClick={onClose} style={{ width: 32, height: 32, borderRadius: 11, border: `1px solid ${T.border}`, background: T.cardElev, color: T.text2, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}>
+              <Icon name="x" size={15} />
+            </button>
+          </div>
+        )}
+        <div style={{ maxHeight: 'calc(min(78vh, 680px) - 72px)', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          {children}
+        </div>
+      </div>
+    </MiniBottomSheet>
+  );
+}

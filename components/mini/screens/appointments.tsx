@@ -2,11 +2,11 @@
 
 import { useMemo, useState } from 'react';
 import { useTheme } from '../theme';
-import { ActionSheet, EmptyState, FieldLabel, NavBtn, NeutralBtn, StatusDot, Icon } from '../primitives/atoms';
-import { AppointmentDetailSheet } from '../sheets/detail-sheets';
+import { EmptyState, FieldLabel, NavBtn, NeutralBtn, StatusDot, Icon } from '../primitives/atoms';
+import { MiniBottomSheet } from '../primitives/mini-bottom-sheet';
 import { type Appointment } from '@/lib/mini-demo';
 import { useMiniData } from '@/hooks/use-mini-data';
-import { useMiniToast } from '../bridge';
+import { haptic, useMiniToast } from '../bridge';
 
 function localIso(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -34,6 +34,14 @@ function formatDayLabel(offset: number) {
 
 function money(value: number) {
   return `${Math.round(value).toLocaleString('ru-RU')} ₽`;
+}
+
+function dateTimeLabel(a?: Appointment | null) {
+  if (!a) return '—';
+  const date = a.date
+    ? new Date(`${a.date}T00:00:00`).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+    : '';
+  return `${date}${date ? ' · ' : ''}${a.time}`;
 }
 
 export function AppointmentsScreen({ openAppt, go }: { openAppt?: (a: Appointment) => void; go?: (kind: string) => void }) {
@@ -118,33 +126,211 @@ export function AppointmentsScreen({ openAppt, go }: { openAppt?: (a: Appointmen
         </div>
       )}
 
-      <AppointmentDetailSheet
-        appt={active}
-        onClose={() => setActive(null)}
-        onConfirm={active && active.rawStatus !== 'confirmed' ? () => changeStatus(active, 'confirmed', 'Запись подтверждена') : undefined}
-        onComplete={active ? () => changeStatus(active, 'completed', 'Запись завершена') : undefined}
-        onCancel={active ? () => setCancelTarget(active) : undefined}
-        onChat={active ? () => { setActive(null); go?.('chats'); } : undefined}
-      />
-      <ActionSheet
-        open={!!cancelTarget}
-        onClose={() => setCancelTarget(null)}
-        title="Отменить запись?"
-        subtitle={cancelTarget ? `${cancelTarget.name} · ${cancelTarget.service} · ${cancelTarget.time}` : undefined}
-        actions={[
-          {
-            id: 'cancel-booking',
-            label: 'Отменить запись',
-            sub: 'Статус изменится, запись останется в истории клиента',
-            icon: 'x-circle',
-            tone: 'danger',
-            onClick: () => {
-              if (cancelTarget) void changeStatus(cancelTarget, 'cancelled', 'Запись отменена');
-              setCancelTarget(null);
-            },
-          },
-        ]}
-      />
+      <MiniBottomSheet open={Boolean(active)} onClose={() => setActive(null)} maxHeight="min(76vh, 620px)" tail>
+        <AppointmentSheetContent
+          appt={active}
+          onClose={() => setActive(null)}
+          onConfirm={active && active.rawStatus !== 'confirmed' ? () => changeStatus(active, 'confirmed', 'Запись подтверждена') : undefined}
+          onComplete={active ? () => changeStatus(active, 'completed', 'Запись завершена') : undefined}
+          onCancel={active ? () => {
+            haptic('warning');
+            setCancelTarget(active);
+            setActive(null);
+          } : undefined}
+          onChat={active ? () => { setActive(null); go?.('chats'); } : undefined}
+        />
+      </MiniBottomSheet>
+
+      <MiniBottomSheet open={Boolean(cancelTarget)} onClose={() => setCancelTarget(null)} maxHeight="340px" tail>
+        <CancelConfirmContent
+          appt={cancelTarget}
+          onClose={() => setCancelTarget(null)}
+          onCancel={() => {
+            if (cancelTarget) void changeStatus(cancelTarget, 'cancelled', 'Запись отменена');
+            setCancelTarget(null);
+          }}
+        />
+      </MiniBottomSheet>
+    </div>
+  );
+}
+
+function AppointmentSheetContent({
+  appt,
+  onClose,
+  onConfirm,
+  onComplete,
+  onCancel,
+  onChat,
+}: {
+  appt: Appointment | null;
+  onClose: () => void;
+  onConfirm?: () => void;
+  onComplete?: () => void;
+  onCancel?: () => void;
+  onChat?: () => void;
+}) {
+  const { T } = useTheme();
+
+  if (!appt) return null;
+
+  const actionButton = {
+    width: '100%',
+    padding: '12px 14px',
+    borderRadius: 15,
+    border: `1px solid ${T.border}`,
+    background: T.cardElev,
+    color: T.text,
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    fontSize: 13,
+    fontWeight: 700,
+  } as const;
+
+  return (
+    <div style={{ padding: '18px 18px 20px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: T.text, letterSpacing: '-0.025em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {appt.name}
+          </div>
+          <div style={{ fontSize: 12, color: T.text3, marginTop: 5 }}>{appt.service}</div>
+        </div>
+
+        <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 11, border: `1px solid ${T.border}`, background: T.cardElev, color: T.text2, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}>
+          <Icon name="x" size={15} />
+        </button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+        <SheetInfo label="Дата и время" value={dateTimeLabel(appt)} />
+        <SheetInfo label="Длительность" value={`${appt.dur} мин`} />
+        <SheetInfo label="Стоимость" value={money(appt.price ?? 0)} />
+        <div style={{ padding: '12px 14px', borderRadius: 16, background: T.cardElev, border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 10, color: T.text3, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 7 }}>Статус</div>
+          <StatusDot status={appt.status} />
+          <div style={{ marginTop: 7, fontSize: 12, color: T.text2 }}>{appt.statusLabel ?? 'Запланирована'}</div>
+        </div>
+      </div>
+
+      {appt.phone && (
+        <a href={`tel:${appt.phone}`} style={{
+          marginBottom: 14,
+          width: '100%',
+          padding: '12px 14px',
+          borderRadius: 15,
+          border: `1px solid ${T.border}`,
+          background: T.cardElev,
+          color: T.accent,
+          textDecoration: 'none',
+          fontSize: 13,
+          fontWeight: 700,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          fontVariantNumeric: 'tabular-nums',
+        }}>
+          <Icon name="phone" size={16} />
+          {appt.phone}
+        </a>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        {onConfirm && (
+          <button onClick={() => { haptic('success'); onConfirm(); }} style={{ ...actionButton, background: T.accent, borderColor: T.accent, color: '#fff' }}>
+            <Icon name="check" size={16} />
+            Подтвердить
+          </button>
+        )}
+
+        {onComplete && (
+          <button onClick={() => { haptic('success'); onComplete(); }} style={actionButton}>
+            <Icon name="check-circle" size={16} />
+            Завершить
+          </button>
+        )}
+
+        {onChat && (
+          <button onClick={() => { haptic('light'); onChat(); }} style={actionButton}>
+            <Icon name="message-square" size={16} />
+            Чат
+          </button>
+        )}
+
+        {onCancel && (
+          <button onClick={onCancel} style={{ ...actionButton, borderColor: 'rgba(239,68,68,0.28)', background: 'rgba(239,68,68,0.10)', color: T.danger }}>
+            <Icon name="x-circle" size={16} />
+            Отменить
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CancelConfirmContent({
+  appt,
+  onClose,
+  onCancel,
+}: {
+  appt: Appointment | null;
+  onClose: () => void;
+  onCancel: () => void;
+}) {
+  const { T } = useTheme();
+
+  return (
+    <div style={{ padding: '18px 18px 20px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
+        <div>
+          <div style={{ fontSize: 17, fontWeight: 700, color: T.text, letterSpacing: '-0.02em' }}>Отменить запись?</div>
+          <div style={{ fontSize: 12, color: T.text3, marginTop: 5, lineHeight: 1.45 }}>
+            {appt ? `${appt.name} · ${appt.service} · ${appt.time}` : 'Запись будет отмечена как отменённая.'}
+          </div>
+        </div>
+
+        <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 11, border: `1px solid ${T.border}`, background: T.cardElev, color: T.text2, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}>
+          <Icon name="x" size={15} />
+        </button>
+      </div>
+
+      <button
+        onClick={() => { haptic('warning'); onCancel(); }}
+        style={{
+          width: '100%',
+          padding: '13px 14px',
+          borderRadius: 15,
+          border: '1px solid rgba(239,68,68,0.28)',
+          background: 'rgba(239,68,68,0.12)',
+          color: T.danger,
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          fontSize: 14,
+          fontWeight: 700,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+        }}
+      >
+        <Icon name="x-circle" size={16} />
+        Отменить запись
+      </button>
+    </div>
+  );
+}
+
+function SheetInfo({ label, value }: { label: string; value: string }) {
+  const { T } = useTheme();
+  return (
+    <div style={{ padding: '12px 14px', borderRadius: 16, background: T.cardElev, border: `1px solid ${T.border}` }}>
+      <div style={{ fontSize: 10, color: T.text3, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 7 }}>{label}</div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: T.text, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>{value}</div>
     </div>
   );
 }

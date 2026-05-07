@@ -3,8 +3,9 @@
 import { type KeyboardEvent, type ReactNode, Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '../theme';
 import {
-  ActionSheet, Avatar, Card, ChannelTag, Divider, EmptyState, Icon, NavBtn, ScreenHeader, SearchBox,
+  Avatar, Card, ChannelTag, Divider, EmptyState, Icon, NavBtn, ScreenHeader, SearchBox,
 } from '../primitives/atoms';
+import { MiniBottomSheet } from '../primitives/mini-bottom-sheet';
 import { haptic, selectionHaptic } from '../bridge';
 import type { Message, Thread } from '@/lib/mini-demo';
 import { useChats } from '@/hooks/use-chats';
@@ -194,8 +195,6 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const templateButtonRef = useRef<HTMLButtonElement>(null);
-  const templatePopoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (thread.unread > 0) markRead(thread.id);
@@ -204,19 +203,6 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length]);
-
-  useEffect(() => {
-    if (!showTemplates) return;
-    const closeOnOutside = (event: PointerEvent) => {
-      const target = event.target as Node | null;
-      if (!target) return;
-      if (templatePopoverRef.current?.contains(target)) return;
-      if (templateButtonRef.current?.contains(target)) return;
-      setShowTemplates(false);
-    };
-    document.addEventListener('pointerdown', closeOnOutside, true);
-    return () => document.removeEventListener('pointerdown', closeOnOutside, true);
-  }, [showTemplates]);
 
   function applyTemplate(body: string) {
     selectionHaptic();
@@ -240,6 +226,7 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
 
   async function handleDelete() {
     haptic('warning');
+    setShowDeleteConfirm(false);
     await deleteThread(thread.id);
     back();
   }
@@ -307,7 +294,6 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
         zIndex: 50,
       }}>
         <button
-          ref={templateButtonRef}
           onClick={() => { haptic('light'); setShowTemplates((value) => !value); }}
           title="Быстрые ответы"
           style={{
@@ -389,24 +375,8 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
         </button>
       </div>
 
-      {showTemplates && (
-        <div
-          ref={templatePopoverRef}
-          style={{
-            position: 'absolute', left: 12, bottom: 'calc(66px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))', zIndex: 90,
-            width: 'min(330px, calc(100% - 24px))',
-            background: mode === 'dark' ? 'rgba(17,17,17,0.86)' : 'rgba(255,255,255,0.90)',
-            border: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.09)' : 'rgba(10,10,10,0.075)'}`,
-            borderRadius: 22,
-            backdropFilter: 'blur(22px) saturate(1.32)',
-            WebkitBackdropFilter: 'blur(22px) saturate(1.32)',
-            boxShadow: mode === 'dark' ? '0 18px 50px rgba(0,0,0,0.42)' : '0 18px 42px rgba(15,23,42,0.14)',
-            padding: 12,
-            animation: 'mini-template-pop 0.18s cubic-bezier(.2,.8,.2,1) both',
-          }}
-        >
-          <style>{`@keyframes mini-template-pop { from { transform: translateY(10px) scale(.96); opacity: 0; transform-origin: 24px 100%; } to { transform: translateY(0) scale(1); opacity: 1; transform-origin: 24px 100%; } }`}</style>
-          <div style={{ position: 'absolute', left: 22, bottom: -7, width: 14, height: 14, transform: 'rotate(45deg)', background: T.sheetBg, borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }} />
+      <MiniBottomSheet open={showTemplates} onClose={() => setShowTemplates(false)} maxHeight="min(72vh, 430px)" tail>
+        <div style={{ padding: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
             <div>
               <div style={{ fontSize: 14, color: T.text, fontWeight: 600 }}>Быстрые ответы</div>
@@ -433,24 +403,46 @@ export function ChatThreadScreen({ thread: threadProp, back }: { thread: Thread;
             )) : <EmptyState icon="file-text" title="Шаблонов нет" text="Добавь шаблоны сообщений в разделе «Ещё»." />}
           </div>
         </div>
-      )}
+      </MiniBottomSheet>
 
-      <ActionSheet
-        open={showDeleteConfirm}
-        onClose={() => setShowDeleteConfirm(false)}
-        title="Удалить переписку?"
-        subtitle={`Чат с ${thread.name} исчезнет из списка, но записи клиента останутся.`}
-        actions={[
-          {
-            id: 'delete-thread',
-            label: 'Удалить переписку',
-            sub: 'Это действие нельзя отменить из miniapp',
-            icon: 'trash-2',
-            tone: 'danger',
-            onClick: () => { setShowDeleteConfirm(false); void handleDelete(); },
-          },
-        ]}
-      />
+      <MiniBottomSheet open={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} maxHeight="320px" tail>
+        <div style={{ padding: '18px 18px 20px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
+            <div>
+              <div style={{ fontSize: 17, fontWeight: 700, color: T.text, letterSpacing: '-0.02em' }}>Удалить переписку?</div>
+              <div style={{ fontSize: 12, color: T.text3, marginTop: 5, lineHeight: 1.45 }}>
+                Чат с {thread.name} исчезнет из списка, но записи клиента останутся.
+              </div>
+            </div>
+            <button onClick={() => setShowDeleteConfirm(false)} style={{ width: 32, height: 32, borderRadius: 11, border: `1px solid ${T.border}`, background: T.cardElev, color: T.text2, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}>
+              <Icon name="x" size={15} />
+            </button>
+          </div>
+
+          <button
+            onClick={() => void handleDelete()}
+            style={{
+              width: '100%',
+              padding: '13px 14px',
+              borderRadius: 15,
+              border: '1px solid rgba(239,68,68,0.28)',
+              background: 'rgba(239,68,68,0.12)',
+              color: T.danger,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              fontSize: 14,
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+            }}
+          >
+            <Icon name="trash-2" size={16} />
+            Удалить переписку
+          </button>
+        </div>
+      </MiniBottomSheet>
     </div>
   );
 }

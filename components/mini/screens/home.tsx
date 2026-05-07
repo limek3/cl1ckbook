@@ -3,13 +3,13 @@
 import { Fragment, useMemo, useState } from 'react';
 import { useTheme } from '../theme';
 import {
-  Card, FieldLabel, SectionTitle, Divider, StatusDot, Icon,
+  Card, FieldLabel, SectionTitle, Divider, StatusDot, Icon, Avatar,
 } from '../primitives/atoms';
+import { MiniBottomSheet } from '../primitives/mini-bottom-sheet';
 import { type Appointment, type Client, type Service } from '@/lib/mini-demo';
 import { useMiniData } from '@/hooks/use-mini-data';
 import { useChats } from '@/hooks/use-chats';
-import { ClientDetailSheet } from '../sheets/detail-sheets';
-import { useMiniToast } from '../bridge';
+import { haptic, useMiniToast } from '../bridge';
 
 function localIso(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -183,12 +183,109 @@ export function HomeScreen({ go }: { go: (kind: string) => void }) {
         <ShortcutCard icon="bar-chart-3" label="Аналитика" sub="за неделю" onClick={() => go('analytics')} />
       </div>
 
-      <ClientDetailSheet
-        client={activeClient}
-        onClose={() => setActiveClient(null)}
-        onChat={() => { setActiveClient(null); go('chats'); }}
-        onBook={() => { setActiveClient(null); show('Создание записи скоро', 'info'); }}
-      />
+      <MiniBottomSheet open={Boolean(activeClient)} onClose={() => setActiveClient(null)} maxHeight="min(72vh, 560px)" tail>
+        <ClientSheetContent
+          client={activeClient}
+          onClose={() => setActiveClient(null)}
+          onChat={() => { setActiveClient(null); go('chats'); }}
+          onBook={() => { setActiveClient(null); show('Создание записи скоро', 'info'); }}
+        />
+      </MiniBottomSheet>
+    </div>
+  );
+}
+
+function ClientSheetContent({
+  client,
+  onClose,
+  onChat,
+  onBook,
+}: {
+  client: Client | null;
+  onClose: () => void;
+  onChat: () => void;
+  onBook: () => void;
+}) {
+  const { T } = useTheme();
+
+  if (!client) return null;
+
+  const actionButton = {
+    width: '100%',
+    padding: '12px 14px',
+    borderRadius: 15,
+    border: `1px solid ${T.border}`,
+    background: T.cardElev,
+    color: T.text,
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    fontSize: 13,
+    fontWeight: 700,
+  } as const;
+
+  return (
+    <div style={{ padding: '18px 18px 20px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+          <Avatar name={client.name} size={46} radius={16} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: T.text, letterSpacing: '-0.025em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {client.name}
+            </div>
+            <a href={`tel:${client.phone}`} style={{ display: 'block', marginTop: 4, fontSize: 12, color: T.accent, textDecoration: 'none', fontVariantNumeric: 'tabular-nums' }}>
+              {client.phone}
+            </a>
+          </div>
+        </div>
+
+        <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 11, border: `1px solid ${T.border}`, background: T.cardElev, color: T.text2, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}>
+          <Icon name="x" size={15} />
+        </button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+        <ClientStat label="Визитов" value={String(client.visits)} />
+        <ClientStat label="Сумма" value={`${client.total.toLocaleString('ru-RU')} ₽`} />
+      </div>
+
+      <div style={{ padding: '12px 14px', borderRadius: 16, background: T.cardElev, border: `1px solid ${T.border}`, marginBottom: 14 }}>
+        <div style={{ fontSize: 10, color: T.text3, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 6 }}>Профиль клиента</div>
+        <div style={{ fontSize: 13, color: T.text2, lineHeight: 1.45 }}>
+          Быстрые действия по клиенту: чат, запись или звонок.
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <button
+          onClick={() => { haptic('light'); onChat(); }}
+          style={{ ...actionButton, background: T.accent, borderColor: T.accent, color: '#fff' }}
+        >
+          <Icon name="message-square" size={16} />
+          Чат
+        </button>
+
+        <button
+          onClick={() => { haptic('light'); onBook(); }}
+          style={actionButton}
+        >
+          <Icon name="calendar-plus" size={16} />
+          Записать
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ClientStat({ label, value }: { label: string; value: string }) {
+  const { T } = useTheme();
+  return (
+    <div style={{ padding: '12px 14px', borderRadius: 16, background: T.cardElev, border: `1px solid ${T.border}` }}>
+      <div style={{ fontSize: 10, color: T.text3, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 7 }}>{label}</div>
+      <div style={{ fontSize: 18, fontWeight: 700, color: T.text, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>{value}</div>
     </div>
   );
 }
