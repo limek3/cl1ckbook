@@ -939,7 +939,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
               minHeight: 0,
               overflowY: 'auto',
               overflowX: 'hidden',
-              paddingTop: 'calc(92px + var(--miniapp-safe-top, 0px))'
+              paddingTop: 'calc(92px + var(--miniapp-safe-top, 0px))',
               paddingBottom: 'calc(76px + var(--miniapp-safe-bottom, 0px))',
               WebkitOverflowScrolling: 'touch',
             }}
