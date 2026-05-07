@@ -111,14 +111,14 @@ function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) 
         position: 'sticky',
         bottom: 0,
         zIndex: 80,
-        padding: '6px 10px calc(8px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
+        padding: '6px 10px calc(18px + var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))))',
         background: 'transparent',
         pointerEvents: 'auto',
       }}
     >
       <div
         style={{
-          ...miniGlass(mode, 'bottom'),
+          ...miniGlass(mode, 'top'),
           minHeight: 58,
           borderRadius: 20,
           padding: 5,
@@ -384,7 +384,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
       const viewportHeight = Number(tg?.viewportStableHeight ?? tg?.viewportHeight ?? window.innerHeight);
       const isTelegramRuntime = Boolean(tg);
 
-      document.documentElement.style.setProperty('--miniapp-header-top-offset', isTelegramRuntime ? '38px' : '12px');
+      document.documentElement.style.setProperty('--miniapp-header-top-offset', isTelegramRuntime ? '54px' : '22px');
       if (Number.isFinite(topInset)) document.documentElement.style.setProperty('--miniapp-safe-top', `${Math.max(0, Math.round(topInset))}px`);
       if (Number.isFinite(bottomInset)) document.documentElement.style.setProperty('--miniapp-safe-bottom', `${Math.max(0, Math.round(bottomInset))}px`);
       if (Number.isFinite(viewportHeight) && viewportHeight > 0) {
@@ -575,10 +575,14 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
               overflowY: 'auto',
               overflowX: 'hidden',
               overscrollBehavior: 'contain',
+              display: 'flex',
+              flexDirection: 'column',
             }}
           >
             <TgHeader master={MASTER} onToggleTheme={toggle} onNotifications={() => setSub({ kind: 'notifications' })} notificationCount={notificationCount} />
-            {content}
+            <div style={{ flex: '1 0 auto', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+              {content}
+            </div>
             <BottomNav active={tab} onChange={(id) => { setTab(id); setSub(null); }} />
           </div>
         )}
