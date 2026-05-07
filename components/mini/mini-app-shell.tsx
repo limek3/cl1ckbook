@@ -104,22 +104,24 @@ function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) 
   const dark = mode === 'dark';
   return (
     <div style={{
-      flexShrink: 0,
-      padding: '6px 12px calc(2px + var(--miniapp-safe-bottom, var(--tg-content-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)))))',
+      position: 'absolute',
+      left: 0, right: 0, bottom: 0,
+      padding: '4px 10px calc(2px + var(--miniapp-safe-bottom, var(--tg-content-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)))))',
       zIndex: 80,
+      pointerEvents: 'auto',
     }}>
       <div style={{
         ...miniGlass(mode, 'bottom'),
         display: 'grid',
         gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
-        gap: 4,
-        padding: 6,
+        gap: 3,
+        padding: 4,
         border: `1px solid ${dark ? 'rgba(255,255,255,0.085)' : 'rgba(0,0,0,0.07)'}`,
-        borderRadius: 25,
+        borderRadius: 20,
         backgroundColor: dark ? 'rgba(17,17,17,0.84)' : 'rgba(255,255,255,0.84)',
         boxShadow: dark
-          ? '0 -20px 54px rgba(0,0,0,0.46), inset 0 1px 0 rgba(255,255,255,0.045)'
-          : '0 -20px 54px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.78)',
+          ? '0 -16px 44px rgba(0,0,0,0.46), inset 0 1px 0 rgba(255,255,255,0.045)'
+          : '0 -16px 44px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.78)',
       }}>
         {TABS.map((t) => {
           const isActive = active === t.id;
@@ -127,15 +129,15 @@ function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) 
             <button key={t.id} onClick={() => { haptic('light'); onChange(t.id); }} style={{
               border: `1px solid ${isActive ? (dark ? 'rgba(255,255,255,0.075)' : 'rgba(0,0,0,0.06)') : 'transparent'}`,
               cursor: 'pointer',
-              height: 62,
+              height: 46,
               minWidth: 0,
-              borderRadius: 19,
+              borderRadius: 14,
               padding: 0,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 6,
+              gap: 3,
               fontFamily: 'inherit',
               WebkitTapHighlightColor: 'transparent',
               background: isActive
@@ -145,13 +147,13 @@ function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) 
               boxShadow: isActive ? 'inset 0 1px 0 rgba(255,255,255,0.05), 0 8px 22px rgba(0,0,0,0.24)' : 'none',
               transition: 'background 0.18s ease, color 0.18s ease, transform 0.12s ease, border-color 0.18s ease',
             }}>
-              <Icon name={t.icon} size={21} stroke={isActive ? 2.05 : 1.6} />
+              <Icon name={t.icon} size={17} stroke={isActive ? 2.05 : 1.6} />
               <span style={{
                 maxWidth: '100%',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
-                fontSize: 10,
+                fontSize: 9,
                 lineHeight: 1,
                 fontWeight: isActive ? 600 : 500,
                 letterSpacing: '-0.04em',
@@ -170,41 +172,43 @@ function TgHeader({ onToggleTheme, onNotifications, notificationCount = 0 }: { o
   const { MASTER } = useMiniData();
   const dark = mode === 'dark';
   const iconBtn: CSSProperties = {
-    width: 40, height: 40,
+    width: 32, height: 32,
     background: dark ? 'rgba(255,255,255,0.055)' : 'rgba(0,0,0,0.045)',
     border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
-    borderRadius: 15, cursor: 'pointer', color: T.text2, padding: 0,
+    borderRadius: 11, cursor: 'pointer', color: T.text2, padding: 0,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     flexShrink: 0,
     boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.045)',
   };
   return (
     <div style={{
-      flexShrink: 0,
-      padding: 'calc(28px + var(--miniapp-safe-top, var(--tg-content-safe-top, 0px))) 12px 6px',
+      position: 'absolute',
+      top: 0, left: 0, right: 0,
+      padding: 'calc(8px + var(--miniapp-safe-top, var(--tg-content-safe-top, 0px))) 10px 4px',
       zIndex: 80,
+      pointerEvents: 'auto',
     }}>
       <div style={{
         ...miniGlass(mode, 'top'),
-        padding: 12,
-        minHeight: 68,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-        borderRadius: 25,
+        padding: '8px 8px 8px 10px',
+        minHeight: 52,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
+        borderRadius: 18,
         border: `1px solid ${dark ? 'rgba(255,255,255,0.075)' : 'rgba(0,0,0,0.07)'}`,
         backgroundColor: dark ? 'rgba(17,17,17,0.82)' : 'rgba(255,255,255,0.84)',
         boxShadow: dark
-          ? '0 18px 52px rgba(0,0,0,0.46), inset 0 1px 0 rgba(255,255,255,0.045)'
-          : '0 18px 52px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.72)',
+          ? '0 14px 42px rgba(0,0,0,0.46), inset 0 1px 0 rgba(255,255,255,0.045)'
+          : '0 14px 42px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.72)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
           <div style={{
-            width: 44, height: 44, borderRadius: 16, flexShrink: 0,
+            width: 34, height: 34, borderRadius: 11, flexShrink: 0,
             background: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
             border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
-            boxShadow: dark ? '0 10px 26px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.05)' : '0 10px 26px rgba(0,0,0,0.08)',
+            boxShadow: dark ? '0 6px 18px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.05)' : '0 6px 18px rgba(0,0,0,0.08)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             overflow: 'hidden',
-            fontSize: 15, color: T.text, fontWeight: 800, letterSpacing: '-0.05em',
+            fontSize: 13, color: T.text, fontWeight: 800, letterSpacing: '-0.05em',
           }}>
             {MASTER.avatar ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -212,42 +216,31 @@ function TgHeader({ onToggleTheme, onNotifications, notificationCount = 0 }: { o
             ) : 'К'}
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 18, fontWeight: 650, color: T.text, lineHeight: 1, letterSpacing: '-0.055em' }}>КликБук</div>
-            <div style={{ fontSize: 12, color: T.text3, marginTop: 6, letterSpacing: '0.02em', textTransform: 'uppercase', fontWeight: 500 }}>MINI APP</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.text, lineHeight: 1, letterSpacing: '-0.045em' }}>КликБук</div>
+            <div style={{ fontSize: 9, color: T.text3, marginTop: 4, letterSpacing: '0.04em', textTransform: 'uppercase', fontWeight: 500 }}>MINI APP</div>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
           <button onClick={() => { haptic('light'); onNotifications(); }} aria-label="notifications" style={{ ...iconBtn, position: 'relative' }}>
-            <Icon name="bell" size={18} stroke={1.65} />
+            <Icon name="bell" size={14} stroke={1.65} />
             {notificationCount > 0 && (
               <span className="notif-badge" style={{
-                position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18,
-                padding: '0 5px', borderRadius: 999,
+                position: 'absolute', top: -3, right: -3, minWidth: 15, height: 15,
+                padding: '0 4px', borderRadius: 999,
                 background: T.danger, color: '#fff',
                 border: `2px solid ${T.bg}`,
-                fontSize: 9, fontWeight: 800,
+                fontSize: 8, fontWeight: 800,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontVariantNumeric: 'tabular-nums',
-                boxShadow: `0 2px 8px ${T.danger}66`,
+                boxShadow: `0 2px 6px ${T.danger}66`,
               }}>{notificationCount > 9 ? '9+' : notificationCount}</span>
             )}
           </button>
           <button onClick={onToggleTheme} aria-label="theme" style={iconBtn}>
-            <Icon name={mode === 'dark' ? 'sun' : 'moon'} size={18} stroke={1.55} />
+            <Icon name={mode === 'dark' ? 'sun' : 'moon'} size={14} stroke={1.55} />
           </button>
-          <button onClick={tgClose} style={{
-            height: 40,
-            paddingLeft: 12, paddingRight: 12,
-            background: dark ? 'rgba(255,255,255,0.055)' : 'rgba(0,0,0,0.045)',
-            border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
-            borderRadius: 15, cursor: 'pointer',
-            color: T.text2, fontSize: 14, fontFamily: 'inherit', fontWeight: 600,
-            display: 'flex', alignItems: 'center', letterSpacing: '-0.035em',
-            whiteSpace: 'nowrap',
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.045)',
-          }}>Закрыть</button>
-          <button onClick={() => { haptic('light'); }} aria-label="more" style={iconBtn}>
-            <Icon name="more-vertical" size={18} stroke={1.75} />
+          <button onClick={tgClose} aria-label="close" style={iconBtn}>
+            <Icon name="x" size={14} stroke={1.85} />
           </button>
         </div>
       </div>
