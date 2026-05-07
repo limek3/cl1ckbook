@@ -378,6 +378,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
   }, [tab, sub?.kind]);
 
   // Telegram WebApp init: keep viewport/safe areas in sync.
+  const stableInsetsRef = useRef({ headerOffset: 0, topInset: 0, bottomInset: 0 });
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const tg = (window as any).Telegram?.WebApp;
@@ -388,12 +389,20 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
       const tgContentBottom = Number(tg?.contentSafeAreaInset?.bottom ?? 0);
       const tgSafeTop = Number(tg?.safeAreaInset?.top ?? 0);
       const tgSafeBottom = Number(tg?.safeAreaInset?.bottom ?? 0);
-      const topInset = Math.max(Number.isFinite(tgContentTop) ? tgContentTop : 0, Number.isFinite(tgSafeTop) ? tgSafeTop : 0);
-      const bottomInset = Math.max(Number.isFinite(tgContentBottom) ? tgContentBottom : 0, Number.isFinite(tgSafeBottom) ? tgSafeBottom : 0);
+      const topInsetRaw = Math.max(Number.isFinite(tgContentTop) ? tgContentTop : 0, Number.isFinite(tgSafeTop) ? tgSafeTop : 0);
+      const bottomInsetRaw = Math.max(Number.isFinite(tgContentBottom) ? tgContentBottom : 0, Number.isFinite(tgSafeBottom) ? tgSafeBottom : 0);
       const viewportHeight = Number(tg?.viewportStableHeight ?? tg?.viewportHeight ?? window.innerHeight);
       const isTelegramRuntime = Boolean(tg);
-      const hasContentSafeArea = tgContentTop > 0;
-      const headerOffset = isTelegramRuntime ? (hasContentSafeArea ? 29 : 77) : 33;
+      const tgButtonsIncluded = tgContentTop >= (tgSafeTop > 0 ? tgSafeTop + 24 : 60);
+      const headerOffsetRaw = isTelegramRuntime ? (tgButtonsIncluded ? 29 : 77) : 33;
+
+      // Ratchet: never shrink — TG sometimes reports 0 mid-session (chat focus, BackButton),
+      // shrinking would make header overlap TG controls. Keep the largest seen value.
+      const prev = stableInsetsRef.current;
+      const headerOffset = Math.max(prev.headerOffset, headerOffsetRaw);
+      const topInset = Math.max(prev.topInset, topInsetRaw);
+      const bottomInset = Math.max(prev.bottomInset, bottomInsetRaw);
+      stableInsetsRef.current = { headerOffset, topInset, bottomInset };
 
       document.documentElement.style.setProperty('--miniapp-header-top-offset', `${headerOffset}px`);
       document.documentElement.style.setProperty('--miniapp-safe-top', `${Math.max(0, Math.round(topInset))}px`);
