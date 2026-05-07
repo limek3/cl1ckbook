@@ -609,7 +609,7 @@ function TgHeader({ onToggleTheme, onNotifications, notificationCount = 0 }: { o
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
         borderRadius: 18,
         border: `1px solid ${dark ? 'rgba(255,255,255,0.055)' : 'rgba(0,0,0,0.045)'}`,
-        backgroundColor: dark ? 'rgba(17,17,17,0.56)' : 'rgba(255,255,255,0.52)'
+        backgroundColor: dark ? 'rgba(17,17,17,0.56)' : 'rgba(255,255,255,0.52)',
         boxShadow: dark
           ? '0 14px 42px rgba(0,0,0,0.46), inset 0 1px 0 rgba(255,255,255,0.045)'
           : '0 14px 42px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.72)',
