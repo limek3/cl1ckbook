@@ -625,17 +625,13 @@ export function BottomSheet({
               position: 'fixed',
               inset: 0,
               zIndex: 240,
-              background: mode === 'dark' ? 'rgba(0,0,0,0.42)' : 'rgba(10,10,10,0.18)',
+              background: mode === 'dark' ? 'rgba(0,0,0,0.40)' : 'rgba(255,255,255,0.20)',
               backdropFilter: 'blur(10px)',
               WebkitBackdropFilter: 'blur(10px)',
             }}
           />
 
-          <motion.div
-            initial={{ y: 36, opacity: 0.96 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 36, opacity: 0.98 }}
-            transition={{ type: 'spring', stiffness: 380, damping: 34, mass: 0.78 }}
+          <div
             style={{
               position: 'fixed',
               left: '50%',
@@ -648,7 +644,11 @@ export function BottomSheet({
               pointerEvents: 'none',
             }}
           >
-            <div
+            <motion.div
+              initial={{ y: 36, opacity: 0.96, scale: 0.985 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: 36, opacity: 0.98, scale: 0.985 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 34, mass: 0.78 }}
               onClick={(event) => event.stopPropagation()}
               style={{
                 pointerEvents: 'auto',
@@ -656,11 +656,11 @@ export function BottomSheet({
                 borderRadius: 26,
                 border: `1px solid ${border}`,
                 background: panelBg,
-                backdropFilter: 'blur(28px) saturate(1.28)',
-                WebkitBackdropFilter: 'blur(28px) saturate(1.28)',
+                backdropFilter: 'blur(30px) saturate(1.45)',
+                WebkitBackdropFilter: 'blur(30px) saturate(1.45)',
                 boxShadow: mode === 'dark'
-                  ? '0 -12px 42px rgba(0,0,0,0.52), inset 0 1px 0 rgba(255,255,255,0.05)'
-                  : '0 -10px 36px rgba(15,23,42,0.12), inset 0 1px 0 rgba(255,255,255,0.82)',
+                  ? '0 -12px 42px rgba(0,0,0,0.52), inset 0 1px 0 rgba(255,255,255,0.06)'
+                  : '0 -10px 36px rgba(15,23,42,0.14), inset 0 1px 0 rgba(255,255,255,0.86)',
                 overflow: 'hidden',
               }}
             >
@@ -674,15 +674,15 @@ export function BottomSheet({
                 ) : null}
               </div>
 
-              <div style={{ maxHeight, overflowY: 'auto', padding: '16px 0 10px' }}>{children}</div>
+              <div style={{ maxHeight, overflowY: 'auto', overflowX: 'hidden', padding: '16px 0 10px' }}>{children}</div>
 
               {footer ? (
                 <div style={{ padding: '12px 16px 16px', borderTop: `1px solid ${T.border}`, background: mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.3)' }}>
                   {footer}
                 </div>
               ) : null}
-            </div>
-          </motion.div>
+            </motion.div>
+          </div>
         </>
       ) : null}
     </AnimatePresence>

@@ -9,7 +9,7 @@ export function MiniBottomSheet({
   onClose,
   children,
   maxHeight = '72vh',
-  tail = true,
+  tail = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -24,15 +24,15 @@ export function MiniBottomSheet({
     position: 'fixed',
     inset: 0,
     zIndex: 240,
-    background: dark ? 'rgba(0,0,0,0.20)' : 'rgba(10,10,10,0.10)',
-    backdropFilter: 'blur(6px)',
-    WebkitBackdropFilter: 'blur(6px)',
+    background: dark ? 'rgba(0,0,0,0.28)' : 'rgba(255,255,255,0.18)',
+    backdropFilter: 'blur(10px)',
+    WebkitBackdropFilter: 'blur(10px)',
   };
 
   const shellStyle: CSSProperties = {
     position: 'fixed',
     left: '50%',
-    bottom: 'calc(80px + var(--miniapp-safe-bottom, 0px))',
+    bottom: 'calc(82px + var(--miniapp-safe-bottom, 0px))',
     transform: 'translateX(-50%)',
     width: '100%',
     maxWidth: 390,
@@ -42,29 +42,28 @@ export function MiniBottomSheet({
   };
 
   const sheetStyle: CSSProperties = {
-    position: 'relative',
     pointerEvents: 'auto',
     width: '100%',
     maxHeight,
     overflow: 'hidden',
-    borderRadius: 24,
-    border: `1px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(10,10,10,0.06)'}`,
-    background: dark ? 'rgba(20,20,22,0.84)' : 'rgba(255,255,255,0.88)',
-    backdropFilter: 'blur(26px) saturate(1.25)',
-    WebkitBackdropFilter: 'blur(26px) saturate(1.25)',
+    borderRadius: 26,
+    border: `1px solid ${dark ? 'rgba(255,255,255,0.09)' : 'rgba(10,10,10,0.07)'}`,
+    background: dark ? 'rgba(20,20,22,0.86)' : 'rgba(255,255,255,0.90)',
+    backdropFilter: 'blur(30px) saturate(1.65)',
+    WebkitBackdropFilter: 'blur(30px) saturate(1.65)',
     boxShadow: dark
-      ? '0 22px 54px rgba(0,0,0,0.56), inset 0 1px 0 rgba(255,255,255,0.05)'
-      : '0 18px 44px rgba(15,23,42,0.14), inset 0 1px 0 rgba(255,255,255,0.82)',
+      ? '0 24px 70px rgba(0,0,0,0.58), inset 0 1px 0 rgba(255,255,255,0.06)'
+      : '0 24px 70px rgba(15,23,42,0.18), inset 0 1px 0 rgba(255,255,255,0.86)',
     color: T.text,
+    position: 'relative',
   };
 
-  const accentLineStyle: CSSProperties = {
-    height: 4,
+  const handleStyle: CSSProperties = {
     width: 38,
+    height: 4,
     borderRadius: 999,
-    background: dark ? 'rgba(255,255,255,0.18)' : 'rgba(10,10,10,0.12)',
-    margin: '10px auto 0',
-    opacity: tail ? 1 : 0.75,
+    background: dark ? 'rgba(255,255,255,0.20)' : 'rgba(10,10,10,0.14)',
+    margin: '10px auto 8px',
   };
 
   return (
@@ -80,34 +79,26 @@ export function MiniBottomSheet({
             onClick={onClose}
           />
 
-          <motion.div
-            style={shellStyle}
-            initial={{ opacity: 0, y: 18, scale: 0.985 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.985 }}
-            transition={{
-              type: 'spring',
-              stiffness: 430,
-              damping: 34,
-              mass: 0.74,
-            }}
-          >
+          <div style={shellStyle}>
             <motion.div
               style={sheetStyle}
+              initial={{ opacity: 0, y: 22, scale: 0.985, filter: 'blur(6px)' }}
+              animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: 24, scale: 0.985, filter: 'blur(4px)' }}
+              transition={{
+                type: 'spring',
+                stiffness: 430,
+                damping: 34,
+                mass: 0.74,
+              }}
               onClick={(event) => event.stopPropagation()}
-              initial={{ filter: 'blur(6px)' }}
-              animate={{ filter: 'blur(0px)' }}
-              exit={{ filter: 'blur(4px)' }}
-              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
             >
-              <div style={{ paddingBottom: 6 }}>
-                <div style={accentLineStyle} />
-              </div>
-              <div style={{ maxHeight, overflowY: 'auto', paddingBottom: 4 }}>
+              <div style={handleStyle} />
+              <div style={{ maxHeight: `calc(${maxHeight} - 22px)`, overflowY: 'auto', overflowX: 'hidden', paddingBottom: 6 }}>
                 {children}
               </div>
             </motion.div>
-          </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>
