@@ -11341,3 +11341,176 @@ html[data-tg-miniapp='true'] body {
   box-shadow: 0 0 0 999px var(--mini-input-bg, #0d0d0d) inset !important;
   -webkit-text-fill-color: var(--mini-text, #fafafa) !important;
 }
+
+/* ClickBook miniapp v9 input fix: final native control hardening.
+   Keeps v8 smooth sheets/chat/reschedule/read-notification behavior intact and only normalizes controls. */
+.cb-mini-app-root,
+.cb-miniapp {
+  --mini-input-bg: #0d0d0d;
+  --mini-text: #fafafa;
+  --mini-text-muted: rgba(250, 250, 250, 0.3);
+  --mini-control-border: rgba(255, 255, 255, 0.08);
+  color-scheme: dark;
+}
+
+.cb-mini-app-root[data-mini-theme='light'],
+.cb-miniapp[data-mini-mode='light'] {
+  --mini-input-bg: #f3f2ef;
+  --mini-text: #0a0a0a;
+  --mini-text-muted: rgba(10, 10, 10, 0.3);
+  --mini-control-border: rgba(10, 10, 10, 0.08);
+  color-scheme: light;
+}
+
+.cb-mini-app-root input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+.cb-mini-app-root textarea,
+.cb-mini-app-root select,
+.cb-miniapp input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+.cb-miniapp textarea,
+.cb-miniapp select,
+.cb-mini-input {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  background: var(--mini-input-bg, #0d0d0d) !important;
+  background-color: var(--mini-input-bg, #0d0d0d) !important;
+  background-image: none !important;
+  background-clip: padding-box !important;
+  box-shadow: 0 0 0 1000px var(--mini-input-bg, #0d0d0d) inset !important;
+  -webkit-box-shadow: 0 0 0 1000px var(--mini-input-bg, #0d0d0d) inset !important;
+  border-color: var(--mini-control-border, rgba(255,255,255,0.08)) !important;
+  color: var(--mini-text, #fafafa) !important;
+  -webkit-text-fill-color: var(--mini-text, #fafafa) !important;
+  caret-color: var(--mini-accent, #127dfe) !important;
+  outline: none !important;
+}
+
+.cb-mini-app-root textarea,
+.cb-miniapp textarea {
+  resize: vertical;
+}
+
+.cb-mini-app-root input.cb-mini-transparent,
+.cb-mini-app-root textarea.cb-mini-transparent,
+.cb-mini-app-root input.cb-mini-input-reset,
+.cb-mini-app-root textarea.cb-mini-input-reset,
+.cb-miniapp input.cb-mini-transparent,
+.cb-miniapp textarea.cb-mini-transparent,
+.cb-miniapp input.cb-mini-input-reset,
+.cb-miniapp textarea.cb-mini-input-reset {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  border-color: transparent !important;
+  -webkit-text-fill-color: var(--mini-text, #fafafa) !important;
+}
+
+.cb-mini-app-root select,
+.cb-miniapp select,
+.cb-mini-select {
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--mini-text-muted, rgba(250,250,250,.5)) 50%),
+    linear-gradient(135deg, var(--mini-text-muted, rgba(250,250,250,.5)) 50%, transparent 50%) !important;
+  background-position: calc(100% - 17px) 50%, calc(100% - 12px) 50% !important;
+  background-repeat: no-repeat !important;
+  background-size: 5px 5px, 5px 5px !important;
+  padding-right: 34px !important;
+}
+
+.cb-mini-app-root select option,
+.cb-mini-app-root select optgroup,
+.cb-miniapp select option,
+.cb-miniapp select optgroup {
+  background: var(--mini-input-bg, #0d0d0d) !important;
+  color: var(--mini-text, #fafafa) !important;
+}
+
+.cb-mini-app-root input[type='date'],
+.cb-mini-app-root input[type='time'],
+.cb-miniapp input[type='date'],
+.cb-miniapp input[type='time'] {
+  color-scheme: dark;
+  min-height: 44px;
+  line-height: normal !important;
+}
+
+.cb-mini-app-root input[type='date']::-webkit-datetime-edit,
+.cb-mini-app-root input[type='date']::-webkit-datetime-edit-fields-wrapper,
+.cb-mini-app-root input[type='date']::-webkit-datetime-edit-text,
+.cb-mini-app-root input[type='date']::-webkit-datetime-edit-month-field,
+.cb-mini-app-root input[type='date']::-webkit-datetime-edit-day-field,
+.cb-mini-app-root input[type='date']::-webkit-datetime-edit-year-field,
+.cb-mini-app-root input[type='time']::-webkit-datetime-edit,
+.cb-mini-app-root input[type='time']::-webkit-datetime-edit-fields-wrapper,
+.cb-mini-app-root input[type='time']::-webkit-datetime-edit-text,
+.cb-mini-app-root input[type='time']::-webkit-datetime-edit-hour-field,
+.cb-mini-app-root input[type='time']::-webkit-datetime-edit-minute-field,
+.cb-mini-app-root input[type='time']::-webkit-datetime-edit-ampm-field,
+.cb-mini-app-root input[type='date']::-webkit-date-and-time-value,
+.cb-mini-app-root input[type='time']::-webkit-date-and-time-value,
+.cb-miniapp input[type='date']::-webkit-datetime-edit,
+.cb-miniapp input[type='date']::-webkit-datetime-edit-fields-wrapper,
+.cb-miniapp input[type='date']::-webkit-datetime-edit-text,
+.cb-miniapp input[type='date']::-webkit-datetime-edit-month-field,
+.cb-miniapp input[type='date']::-webkit-datetime-edit-day-field,
+.cb-miniapp input[type='date']::-webkit-datetime-edit-year-field,
+.cb-miniapp input[type='time']::-webkit-datetime-edit,
+.cb-miniapp input[type='time']::-webkit-datetime-edit-fields-wrapper,
+.cb-miniapp input[type='time']::-webkit-datetime-edit-text,
+.cb-miniapp input[type='time']::-webkit-datetime-edit-hour-field,
+.cb-miniapp input[type='time']::-webkit-datetime-edit-minute-field,
+.cb-miniapp input[type='time']::-webkit-datetime-edit-ampm-field,
+.cb-miniapp input[type='date']::-webkit-date-and-time-value,
+.cb-miniapp input[type='time']::-webkit-date-and-time-value {
+  background: transparent !important;
+  color: var(--mini-text, #fafafa) !important;
+  -webkit-text-fill-color: var(--mini-text, #fafafa) !important;
+  text-align: left;
+}
+
+.cb-mini-app-root input[type='date']::-webkit-calendar-picker-indicator,
+.cb-mini-app-root input[type='time']::-webkit-calendar-picker-indicator,
+.cb-miniapp input[type='date']::-webkit-calendar-picker-indicator,
+.cb-miniapp input[type='time']::-webkit-calendar-picker-indicator {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  color: var(--mini-text, #fafafa) !important;
+  filter: invert(1) brightness(1.35) opacity(.72);
+  opacity: .78;
+}
+
+.cb-mini-app-root input[type='date']::-webkit-inner-spin-button,
+.cb-mini-app-root input[type='date']::-webkit-clear-button,
+.cb-mini-app-root input[type='time']::-webkit-inner-spin-button,
+.cb-mini-app-root input[type='time']::-webkit-clear-button,
+.cb-miniapp input[type='date']::-webkit-inner-spin-button,
+.cb-miniapp input[type='date']::-webkit-clear-button,
+.cb-miniapp input[type='time']::-webkit-inner-spin-button,
+.cb-miniapp input[type='time']::-webkit-clear-button {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  display: none !important;
+}
+
+.cb-mini-app-root input:-webkit-autofill,
+.cb-mini-app-root textarea:-webkit-autofill,
+.cb-miniapp input:-webkit-autofill,
+.cb-miniapp textarea:-webkit-autofill,
+.cb-mini-input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 999px var(--mini-input-bg, #0d0d0d) inset !important;
+  box-shadow: 0 0 0 999px var(--mini-input-bg, #0d0d0d) inset !important;
+  -webkit-text-fill-color: var(--mini-text, #fafafa) !important;
+}
+
+.cb-mini-app-root[data-mini-theme='light'] input[type='date']::-webkit-calendar-picker-indicator,
+.cb-mini-app-root[data-mini-theme='light'] input[type='time']::-webkit-calendar-picker-indicator,
+.cb-miniapp[data-mini-mode='light'] input[type='date']::-webkit-calendar-picker-indicator,
+.cb-miniapp[data-mini-mode='light'] input[type='time']::-webkit-calendar-picker-indicator {
+  filter: none;
+  opacity: .62;
+}
+

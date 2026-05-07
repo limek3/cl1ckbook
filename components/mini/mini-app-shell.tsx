@@ -880,14 +880,83 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
           @keyframes badge-pop { 0% { transform: scale(0); } 70% { transform: scale(1.25); } 100% { transform: scale(1); } }
           .cb-miniapp .notif-badge { animation: badge-pop 0.28s cubic-bezier(.2,.8,.2,1) both; }
           .cb-miniapp input, .cb-miniapp textarea, .cb-miniapp select {
-            -webkit-appearance: none !important; appearance: none !important;
+            -webkit-appearance: none !important;
+            appearance: none !important;
             background: var(--mini-input-bg, #0d0d0d) !important;
             background-color: var(--mini-input-bg, #0d0d0d) !important;
+            background-image: none !important;
+            background-clip: padding-box !important;
             box-shadow: 0 0 0 1000px var(--mini-input-bg, #0d0d0d) inset !important;
+            -webkit-box-shadow: 0 0 0 1000px var(--mini-input-bg, #0d0d0d) inset !important;
+            border-color: var(--mini-control-border, rgba(255,255,255,0.08)) !important;
             color: var(--mini-text, #fafafa) !important;
-            color-scheme: dark; caret-color: var(--miniapp-accent, #127dfe);
+            color-scheme: dark;
+            caret-color: var(--miniapp-accent, #127dfe) !important;
             -webkit-text-fill-color: var(--mini-text, #fafafa) !important;
             border-radius: 10px;
+            outline: none !important;
+            transition: background-color .22s ease, border-color .22s ease, color .22s ease, box-shadow .22s ease;
+          }
+          .cb-miniapp textarea {
+            resize: vertical;
+          }
+          .cb-miniapp select {
+            background-image:
+              linear-gradient(45deg, transparent 50%, var(--mini-text-muted, rgba(250,250,250,.48)) 50%),
+              linear-gradient(135deg, var(--mini-text-muted, rgba(250,250,250,.48)) 50%, transparent 50%) !important;
+            background-position: calc(100% - 17px) 50%, calc(100% - 12px) 50% !important;
+            background-size: 5px 5px, 5px 5px !important;
+            background-repeat: no-repeat !important;
+            padding-right: 34px !important;
+          }
+          .cb-miniapp select option,
+          .cb-miniapp select optgroup {
+            background: var(--mini-input-bg, #0d0d0d) !important;
+            color: var(--mini-text, #fafafa) !important;
+          }
+          .cb-miniapp input[type="date"], .cb-miniapp input[type="time"] {
+            min-height: 44px;
+            line-height: normal !important;
+            color-scheme: dark;
+          }
+          .cb-miniapp input[type="date"]::-webkit-datetime-edit,
+          .cb-miniapp input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+          .cb-miniapp input[type="date"]::-webkit-datetime-edit-text,
+          .cb-miniapp input[type="date"]::-webkit-datetime-edit-month-field,
+          .cb-miniapp input[type="date"]::-webkit-datetime-edit-day-field,
+          .cb-miniapp input[type="date"]::-webkit-datetime-edit-year-field,
+          .cb-miniapp input[type="time"]::-webkit-datetime-edit,
+          .cb-miniapp input[type="time"]::-webkit-datetime-edit-fields-wrapper,
+          .cb-miniapp input[type="time"]::-webkit-datetime-edit-text,
+          .cb-miniapp input[type="time"]::-webkit-datetime-edit-hour-field,
+          .cb-miniapp input[type="time"]::-webkit-datetime-edit-minute-field,
+          .cb-miniapp input[type="time"]::-webkit-datetime-edit-ampm-field,
+          .cb-miniapp input[type="date"]::-webkit-date-and-time-value,
+          .cb-miniapp input[type="time"]::-webkit-date-and-time-value {
+            background: transparent !important;
+            color: var(--mini-text, #fafafa) !important;
+            -webkit-text-fill-color: var(--mini-text, #fafafa) !important;
+            text-align: left;
+          }
+          .cb-miniapp input[type="date"]::-webkit-calendar-picker-indicator,
+          .cb-miniapp input[type="time"]::-webkit-calendar-picker-indicator {
+            -webkit-appearance: none !important;
+            appearance: none !important;
+            background-color: transparent !important;
+            background-image: none !important;
+            border: 0 !important;
+            color: var(--mini-text, #fafafa) !important;
+            cursor: pointer;
+            filter: invert(1) brightness(1.35) opacity(.72);
+            opacity: .78;
+          }
+          .cb-miniapp input[type="date"]::-webkit-inner-spin-button,
+          .cb-miniapp input[type="date"]::-webkit-clear-button,
+          .cb-miniapp input[type="time"]::-webkit-inner-spin-button,
+          .cb-miniapp input[type="time"]::-webkit-clear-button {
+            -webkit-appearance: none !important;
+            appearance: none !important;
+            display: none !important;
           }
           .cb-miniapp input.cb-mini-transparent, .cb-miniapp textarea.cb-mini-transparent,
           .cb-miniapp input.cb-mini-input-reset, .cb-miniapp textarea.cb-mini-input-reset,
@@ -898,11 +967,12 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
             background-color: transparent !important;
             background-image: none !important;
             box-shadow: none !important;
-            -webkit-box-shadow: 0 0 0 1000px transparent inset !important;
+            -webkit-box-shadow: none !important;
             border: 0 !important;
             outline: none !important;
             border-radius: 0 !important;
             background-clip: padding-box !important;
+            color: var(--mini-text, #fafafa) !important;
             -webkit-text-fill-color: var(--mini-text, #fafafa) !important;
             caret-color: var(--miniapp-accent, #127dfe) !important;
           }
@@ -916,16 +986,26 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
           }
           .cb-miniapp input:-webkit-autofill, .cb-miniapp textarea:-webkit-autofill {
             box-shadow: 0 0 0 999px var(--mini-input-bg, #0d0d0d) inset !important;
+            -webkit-box-shadow: 0 0 0 999px var(--mini-input-bg, #0d0d0d) inset !important;
             -webkit-text-fill-color: var(--mini-text, #fafafa) !important;
+            caret-color: var(--miniapp-accent, #127dfe) !important;
           }
-          .cb-miniapp[data-mini-mode="light"] input, .cb-miniapp[data-mini-mode="light"] textarea, .cb-miniapp[data-mini-mode="light"] select {
+          .cb-miniapp[data-mini-mode="light"] input,
+          .cb-miniapp[data-mini-mode="light"] textarea,
+          .cb-miniapp[data-mini-mode="light"] select {
             color-scheme: light;
             background: var(--mini-input-bg, #ffffff) !important;
             background-color: var(--mini-input-bg, #ffffff) !important;
             box-shadow: 0 0 0 1000px var(--mini-input-bg, #ffffff) inset !important;
+            -webkit-box-shadow: 0 0 0 1000px var(--mini-input-bg, #ffffff) inset !important;
           }
-          .cb-miniapp ::placeholder { color: ${T.text3}; opacity: 1; }
-          .cb-miniapp { --miniapp-accent: ${T.accent}; }
+          .cb-miniapp[data-mini-mode="light"] input[type="date"]::-webkit-calendar-picker-indicator,
+          .cb-miniapp[data-mini-mode="light"] input[type="time"]::-webkit-calendar-picker-indicator {
+            filter: none;
+            opacity: .62;
+          }
+          .cb-miniapp ::placeholder { color: ${T.text3}; opacity: 1; -webkit-text-fill-color: ${T.text3}; }
+          .cb-miniapp { --miniapp-accent: ${T.accent}; --mini-control-border: ${T.border}; }
         `}</style>
         {!isFullHeight && (
           <TgHeader

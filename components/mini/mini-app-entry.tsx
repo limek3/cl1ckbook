@@ -666,7 +666,7 @@ function MiniInput({
   type?: string;
 }) {
   const className =
-    'w-full rounded-[15px] border border-white/[0.08] !bg-transparent px-3 text-[16px] font-medium tracking-[-0.035em] !text-white outline-none placeholder:!text-white/25 focus:border-white/[0.16] focus:!bg-transparent [appearance:none] [-webkit-appearance:none] [-webkit-text-fill-color:white] shadow-none';
+    'cb-mini-input w-full rounded-[15px] border border-white/[0.08] bg-[#0d0d0d] px-3 text-[16px] font-medium tracking-[-0.035em] text-white outline-none placeholder:text-white/25 focus:border-white/[0.16] [appearance:none] [-webkit-appearance:none] shadow-none';
 
   return (
     <label className="block">
@@ -714,7 +714,7 @@ function MiniSelect({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-11 w-full rounded-[15px] border border-white/[0.08] bg-[#141414] px-3 text-[14px] font-medium tracking-[-0.035em] text-white outline-none focus:border-white/[0.16]"
+        className="cb-mini-input cb-mini-select h-11 w-full rounded-[15px] border border-white/[0.08] bg-[#0d0d0d] px-3 text-[14px] font-medium tracking-[-0.035em] text-white outline-none focus:border-white/[0.16]"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value} className="bg-[#141414] text-white">
