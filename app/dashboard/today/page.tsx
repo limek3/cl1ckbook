@@ -16,10 +16,9 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Clock3,
+  Globe2,
   MessageCircleMore,
   PhoneCall,
-  Sparkles,
   SquarePen,
   UserRound,
   Wallet,
@@ -58,7 +57,7 @@ interface CalendarBooking {
   status: BookingStatus;
   phone: string;
   note?: string;
-  source?: string;
+  source: string;
   color: string;
   amount: number;
   raw: Booking;
@@ -102,15 +101,19 @@ function pageText(light: boolean) {
 }
 
 function mutedText(light: boolean) {
-  return light ? 'text-black/50' : 'text-white/46';
+  return light ? 'text-black/48' : 'text-white/42';
 }
 
 function faintText(light: boolean) {
-  return light ? 'text-black/34' : 'text-white/30';
+  return light ? 'text-black/32' : 'text-white/26';
 }
 
 function borderTone(light: boolean) {
   return light ? 'border-black/[0.08]' : 'border-white/[0.08]';
+}
+
+function divideTone(light: boolean) {
+  return light ? 'divide-black/[0.08]' : 'divide-white/[0.08]';
 }
 
 function cardTone(light: boolean) {
@@ -127,14 +130,14 @@ function insetTone(light: boolean) {
 
 function buttonBase(light: boolean, active = false) {
   return cn(
-    'inline-flex h-9 items-center justify-center gap-2 rounded-[10px] border px-3 text-[12px] font-semibold shadow-none transition-[background,border-color,color,opacity,transform] duration-150 active:scale-[0.985]',
+    'inline-flex h-8 items-center justify-center gap-2 rounded-[9px] border px-3 text-[12px] font-medium shadow-none transition-[background,border-color,color,opacity,transform] duration-150 active:scale-[0.985]',
     active
       ? light
         ? 'cb-neutral-primary cb-neutral-primary-light hover:opacity-[0.98]'
         : 'cb-neutral-primary cb-neutral-primary-dark hover:opacity-[0.98]'
       : light
-        ? 'border-black/[0.08] bg-white text-black/62 hover:border-black/[0.14] hover:bg-black/[0.035] hover:text-black'
-        : 'border-white/[0.08] bg-white/[0.04] text-white/62 hover:border-white/[0.14] hover:bg-white/[0.07] hover:text-white',
+        ? 'border-black/[0.08] bg-white text-black/58 hover:border-black/[0.14] hover:bg-black/[0.035] hover:text-black'
+        : 'border-white/[0.08] bg-white/[0.04] text-white/55 hover:border-white/[0.14] hover:bg-white/[0.07] hover:text-white',
   );
 }
 
@@ -154,38 +157,37 @@ function accentPillStyle(
       ? `color-mix(in srgb, ${color} ${borderAmount}%, rgba(0,0,0,0.1))`
       : `color-mix(in srgb, ${color} ${borderAmount}%, rgba(255,255,255,0.1))`,
     color: light
-      ? `color-mix(in srgb, ${color} 74%, #111111)`
-      : `color-mix(in srgb, ${color} 16%, #ffffff)`,
+      ? `color-mix(in srgb, ${color} 70%, #101010)`
+      : `color-mix(in srgb, ${color} 18%, #ffffff)`,
     boxShadow:
       strength === 'strong'
         ? light
-          ? `0 10px 28px color-mix(in srgb, ${color} 12%, transparent)`
-          : `0 14px 34px color-mix(in srgb, ${color} 18%, transparent)`
+          ? `0 0 0 1px color-mix(in srgb, ${color} 10%, transparent)`
+          : `0 0 0 1px color-mix(in srgb, ${color} 14%, transparent)`
         : undefined,
   };
 }
 
-function bookingCardStyle(color: string, light: boolean): CSSProperties {
+function bookingBlockStyle(color: string, light: boolean): CSSProperties {
   return {
     background: light
-      ? `linear-gradient(180deg, color-mix(in srgb, ${color} 16%, #ffffff), color-mix(in srgb, ${color} 8%, #ffffff))`
-      : `linear-gradient(180deg, color-mix(in srgb, ${color} 30%, #151515), color-mix(in srgb, ${color} 18%, #111111))`,
+      ? `linear-gradient(180deg, color-mix(in srgb, ${color} 13%, #ffffff), color-mix(in srgb, ${color} 7%, #ffffff))`
+      : `linear-gradient(180deg, color-mix(in srgb, ${color} 28%, #151515), color-mix(in srgb, ${color} 16%, #111111))`,
     borderColor: light
-      ? `color-mix(in srgb, ${color} 42%, rgba(0,0,0,.12))`
-      : `color-mix(in srgb, ${color} 54%, rgba(255,255,255,.16))`,
+      ? `color-mix(in srgb, ${color} 42%, rgba(0,0,0,0.1))`
+      : `color-mix(in srgb, ${color} 50%, rgba(255,255,255,0.12))`,
     color: light
-      ? `color-mix(in srgb, ${color} 70%, #080808)`
-      : `color-mix(in srgb, ${color} 10%, #ffffff)`,
+      ? `color-mix(in srgb, ${color} 68%, #0e0e0e)`
+      : `color-mix(in srgb, ${color} 14%, #ffffff)`,
     boxShadow: light
-      ? `0 12px 30px color-mix(in srgb, ${color} 12%, transparent)`
-      : `0 18px 42px color-mix(in srgb, ${color} 18%, transparent)`,
+      ? `0 10px 24px color-mix(in srgb, ${color} 10%, transparent)`
+      : `0 14px 32px color-mix(in srgb, ${color} 14%, transparent)`,
   };
 }
 
 function toLocalIsoDate(date: Date) {
-  const copy = new Date(date);
-  const timezoneOffset = copy.getTimezoneOffset() * 60000;
-  return new Date(copy.getTime() - timezoneOffset).toISOString().slice(0, 10);
+  const timezoneOffset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 10);
 }
 
 function startOfDay(date: Date) {
@@ -244,7 +246,7 @@ function formatMinutesAsTime(totalMinutes: number) {
   return `${hours}:${minutes}`;
 }
 
-function formatMoney(value: number, locale: 'ru' | 'en') {
+function formatCurrencyCompact(value: number, locale: 'ru' | 'en') {
   try {
     return new Intl.NumberFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
       style: 'currency',
@@ -276,7 +278,7 @@ function formatWeekday(date: Date, locale: 'ru' | 'en') {
       .replace('.', '')
       .replace(/^[a-zа-яё]/i, (char) => char.toUpperCase());
   } catch {
-    return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][(date.getDay() + 6) % 7] ?? '';
+    return ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][(date.getDay() + 6) % 7] ?? '';
   }
 }
 
@@ -313,13 +315,14 @@ function formatCalendarRange(view: CalendarViewMode, selectedDate: Date, locale:
 
 function getRangeDates(view: CalendarViewMode, selectedDate: Date) {
   if (view === 'day') return [startOfDay(selectedDate)];
+
   if (view === 'week') {
     const start = startOfWeekMonday(selectedDate);
     return Array.from({ length: 7 }, (_, index) => addDays(start, index));
   }
 
-  const first = startOfWeekMonday(startOfMonth(selectedDate));
-  return Array.from({ length: 42 }, (_, index) => addDays(first, index));
+  const firstVisibleDay = startOfWeekMonday(startOfMonth(selectedDate));
+  return Array.from({ length: 42 }, (_, index) => addDays(firstVisibleDay, index));
 }
 
 function getRangeIsoBounds(view: CalendarViewMode, selectedDate: Date) {
@@ -338,6 +341,7 @@ function getRangeIsoBounds(view: CalendarViewMode, selectedDate: Date) {
 
   const monthStart = startOfMonth(selectedDate);
   const monthEnd = addDays(addMonths(monthStart, 1), -1);
+
   return {
     startIso: toLocalIsoDate(monthStart),
     endIso: toLocalIsoDate(monthEnd),
@@ -366,7 +370,12 @@ function getServiceColor(
     ? booking.metadata as Record<string, unknown>
     : null;
   const service = serviceMap.get(booking.service);
-  const fromData = metadata?.color ?? metadata?.serviceColor ?? service?.color;
+  const fromData =
+    metadata?.bookingColor ??
+    metadata?.color ??
+    metadata?.serviceColor ??
+    metadata?.accentColor ??
+    service?.color;
 
   if (isCssColor(fromData)) return fromData;
 
@@ -376,10 +385,12 @@ function getServiceColor(
 
 function sourceLabel(booking: Booking, locale: 'ru' | 'en') {
   const raw = String(booking.source ?? booking.channel ?? '').toLowerCase();
+
   if (!raw) return locale === 'ru' ? 'Сайт' : 'Web';
   if (raw.includes('tg') || raw.includes('telegram') || raw.includes('тг')) return locale === 'ru' ? 'Телеграм' : 'Telegram';
   if (raw.includes('vk') || raw.includes('вк')) return locale === 'ru' ? 'ВК' : 'VK';
   if (raw.includes('inst')) return locale === 'ru' ? 'Инстаграм' : 'Instagram';
+
   return String(booking.source ?? booking.channel ?? 'Web');
 }
 
@@ -416,9 +427,8 @@ function mapBookingToCalendarBooking(
   };
 }
 
-function activeBooking(booking: Booking | CalendarBooking) {
-  const status = 'raw' in booking ? booking.status : booking.status;
-  return status !== 'cancelled' && status !== 'no_show';
+function isBookingActive(booking: CalendarBooking | Booking) {
+  return booking.status !== 'cancelled' && booking.status !== 'no_show';
 }
 
 function deriveWorkWindow(bookings: CalendarBooking[]): WorkWindow {
@@ -429,8 +439,8 @@ function deriveWorkWindow(bookings: CalendarBooking[]): WorkWindow {
 
   const startMinutes = Math.max(0, Math.min(DEFAULT_WORK_START, Math.floor(earliest / 60) * 60));
   const endMinutes = Math.min(24 * 60, Math.max(DEFAULT_WORK_END, Math.ceil(latest / 60) * 60));
-
   const hours: number[] = [];
+
   for (let minute = startMinutes; minute <= endMinutes; minute += 60) {
     hours.push(minute);
   }
@@ -449,6 +459,7 @@ function layoutBookings(bookings: CalendarBooking[]): LaidOutBooking[] {
 
   for (const booking of sorted) {
     let lane = laneEnds.findIndex((end) => end <= booking.startMinutes);
+
     if (lane < 0) {
       lane = laneEnds.length;
       laneEnds.push(booking.endMinutes);
@@ -465,6 +476,7 @@ function layoutBookings(bookings: CalendarBooking[]): LaidOutBooking[] {
 
 function groupByDate(bookings: CalendarBooking[]) {
   const map = new Map<string, CalendarBooking[]>();
+
   for (const booking of bookings) {
     const current = map.get(booking.date) ?? [];
     current.push(booking);
@@ -478,7 +490,7 @@ function groupByDate(bookings: CalendarBooking[]) {
   return map;
 }
 
-function statusLabel(status: BookingStatus, locale: 'ru' | 'en') {
+function bookingStatusLabel(status: BookingStatus, locale: 'ru' | 'en') {
   if (locale === 'ru') {
     if (status === 'new') return 'Новая';
     if (status === 'confirmed') return 'Подтверждена';
@@ -504,9 +516,65 @@ function Card({
   className?: string;
 }) {
   return (
-    <section className={cn('rounded-[18px] border', cardTone(light), className)}>
+    <section className={cn('rounded-[11px] border', cardTone(light), className)}>
       {children}
     </section>
+  );
+}
+
+function CardTitle({
+  title,
+  description,
+  light,
+  action,
+}: {
+  title: string;
+  description?: string;
+  light: boolean;
+  action?: ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        'flex min-h-[58px] items-center justify-between gap-4 border-b px-4 py-3',
+        borderTone(light),
+      )}
+    >
+      <div className="min-w-0">
+        <h2
+          className={cn(
+            'truncate text-[13px] font-semibold tracking-[-0.018em]',
+            pageText(light),
+          )}
+        >
+          {title}
+        </h2>
+
+        {description ? (
+          <p className={cn('mt-1 truncate text-[11px]', mutedText(light))}>
+            {description}
+          </p>
+        ) : null}
+      </div>
+
+      {action ? <div className="shrink-0">{action}</div> : null}
+    </div>
+  );
+}
+
+function Panel({
+  children,
+  light,
+  className,
+}: {
+  children: ReactNode;
+  light: boolean;
+  className?: string;
+}) {
+  return (
+    <div className={cn('rounded-[10px] border', insetTone(light), className)}>
+      {children}
+    </div>
   );
 }
 
@@ -514,28 +582,28 @@ function MicroLabel({
   children,
   light,
   active,
-  color,
+  accentColor,
   className,
 }: {
   children: ReactNode;
   light: boolean;
   active?: boolean;
-  color?: string;
+  accentColor?: string;
   className?: string;
 }) {
   return (
     <span
-      style={active && color ? accentPillStyle(color, light, 'soft') : undefined}
+      style={active && accentColor ? accentPillStyle(accentColor, light, 'soft') : undefined}
       className={cn(
-        'inline-flex h-7 items-center gap-1.5 rounded-[9px] border px-2.5 text-[10.5px] font-semibold',
-        active && !color
+        'inline-flex h-7 items-center gap-1.5 rounded-[9px] border px-2.5 text-[10.5px] font-medium',
+        active && !accentColor
           ? light
-            ? 'border-black/[0.1] bg-black/[0.045] text-black/68'
-            : 'border-white/[0.11] bg-white/[0.075] text-white/72'
+            ? 'border-black/[0.1] bg-black/[0.045] text-black/62'
+            : 'border-white/[0.11] bg-white/[0.075] text-white/68'
           : !active
             ? light
-              ? 'border-black/[0.08] bg-white text-black/52'
-              : 'border-white/[0.08] bg-white/[0.04] text-white/48'
+              ? 'border-black/[0.08] bg-white text-black/50'
+              : 'border-white/[0.08] bg-white/[0.04] text-white/42'
             : '',
         className,
       )}
@@ -545,8 +613,191 @@ function MicroLabel({
   );
 }
 
-function StatusDot({ color }: { color: string }) {
-  return <span style={{ background: color }} className="size-1.5 shrink-0 rounded-full" />;
+function StatusDot({
+  light,
+  active,
+  accentColor,
+}: {
+  light: boolean;
+  active?: boolean;
+  accentColor?: string;
+}) {
+  return (
+    <span
+      style={active && accentColor ? { background: accentColor } : undefined}
+      className={cn(
+        'size-1.5 shrink-0 rounded-full',
+        !(active && accentColor) &&
+          (active ? 'bg-current' : light ? 'bg-black/24' : 'bg-white/22'),
+      )}
+    />
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  hint,
+  icon,
+  light,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  icon: ReactNode;
+  light: boolean;
+}) {
+  return (
+    <div className="min-w-0 p-4 md:p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className={cn('text-[11px] font-medium', mutedText(light))}>
+            {label}
+          </div>
+
+          <div
+            className={cn(
+              'mt-2 truncate text-[25px] font-semibold tracking-[-0.065em]',
+              pageText(light),
+            )}
+          >
+            {value}
+          </div>
+
+          <div className={cn('mt-1 truncate text-[11px]', faintText(light))}>
+            {hint}
+          </div>
+        </div>
+
+        <div
+          className={cn(
+            'inline-flex size-8 shrink-0 items-center justify-center rounded-[9px] border',
+            light
+              ? 'border-black/[0.07] bg-black/[0.025] text-black/38'
+              : 'border-white/[0.07] bg-white/[0.035] text-white/38',
+          )}
+        >
+          {icon}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HeroStat({
+  label,
+  value,
+  hint,
+  light,
+}: {
+  label: string;
+  value: string | number;
+  hint?: string;
+  light: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        'min-w-0 rounded-[10px] border px-3.5 py-3 transition-colors duration-150',
+        light
+          ? 'border-black/[0.07] bg-white hover:bg-black/[0.018]'
+          : 'border-white/[0.07] bg-white/[0.035] hover:bg-white/[0.055]',
+      )}
+    >
+      <div className="grid min-h-[34px] grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
+        <div className="min-w-0">
+          <div className={cn('truncate text-[10.5px] font-medium', mutedText(light))}>
+            {label}
+          </div>
+
+          {hint ? (
+            <div className={cn('mt-0.5 truncate text-[10px]', faintText(light))}>
+              {hint}
+            </div>
+          ) : null}
+        </div>
+
+        <div
+          className={cn(
+            'min-w-[54px] max-w-[170px] truncate text-right text-[18px] font-semibold leading-none tracking-[-0.055em] tabular-nums',
+            pageText(light),
+          )}
+        >
+          {value}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ControlGroup({
+  children,
+  light,
+  className,
+}: {
+  children: ReactNode;
+  light: boolean;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        'inline-flex max-w-full shrink-0 items-center overflow-hidden rounded-[12px] border p-0',
+        light
+          ? 'border-black/[0.08] bg-white'
+          : 'border-white/[0.08] bg-white/[0.045]',
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+function FilterChip({
+  label,
+  active,
+  onClick,
+  light,
+  accentColor,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  light: boolean;
+  accentColor: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'group relative inline-flex h-10 min-w-[72px] shrink-0 items-center justify-center border-r px-4 text-[11px] font-semibold tracking-[-0.015em] transition-colors duration-150 last:border-r-0 active:scale-[0.985]',
+        light ? 'border-black/[0.07]' : 'border-white/[0.07]',
+        active
+          ? light
+            ? 'text-black'
+            : 'text-white'
+          : light
+            ? 'text-black/40 hover:text-black/70'
+            : 'text-white/36 hover:text-white/70',
+      )}
+    >
+      <span className="relative z-10">{label}</span>
+
+      <span
+        style={active ? { background: accentColor } : undefined}
+        className={cn(
+          'absolute bottom-1.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full transition-all duration-200',
+          active
+            ? 'opacity-100'
+            : light
+              ? 'bg-black/0 opacity-0 group-hover:bg-black/18 group-hover:opacity-100'
+              : 'bg-white/0 opacity-0 group-hover:bg-white/18 group-hover:opacity-100',
+        )}
+      />
+    </button>
+  );
 }
 
 function IconButton({
@@ -566,10 +817,10 @@ function IconButton({
       aria-label={label}
       onClick={onClick}
       className={cn(
-        'inline-flex size-9 items-center justify-center rounded-[10px] border transition-all duration-150 active:scale-[0.97]',
+        'inline-flex size-10 items-center justify-center border-r text-[11px] font-semibold transition-colors duration-150 last:border-r-0 active:scale-[0.985]',
         light
-          ? 'border-black/[0.08] bg-white text-black/62 hover:bg-black/[0.035] hover:text-black'
-          : 'border-white/[0.08] bg-white/[0.04] text-white/62 hover:bg-white/[0.07] hover:text-white',
+          ? 'border-black/[0.07] text-black/45 hover:bg-black/[0.025] hover:text-black/72'
+          : 'border-white/[0.07] text-white/42 hover:bg-white/[0.04] hover:text-white/72',
       )}
     >
       {children}
@@ -577,95 +828,26 @@ function IconButton({
   );
 }
 
-function SegmentButton({
-  label,
-  active,
-  onClick,
+function CalendarEmptyOverlay({
   light,
-  accentColor,
+  title,
+  text,
 }: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
   light: boolean;
-  accentColor: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'relative inline-flex h-9 min-w-[78px] items-center justify-center rounded-[10px] px-3 text-[11px] font-semibold tracking-[-0.015em] transition-all duration-150 active:scale-[0.985]',
-        active
-          ? light
-            ? 'text-black'
-            : 'text-white'
-          : light
-            ? 'text-black/45 hover:text-black/72'
-            : 'text-white/42 hover:text-white/72',
-      )}
-    >
-      {active ? (
-        <span
-          style={accentPillStyle(accentColor, light, 'soft')}
-          className="absolute inset-0 rounded-[10px] border"
-        />
-      ) : null}
-      <span className="relative z-10">{label}</span>
-    </button>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  hint,
-  icon,
-  light,
-}: {
-  label: string;
-  value: string | number;
-  hint?: string;
-  icon: ReactNode;
-  light: boolean;
+  title: string;
+  text: string;
 }) {
   return (
     <div
       className={cn(
-        'min-w-0 rounded-[14px] border px-4 py-3.5',
-        light ? 'border-black/[0.07] bg-white' : 'border-white/[0.07] bg-white/[0.04]',
+        'pointer-events-none absolute left-1/2 top-16 z-20 w-[min(420px,calc(100%-32px))] -translate-x-1/2 rounded-[10px] border px-4 py-4 text-center shadow-sm backdrop-blur-xl',
+        light
+          ? 'border-black/[0.08] bg-white/88 text-black'
+          : 'border-white/[0.08] bg-[#101010]/88 text-white',
       )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className={cn('truncate text-[10.5px] font-semibold', mutedText(light))}>
-            {label}
-          </div>
-          <div
-            className={cn(
-              'mt-2 truncate text-[24px] font-semibold leading-none tracking-[-0.065em]',
-              pageText(light),
-            )}
-          >
-            {value}
-          </div>
-          {hint ? (
-            <div className={cn('mt-1.5 truncate text-[10.5px]', faintText(light))}>
-              {hint}
-            </div>
-          ) : null}
-        </div>
-        <div
-          className={cn(
-            'inline-flex size-9 shrink-0 items-center justify-center rounded-[11px] border',
-            light
-              ? 'border-black/[0.07] bg-black/[0.025] text-black/38'
-              : 'border-white/[0.07] bg-white/[0.035] text-white/38',
-          )}
-        >
-          {icon}
-        </div>
-      </div>
+      <div className="text-[13px] font-semibold tracking-[-0.018em]">{title}</div>
+      <div className={cn('mt-1 text-[11px] leading-5', mutedText(light))}>{text}</div>
     </div>
   );
 }
@@ -686,8 +868,8 @@ function BookingBlock({
   compact?: boolean;
 }) {
   const top = ((booking.startMinutes - workWindow.startMinutes) / 60) * hourHeight + 4;
-  const height = Math.max(46, ((booking.endMinutes - booking.startMinutes) / 60) * hourHeight - 8);
-  const gap = 4;
+  const height = Math.max(42, ((booking.endMinutes - booking.startMinutes) / 60) * hourHeight - 8);
+  const gap = 5;
   const width = `calc(${100 / booking.lanes}% - ${gap}px)`;
   const left = `calc(${(booking.lane * 100) / booking.lanes}% + ${booking.lane ? gap / 2 : 0}px)`;
   const inactive = booking.status === 'cancelled' || booking.status === 'no_show';
@@ -698,15 +880,15 @@ function BookingBlock({
       type="button"
       onClick={() => onSelect(booking)}
       style={{
-        ...bookingCardStyle(booking.color, light),
+        ...bookingBlockStyle(booking.color, light),
         top,
         height,
         left,
         width,
       }}
       className={cn(
-        'absolute z-10 overflow-hidden rounded-[13px] border px-2.5 py-2 text-left transition-all duration-150 hover:-translate-y-0.5 hover:shadow-xl active:scale-[0.99]',
-        inactive && 'opacity-55 saturate-50',
+        'absolute z-10 overflow-hidden rounded-[10px] border px-2.5 py-2 text-left transition-[box-shadow,transform,opacity,filter] duration-150 hover:-translate-y-0.5 active:scale-[0.99]',
+        inactive && 'opacity-50 saturate-50',
         done && 'opacity-72',
       )}
     >
@@ -714,49 +896,21 @@ function BookingBlock({
         style={{ background: booking.color }}
         className="absolute left-0 top-0 h-full w-[3px]"
       />
-      <span
-        style={{ background: booking.color }}
-        className="absolute right-2 top-2 size-1.5 rounded-full opacity-80"
-      />
 
       <div className="min-w-0 pl-1.5">
-        <div className="truncate text-[12px] font-bold leading-tight tracking-[-0.02em]">
+        <div className="truncate text-[11.5px] font-semibold leading-tight tracking-[-0.018em]">
           {booking.clientName}
         </div>
-        <div className="mt-1 truncate text-[10.5px] font-semibold opacity-78">
+        <div className="mt-1 truncate text-[10px] font-medium opacity-80">
           {booking.service}
         </div>
-        {!compact || height > 58 ? (
-          <div className="mt-1.5 truncate text-[10px] font-semibold opacity-62">
+        {!compact || height > 56 ? (
+          <div className="mt-1.5 truncate text-[9.5px] font-semibold opacity-60">
             {booking.start}–{booking.end}
           </div>
         ) : null}
       </div>
     </button>
-  );
-}
-
-function EmptyCalendarState({
-  light,
-  title,
-  text,
-}: {
-  light: boolean;
-  title: string;
-  text: string;
-}) {
-  return (
-    <div
-      className={cn(
-        'pointer-events-none absolute left-1/2 top-16 z-20 w-[min(420px,calc(100%-32px))] -translate-x-1/2 rounded-[16px] border px-4 py-4 text-center shadow-sm',
-        light
-          ? 'border-black/[0.08] bg-white/88 text-black backdrop-blur-xl'
-          : 'border-white/[0.08] bg-[#111]/88 text-white backdrop-blur-xl',
-      )}
-    >
-      <div className="text-[13px] font-semibold tracking-[-0.018em]">{title}</div>
-      <div className={cn('mt-1 text-[11px] leading-5', mutedText(light))}>{text}</div>
-    </div>
   );
 }
 
@@ -788,7 +942,7 @@ function DayCalendar({
       <div className="min-w-[760px]">
         <div
           className={cn(
-            'grid grid-cols-[82px_minmax(0,1fr)] overflow-hidden rounded-[16px] border',
+            'grid grid-cols-[82px_minmax(0,1fr)] overflow-hidden rounded-[10px] border',
             light ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.025]',
           )}
         >
@@ -798,7 +952,7 @@ function DayCalendar({
                 <div
                   key={hour}
                   style={{ top: ((hour - workWindow.startMinutes) / 60) * DAY_HOUR_HEIGHT - 7 }}
-                  className={cn('absolute right-3 text-[11px] font-semibold tabular-nums', mutedText(light))}
+                  className={cn('absolute right-3 text-[11px] font-medium tabular-nums', mutedText(light))}
                 >
                   {formatMinutesAsTime(hour)}
                 </div>
@@ -811,8 +965,8 @@ function DayCalendar({
             style={{
               height,
               backgroundImage: light
-                ? 'linear-gradient(to bottom, rgba(0,0,0,.07) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,.035) 1px, transparent 1px)'
-                : 'linear-gradient(to bottom, rgba(255,255,255,.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.035) 1px, transparent 1px)',
+                ? 'linear-gradient(to bottom, rgba(0,0,0,.064) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,.032) 1px, transparent 1px)'
+                : 'linear-gradient(to bottom, rgba(255,255,255,.07) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.032) 1px, transparent 1px)',
               backgroundSize: `100% ${DAY_HOUR_HEIGHT}px, 100% ${DAY_HOUR_HEIGHT / 2}px`,
             }}
           >
@@ -841,7 +995,7 @@ function DayCalendar({
             ))}
 
             {!dayBookings.length ? (
-              <EmptyCalendarState
+              <CalendarEmptyOverlay
                 light={light}
                 title={locale === 'ru' ? 'Записей на этот день нет' : 'No bookings for this day'}
                 text={locale === 'ru' ? 'Свободный день. Новые заявки появятся здесь автоматически.' : 'Free day. New requests will appear here automatically.'}
@@ -886,7 +1040,7 @@ function WeekCalendar({
       <div className="min-w-[1080px]">
         <div
           className={cn(
-            'overflow-hidden rounded-[16px] border',
+            'overflow-hidden rounded-[10px] border',
             light ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.025]',
           )}
         >
@@ -897,13 +1051,14 @@ function WeekCalendar({
               light ? 'bg-white/92' : 'bg-[#101010]/92',
             )}
           >
-            <div className={cn('border-r px-3 py-3 text-[11px] font-semibold', borderTone(light), mutedText(light))}>
+            <div className={cn('border-r px-3 py-3 text-[11px] font-medium', borderTone(light), mutedText(light))}>
               {locale === 'ru' ? 'Время' : 'Time'}
             </div>
             {dates.map((date) => {
               const iso = toLocalIsoDate(date);
               const isToday = iso === todayIso;
               const isSelected = isSameDay(date, selectedDate);
+
               return (
                 <button
                   key={iso}
@@ -927,12 +1082,12 @@ function WeekCalendar({
                     </span>
                     <span
                       className={cn(
-                        'grid size-7 place-items-center rounded-[9px] text-[11px] font-bold',
+                        'grid size-7 place-items-center rounded-[9px] text-[11px] font-semibold',
                         isToday
-                          ? 'bg-red-500 text-white'
+                          ? 'cb-neutral-primary cb-neutral-primary-dark text-white'
                           : light
-                            ? 'bg-black/[0.035] text-black/60'
-                            : 'bg-white/[0.05] text-white/60',
+                            ? 'bg-black/[0.035] text-black/58'
+                            : 'bg-white/[0.05] text-white/58',
                       )}
                     >
                       {date.getDate()}
@@ -949,7 +1104,7 @@ function WeekCalendar({
                 <div
                   key={hour}
                   style={{ top: ((hour - workWindow.startMinutes) / 60) * WEEK_HOUR_HEIGHT - 7 }}
-                  className={cn('absolute right-3 text-[11px] font-semibold tabular-nums', mutedText(light))}
+                  className={cn('absolute right-3 text-[11px] font-medium tabular-nums', mutedText(light))}
                 >
                   {formatMinutesAsTime(hour)}
                 </div>
@@ -968,8 +1123,8 @@ function WeekCalendar({
                   style={{
                     height,
                     backgroundImage: light
-                      ? 'linear-gradient(to bottom, rgba(0,0,0,.07) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,.035) 1px, transparent 1px)'
-                      : 'linear-gradient(to bottom, rgba(255,255,255,.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.035) 1px, transparent 1px)',
+                      ? 'linear-gradient(to bottom, rgba(0,0,0,.064) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,.032) 1px, transparent 1px)'
+                      : 'linear-gradient(to bottom, rgba(255,255,255,.07) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.032) 1px, transparent 1px)',
                     backgroundSize: `100% ${WEEK_HOUR_HEIGHT}px, 100% ${WEEK_HOUR_HEIGHT / 2}px`,
                   }}
                 >
@@ -1006,6 +1161,7 @@ function WeekCalendar({
 function MonthCalendar({
   dates,
   selectedDate,
+  todayIso,
   bookingsByDate,
   light,
   locale,
@@ -1014,6 +1170,7 @@ function MonthCalendar({
 }: {
   dates: Date[];
   selectedDate: Date;
+  todayIso: string;
   bookingsByDate: Map<string, CalendarBooking[]>;
   light: boolean;
   locale: 'ru' | 'en';
@@ -1026,15 +1183,15 @@ function MonthCalendar({
   return (
     <div
       className={cn(
-        'overflow-hidden rounded-[16px] border',
+        'overflow-hidden rounded-[10px] border',
         light ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.025]',
       )}
     >
-      <div className="grid grid-cols-7 border-b">
+      <div className={cn('grid grid-cols-7 border-b', borderTone(light))}>
         {weekdays.map((date) => (
           <div
             key={date.getDay()}
-            className={cn('border-r px-3 py-2 text-[11px] font-semibold last:border-r-0', borderTone(light), mutedText(light))}
+            className={cn('border-r px-3 py-2 text-[11px] font-medium last:border-r-0', borderTone(light), mutedText(light))}
           >
             {formatWeekday(date, locale)}
           </div>
@@ -1047,14 +1204,22 @@ function MonthCalendar({
           const dayBookings = bookingsByDate.get(iso) ?? [];
           const outside = date.getMonth() !== currentMonth;
           const selected = isSameDay(date, selectedDate);
+          const today = iso === todayIso;
           const visible = dayBookings.slice(0, 3);
           const hidden = Math.max(0, dayBookings.length - visible.length);
 
           return (
-            <button
+            <div
               key={iso}
-              type="button"
+              role="button"
+              tabIndex={0}
               onClick={() => onDateSelect(date)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onDateSelect(date);
+                }
+              }}
               className={cn(
                 'min-h-[138px] border-r border-b p-2.5 text-left transition-colors last:border-r-0',
                 borderTone(light),
@@ -1071,20 +1236,22 @@ function MonthCalendar({
               <div className="mb-2 flex items-center justify-between gap-2">
                 <span
                   className={cn(
-                    'grid size-7 place-items-center rounded-[9px] text-[11px] font-bold',
-                    selected
-                      ? light
-                        ? 'bg-black text-white'
-                        : 'bg-white text-black'
-                      : light
-                        ? 'bg-black/[0.035] text-black/58'
-                        : 'bg-white/[0.045] text-white/58',
+                    'grid size-7 place-items-center rounded-[9px] text-[11px] font-semibold',
+                    today
+                      ? 'cb-neutral-primary cb-neutral-primary-dark text-white'
+                      : selected
+                        ? light
+                          ? 'bg-black text-white'
+                          : 'bg-white text-black'
+                        : light
+                          ? 'bg-black/[0.035] text-black/58'
+                          : 'bg-white/[0.045] text-white/58',
                   )}
                 >
                   {date.getDate()}
                 </span>
                 {dayBookings.length ? (
-                  <span className={cn('text-[10px] font-semibold', mutedText(light))}>
+                  <span className={cn('text-[10px] font-medium', mutedText(light))}>
                     {dayBookings.length}
                   </span>
                 ) : null}
@@ -1092,39 +1259,53 @@ function MonthCalendar({
 
               <div className="space-y-1.5">
                 {visible.map((booking) => (
-                  <span
+                  <button
                     key={booking.id}
-                    role="button"
-                    tabIndex={0}
+                    type="button"
                     onClick={(event) => {
                       event.stopPropagation();
                       onSelect(booking);
                     }}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        onSelect(booking);
-                      }
-                    }}
                     style={accentPillStyle(booking.color, light, 'soft')}
-                    className="block rounded-[9px] border px-2 py-1.5 text-[10.5px] font-semibold"
+                    className="block w-full rounded-[9px] border px-2 py-1.5 text-left text-[10.5px] font-medium transition-transform duration-150 active:scale-[0.99]"
                   >
                     <span className="block truncate">{booking.start} · {booking.clientName}</span>
                     <span className="mt-0.5 block truncate text-[9.5px] opacity-72">{booking.service}</span>
-                  </span>
+                  </button>
                 ))}
 
                 {hidden ? (
-                  <span className={cn('block px-1 pt-1 text-[10.5px] font-semibold', mutedText(light))}>
+                  <span className={cn('block px-1 pt-1 text-[10.5px] font-medium', mutedText(light))}>
                     +{hidden}
                   </span>
                 ) : null}
               </div>
-            </button>
+            </div>
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function InfoRow({
+  label,
+  value,
+  light,
+}: {
+  label: string;
+  value: string;
+  light: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        'flex min-h-10 items-center justify-between gap-3 rounded-[9px] border px-3',
+        light ? 'border-black/[0.07] bg-white' : 'border-white/[0.08] bg-white/[0.04]',
+      )}
+    >
+      <span className={cn('text-[11px] font-medium', mutedText(light))}>{label}</span>
+      <span className={cn('truncate text-right text-[11.5px] font-medium', pageText(light))}>{value}</span>
     </div>
   );
 }
@@ -1152,30 +1333,31 @@ function BookingDialog({
     <div
       role="presentation"
       onClick={onClose}
-      className="fixed inset-0 z-[90] bg-black/45 backdrop-blur-[6px]"
+      className="fixed inset-0 z-[90] bg-black/42 backdrop-blur-[6px]"
     >
       <div
         role="dialog"
         aria-modal="true"
         onClick={(event) => event.stopPropagation()}
         className={cn(
-          'fixed bottom-0 left-0 right-0 rounded-t-[24px] border p-4 shadow-2xl sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2 sm:w-[420px] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-[22px] sm:p-5',
-          light
-            ? 'border-black/[0.08] bg-[#fbfbfa] text-black'
-            : 'border-white/[0.1] bg-[#101010] text-white',
+          'fixed bottom-0 left-0 right-0 rounded-t-[18px] border p-4 shadow-2xl sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2 sm:w-[430px] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-[14px] sm:p-5',
+          cardTone(light),
+          pageText(light),
         )}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <MicroLabel light={light} active color={booking.color}>
-              <StatusDot color={booking.color} />
+            <MicroLabel light={light} active accentColor={booking.color}>
+              <StatusDot light={light} active accentColor={booking.color} />
               {booking.service}
             </MicroLabel>
+
             <h2 className="mt-4 truncate text-[28px] font-semibold tracking-[-0.07em]">
               {booking.clientName}
             </h2>
+
             <p className={cn('mt-1 text-[12px]', mutedText(light))}>
-              {statusLabel(booking.status, locale)} · {booking.source}
+              {bookingStatusLabel(booking.status, locale)} · {booking.source}
             </p>
           </div>
 
@@ -1183,7 +1365,7 @@ function BookingDialog({
             type="button"
             onClick={onClose}
             className={cn(
-              'inline-flex size-9 shrink-0 items-center justify-center rounded-[11px] border transition-colors',
+              'inline-flex size-9 shrink-0 items-center justify-center rounded-[9px] border transition-colors',
               light
                 ? 'border-black/[0.08] bg-white text-black/50 hover:text-black'
                 : 'border-white/[0.08] bg-white/[0.04] text-white/52 hover:text-white',
@@ -1212,23 +1394,18 @@ function BookingDialog({
           <InfoRow
             light={light}
             label={locale === 'ru' ? 'Сумма' : 'Amount'}
-            value={booking.amount > 0 ? formatMoney(booking.amount, locale) : '—'}
+            value={booking.amount > 0 ? formatCurrencyCompact(booking.amount, locale) : '—'}
           />
         </div>
 
-        <div
-          className={cn(
-            'mt-3 rounded-[14px] border px-3.5 py-3',
-            light ? 'border-black/[0.07] bg-white' : 'border-white/[0.08] bg-white/[0.04]',
-          )}
-        >
-          <div className={cn('text-[10.5px] font-semibold', mutedText(light))}>
+        <Panel light={light} className="mt-3 p-4">
+          <div className={cn('text-[10.5px] font-medium', mutedText(light))}>
             {locale === 'ru' ? 'Комментарий' : 'Note'}
           </div>
-          <div className="mt-1.5 text-[13px] leading-5">
+          <div className={cn('mt-2 text-[13px] leading-6', pageText(light))}>
             {booking.note || '—'}
           </div>
-        </div>
+        </Panel>
 
         <div className="mt-4 grid grid-cols-2 gap-2">
           <Button asChild className={cn('justify-start', buttonBase(light))}>
@@ -1237,18 +1414,21 @@ function BookingDialog({
               {locale === 'ru' ? 'Позвонить' : 'Call'}
             </Link>
           </Button>
+
           <Button asChild className={cn('justify-start', buttonBase(light, true))}>
             <Link href="/dashboard/chats">
               <MessageCircleMore className="size-3.5" />
               {locale === 'ru' ? 'Чат' : 'Chat'}
             </Link>
           </Button>
+
           <Button asChild className={cn('justify-start', buttonBase(light))}>
             <Link href="/dashboard/availability">
               <CalendarClock className="size-3.5" />
               {locale === 'ru' ? 'Перенести' : 'Reschedule'}
             </Link>
           </Button>
+
           {canClose ? (
             <Button
               type="button"
@@ -1260,6 +1440,7 @@ function BookingDialog({
               {actionLoading === 'completed' ? '…' : locale === 'ru' ? 'Завершить' : 'Complete'}
             </Button>
           ) : null}
+
           {canClose ? (
             <Button
               type="button"
@@ -1273,28 +1454,6 @@ function BookingDialog({
           ) : null}
         </div>
       </div>
-    </div>
-  );
-}
-
-function InfoRow({
-  label,
-  value,
-  light,
-}: {
-  label: string;
-  value: string;
-  light: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        'flex min-h-10 items-center justify-between gap-3 rounded-[12px] border px-3',
-        light ? 'border-black/[0.07] bg-white' : 'border-white/[0.08] bg-white/[0.04]',
-      )}
-    >
-      <span className={cn('text-[11px] font-semibold', mutedText(light))}>{label}</span>
-      <span className="truncate text-right text-[11.5px] font-semibold">{value}</span>
     </div>
   );
 }
@@ -1340,17 +1499,19 @@ export default function DashboardTodayPage() {
 
   const isLight = currentTheme === 'light';
   const accentColor = accentPalette[settings.accentTone].solid;
+  const publicAccentColor = accentPalette[settings.publicAccent].solid;
   const todayIso = useMemo(() => toLocalIsoDate(now), [now]);
 
   const labels = locale === 'ru'
     ? {
-        title: 'Расписание',
-        description: 'День, неделя и месяц в одном календаре. Цвет записи зависит от услуги.',
+        title: 'Записи на сегодня',
+        description: 'Профессиональный календарь мастера: день, неделя, месяц, статусы и быстрые действия.',
         emptyTitle: 'Сначала настройте профиль мастера',
         emptyDescription: 'Создайте профиль, чтобы открыть календарь, записи, чаты и быстрые действия.',
         emptyAction: 'Создать профиль',
         profileMissing: 'Профиль не настроен',
         calendar: 'Календарь записей',
+        calendarDescription: 'Клик по записи открывает мини-карточку клиента с действиями.',
         today: 'Сегодня',
         previous: 'Назад',
         next: 'Вперёд',
@@ -1358,27 +1519,30 @@ export default function DashboardTodayPage() {
         week: 'Неделя',
         month: 'Месяц',
         bookings: 'Записей',
-        confirmed: 'Активных',
+        active: 'Активных',
         completed: 'Завершено',
         revenue: 'Выручка',
         nearest: 'Ближайшая',
         quiet: 'Пока пусто',
         live: demoMode ? 'Демо-режим' : 'Рабочий календарь',
-        setupTimeline: 'Календарь',
-        setupTimelineText: 'После создания профиля здесь появится рабочее расписание.',
-        setupChats: 'Чаты',
-        setupChatsText: 'Быстрый переход к перепискам и напоминаниям.',
-        setupPublic: 'Онлайн-запись',
-        setupPublicText: 'Публичная ссылка для клиентов создаст новые записи.',
+        setupCards: {
+          calendar: 'Календарь',
+          calendarText: 'После создания профиля здесь появится рабочее расписание.',
+          chats: 'Чаты',
+          chatsText: 'Быстрый переход к перепискам и напоминаниям.',
+          public: 'Онлайн-запись',
+          publicText: 'Публичная ссылка для клиентов создаст новые записи.',
+        },
       }
     : {
-        title: 'Schedule',
-        description: 'Day, week, and month in one calendar. Booking color follows the service.',
+        title: 'Today bookings',
+        description: 'Professional master schedule: day, week, month, statuses, and quick actions.',
         emptyTitle: 'Create the master profile first',
         emptyDescription: 'Create a profile to unlock calendar, bookings, chats, and quick actions.',
         emptyAction: 'Create profile',
         profileMissing: 'Profile missing',
         calendar: 'Booking calendar',
+        calendarDescription: 'Click a booking to open a compact client card with actions.',
         today: 'Today',
         previous: 'Previous',
         next: 'Next',
@@ -1386,26 +1550,30 @@ export default function DashboardTodayPage() {
         week: 'Week',
         month: 'Month',
         bookings: 'Bookings',
-        confirmed: 'Active',
+        active: 'Active',
         completed: 'Completed',
         revenue: 'Revenue',
         nearest: 'Next up',
         quiet: 'Quiet for now',
         live: demoMode ? 'Demo mode' : 'Live calendar',
-        setupTimeline: 'Calendar',
-        setupTimelineText: 'After profile setup, the work schedule will appear here.',
-        setupChats: 'Chats',
-        setupChatsText: 'Quick access to conversations and reminders.',
-        setupPublic: 'Online booking',
-        setupPublicText: 'A public client link creates new bookings.',
+        setupCards: {
+          calendar: 'Calendar',
+          calendarText: 'After profile setup, the work schedule will appear here.',
+          chats: 'Chats',
+          chatsText: 'Quick access to conversations and reminders.',
+          public: 'Online booking',
+          publicText: 'A public client link creates new bookings.',
+        },
       };
 
   const serviceMap = useMemo(() => {
     const map = new Map<string, ServiceLike>();
+
     for (const service of dataset?.services ?? []) {
       const item = service as ServiceLike;
       map.set(item.name, item);
     }
+
     return map;
   }, [dataset]);
 
@@ -1431,12 +1599,12 @@ export default function DashboardTodayPage() {
   const workWindow = useMemo(() => deriveWorkWindow(rangeBookings), [rangeBookings]);
 
   const nearestBooking = useMemo(
-    () => calendarBookings.find((booking) => activeBooking(booking) && `${booking.date}T${booking.start}` >= `${todayIso}T00:00`) ?? null,
+    () => calendarBookings.find((booking) => isBookingActive(booking) && `${booking.date}T${booking.start}` >= `${todayIso}T00:00`) ?? null,
     [calendarBookings, todayIso],
   );
 
   const stats = useMemo(() => {
-    const active = rangeBookings.filter(activeBooking);
+    const active = rangeBookings.filter(isBookingActive);
     const completed = rangeBookings.filter((booking) => booking.status === 'completed');
     const revenue = rangeBookings.reduce((sum, booking) => sum + booking.amount, 0);
 
@@ -1464,6 +1632,7 @@ export default function DashboardTodayPage() {
     if (!selectedBooking) return;
 
     setActionLoading(status);
+
     try {
       await updateBookingStatus(selectedBooking.id, status);
       setSelectedBooking((current) => current ? { ...current, status } : current);
@@ -1475,32 +1644,64 @@ export default function DashboardTodayPage() {
   if (!hasHydrated || !mounted) return null;
 
   if (!ownedProfile) {
+    const setupCards: Array<[string, string, ReactNode]> = [
+      [labels.setupCards.calendar, labels.setupCards.calendarText, <CalendarDays key="calendar" className="size-3.5" />],
+      [labels.setupCards.chats, labels.setupCards.chatsText, <MessageCircleMore key="chats" className="size-3.5" />],
+      [labels.setupCards.public, labels.setupCards.publicText, <Globe2 key="public" className="size-3.5" />],
+    ];
+
     return (
       <WorkspaceShell>
-        <main className={cn('min-h-[calc(100dvh-68px)] px-4 pb-12 pt-5 md:px-7 md:pt-6', pageBg(isLight))}>
+        <main
+          className={cn(
+            'min-h-[calc(100dvh-68px)] px-4 pb-12 pt-5 md:px-7 md:pt-6',
+            pageBg(isLight),
+          )}
+        >
           <div className="mx-auto w-full max-w-[var(--page-max-width)]">
             <div className="mb-6 md:mb-7">
-              <h1 className={cn('text-[31px] font-semibold tracking-[-0.075em] md:text-[42px]', pageText(isLight))}>
-                {labels.title}
-              </h1>
-              <p className={cn('mt-2 max-w-[760px] text-[13px] leading-5', mutedText(isLight))}>
-                {labels.description}
-              </p>
+              <div className="min-w-0">
+                <h1
+                  className={cn(
+                    'text-[31px] font-semibold tracking-[-0.075em] md:text-[42px]',
+                    pageText(isLight),
+                  )}
+                >
+                  {labels.title}
+                </h1>
+
+                <p
+                  className={cn(
+                    'mt-2 max-w-[760px] text-[13px] leading-5',
+                    mutedText(isLight),
+                  )}
+                >
+                  {labels.description}
+                </p>
+              </div>
             </div>
 
             <Card light={isLight} className="overflow-hidden">
               <div className="grid min-h-[320px] place-items-center px-5 py-12 text-center">
                 <div className="mx-auto max-w-[520px]">
                   <MicroLabel light={isLight}>
-                    <StatusDot color={accentColor} />
+                    <StatusDot light={isLight} />
                     {labels.profileMissing}
                   </MicroLabel>
-                  <h2 className={cn('mt-5 text-[28px] font-semibold tracking-[-0.065em] md:text-[36px]', pageText(isLight))}>
+
+                  <h2
+                    className={cn(
+                      'mt-5 text-[28px] font-semibold tracking-[-0.065em] md:text-[36px]',
+                      pageText(isLight),
+                    )}
+                  >
                     {labels.emptyTitle}
                   </h2>
+
                   <p className={cn('mt-3 text-[13px] leading-5', mutedText(isLight))}>
                     {labels.emptyDescription}
                   </p>
+
                   <div className="mt-6 flex justify-center">
                     <Button asChild className={buttonBase(isLight, true)}>
                       <Link href="/create-profile">
@@ -1514,15 +1715,26 @@ export default function DashboardTodayPage() {
             </Card>
 
             <div className="mt-4 grid gap-4 md:grid-cols-3">
-              {[
-                [labels.setupTimeline, labels.setupTimelineText, <CalendarDays key="calendar" className="size-3.5" />],
-                [labels.setupChats, labels.setupChatsText, <MessageCircleMore key="chat" className="size-3.5" />],
-                [labels.setupPublic, labels.setupPublicText, <Sparkles key="public" className="size-3.5" />],
-              ].map(([title, text, icon]) => (
-                <Card key={String(title)} light={isLight}>
+              {setupCards.map(([title, text, icon]) => (
+                <Card key={title} light={isLight}>
                   <div className="p-4">
-                    <MicroLabel light={isLight}>{icon}{title}</MicroLabel>
-                    <p className={cn('mt-4 text-[12px] leading-5', mutedText(isLight))}>{text}</p>
+                    <MicroLabel light={isLight}>
+                      {icon}
+                      {title}
+                    </MicroLabel>
+
+                    <div
+                      className={cn(
+                        'mt-4 text-[13px] font-semibold tracking-[-0.018em]',
+                        pageText(isLight),
+                      )}
+                    >
+                      {title}
+                    </div>
+
+                    <p className={cn('mt-1 text-[11px] leading-4', mutedText(isLight))}>
+                      {text}
+                    </p>
                   </div>
                 </Card>
               ))}
@@ -1535,115 +1747,258 @@ export default function DashboardTodayPage() {
 
   return (
     <WorkspaceShell>
-      <main className={cn('min-h-[calc(100dvh-68px)] px-4 pb-12 pt-5 md:px-7 md:pt-6', pageBg(isLight))}>
+      <main
+        className={cn(
+          'min-h-[calc(100dvh-68px)] px-4 pb-12 pt-5 md:px-7 md:pt-6',
+          pageBg(isLight),
+        )}
+      >
         <div className="mx-auto w-full max-w-[var(--page-max-width)]">
-          <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div className="mb-6 md:mb-7">
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <MicroLabel light={isLight} active color={accentColor}>
-                  <StatusDot color={accentColor} />
-                  {labels.live}
-                </MicroLabel>
-                <MicroLabel light={isLight}>{formatCalendarRange(viewMode, selectedDate, locale)}</MicroLabel>
-              </div>
-              <h1 className={cn('mt-4 text-[32px] font-semibold tracking-[-0.078em] md:text-[44px]', pageText(isLight))}>
+              <h1
+                className={cn(
+                  'text-[31px] font-semibold tracking-[-0.075em] md:text-[42px]',
+                  pageText(isLight),
+                )}
+              >
                 {labels.title}
               </h1>
-              <p className={cn('mt-2 max-w-[760px] text-[13px] leading-5', mutedText(isLight))}>
+
+              <p
+                className={cn(
+                  'mt-2 max-w-[760px] text-[13px] leading-5',
+                  mutedText(isLight),
+                )}
+              >
                 {labels.description}
               </p>
             </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <div className={cn('inline-flex items-center gap-1 rounded-[12px] border p-1', isLight ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.045]')}>
-                <IconButton light={isLight} label={labels.previous} onClick={() => shiftPeriod(-1)}>
-                  <ChevronLeft className="size-4" />
-                </IconButton>
-                <Button type="button" onClick={goToday} className={buttonBase(isLight)}>
-                  {labels.today}
-                </Button>
-                <IconButton light={isLight} label={labels.next} onClick={() => shiftPeriod(1)}>
-                  <ChevronRight className="size-4" />
-                </IconButton>
-              </div>
-
-              <div className={cn('inline-flex max-w-full items-center gap-1 rounded-[12px] border p-1', isLight ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.045]')}>
-                <SegmentButton label={labels.day} active={viewMode === 'day'} onClick={() => setViewMode('day')} light={isLight} accentColor={accentColor} />
-                <SegmentButton label={labels.week} active={viewMode === 'week'} onClick={() => setViewMode('week')} light={isLight} accentColor={accentColor} />
-                <SegmentButton label={labels.month} active={viewMode === 'month'} onClick={() => setViewMode('month')} light={isLight} accentColor={accentColor} />
-              </div>
-            </div>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-            <StatCard label={labels.bookings} value={stats.total} hint={formatCalendarRange(viewMode, selectedDate, locale)} icon={<CalendarClock className="size-4" />} light={isLight} />
-            <StatCard label={labels.confirmed} value={stats.active} hint={locale === 'ru' ? 'без отмен и неявок' : 'excluding missed'} icon={<UserRound className="size-4" />} light={isLight} />
-            <StatCard label={labels.completed} value={stats.completed} hint={locale === 'ru' ? 'закрытые визиты' : 'closed visits'} icon={<CheckCircle2 className="size-4" />} light={isLight} />
-            <StatCard label={labels.revenue} value={formatMoney(stats.revenue, locale)} hint={locale === 'ru' ? 'по выбранному периоду' : 'selected period'} icon={<Wallet className="size-4" />} light={isLight} />
-            <StatCard label={labels.nearest} value={nearestBooking?.start ?? '—'} hint={nearestBooking ? `${nearestBooking.clientName} · ${nearestBooking.service}` : labels.quiet} icon={<Clock3 className="size-4" />} light={isLight} />
-          </div>
+          <div className="grid gap-4">
+            <Card light={isLight} className="overflow-hidden">
+              <div className="p-5 md:p-6">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <MicroLabel light={isLight} active accentColor={accentColor}>
+                        <StatusDot light={isLight} active accentColor={accentColor} />
+                        {labels.live}
+                      </MicroLabel>
 
-          <Card light={isLight} className="mt-4 overflow-hidden">
-            <div className={cn('flex min-h-[58px] flex-col gap-3 border-b px-4 py-3 md:flex-row md:items-center md:justify-between', borderTone(isLight))}>
-              <div className="min-w-0">
-                <h2 className={cn('truncate text-[14px] font-semibold tracking-[-0.018em]', pageText(isLight))}>
-                  {labels.calendar}
-                </h2>
-                <p className={cn('mt-1 text-[11px]', mutedText(isLight))}>
-                  {locale === 'ru'
-                    ? 'Клик по записи открывает мини-карточку с действиями.'
-                    : 'Click a booking to open a quick action card.'}
-                </p>
+                      <MicroLabel light={isLight}>
+                        {formatCalendarRange(viewMode, selectedDate, locale)}
+                      </MicroLabel>
+                    </div>
+
+                    <div
+                      className={cn(
+                        'mt-4 text-[28px] font-semibold tracking-[-0.075em] md:text-[38px]',
+                        pageText(isLight),
+                      )}
+                    >
+                      {nearestBooking
+                        ? `${nearestBooking.start} · ${nearestBooking.clientName}`
+                        : labels.quiet}
+                    </div>
+
+                    <p
+                      className={cn(
+                        'mt-2 max-w-[780px] text-[12.5px] leading-6',
+                        mutedText(isLight),
+                      )}
+                    >
+                      {nearestBooking
+                        ? `${nearestBooking.service} · ${nearestBooking.date} · ${bookingStatusLabel(nearestBooking.status, locale)}`
+                        : locale === 'ru'
+                          ? 'Новые заявки сразу появятся в календаре и в карточках периода.'
+                          : 'New requests will appear in the calendar and period cards.'}
+                    </p>
+                  </div>
+
+                  <div className="flex max-w-full flex-wrap items-center gap-2">
+                    <ControlGroup light={isLight}>
+                      <IconButton light={isLight} label={labels.previous} onClick={() => shiftPeriod(-1)}>
+                        <ChevronLeft className="size-4" />
+                      </IconButton>
+                      <button
+                        type="button"
+                        onClick={goToday}
+                        className={cn(
+                          'inline-flex h-10 items-center justify-center border-r px-4 text-[11px] font-semibold tracking-[-0.015em] transition-colors duration-150 active:scale-[0.985]',
+                          isLight
+                            ? 'border-black/[0.07] text-black/58 hover:bg-black/[0.025] hover:text-black'
+                            : 'border-white/[0.07] text-white/55 hover:bg-white/[0.04] hover:text-white',
+                        )}
+                      >
+                        {labels.today}
+                      </button>
+                      <IconButton light={isLight} label={labels.next} onClick={() => shiftPeriod(1)}>
+                        <ChevronRight className="size-4" />
+                      </IconButton>
+                    </ControlGroup>
+
+                    <ControlGroup light={isLight} className="overflow-x-auto">
+                      <FilterChip
+                        label={labels.day}
+                        active={viewMode === 'day'}
+                        onClick={() => setViewMode('day')}
+                        light={isLight}
+                        accentColor={accentColor}
+                      />
+                      <FilterChip
+                        label={labels.week}
+                        active={viewMode === 'week'}
+                        onClick={() => setViewMode('week')}
+                        light={isLight}
+                        accentColor={accentColor}
+                      />
+                      <FilterChip
+                        label={labels.month}
+                        active={viewMode === 'month'}
+                        onClick={() => setViewMode('month')}
+                        light={isLight}
+                        accentColor={accentColor}
+                      />
+                    </ControlGroup>
+                  </div>
+                </div>
+
+                <div className="mt-6 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                  <HeroStat
+                    label={labels.bookings}
+                    value={stats.total}
+                    hint={formatCalendarRange(viewMode, selectedDate, locale)}
+                    light={isLight}
+                  />
+
+                  <HeroStat
+                    label={labels.active}
+                    value={stats.active}
+                    hint={locale === 'ru' ? 'без отмен и неявок' : 'excluding missed'}
+                    light={isLight}
+                  />
+
+                  <HeroStat
+                    label={labels.completed}
+                    value={stats.completed}
+                    hint={locale === 'ru' ? 'закрытые визиты' : 'closed visits'}
+                    light={isLight}
+                  />
+
+                  <HeroStat
+                    label={labels.revenue}
+                    value={formatCurrencyCompact(stats.revenue, locale)}
+                    hint={locale === 'ru' ? 'по выбранному периоду' : 'selected period'}
+                    light={isLight}
+                  />
+                </div>
               </div>
-              <MicroLabel light={isLight}>
-                {formatMinutesAsTime(workWindow.startMinutes)}–{formatMinutesAsTime(workWindow.endMinutes)}
-              </MicroLabel>
-            </div>
+            </Card>
 
-            <div className="p-3 md:p-4">
-              {viewMode === 'day' ? (
-                <DayCalendar
-                  date={selectedDate}
-                  bookings={calendarBookings}
-                  workWindow={workWindow}
-                  now={now}
-                  light={isLight}
-                  locale={locale}
-                  onSelect={setSelectedBooking}
-                />
-              ) : null}
+            <Card light={isLight}>
+              <CardTitle
+                title={labels.calendar}
+                description={labels.calendarDescription}
+                light={isLight}
+                action={
+                  <MicroLabel light={isLight} active accentColor={publicAccentColor}>
+                    {formatMinutesAsTime(workWindow.startMinutes)}–{formatMinutesAsTime(workWindow.endMinutes)}
+                  </MicroLabel>
+                }
+              />
 
-              {viewMode === 'week' ? (
-                <WeekCalendar
-                  dates={rangeDates.slice(0, 7)}
-                  bookingsByDate={bookingsByDate}
-                  workWindow={workWindow}
-                  now={now}
-                  todayIso={todayIso}
-                  selectedDate={selectedDate}
-                  light={isLight}
-                  locale={locale}
-                  onSelect={setSelectedBooking}
-                  onDateSelect={(date) => setSelectedDate(startOfDay(date))}
-                />
-              ) : null}
+              <div className="p-3 md:p-4">
+                {viewMode === 'day' ? (
+                  <DayCalendar
+                    date={selectedDate}
+                    bookings={calendarBookings}
+                    workWindow={workWindow}
+                    now={now}
+                    light={isLight}
+                    locale={locale}
+                    onSelect={setSelectedBooking}
+                  />
+                ) : null}
 
-              {viewMode === 'month' ? (
-                <MonthCalendar
-                  dates={rangeDates}
-                  selectedDate={selectedDate}
-                  bookingsByDate={bookingsByDate}
+                {viewMode === 'week' ? (
+                  <WeekCalendar
+                    dates={rangeDates.slice(0, 7)}
+                    bookingsByDate={bookingsByDate}
+                    workWindow={workWindow}
+                    now={now}
+                    todayIso={todayIso}
+                    selectedDate={selectedDate}
+                    light={isLight}
+                    locale={locale}
+                    onSelect={setSelectedBooking}
+                    onDateSelect={(date) => setSelectedDate(startOfDay(date))}
+                  />
+                ) : null}
+
+                {viewMode === 'month' ? (
+                  <MonthCalendar
+                    dates={rangeDates}
+                    selectedDate={selectedDate}
+                    todayIso={todayIso}
+                    bookingsByDate={bookingsByDate}
+                    light={isLight}
+                    locale={locale}
+                    onDateSelect={(date) => {
+                      setSelectedDate(startOfDay(date));
+                      setViewMode('day');
+                    }}
+                    onSelect={setSelectedBooking}
+                  />
+                ) : null}
+              </div>
+            </Card>
+
+            <Card light={isLight}>
+              <CardTitle
+                title={locale === 'ru' ? 'Срез периода' : 'Period snapshot'}
+                description={locale === 'ru' ? 'Быстрые показатели в стиле рабочей панели.' : 'Quick metrics in the workspace style.'}
+                light={isLight}
+              />
+
+              <div
+                className={cn(
+                  'grid divide-y md:grid-cols-4 md:divide-x md:divide-y-0',
+                  divideTone(isLight),
+                )}
+              >
+                <StatTile
+                  label={labels.bookings}
+                  value={String(stats.total)}
+                  hint={formatCalendarRange(viewMode, selectedDate, locale)}
+                  icon={<CalendarClock className="size-4" />}
                   light={isLight}
-                  locale={locale}
-                  onDateSelect={(date) => {
-                    setSelectedDate(startOfDay(date));
-                    setViewMode('day');
-                  }}
-                  onSelect={setSelectedBooking}
                 />
-              ) : null}
-            </div>
-          </Card>
+                <StatTile
+                  label={labels.active}
+                  value={String(stats.active)}
+                  hint={locale === 'ru' ? 'активные записи' : 'active bookings'}
+                  icon={<UserRound className="size-4" />}
+                  light={isLight}
+                />
+                <StatTile
+                  label={labels.completed}
+                  value={String(stats.completed)}
+                  hint={locale === 'ru' ? 'завершённые визиты' : 'completed visits'}
+                  icon={<CheckCircle2 className="size-4" />}
+                  light={isLight}
+                />
+                <StatTile
+                  label={labels.revenue}
+                  value={formatCurrencyCompact(stats.revenue, locale)}
+                  hint={locale === 'ru' ? 'сумма записей' : 'booking amount'}
+                  icon={<Wallet className="size-4" />}
+                  light={isLight}
+                />
+              </div>
+            </Card>
+          </div>
         </div>
       </main>
 
