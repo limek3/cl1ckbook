@@ -8,6 +8,7 @@ const classes: Record<BookingStatus, string> = {
   new: 'status-chip-new',
   confirmed: 'status-chip-confirmed',
   completed: 'status-chip-completed',
+  no_show: 'status-chip-noshow',
   cancelled: 'status-chip-cancelled',
 };
 
@@ -17,7 +18,7 @@ export function BookingStatusBadge({ status }: { status: BookingStatus }) {
   return (
     <span
       className={cn(
-        'inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium',
+        'cb-status-badge inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium',
         classes[status],
       )}
     >
@@ -33,6 +34,7 @@ export function useBookingStatusOptions() {
     { value: 'new', label: copy.statuses.new },
     { value: 'confirmed', label: copy.statuses.confirmed },
     { value: 'completed', label: copy.statuses.completed },
+    { value: 'no_show', label: copy.statuses.no_show },
     { value: 'cancelled', label: copy.statuses.cancelled },
   ] as const;
 }

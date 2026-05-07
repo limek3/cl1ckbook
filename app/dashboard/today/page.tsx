@@ -18,7 +18,10 @@ import {
   ChevronRight,
   Globe2,
   MessageCircleMore,
+  MessageSquareText,
   PhoneCall,
+  Plus,
+  Repeat2,
   SquarePen,
   X,
 } from 'lucide-react';
@@ -748,8 +751,18 @@ function bookingStatusHint(status: BookingStatus, locale: 'ru' | 'en') {
 
 function statusColor(booking: CalendarBooking, light: boolean) {
   if (booking.status === 'completed') return light ? 'rgba(17,17,17,0.38)' : 'rgba(255,255,255,0.42)';
+  if (booking.status === 'new') return light ? '#C47F13' : '#F5C16C';
   if (booking.status === 'no_show' || booking.status === 'cancelled') return light ? CALENDAR_CONFLICT_COLOR : '#FB7185';
   return light ? booking.color : CALENDAR_BOOKING_COLOR_DARK;
+}
+
+function statusCssColor(status: BookingStatus, light: boolean) {
+  if (status === 'new') return light ? '#C47F13' : '#F5C16C';
+  if (status === 'confirmed') return light ? CALENDAR_BOOKING_COLOR : CALENDAR_BOOKING_COLOR_DARK;
+  if (status === 'completed') return light ? '#6B7280' : 'rgba(255,255,255,0.48)';
+  if (status === 'cancelled') return light ? CALENDAR_CONFLICT_COLOR : '#FB7185';
+  if (status === 'no_show') return light ? '#E5484D' : '#FB7185';
+  return light ? CALENDAR_BOOKING_COLOR : CALENDAR_BOOKING_COLOR_DARK;
 }
 
 function PageAction({
@@ -780,7 +793,7 @@ function Card({
   className?: string;
 }) {
   return (
-    <section className={cn('rounded-[11px] border', cardTone(light), className)}>
+    <section className={cn('cb-card-lift rounded-[11px] border', cardTone(light), className)}>
       {children}
     </section>
   );
@@ -1048,14 +1061,15 @@ function BookingPill({
   onClick: () => void;
 }) {
   const tone = statusColor(booking, light);
+  const statusTone = statusCssColor(booking.status, light);
 
   return (
     <button
       type="button"
       onClick={onClick}
-      style={bookingSurfaceStyle(booking.color, light, selected)}
+      style={bookingSurfaceStyle(tone, light, selected)}
       className={cn(
-        'group relative w-full min-w-0 overflow-hidden rounded-[9px] border text-left transition-[box-shadow,transform,filter] duration-150 hover:-translate-y-px',
+        'group relative w-full min-w-0 overflow-hidden rounded-[9px] border text-left transition-[box-shadow,transform,filter] duration-150 hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current/20',
         compact ? 'px-2 py-1.5' : 'px-2.5 py-2',
       )}
     >
@@ -1091,10 +1105,26 @@ function BookingPill({
         </div>
 
         {!compact ? (
-          <div className={cn('mt-1 flex items-center gap-1.5 text-[9.5px]', faintText(light))}>
-            <span>{booking.durationMinutes} {locale === 'ru' ? 'мин' : 'min'}</span>
-            <span>·</span>
-            <span>{bookingStatusHint(booking.status, locale)}</span>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="cb-status-badge" style={{ '--cb-status-color': statusTone } as CSSProperties}>
+              {bookingStatusLabel(booking.status, locale)}
+            </span>
+            <span className={cn('text-[9.5px]', faintText(light))}>
+              {booking.durationMinutes} {locale === 'ru' ? 'мин' : 'min'}
+            </span>
+          </div>
+        ) : null}
+
+        {!compact ? (
+          <div className={cn('cb-booking-actions mt-2 flex flex-wrap gap-1.5 text-[9.5px]', faintText(light))}>
+            <span className="inline-flex items-center gap-1 rounded-[7px] border border-current/10 px-1.5 py-1">
+              <MessageSquareText className="size-3" />
+              {locale === 'ru' ? 'Чат' : 'Chat'}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-[7px] border border-current/10 px-1.5 py-1">
+              <Repeat2 className="size-3" />
+              {locale === 'ru' ? 'Перенести' : 'Move'}
+            </span>
           </div>
         ) : null}
       </div>
@@ -1116,7 +1146,7 @@ function SlotCell({
   return (
     <div
       className={cn(
-        'group/slot min-h-[46px] rounded-[9px] border px-1.5 py-1.5 transition-[background,border-color,box-shadow] duration-150',
+        'group/slot cb-interactive-slot min-h-[46px] rounded-[9px] border px-1.5 py-1.5 transition-[background,border-color,box-shadow] duration-150',
         slotStateClass(state, light),
         className,
       )}
@@ -1127,6 +1157,8 @@ function SlotCell({
 }
 
 function FreeSlotHint({ light, label }: { light: boolean; label: string }) {
+  const isFree = label === 'св.' || label.toLowerCase() === 'free' || label.toLowerCase() === 'свободно';
+
   return (
     <div className="flex h-full min-h-[31px] items-center justify-center">
       <span
@@ -1137,6 +1169,20 @@ function FreeSlotHint({ light, label }: { light: boolean; label: string }) {
       >
         {label}
       </span>
+
+      {isFree ? (
+        <span
+          className={cn(
+            'cb-slot-action ml-2 inline-flex items-center gap-1 rounded-[7px] border px-1.5 py-0.5 text-[9.5px] font-semibold',
+            light
+              ? 'border-[#0f766e]/20 bg-[#e6f6f3] text-[#0f766e]'
+              : 'border-[#2dd4bf]/20 bg-[#2dd4bf]/10 text-[#77eadc]',
+          )}
+        >
+          <Plus className="size-2.5" />
+          {label === 'св.' || label.toLowerCase() === 'свободно' ? 'Записать' : 'Book'}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -1144,15 +1190,15 @@ function FreeSlotHint({ light, label }: { light: boolean; label: string }) {
 function CalendarLegend({ light, locale }: { light: boolean; locale: 'ru' | 'en' }) {
   const items = locale === 'ru'
     ? [
-        { label: 'Запись', color: light ? CALENDAR_BOOKING_COLOR : CALENDAR_BOOKING_COLOR_DARK },
+        { label: 'Подтверждена', color: light ? CALENDAR_BOOKING_COLOR : CALENDAR_BOOKING_COLOR_DARK },
+        { label: 'Ожидает', color: light ? '#C47F13' : '#F5C16C' },
         { label: 'Перерыв', color: CALENDAR_BREAK_COLOR },
-        { label: 'Свободно', color: CALENDAR_FREE_COLOR },
         { label: 'Конфликт', color: CALENDAR_CONFLICT_COLOR },
       ]
     : [
-        { label: 'Booking', color: light ? CALENDAR_BOOKING_COLOR : CALENDAR_BOOKING_COLOR_DARK },
+        { label: 'Confirmed', color: light ? CALENDAR_BOOKING_COLOR : CALENDAR_BOOKING_COLOR_DARK },
+        { label: 'Waiting', color: light ? '#C47F13' : '#F5C16C' },
         { label: 'Break', color: CALENDAR_BREAK_COLOR },
-        { label: 'Free', color: CALENDAR_FREE_COLOR },
         { label: 'Conflict', color: CALENDAR_CONFLICT_COLOR },
       ];
 
@@ -1558,6 +1604,99 @@ function MonthPlanner({
         })}
       </div>
     </Panel>
+  );
+}
+
+function MobileAgendaPlanner({
+  plans,
+  bookings,
+  todayIso,
+  selectedBookingId,
+  light,
+  locale,
+  onSelectBooking,
+  onSelectDate,
+}: {
+  plans: DayPlan[];
+  bookings: CalendarBooking[];
+  todayIso: string;
+  selectedBookingId?: string | null;
+  light: boolean;
+  locale: 'ru' | 'en';
+  onSelectBooking: (booking: CalendarBooking) => void;
+  onSelectDate: (date: Date) => void;
+}) {
+  return (
+    <div className="cb-mobile-calendar space-y-2">
+      {plans.map((plan) => {
+        const dayBookings = getBookingsForDate(bookings, plan.iso);
+        const activeCount = dayBookings.filter(isActiveBooking).length;
+        const freeCount = Math.max(0, plan.slots.length - activeCount);
+        const isToday = plan.iso === todayIso;
+
+        return (
+          <section key={plan.iso} className="cb-mobile-agenda-card overflow-hidden rounded-[14px]">
+            <button
+              type="button"
+              onClick={() => onSelectDate(plan.date)}
+              className={cn(
+                'flex w-full items-center justify-between gap-3 border-b px-3.5 py-3 text-left transition',
+                borderTone(light),
+                isToday && (light ? 'bg-[#faf4ea]' : 'bg-[#181511]'),
+              )}
+            >
+              <div className="min-w-0">
+                <div className={cn('text-[12px] font-semibold tracking-[-0.02em]', pageText(light))}>
+                  {getShortWeekday(plan.date, locale)}, {plan.date.getDate()}
+                </div>
+                <div className={cn('mt-1 text-[10.5px]', mutedText(light))}>
+                  {plan.isDayOff
+                    ? locale === 'ru' ? 'Выходной день' : 'Day off'
+                    : `${activeCount} ${locale === 'ru' ? 'записей' : 'bookings'} · ${freeCount} ${locale === 'ru' ? 'окон' : 'free'}`}
+                </div>
+              </div>
+
+              <span className="cb-status-badge" style={{ '--cb-status-color': isToday ? (light ? '#111111' : '#f1e8d8') : statusCssColor('confirmed', light) } as CSSProperties}>
+                {isToday ? (locale === 'ru' ? 'Сегодня' : 'Today') : `${Math.round(plan.slots.length ? (activeCount / plan.slots.length) * 100 : 0)}%`}
+              </span>
+            </button>
+
+            <div className="space-y-2 p-2.5">
+              {dayBookings.length ? (
+                dayBookings.map((booking) => (
+                  <BookingPill
+                    key={booking.id}
+                    booking={booking}
+                    light={light}
+                    locale={locale}
+                    selected={selectedBookingId === booking.id}
+                    onClick={() => onSelectBooking(booking)}
+                  />
+                ))
+              ) : plan.isDayOff ? (
+                <div className={cn('rounded-[10px] border border-dashed px-3 py-4 text-center text-[12px]', insetTone(light), mutedText(light))}>
+                  {locale === 'ru' ? 'День закрыт для записи' : 'Closed for booking'}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onSelectDate(plan.date)}
+                  className={cn(
+                    'cb-interactive-slot flex w-full items-center justify-center gap-2 rounded-[10px] border border-dashed px-3 py-4 text-[12px] font-semibold transition',
+                    light
+                      ? 'border-[#0f766e]/18 bg-[#e6f6f3]/50 text-[#0f766e] hover:bg-[#e6f6f3]'
+                      : 'border-[#2dd4bf]/18 bg-[#2dd4bf]/8 text-[#77eadc] hover:bg-[#2dd4bf]/12',
+                  )}
+                >
+                  <Plus className="size-3.5" />
+                  {locale === 'ru' ? 'Записать клиента' : 'Add booking'}
+                </button>
+              )}
+            </div>
+          </section>
+        );
+      })}
+    </div>
   );
 }
 
@@ -2158,7 +2297,7 @@ export default function DashboardTodayPage() {
           </div>
 
           <div className="grid gap-4">
-            <Card light={isLight} className="overflow-hidden">
+            <Card light={isLight} className="cb-brand-halo overflow-hidden">
               <div className="p-4 md:p-5">
                 <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
                   <div className="min-w-0">
@@ -2205,46 +2344,59 @@ export default function DashboardTodayPage() {
               />
 
               <div className="p-3 md:p-4">
-                {view === 'day' ? (
-                  <DayPlanner
-                    plan={selectedPlan}
-                    bookings={selectedDayBookings}
-                    selectedBookingId={selectedBookingId}
-                    nowMinutes={nowMinutes}
-                    todayIso={todayIso}
-                    light={isLight}
-                    locale={locale}
-                    onSelectBooking={(booking) => setSelectedBookingId(booking.id)}
-                  />
-                ) : null}
+                <MobileAgendaPlanner
+                  plans={view === 'day' ? [selectedPlan] : visiblePlans}
+                  bookings={view === 'day' ? selectedDayBookings : visibleBookings}
+                  selectedBookingId={selectedBookingId}
+                  todayIso={todayIso}
+                  light={isLight}
+                  locale={locale}
+                  onSelectBooking={(booking) => setSelectedBookingId(booking.id)}
+                  onSelectDate={handleSelectDate}
+                />
 
-                {view === 'week' ? (
-                  <WeekPlanner
-                    plans={visiblePlans}
-                    bookings={visibleBookings}
-                    selectedBookingId={selectedBookingId}
-                    nowMinutes={nowMinutes}
-                    todayIso={todayIso}
-                    light={isLight}
-                    locale={locale}
-                    onSelectBooking={(booking) => setSelectedBookingId(booking.id)}
-                    onSelectDate={handleSelectDate}
-                  />
-                ) : null}
+                <div className="cb-desktop-calendar">
+                  {view === 'day' ? (
+                    <DayPlanner
+                      plan={selectedPlan}
+                      bookings={selectedDayBookings}
+                      selectedBookingId={selectedBookingId}
+                      nowMinutes={nowMinutes}
+                      todayIso={todayIso}
+                      light={isLight}
+                      locale={locale}
+                      onSelectBooking={(booking) => setSelectedBookingId(booking.id)}
+                    />
+                  ) : null}
 
-                {view === 'month' ? (
-                  <MonthPlanner
-                    selectedDate={selectedDate}
-                    plans={visiblePlans}
-                    bookings={visibleBookings}
-                    todayIso={todayIso}
-                    light={isLight}
-                    locale={locale}
-                    accentColor={accentColor}
-                    onSelectBooking={(booking) => setSelectedBookingId(booking.id)}
-                    onSelectDate={handleSelectDate}
-                  />
-                ) : null}
+                  {view === 'week' ? (
+                    <WeekPlanner
+                      plans={visiblePlans}
+                      bookings={visibleBookings}
+                      selectedBookingId={selectedBookingId}
+                      nowMinutes={nowMinutes}
+                      todayIso={todayIso}
+                      light={isLight}
+                      locale={locale}
+                      onSelectBooking={(booking) => setSelectedBookingId(booking.id)}
+                      onSelectDate={handleSelectDate}
+                    />
+                  ) : null}
+
+                  {view === 'month' ? (
+                    <MonthPlanner
+                      selectedDate={selectedDate}
+                      plans={visiblePlans}
+                      bookings={visibleBookings}
+                      todayIso={todayIso}
+                      light={isLight}
+                      locale={locale}
+                      accentColor={accentColor}
+                      onSelectBooking={(booking) => setSelectedBookingId(booking.id)}
+                      onSelectDate={handleSelectDate}
+                    />
+                  ) : null}
+                </div>
               </div>
             </Card>
           </div>

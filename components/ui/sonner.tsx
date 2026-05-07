@@ -23,12 +23,12 @@ const Toaster = ({ ...props }: ToasterProps) => {
           '--normal-bg': 'color-mix(in srgb, var(--popover) 92%, transparent)',
           '--normal-text': 'var(--popover-foreground)',
           '--normal-border': 'color-mix(in srgb, var(--border) 82%, transparent)',
-          '--success-bg': 'color-mix(in srgb, var(--popover) 92%, transparent)',
+          '--success-bg': 'color-mix(in srgb, var(--cb-success) 9%, var(--popover))',
           '--success-text': 'var(--popover-foreground)',
-          '--success-border': 'color-mix(in srgb, var(--border) 82%, transparent)',
-          '--error-bg': 'color-mix(in srgb, var(--popover) 92%, transparent)',
+          '--success-border': 'color-mix(in srgb, var(--cb-success) 36%, var(--border))',
+          '--error-bg': 'color-mix(in srgb, var(--cb-danger) 10%, var(--popover))',
           '--error-text': 'var(--popover-foreground)',
-          '--error-border': 'color-mix(in srgb, var(--border) 82%, transparent)',
+          '--error-border': 'color-mix(in srgb, var(--cb-danger) 36%, var(--border))',
         } as React.CSSProperties
       }
       {...props}

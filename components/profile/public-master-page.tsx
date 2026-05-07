@@ -416,7 +416,7 @@ function SectionCard({
 
       <div
         className={cn(
-          'cb-public-section-frame overflow-hidden rounded-[11px] border',
+          'cb-public-section-frame cb-card-lift overflow-hidden rounded-[11px] border',
           cardTone(light),
         )}
       >
@@ -995,6 +995,71 @@ function BookingBox({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function TrustConversionStrip({
+  light,
+  accentColor,
+  rating,
+  reviewCount,
+  serviceCount,
+  responseLabel,
+  onBook,
+  locale,
+}: {
+  light: boolean;
+  accentColor: string;
+  rating: number;
+  reviewCount: number;
+  serviceCount: number;
+  responseLabel: string;
+  onBook: () => void;
+  locale: 'ru' | 'en';
+}) {
+  const items = [
+    {
+      icon: <Star className="size-4" />,
+      label: locale === 'ru' ? 'Рейтинг' : 'Rating',
+      value: rating.toFixed(1),
+      hint: locale === 'ru' ? `${reviewCount} отзывов` : `${reviewCount} reviews`,
+    },
+    {
+      icon: <Sparkles className="size-4" />,
+      label: locale === 'ru' ? 'Услуги' : 'Services',
+      value: serviceCount,
+      hint: locale === 'ru' ? 'можно выбрать сразу' : 'ready to choose',
+    },
+    {
+      icon: <MessageCircle className="size-4" />,
+      label: locale === 'ru' ? 'Ответ' : 'Reply',
+      value: responseLabel,
+      hint: locale === 'ru' ? 'после заявки' : 'after request',
+    },
+  ];
+
+  return (
+    <section className={cn('cb-card-lift overflow-hidden rounded-[11px] border', cardTone(light))}>
+      <div className="grid gap-2 p-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+        <div className="grid gap-2 sm:grid-cols-3">
+          {items.map((item) => (
+            <div key={item.label} className={cn('rounded-[10px] border p-3', light ? 'border-black/[0.07] bg-white/72' : 'border-white/[0.08] bg-white/[0.035]')}>
+              <span className="inline-flex size-8 items-center justify-center rounded-[10px]" style={{ background: `color-mix(in srgb, ${accentColor} 12%, transparent)`, color: accentColor }}>
+                {item.icon}
+              </span>
+              <span className={cn('ml-2 text-[10.5px] font-medium', mutedText(light))}>{item.label}</span>
+              <div className={cn('mt-2 truncate text-[18px] font-semibold tracking-[-0.05em]', pageText(light))}>{item.value}</div>
+              <div className={cn('mt-1 text-[10.5px]', faintText(light))}>{item.hint}</div>
+            </div>
+          ))}
+        </div>
+
+        <Button className={cn('min-h-[44px] md:min-w-[170px]', primaryButtonClass(light))} onClick={onBook}>
+          {locale === 'ru' ? 'Записаться сейчас' : 'Book now'}
+          <ChevronRight className="size-4" />
+        </Button>
+      </div>
+    </section>
   );
 }
 
@@ -1951,7 +2016,7 @@ export function PublicMasterPage({
 
             <section
               className={cn(
-                'overflow-hidden rounded-[11px] border',
+                'cb-card-lift cb-brand-halo overflow-hidden rounded-[11px] border',
                 cardTone(isLight),
                 heroCentered && 'text-center',
               )}
@@ -2086,6 +2151,17 @@ export function PublicMasterPage({
                 </div>
               ) : null}
             </section>
+
+            <TrustConversionStrip
+              light={isLight}
+              accentColor={accentColor}
+              rating={rating}
+              reviewCount={reviewCount}
+              serviceCount={services.length}
+              responseLabel={responseLabel}
+              onBook={() => openBooking()}
+              locale={locale}
+            />
 
             {services.length > 0 ? (
               <SectionCard
