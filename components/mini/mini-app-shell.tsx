@@ -231,7 +231,7 @@ function TgHeader({
         right: 0,
         top: 0,
         zIndex: 80,
-        padding: 'calc(var(--miniapp-header-top-offset, 10px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px)))) 10px 8px',
+        padding: 'calc(var(--miniapp-header-top-offset, 10px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px)))) 10px 4px',
         background: 'transparent',
         pointerEvents: 'auto',
       }}
@@ -571,7 +571,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
                 overflow: 'hidden',
                 display: 'flex',
                 flexDirection: 'column',
-                paddingTop: 'calc(var(--miniapp-header-top-offset, 10px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 64px + 16px)',
+                paddingTop: 'calc(var(--miniapp-header-top-offset, 10px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 64px + 6px)',
               }}
             >
               {content}
@@ -590,7 +590,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
                 overscrollBehavior: 'contain',
                 display: 'flex',
                 flexDirection: 'column',
-                paddingTop: 'calc(var(--miniapp-header-top-offset, 10px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 64px + 16px)',
+                paddingTop: 'calc(var(--miniapp-header-top-offset, 10px) + var(--miniapp-safe-top, var(--tg-safe-top, env(safe-area-inset-top, 0px))) + 64px + 6px)',
                 paddingBottom: 'calc(var(--miniapp-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px))) + 58px + 9px)',
               }}
             >
