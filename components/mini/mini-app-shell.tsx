@@ -84,7 +84,7 @@ const introPaths = {
 
 function StaticIntroLogo() {
   return (
-    <svg viewBox="0 0 1523 422" role="img" aria-labelledby="clickbook-static-title clickbook-static-desc" style={{ width: '50%', maxWidth: 600, height: 'auto' }}>
+    <svg viewBox="0 0 1523 422" role="img" aria-labelledby="clickbook-static-title clickbook-static-desc" style={{ width: '60%', maxWidth: 600, height: 'auto' }}>
       <title id="clickbook-static-title">КликБук — логотип</title>
       <desc id="clickbook-static-desc">Минималистичный чёрно-белый логотип КликБук.</desc>
       <rect width="100%" height="100%" fill={INTRO_WHITE} />
