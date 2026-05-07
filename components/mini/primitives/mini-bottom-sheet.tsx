@@ -24,9 +24,9 @@ export function MiniBottomSheet({
     position: 'fixed',
     inset: 0,
     zIndex: 240,
-    background: dark ? 'rgba(0,0,0,0.28)' : 'rgba(255,255,255,0.18)',
-    backdropFilter: 'blur(10px)',
-    WebkitBackdropFilter: 'blur(10px)',
+    background: dark ? 'rgba(0,0,0,0.24)' : 'rgba(255,255,255,0.14)',
+    backdropFilter: 'blur(3px)',
+    WebkitBackdropFilter: 'blur(3px)',
   };
 
   const shellStyle: CSSProperties = {
@@ -49,13 +49,15 @@ export function MiniBottomSheet({
     borderRadius: 26,
     border: `1px solid ${dark ? 'rgba(255,255,255,0.09)' : 'rgba(10,10,10,0.07)'}`,
     background: dark ? 'rgba(20,20,22,0.86)' : 'rgba(255,255,255,0.90)',
-    backdropFilter: 'blur(30px) saturate(1.65)',
-    WebkitBackdropFilter: 'blur(30px) saturate(1.65)',
+    backdropFilter: 'blur(22px) saturate(1.35)',
+    WebkitBackdropFilter: 'blur(22px) saturate(1.35)',
     boxShadow: dark
       ? '0 24px 70px rgba(0,0,0,0.58), inset 0 1px 0 rgba(255,255,255,0.06)'
       : '0 24px 70px rgba(15,23,42,0.18), inset 0 1px 0 rgba(255,255,255,0.86)',
     color: T.text,
     position: 'relative',
+    transform: 'translateZ(0)',
+    willChange: 'transform, opacity',
   };
 
   const handleStyle: CSSProperties = {
@@ -82,14 +84,12 @@ export function MiniBottomSheet({
           <div style={shellStyle}>
             <motion.div
               style={sheetStyle}
-              initial={{ opacity: 0, y: 22, scale: 0.985, filter: 'blur(6px)' }}
-              animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, y: 24, scale: 0.985, filter: 'blur(4px)' }}
+              initial={{ opacity: 0, y: 18, scale: 0.99 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 18, scale: 0.99 }}
               transition={{
-                type: 'spring',
-                stiffness: 430,
-                damping: 34,
-                mass: 0.74,
+                duration: 0.22,
+                ease: [0.16, 1, 0.3, 1],
               }}
               onClick={(event) => event.stopPropagation()}
             >

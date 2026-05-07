@@ -625,9 +625,9 @@ export function BottomSheet({
               position: 'fixed',
               inset: 0,
               zIndex: 240,
-              background: mode === 'dark' ? 'rgba(0,0,0,0.40)' : 'rgba(255,255,255,0.20)',
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)',
+              background: mode === 'dark' ? 'rgba(0,0,0,0.34)' : 'rgba(255,255,255,0.16)',
+              backdropFilter: 'blur(3px)',
+              WebkitBackdropFilter: 'blur(3px)',
             }}
           />
 
@@ -645,10 +645,10 @@ export function BottomSheet({
             }}
           >
             <motion.div
-              initial={{ y: 36, opacity: 0.96, scale: 0.985 }}
+              initial={{ y: 22, opacity: 0, scale: 0.99 }}
               animate={{ y: 0, opacity: 1, scale: 1 }}
-              exit={{ y: 36, opacity: 0.98, scale: 0.985 }}
-              transition={{ type: 'spring', stiffness: 380, damping: 34, mass: 0.78 }}
+              exit={{ y: 22, opacity: 0, scale: 0.99 }}
+              transition={{ duration: 0.23, ease: [0.16, 1, 0.3, 1] }}
               onClick={(event) => event.stopPropagation()}
               style={{
                 pointerEvents: 'auto',
@@ -656,12 +656,14 @@ export function BottomSheet({
                 borderRadius: 26,
                 border: `1px solid ${border}`,
                 background: panelBg,
-                backdropFilter: 'blur(30px) saturate(1.45)',
-                WebkitBackdropFilter: 'blur(30px) saturate(1.45)',
+                backdropFilter: 'blur(22px) saturate(1.3)',
+                WebkitBackdropFilter: 'blur(22px) saturate(1.3)',
                 boxShadow: mode === 'dark'
                   ? '0 -12px 42px rgba(0,0,0,0.52), inset 0 1px 0 rgba(255,255,255,0.06)'
                   : '0 -10px 36px rgba(15,23,42,0.14), inset 0 1px 0 rgba(255,255,255,0.86)',
                 overflow: 'hidden',
+                transform: 'translateZ(0)',
+                willChange: 'transform, opacity',
               }}
             >
               <div style={{ padding: '10px 16px 12px', borderBottom: title || subtitle ? `1px solid ${T.border}` : 'none' }}>
