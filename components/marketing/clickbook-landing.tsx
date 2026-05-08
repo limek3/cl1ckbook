@@ -1,137 +1,125 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import {
   ArrowRight,
+  BarChart3,
   Bell,
-  BriefcaseBusiness,
   CalendarCheck,
-  CalendarDays,
   Check,
   ChevronDown,
   Clock3,
+  GraduationCap,
   Menu,
-  MessageCircle,
   Scissors,
+  Settings2,
   ShieldCheck,
   Sparkles,
   Star,
   Stethoscope,
   Store,
   Users,
-  WandSparkles,
+  Wrench,
   X,
-  Zap,
   type LucideIcon,
 } from 'lucide-react';
 
 const navItems = [
+  { label: 'Продукт', href: '#product' },
   { label: 'Возможности', href: '#features' },
-  { label: 'Для кого', href: '#audience' },
-  { label: 'Как работает', href: '#how' },
+  { label: 'Сценарии', href: '#audience' },
   { label: 'Тарифы', href: '#pricing' },
   { label: 'FAQ', href: '#faq' },
 ];
 
-const badges = ['Без лишних звонков', '24/7 онлайн-запись', 'Удобно для клиентов'];
-
-const features: Array<{ icon: LucideIcon; title: string; text: string }> = [
+const featureCards: Array<{ icon: LucideIcon; title: string; text: string }> = [
   {
     icon: CalendarCheck,
-    title: 'Онлайн-запись 24/7',
-    text: 'Клиенты бронируют услуги в любое время — даже когда вы заняты или не на связи.',
+    title: 'Запись без администраторского шума',
+    text: 'Клиент сам выбирает услугу, специалиста и свободное окно. Вы видите готовую запись в расписании.',
   },
   {
-    icon: CalendarDays,
-    title: 'Автоматическое расписание',
-    text: 'Свободные окна, занятость специалистов и график работы всегда под контролем.',
+    icon: Clock3,
+    title: 'Расписание, которое не ломается',
+    text: 'Графики, перерывы, длительность услуг и занятость команды собираются в один аккуратный календарь.',
   },
   {
     icon: Bell,
-    title: 'Напоминания клиентам',
-    text: 'Уменьшайте количество неявок с помощью автоматических уведомлений о записи.',
+    title: 'Мягкие напоминания клиентам',
+    text: 'Уведомления помогают снизить неявки и не превращают коммуникацию в ручную рутину.',
   },
   {
     icon: Users,
-    title: 'Удобная база клиентов',
-    text: 'Храните историю визитов, контакты, заметки и предпочтения клиентов в одном месте.',
+    title: 'Клиентская база под рукой',
+    text: 'Контакты, история визитов и заметки остаются рядом с каждой записью.',
   },
   {
-    icon: BriefcaseBusiness,
-    title: 'Управление услугами и специалистами',
-    text: 'Настраивайте услуги, длительность, цены, сотрудников и доступные временные слоты.',
+    icon: Settings2,
+    title: 'Настройки без перегруза',
+    text: 'Услуги, цены, специалисты и правила записи настраиваются простыми понятными шагами.',
   },
   {
-    icon: Zap,
-    title: 'Быстрый запуск без сложных настроек',
-    text: 'Создайте страницу бронирования за несколько минут без сложных интеграций.',
+    icon: BarChart3,
+    title: 'Понятная картина дня',
+    text: 'Смотрите загрузку, новые заявки, свободные окна и динамику записей без сложных отчетов.',
   },
 ];
 
-const audiences: Array<{ icon: LucideIcon; title: string; text: string }> = [
-  { icon: Scissors, title: 'Салоны красоты', text: 'Маникюр, косметология, уход, spa и комплексные услуги.' },
-  { icon: Store, title: 'Барбершопы', text: 'Запись к мастерам, управление сменами и повторные визиты.' },
-  { icon: Sparkles, title: 'Частные специалисты', text: 'Идеально для мастеров, консультантов, тренеров и экспертов.' },
-  { icon: Stethoscope, title: 'Клиники и кабинеты', text: 'Приемы, консультации, кабинеты, специалисты и уведомления.' },
-  { icon: WandSparkles, title: 'Студии и школы', text: 'Уроки, занятия, мастер-классы, групповые и личные встречи.' },
-  { icon: BriefcaseBusiness, title: 'Сервисные компании', text: 'Выезды, диагностика, консультации и работа с заявками.' },
+const audienceCards: Array<{ icon: LucideIcon; title: string }> = [
+  { icon: Scissors, title: 'Салоны красоты' },
+  { icon: Store, title: 'Барбершопы' },
+  { icon: Sparkles, title: 'Частные мастера' },
+  { icon: Stethoscope, title: 'Клиники и кабинеты' },
+  { icon: GraduationCap, title: 'Студии и школы' },
+  { icon: Wrench, title: 'Сервисные компании' },
 ];
 
-const steps = [
-  'Бизнес добавляет услуги, специалистов и расписание',
-  'Клиент выбирает услугу, дату и удобное время',
-  'Запись автоматически появляется в календаре',
-  'Команда управляет заявками, клиентами и загрузкой',
+const timeline = [
+  ['01', 'Настройте услуги', 'Добавьте услуги, длительность, цены и специалистов.'],
+  ['02', 'Поделитесь ссылкой', 'Клиент открывает страницу записи и выбирает удобное время.'],
+  ['03', 'Получайте записи', 'Заявки появляются в календаре автоматически и без дублей.'],
+  ['04', 'Управляйте потоком', 'Меняйте статусы, смотрите клиентов и свободные окна.'],
 ];
 
-const pricing = [
+const plans = [
   {
     name: 'Старт',
-    subtitle: 'для одного специалиста',
     price: '₽0',
-    period: '/ месяц',
-    description: 'Базовый набор для быстрого запуска онлайн-записи.',
-    features: ['1 специалист', 'Страница бронирования', 'До 50 записей', 'База клиентов', 'Email-уведомления'],
-    cta: 'Начать со Старта',
+    caption: 'для одного специалиста',
+    description: 'Чтобы спокойно запустить первую страницу онлайн-записи.',
+    items: ['1 специалист', 'Страница бронирования', 'До 50 записей', 'База клиентов'],
   },
   {
     name: 'Бизнес',
-    subtitle: 'для команды',
     price: '₽990',
-    period: '/ месяц',
-    description: 'Оптимальный тариф для растущего сервиса и нескольких сотрудников.',
-    features: ['До 10 специалистов', 'Умное расписание', 'SMS и email-напоминания', 'Статистика записей', 'Приоритетная поддержка'],
-    cta: 'Выбрать Бизнес',
-    popular: true,
+    caption: 'для команды',
+    description: 'Для бизнеса, где важно видеть расписание всей команды.',
+    items: ['До 10 специалистов', 'Напоминания клиентам', 'Статистика дня', 'Приоритетная поддержка'],
+    accent: true,
   },
   {
     name: 'Pro',
-    subtitle: 'для растущего бизнеса',
     price: '₽2490',
-    period: '/ месяц',
-    description: 'Расширенные возможности для сети, филиалов и активных команд.',
-    features: ['Неограниченно специалистов', 'Филиалы и роли', 'Расширенная аналитика', 'Интеграции', 'Персональные настройки'],
-    cta: 'Перейти на Pro',
+    caption: 'для роста',
+    description: 'Для филиалов, сетей и команд с активным потоком заявок.',
+    items: ['Безлимит специалистов', 'Роли и филиалы', 'Расширенная аналитика', 'Интеграции'],
   },
 ];
 
 const testimonials = [
   {
-    quote:
-      'После запуска КликБук администратор перестал постоянно отвечать на звонки. Клиенты сами выбирают время, а мы видим загрузку мастеров в одном календаре.',
+    text: 'КликБук выглядит спокойно и профессионально. Клиенты записываются сами, а у нас стало меньше звонков и переспросов.',
     name: 'Анна Морозова',
     role: 'владелец салона красоты',
   },
   {
-    quote:
-      'Я работаю одна, и раньше записи терялись в мессенджерах. Теперь у клиентов есть аккуратная страница, а у меня — понятное расписание на неделю.',
+    text: 'Мне нравится, что все просто: ссылка, календарь, напоминания. Никаких таблиц и потерянных сообщений.',
     name: 'Мария Лебедева',
     role: 'частный мастер',
   },
   {
-    quote:
-      'Для клиники важно, чтобы запись была простой и надежной. КликБук помогает быстро распределять приемы и не путаться в заявках.',
+    text: 'Администратору стало легче распределять приемы, а руководителю — видеть загрузку специалистов за день.',
     name: 'Игорь Ковалев',
     role: 'администратор клиники',
   },
@@ -140,109 +128,75 @@ const testimonials = [
 const faqs = [
   {
     q: 'Можно ли пользоваться бесплатно?',
-    a: 'Да. Вы можете начать с базового тарифа, протестировать онлайн-запись и позже перейти на расширенный план.',
+    a: 'Да. Можно начать с базового тарифа, проверить сценарий онлайн-записи и перейти на расширенный план позже.',
   },
   {
     q: 'Нужно ли устанавливать приложение?',
-    a: 'Нет. КликБук работает онлайн: бизнес управляет записями в веб-интерфейсе, а клиенты бронируют услуги по ссылке.',
+    a: 'Нет. КликБук работает в браузере: бизнес управляет записями в веб-интерфейсе, клиенты бронируют по ссылке.',
   },
   {
     q: 'Подходит ли сервис для команды?',
-    a: 'Да. Можно добавлять специалистов, настраивать графики, услуги, роли и отслеживать загрузку каждого сотрудника.',
+    a: 'Да. Вы можете добавить специалистов, настроить расписание каждого и видеть общую загрузку.',
   },
   {
     q: 'Можно ли настроить свои услуги?',
-    a: 'Конечно. Вы задаете название, описание, стоимость, длительность услуги и специалистов, которые ее выполняют.',
+    a: 'Да. Для каждой услуги можно указать название, цену, длительность, описание и доступных специалистов.',
   },
   {
     q: 'Будут ли уведомления клиентам?',
-    a: 'Да. Сервис может отправлять напоминания о записи, чтобы клиент не забыл о визите, а бизнес снизил количество неявок.',
+    a: 'Да. Напоминания помогают клиентам не забывать о визите и снижают количество пропущенных записей.',
   },
 ];
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 28 },
+const fadeIn = {
+  hidden: { opacity: 0, y: 18 },
   visible: { opacity: 1, y: 0 },
 };
 
-const stagger = {
-  hidden: {},
-  visible: {
-    transition: {
-      staggerChildren: 0.08,
-    },
-  },
-};
+const slow = { duration: 0.7, ease: 'easeOut' as const };
 
 function Container({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <div className={`mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 ${className}`}>{children}</div>;
+  return <div className={`mx-auto w-full max-w-6xl px-5 sm:px-6 lg:px-8 ${className}`}>{children}</div>;
 }
 
-function SectionHeading({
-  eyebrow,
-  title,
-  text,
-  centered = true,
-}: {
-  eyebrow?: string;
-  title: string;
-  text?: string;
-  centered?: boolean;
-}) {
+function Reveal({ children, className = '', delay = 0 }: { children: ReactNode; className?: string; delay?: number }) {
   return (
     <motion.div
-      variants={fadeUp}
       initial="hidden"
       whileInView="visible"
-      viewport={{ once: true, amount: 0.35 }}
-      transition={{ duration: 0.65, ease: 'easeOut' }}
-      className={`${centered ? 'mx-auto text-center' : ''} max-w-3xl`}
+      viewport={{ once: true, amount: 0.22 }}
+      variants={fadeIn}
+      transition={{ ...slow, delay }}
+      className={className}
     >
-      {eyebrow ? (
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-white/70 px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm shadow-blue-100/70 backdrop-blur">
-          <Sparkles className="h-4 w-4" />
-          {eyebrow}
-        </div>
-      ) : null}
-      <h2 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl lg:text-5xl">{title}</h2>
-      {text ? <p className="mt-5 text-base leading-8 text-slate-600 sm:text-lg">{text}</p> : null}
+      {children}
     </motion.div>
   );
 }
 
-function PrimaryButton({ children, className = '', href = '#pricing' }: { children: ReactNode; className?: string; href?: string }) {
+function Button({ children, href = '#pricing', muted = false }: { children: ReactNode; href?: string; muted?: boolean }) {
   return (
     <a
       href={href}
-      className={`group inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-violet-600 px-6 py-3.5 text-sm font-bold text-white shadow-xl shadow-blue-500/25 transition duration-300 hover:-translate-y-0.5 hover:shadow-2xl hover:shadow-violet-500/30 ${className}`}
+      className={`group inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition-all duration-300 ${
+        muted
+          ? 'border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+          : 'bg-slate-950 text-white shadow-lg shadow-slate-900/10 hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-xl hover:shadow-slate-900/15'
+      }`}
     >
       {children}
-      <ArrowRight className="h-4 w-4 transition duration-300 group-hover:translate-x-1" />
-    </a>
-  );
-}
-
-function SecondaryButton({ children, className = '', href = '#demo' }: { children: ReactNode; className?: string; href?: string }) {
-  return (
-    <a
-      href={href}
-      className={`inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white/80 px-6 py-3.5 text-sm font-bold text-slate-800 shadow-lg shadow-slate-200/60 backdrop-blur transition duration-300 hover:-translate-y-0.5 hover:border-blue-200 hover:text-blue-700 hover:shadow-xl ${className}`}
-    >
-      {children}
+      {!muted ? <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" /> : null}
     </a>
   );
 }
 
 function Logo() {
   return (
-    <a href="#top" className="flex items-center gap-3" aria-label="КликБук — на главную">
-      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 text-white shadow-lg shadow-blue-500/25">
-        <CalendarCheck className="h-5 w-5" />
-      </div>
-      <div className="leading-none">
-        <span className="block text-lg font-black tracking-tight text-slate-950">КликБук</span>
-        <span className="mt-1 block text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">booking SaaS</span>
-      </div>
+    <a href="#top" className="flex items-center gap-3" aria-label="КликБук — главная">
+      <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-slate-950 text-white">
+        <CalendarCheck className="h-4 w-4" />
+      </span>
+      <span className="text-base font-semibold tracking-tight text-slate-950">КликБук</span>
     </a>
   );
 }
@@ -251,34 +205,30 @@ function Header() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 border-b border-white/60 bg-white/75 backdrop-blur-2xl">
+    <header className="fixed inset-x-0 top-0 z-50 border-b border-slate-200/60 bg-white/80 backdrop-blur-xl">
       <Container>
-        <div className="flex h-20 items-center justify-between gap-6">
+        <div className="flex h-16 items-center justify-between gap-6">
           <Logo />
 
-          <nav className="hidden items-center gap-1 rounded-full border border-slate-200/70 bg-white/70 p-1.5 shadow-sm shadow-slate-200/70 lg:flex">
+          <nav className="hidden items-center gap-7 lg:flex">
             {navItems.map((item) => (
-              <a
-                key={item.href}
-                href={item.href}
-                className="rounded-full px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-blue-700"
-              >
+              <a key={item.href} href={item.href} className="text-sm font-medium text-slate-500 transition-colors hover:text-slate-950">
                 {item.label}
               </a>
             ))}
           </nav>
 
           <div className="hidden items-center gap-3 lg:flex">
-            <a href="#demo" className="text-sm font-bold text-slate-600 transition hover:text-blue-700">
+            <a href="#product" className="text-sm font-medium text-slate-500 transition-colors hover:text-slate-950">
               Демо
             </a>
-            <PrimaryButton className="px-5 py-3">Попробовать бесплатно</PrimaryButton>
+            <Button>Попробовать бесплатно</Button>
           </div>
 
           <button
             type="button"
             onClick={() => setOpen((value) => !value)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-800 shadow-sm lg:hidden"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-900 lg:hidden"
             aria-label="Открыть меню"
             aria-expanded={open}
           >
@@ -291,20 +241,23 @@ function Header() {
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="border-t border-slate-100 bg-white/95 px-4 pb-5 pt-2 shadow-xl shadow-slate-200/40 backdrop-blur-xl lg:hidden"
+          transition={{ duration: 0.22 }}
+          className="border-t border-slate-100 bg-white px-5 py-4 lg:hidden"
         >
-          <div className="mx-auto flex max-w-7xl flex-col gap-2">
+          <div className="mx-auto flex max-w-6xl flex-col gap-1">
             {navItems.map((item) => (
               <a
                 key={item.href}
                 href={item.href}
                 onClick={() => setOpen(false)}
-                className="rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 hover:text-blue-700"
+                className="rounded-2xl px-3 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
                 {item.label}
               </a>
             ))}
-            <PrimaryButton className="mt-2 w-full">Попробовать бесплатно</PrimaryButton>
+            <div className="pt-3">
+              <Button>Попробовать бесплатно</Button>
+            </div>
           </div>
         </motion.div>
       ) : null}
@@ -312,108 +265,62 @@ function Header() {
   );
 }
 
-function HeroMockup() {
-  const bookings = [
-    { time: '10:00', name: 'Ольга', service: 'Маникюр', status: 'Подтверждено' },
-    { time: '12:30', name: 'Дмитрий', service: 'Стрижка', status: 'Ожидает' },
-    { time: '15:00', name: 'Елена', service: 'Консультация', status: 'Новая' },
-  ];
+function MiniBooking() {
+  const slots = ['10:00', '11:30', '14:00', '16:30'];
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.94, y: 24 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ duration: 0.8, delay: 0.15, ease: 'easeOut' }}
-      className="relative mx-auto w-full max-w-xl lg:max-w-none"
+      initial={{ opacity: 0, y: 24, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ ...slow, delay: 0.16 }}
+      className="mx-auto w-full max-w-xl"
     >
-      <div className="absolute -left-8 -top-8 h-48 w-48 rounded-full bg-blue-400/20 blur-3xl" />
-      <div className="absolute -bottom-10 -right-8 h-56 w-56 rounded-full bg-violet-500/20 blur-3xl" />
+      <div className="relative rounded-[2rem] border border-slate-200 bg-white p-3 shadow-2xl shadow-slate-200/70">
+        <div className="absolute -left-8 top-8 h-28 w-28 rounded-full bg-blue-100 blur-3xl" />
+        <div className="absolute -right-8 bottom-6 h-28 w-28 rounded-full bg-violet-100 blur-3xl" />
 
-      <div className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/80 p-4 shadow-2xl shadow-blue-950/10 backdrop-blur-2xl sm:p-5">
-        <div className="rounded-[1.5rem] border border-slate-100 bg-slate-950 p-4 text-white shadow-2xl shadow-slate-900/20">
-          <div className="mb-5 flex items-center justify-between">
+        <div className="relative overflow-hidden rounded-[1.5rem] bg-slate-950 p-5 text-white">
+          <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold text-blue-200">Панель записи</p>
-              <h3 className="mt-1 text-xl font-black">Сегодня, 18 июня</h3>
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">запись клиента</p>
+              <h3 className="mt-2 text-2xl font-semibold tracking-tight">Стрижка и уход</h3>
             </div>
-            <div className="rounded-2xl bg-white/10 px-3 py-2 text-xs font-bold text-white ring-1 ring-white/10">+28% записей</div>
+            <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-slate-200 ring-1 ring-white/10">30 мин</span>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-[0.9fr_1.1fr]">
-            <div className="rounded-3xl bg-white p-4 text-slate-900">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-black">Июнь</span>
-                <CalendarDays className="h-4 w-4 text-blue-600" />
-              </div>
-              <div className="mt-4 grid grid-cols-7 gap-1.5 text-center text-[11px] font-bold text-slate-400">
-                {['П', 'В', 'С', 'Ч', 'П', 'С', 'В'].map((day, index) => (
-                  <span key={`${day}-${index}`}>{day}</span>
-                ))}
-              </div>
-              <div className="mt-2 grid grid-cols-7 gap-1.5 text-center text-xs font-bold text-slate-600">
-                {Array.from({ length: 28 }).map((_, index) => {
-                  const day = index + 1;
-                  const active = [7, 12, 18, 22].includes(day);
-                  return (
-                    <div
-                      key={day}
-                      className={`flex aspect-square items-center justify-center rounded-xl ${
-                        active
-                          ? 'bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-lg shadow-blue-500/25'
-                          : 'bg-slate-50'
-                      }`}
-                    >
-                      {day}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+          <div className="mt-8 grid gap-3 sm:grid-cols-4">
+            {slots.map((slot, index) => (
+              <motion.button
+                key={slot}
+                type="button"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.35, delay: 0.32 + index * 0.06 }}
+                className={`rounded-2xl px-3 py-3 text-sm font-semibold transition ${
+                  index === 2 ? 'bg-white text-slate-950' : 'bg-white/[0.08] text-slate-300 ring-1 ring-white/10 hover:bg-white/[0.12]'
+                }`}
+              >
+                {slot}
+              </motion.button>
+            ))}
+          </div>
 
-            <div className="space-y-3">
-              {bookings.map((booking, index) => (
-                <motion.div
-                  key={booking.time}
-                  initial={{ opacity: 0, x: 24 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.5, delay: 0.35 + index * 0.12 }}
-                  className="rounded-3xl border border-white/10 bg-white/10 p-3 backdrop-blur"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex gap-3">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-400 to-violet-400 text-sm font-black">
-                        {booking.name[0]}
-                      </div>
-                      <div>
-                        <p className="font-bold text-white">{booking.name}</p>
-                        <p className="text-sm text-slate-300">{booking.service}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-black text-white">{booking.time}</p>
-                      <p className="mt-1 rounded-full bg-emerald-400/15 px-2 py-1 text-[10px] font-bold text-emerald-200">{booking.status}</p>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
+          <div className="mt-6 rounded-3xl bg-white p-4 text-slate-950">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-slate-500">Выбрано</p>
+                <p className="mt-1 text-lg font-semibold">Сегодня, 14:00</p>
+              </div>
+              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">готово</span>
+            </div>
+            <div className="mt-5 flex items-center gap-3 border-t border-slate-100 pt-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold">А</div>
+              <div>
+                <p className="text-sm font-semibold">Алексей, мастер</p>
+                <p className="text-xs text-slate-500">свободен в выбранное время</p>
+              </div>
             </div>
           </div>
-        </div>
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          {[
-            ['Записей', '42', '+12%'],
-            ['Клиентов', '318', '+24'],
-            ['Свободно', '8', 'окон'],
-          ].map(([label, value, hint]) => (
-            <div key={label} className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{label}</p>
-              <div className="mt-2 flex items-end justify-between">
-                <span className="text-2xl font-black text-slate-950">{value}</span>
-                <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700">{hint}</span>
-              </div>
-            </div>
-          ))}
         </div>
       </div>
     </motion.div>
@@ -422,92 +329,193 @@ function HeroMockup() {
 
 function Hero() {
   return (
-    <section id="top" className="relative overflow-hidden pb-20 pt-32 sm:pb-24 lg:pb-32 lg:pt-40">
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.18),transparent_34%),radial-gradient(circle_at_top_right,rgba(124,58,237,0.16),transparent_30%),linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)]" />
-      <div className="absolute left-1/2 top-24 -z-10 h-[36rem] w-[36rem] -translate-x-1/2 rounded-full bg-blue-100/50 blur-3xl" />
+    <section id="top" className="relative overflow-hidden bg-[#fbfbfc] pt-28 sm:pt-32 lg:pt-40">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-96 bg-[radial-gradient(circle_at_50%_0%,rgba(79,70,229,0.14),transparent_48%)]" />
+      <Container className="relative pb-20 sm:pb-24 lg:pb-32">
+        <div className="mx-auto max-w-3xl text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...slow, delay: 0.04 }}
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 shadow-sm"
+          >
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            Онлайн-запись без лишнего шума
+          </motion.div>
 
+          <motion.h1
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...slow, delay: 0.1 }}
+            className="mt-8 text-5xl font-semibold tracking-[-0.055em] text-slate-950 sm:text-6xl lg:text-7xl"
+          >
+            Запись клиентов, которая выглядит спокойно и работает быстро
+          </motion.h1>
+
+          <motion.p
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...slow, delay: 0.18 }}
+            className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-slate-600"
+          >
+            КликБук помогает бизнесу принимать бронирования онлайн, управлять расписанием и видеть клиентов в одном минималистичном интерфейсе.
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...slow, delay: 0.26 }}
+            className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row"
+          >
+            <Button>Начать бесплатно</Button>
+            <Button href="#product" muted>
+              Посмотреть интерфейс
+            </Button>
+          </motion.div>
+        </div>
+
+        <div className="mt-16">
+          <MiniBooking />
+        </div>
+
+        <Reveal className="mx-auto mt-14 grid max-w-4xl grid-cols-1 divide-y divide-slate-200 rounded-[2rem] border border-slate-200 bg-white shadow-sm sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+          {[
+            ['5 минут', 'на запуск первой страницы'],
+            ['24/7', 'прием заявок без звонков'],
+            ['1 окно', 'для расписания и клиентов'],
+          ].map(([value, label]) => (
+            <div key={value} className="p-6 text-center">
+              <p className="text-2xl font-semibold tracking-tight text-slate-950">{value}</p>
+              <p className="mt-1 text-sm text-slate-500">{label}</p>
+            </div>
+          ))}
+        </Reveal>
+      </Container>
+    </section>
+  );
+}
+
+function SectionTitle({ kicker, title, text }: { kicker: string; title: string; text?: string }) {
+  return (
+    <Reveal className="mx-auto max-w-2xl text-center">
+      <p className="text-sm font-semibold uppercase tracking-[0.22em] text-blue-600">{kicker}</p>
+      <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-5xl">{title}</h2>
+      {text ? <p className="mt-5 text-base leading-7 text-slate-600 sm:text-lg">{text}</p> : null}
+    </Reveal>
+  );
+}
+
+function Product() {
+  return (
+    <section id="product" className="bg-white py-20 sm:py-24 lg:py-32">
       <Container>
-        <div className="grid items-center gap-12 lg:grid-cols-[1.02fr_0.98fr] lg:gap-16">
-          <motion.div initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.75, ease: 'easeOut' }}>
-            <div className="mb-7 flex flex-wrap gap-3">
-              {badges.map((badge) => (
-                <span
-                  key={badge}
-                  className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-white/80 px-4 py-2 text-sm font-bold text-slate-700 shadow-sm shadow-blue-100/70 backdrop-blur"
-                >
-                  <Check className="h-4 w-4 text-blue-600" />
-                  {badge}
-                </span>
-              ))}
-            </div>
-
-            <h1 className="max-w-4xl text-4xl font-black tracking-tight text-slate-950 sm:text-5xl lg:text-7xl lg:leading-[1.02]">
-              Онлайн-запись для вашего бизнеса в пару кликов
-            </h1>
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600 sm:text-xl">
-              КликБук помогает клиентам быстро бронировать услуги, а бизнесу — управлять расписанием, заявками и клиентами в одном удобном интерфейсе.
+        <div className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+          <Reveal>
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-blue-600">продукт</p>
+            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-5xl">
+              Один экран, где видно главное
+            </h2>
+            <p className="mt-5 text-lg leading-8 text-slate-600">
+              Минимальный dashboard показывает день без визуального шума: кто записан, когда свободно, какой статус у заявки и что нужно сделать дальше.
             </p>
-
-            <div className="mt-9 flex flex-col gap-4 sm:flex-row">
-              <PrimaryButton>Начать бесплатно</PrimaryButton>
-              <SecondaryButton>Посмотреть демо</SecondaryButton>
-            </div>
-
-            <div className="mt-10 grid max-w-xl grid-cols-3 gap-4 border-t border-slate-200 pt-7">
-              {[
-                ['5 мин', 'на запуск'],
-                ['24/7', 'прием заявок'],
-                ['−35%', 'неявок'],
-              ].map(([value, label]) => (
-                <div key={value}>
-                  <p className="text-2xl font-black text-slate-950">{value}</p>
-                  <p className="mt-1 text-sm font-medium text-slate-500">{label}</p>
+            <div className="mt-8 grid gap-3 sm:grid-cols-2">
+              {['Календарь записей', 'Статусы заявок', 'Карточки клиентов', 'Статистика дня'].map((item) => (
+                <div key={item} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+                  <Check className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm font-medium text-slate-700">{item}</span>
                 </div>
               ))}
             </div>
-          </motion.div>
+          </Reveal>
 
-          <HeroMockup />
+          <Reveal delay={0.1}>
+            <div className="rounded-[2rem] border border-slate-200 bg-[#fbfbfc] p-4 shadow-xl shadow-slate-200/60">
+              <div className="rounded-[1.5rem] bg-white p-5">
+                <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm text-slate-500">Сегодня</p>
+                    <h3 className="text-2xl font-semibold tracking-tight text-slate-950">18 июня</h3>
+                  </div>
+                  <div className="flex gap-2">
+                    {['День', 'Неделя'].map((item, index) => (
+                      <span key={item} className={`rounded-full px-4 py-2 text-sm font-medium ${index === 0 ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-5 space-y-3">
+                  {[
+                    ['09:30', 'Консультация', 'Наталья', 'Подтверждена'],
+                    ['12:00', 'Стрижка', 'Артем', 'Ожидает'],
+                    ['15:30', 'Маникюр', 'Виктория', 'Новая'],
+                  ].map(([time, service, client, status], index) => (
+                    <motion.div
+                      key={`${time}-${client}`}
+                      initial={{ opacity: 0, x: 12 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.4, delay: index * 0.08 }}
+                      className="grid gap-3 rounded-2xl border border-slate-100 bg-white p-4 sm:grid-cols-[72px_1fr_auto] sm:items-center"
+                    >
+                      <span className="text-sm font-semibold text-slate-500">{time}</span>
+                      <div>
+                        <p className="font-semibold text-slate-950">{service}</p>
+                        <p className="text-sm text-slate-500">{client}</p>
+                      </div>
+                      <span className="w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">{status}</span>
+                    </motion.div>
+                  ))}
+                </div>
+
+                <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                  {[
+                    ['24', 'записи'],
+                    ['7', 'новых'],
+                    ['82%', 'загрузка'],
+                  ].map(([value, label]) => (
+                    <div key={label} className="rounded-2xl bg-slate-50 p-4">
+                      <p className="text-2xl font-semibold text-slate-950">{value}</p>
+                      <p className="text-sm text-slate-500">{label}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </Reveal>
         </div>
       </Container>
     </section>
   );
 }
 
-function FeatureCard({ feature }: { feature: { icon: LucideIcon; title: string; text: string } }) {
-  const Icon = feature.icon;
-
-  return (
-    <motion.div
-      variants={fadeUp}
-      whileHover={{ y: -8 }}
-      transition={{ duration: 0.25 }}
-      className="group rounded-[1.75rem] border border-slate-200/70 bg-white p-6 shadow-lg shadow-slate-200/50 transition duration-300 hover:border-blue-200 hover:shadow-2xl hover:shadow-blue-100/80"
-    >
-      <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-50 to-violet-50 text-blue-700 ring-1 ring-blue-100 transition duration-300 group-hover:scale-110 group-hover:from-blue-600 group-hover:to-violet-600 group-hover:text-white">
-        <Icon className="h-6 w-6" />
-      </div>
-      <h3 className="text-lg font-black text-slate-950">{feature.title}</h3>
-      <p className="mt-3 leading-7 text-slate-600">{feature.text}</p>
-    </motion.div>
-  );
-}
-
 function Features() {
   return (
-    <section id="features" className="bg-slate-50 py-20 sm:py-24 lg:py-32">
+    <section id="features" className="bg-[#fbfbfc] py-20 sm:py-24 lg:py-32">
       <Container>
-        <SectionHeading
-          eyebrow="Возможности"
-          title="Почему выбирают КликБук"
-          text="Все необходимое для приема записей, управления расписанием и повышения качества клиентского сервиса — в одном аккуратном интерфейсе."
+        <SectionTitle
+          kicker="возможности"
+          title="Все нужное — без лишнего интерфейса"
+          text="Новый лендинг сделан в более минималистичной логике: меньше декоративности, больше воздуха, аккуратные акценты и плавные появления."
         />
 
-        <motion.div variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.18 }} className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {features.map((feature) => (
-            <FeatureCard key={feature.title} feature={feature} />
-          ))}
-        </motion.div>
+        <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {featureCards.map((feature, index) => {
+            const Icon = feature.icon;
+            return (
+              <Reveal key={feature.title} delay={index * 0.035}>
+                <div className="group h-full rounded-[1.75rem] border border-slate-200 bg-white p-6 transition-all duration-300 hover:-translate-y-1 hover:border-slate-300 hover:shadow-xl hover:shadow-slate-200/70">
+                  <div className="mb-8 flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-900 transition-colors group-hover:bg-slate-950 group-hover:text-white">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <h3 className="text-lg font-semibold tracking-tight text-slate-950">{feature.title}</h3>
+                  <p className="mt-3 leading-7 text-slate-600">{feature.text}</p>
+                </div>
+              </Reveal>
+            );
+          })}
+        </div>
       </Container>
     </section>
   );
@@ -515,197 +523,60 @@ function Features() {
 
 function Audience() {
   return (
-    <section id="audience" className="relative overflow-hidden bg-white py-20 sm:py-24 lg:py-32">
-      <div className="absolute -right-32 top-24 h-96 w-96 rounded-full bg-violet-100/70 blur-3xl" />
-      <div className="absolute -left-32 bottom-24 h-96 w-96 rounded-full bg-blue-100/70 blur-3xl" />
-
-      <Container className="relative">
-        <SectionHeading
-          eyebrow="Для кого"
-          title="Подходит бизнесу, где важны время, запись и сервис"
-          text="КликБук легко адаптируется под разные услуги: от индивидуальных мастеров до команд с несколькими специалистами и филиалами."
+    <section id="audience" className="bg-white py-20 sm:py-24 lg:py-32">
+      <Container>
+        <SectionTitle
+          kicker="сценарии"
+          title="Для бизнеса, который живет по расписанию"
+          text="КликБук подходит тем, кто продает услуги по времени и хочет сделать запись понятной для клиента."
         />
 
-        <motion.div variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.18 }} className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {audiences.map((item) => {
+        <Reveal className="mx-auto mt-12 grid max-w-4xl gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {audienceCards.map((item) => {
             const Icon = item.icon;
             return (
-              <motion.div
-                key={item.title}
-                variants={fadeUp}
-                className="group overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white/80 p-6 shadow-lg shadow-slate-200/50 backdrop-blur transition duration-300 hover:-translate-y-1 hover:border-violet-200 hover:shadow-2xl hover:shadow-violet-100/70"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-white transition duration-300 group-hover:bg-gradient-to-br group-hover:from-blue-600 group-hover:to-violet-600">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-black text-slate-950">{item.title}</h3>
-                    <p className="mt-2 leading-7 text-slate-600">{item.text}</p>
-                  </div>
-                </div>
-              </motion.div>
+              <div key={item.title} className="flex items-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-3 shadow-sm shadow-slate-100">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-700">
+                  <Icon className="h-4 w-4" />
+                </span>
+                <span className="text-sm font-medium text-slate-700">{item.title}</span>
+              </div>
             );
           })}
-        </motion.div>
+        </Reveal>
       </Container>
     </section>
   );
 }
 
-function HowItWorks() {
+function Workflow() {
   return (
-    <section id="how" className="bg-slate-950 py-20 text-white sm:py-24 lg:py-32">
+    <section className="bg-slate-950 py-20 text-white sm:py-24 lg:py-32">
       <Container>
-        <div className="grid gap-12 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
-          <SectionHeading
-            centered={false}
-            eyebrow="Как это работает"
-            title="От настройки до первой записи — без лишней сложности"
-            text="КликБук превращает процесс бронирования в понятный путь для клиента и удобный рабочий инструмент для команды."
-          />
+        <div className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+          <Reveal>
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-blue-300">как работает</p>
+            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-white sm:text-5xl">Плавный путь от настройки до записи</h2>
+            <p className="mt-5 text-lg leading-8 text-slate-300">
+              Сервис не требует сложного внедрения. Вы задаете правила, а клиент получает понятный путь бронирования.
+            </p>
+          </Reveal>
 
-          <motion.div variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.2 }} className="grid gap-4">
-            {steps.map((step, index) => (
-              <motion.div key={step} variants={fadeUp} className="group relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-5 backdrop-blur transition hover:bg-white/[0.09]">
-                <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-blue-400 to-violet-400 opacity-0 transition group-hover:opacity-100" />
-                <div className="flex items-center gap-5">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-lg font-black text-slate-950 shadow-xl shadow-black/20">{index + 1}</div>
-                  <p className="text-lg font-bold leading-7 text-slate-100">{step}</p>
+          <div className="space-y-3">
+            {timeline.map(([number, title, text], index) => (
+              <Reveal key={number} delay={index * 0.06}>
+                <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-5 transition-colors hover:bg-white/[0.07]">
+                  <div className="flex gap-5">
+                    <span className="font-mono text-sm text-blue-300">{number}</span>
+                    <div>
+                      <h3 className="font-semibold text-white">{title}</h3>
+                      <p className="mt-1 leading-7 text-slate-400">{text}</p>
+                    </div>
+                  </div>
                 </div>
-              </motion.div>
+              </Reveal>
             ))}
-          </motion.div>
-        </div>
-      </Container>
-    </section>
-  );
-}
-
-function DashboardDemo() {
-  const dayStats: Array<{ label: string; value: string; icon: LucideIcon }> = [
-    { label: 'Записей сегодня', value: '24', icon: CalendarCheck },
-    { label: 'Новых клиентов', value: '7', icon: Users },
-    { label: 'Средняя загрузка', value: '82%', icon: Clock3 },
-  ];
-
-  const clients = ['Наталья Смирнова', 'Артем Волков', 'Виктория Орлова', 'Павел Соколов'];
-
-  return (
-    <section id="demo" className="relative overflow-hidden bg-white py-20 sm:py-24 lg:py-32">
-      <Container>
-        <div className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
-          <SectionHeading
-            centered={false}
-            eyebrow="Интерфейс"
-            title="Понятная панель управления для всей команды"
-            text="Видите записи, клиентов, услуги, статусы и статистику в одном визуально чистом dashboard. Mockup ниже собран без изображений — только из UI-блоков."
-          />
-
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.25 }}
-            transition={{ duration: 0.7, ease: 'easeOut' }}
-            className="relative"
-          >
-            <div className="absolute -inset-6 rounded-[2.5rem] bg-gradient-to-br from-blue-100 via-violet-100 to-white blur-2xl" />
-            <div className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-slate-50 p-4 shadow-2xl shadow-slate-200/80 sm:p-5">
-              <div className="mb-4 flex items-center justify-between rounded-3xl bg-white p-4 shadow-sm">
-                <div>
-                  <p className="text-sm font-bold text-slate-400">Dashboard</p>
-                  <h3 className="text-xl font-black text-slate-950">Календарь записей</h3>
-                </div>
-                <div className="flex -space-x-2">
-                  {['A', 'M', 'K'].map((letter) => (
-                    <div key={letter} className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-white bg-gradient-to-br from-blue-600 to-violet-600 text-sm font-black text-white">
-                      {letter}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-                <div className="rounded-3xl bg-white p-4 shadow-sm">
-                  <div className="mb-4 flex items-center justify-between">
-                    <h4 className="font-black text-slate-950">Расписание</h4>
-                    <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">Сегодня</span>
-                  </div>
-                  <div className="space-y-3">
-                    {[
-                      ['09:30', 'Массаж', 'Подтверждено', 'bg-emerald-50 text-emerald-700'],
-                      ['11:00', 'Стрижка', 'Ожидает', 'bg-amber-50 text-amber-700'],
-                      ['14:30', 'Консультация', 'Новая', 'bg-blue-50 text-blue-700'],
-                      ['17:00', 'Маникюр', 'Подтверждено', 'bg-emerald-50 text-emerald-700'],
-                    ].map(([time, service, status, tone]) => (
-                      <div key={`${time}-${service}`} className="flex items-center gap-3 rounded-2xl border border-slate-100 p-3 transition hover:border-blue-100 hover:bg-blue-50/40">
-                        <div className="w-14 text-sm font-black text-slate-500">{time}</div>
-                        <div className="h-10 w-1 rounded-full bg-gradient-to-b from-blue-600 to-violet-600" />
-                        <div className="flex-1">
-                          <p className="font-bold text-slate-950">{service}</p>
-                          <p className="text-sm text-slate-500">Специалист назначен</p>
-                        </div>
-                        <span className={`rounded-full px-3 py-1 text-xs font-bold ${tone}`}>{status}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="rounded-3xl bg-white p-4 shadow-sm">
-                    <h4 className="font-black text-slate-950">Статистика за день</h4>
-                    <div className="mt-4 grid gap-3">
-                      {dayStats.map((stat) => {
-                        const Icon = stat.icon;
-                        return (
-                          <div key={stat.label} className="flex items-center justify-between rounded-2xl bg-slate-50 p-3">
-                            <div className="flex items-center gap-3">
-                              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-blue-700 shadow-sm">
-                                <Icon className="h-4 w-4" />
-                              </div>
-                              <span className="text-sm font-bold text-slate-500">{stat.label}</span>
-                            </div>
-                            <span className="font-black text-slate-950">{stat.value}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="rounded-3xl bg-slate-950 p-4 text-white shadow-xl shadow-slate-950/20">
-                    <div className="mb-4 flex items-center justify-between">
-                      <h4 className="font-black">Клиенты</h4>
-                      <Users className="h-5 w-5 text-blue-300" />
-                    </div>
-                    <div className="space-y-3">
-                      {clients.map((client, index) => (
-                        <div key={client} className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-sm font-black ring-1 ring-white/10">{index + 1}</div>
-                          <div>
-                            <p className="text-sm font-bold">{client}</p>
-                            <p className="text-xs text-slate-400">История визитов доступна</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4 rounded-3xl bg-gradient-to-r from-blue-600 to-violet-600 p-4 text-white shadow-xl shadow-blue-500/20">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm font-bold text-blue-100">Карточка услуги</p>
-                    <h4 className="mt-1 text-xl font-black">Первичная консультация</h4>
-                    <p className="mt-1 text-sm text-blue-100">60 минут · 2 специалиста · онлайн-предоплата</p>
-                  </div>
-                  <span className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-black text-blue-700">
-                    <ShieldCheck className="h-4 w-4" /> Активна
-                  </span>
-                </div>
-              </div>
-            </div>
-          </motion.div>
+          </div>
         </div>
       </Container>
     </section>
@@ -714,63 +585,54 @@ function DashboardDemo() {
 
 function Pricing() {
   return (
-    <section id="pricing" className="bg-slate-50 py-20 sm:py-24 lg:py-32">
+    <section id="pricing" className="bg-[#fbfbfc] py-20 sm:py-24 lg:py-32">
       <Container>
-        <SectionHeading
-          eyebrow="Тарифы"
-          title="Выберите формат, который подходит вашему бизнесу"
-          text="Начните с простого сценария и расширяйте возможности по мере роста команды, клиентской базы и количества записей."
+        <SectionTitle
+          kicker="тарифы"
+          title="Простые планы без сложной математики"
+          text="Цены можно заменить на реальные перед запуском. Сейчас блок выглядит как аккуратная SaaS-сетка тарифов."
         />
 
-        <motion.div variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.18 }} className="mt-14 grid gap-6 lg:grid-cols-3">
-          {pricing.map((plan) => (
-            <motion.div
-              key={plan.name}
-              variants={fadeUp}
-              whileHover={{ y: -8 }}
-              className={`relative rounded-[2rem] border p-6 shadow-xl transition duration-300 ${
-                plan.popular ? 'border-blue-200 bg-slate-950 text-white shadow-blue-950/20' : 'border-slate-200 bg-white text-slate-950 shadow-slate-200/60'
-              }`}
-            >
-              {plan.popular ? (
-                <div className="absolute right-6 top-6 rounded-full bg-gradient-to-r from-blue-500 to-violet-500 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-white">
-                  Популярный
-                </div>
-              ) : null}
-
-              <div className="pr-28">
-                <h3 className="text-2xl font-black">{plan.name}</h3>
-                <p className={`mt-1 text-sm font-bold ${plan.popular ? 'text-blue-200' : 'text-slate-500'}`}>{plan.subtitle}</p>
-              </div>
-
-              <div className="mt-8 flex items-end gap-1">
-                <span className="text-5xl font-black tracking-tight">{plan.price}</span>
-                <span className={`pb-2 text-sm font-bold ${plan.popular ? 'text-slate-300' : 'text-slate-500'}`}>{plan.period}</span>
-              </div>
-              <p className={`mt-5 leading-7 ${plan.popular ? 'text-slate-300' : 'text-slate-600'}`}>{plan.description}</p>
-
-              <div className="mt-7 space-y-3">
-                {plan.features.map((feature) => (
-                  <div key={feature} className="flex items-center gap-3">
-                    <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${plan.popular ? 'bg-white text-blue-700' : 'bg-blue-50 text-blue-700'}`}>
-                      <Check className="h-4 w-4" />
-                    </div>
-                    <span className={`text-sm font-semibold ${plan.popular ? 'text-slate-100' : 'text-slate-700'}`}>{feature}</span>
-                  </div>
-                ))}
-              </div>
-
-              <a
-                href="#top"
-                className={`mt-8 inline-flex w-full items-center justify-center rounded-2xl px-5 py-3.5 text-sm font-black transition duration-300 ${
-                  plan.popular ? 'bg-white text-blue-700 hover:bg-blue-50' : 'bg-slate-950 text-white hover:-translate-y-0.5 hover:bg-blue-700'
+        <div className="mt-14 grid gap-5 lg:grid-cols-3">
+          {plans.map((plan, index) => (
+            <Reveal key={plan.name} delay={index * 0.06}>
+              <div
+                className={`relative h-full rounded-[2rem] border p-6 transition-all duration-300 hover:-translate-y-1 ${
+                  plan.accent
+                    ? 'border-slate-950 bg-slate-950 text-white shadow-2xl shadow-slate-900/20'
+                    : 'border-slate-200 bg-white text-slate-950 shadow-sm shadow-slate-100'
                 }`}
               >
-                {plan.cta}
-              </a>
-            </motion.div>
+                {plan.accent ? <span className="absolute right-6 top-6 rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-950">популярный</span> : null}
+                <p className={`text-sm font-medium ${plan.accent ? 'text-slate-300' : 'text-slate-500'}`}>{plan.caption}</p>
+                <h3 className="mt-2 text-2xl font-semibold tracking-tight">{plan.name}</h3>
+                <div className="mt-8 flex items-end gap-2">
+                  <span className="text-5xl font-semibold tracking-[-0.05em]">{plan.price}</span>
+                  <span className={`pb-2 text-sm ${plan.accent ? 'text-slate-400' : 'text-slate-500'}`}>/ месяц</span>
+                </div>
+                <p className={`mt-5 min-h-[56px] leading-7 ${plan.accent ? 'text-slate-300' : 'text-slate-600'}`}>{plan.description}</p>
+                <div className="mt-7 space-y-3">
+                  {plan.items.map((item) => (
+                    <div key={item} className="flex items-center gap-3">
+                      <span className={`flex h-5 w-5 items-center justify-center rounded-full ${plan.accent ? 'bg-white text-slate-950' : 'bg-slate-100 text-slate-700'}`}>
+                        <Check className="h-3.5 w-3.5" />
+                      </span>
+                      <span className={`text-sm font-medium ${plan.accent ? 'text-slate-100' : 'text-slate-700'}`}>{item}</span>
+                    </div>
+                  ))}
+                </div>
+                <a
+                  href="#top"
+                  className={`mt-8 inline-flex w-full items-center justify-center rounded-full px-5 py-3 text-sm font-semibold transition ${
+                    plan.accent ? 'bg-white text-slate-950 hover:bg-slate-100' : 'bg-slate-950 text-white hover:bg-slate-800'
+                  }`}
+                >
+                  Выбрать тариф
+                </a>
+              </div>
+            </Reveal>
           ))}
-        </motion.div>
+        </div>
       </Container>
     </section>
   );
@@ -780,110 +642,100 @@ function Testimonials() {
   return (
     <section className="bg-white py-20 sm:py-24 lg:py-32">
       <Container>
-        <SectionHeading
-          eyebrow="Отзывы"
-          title="Команды ценят простоту, скорость и порядок"
-          text="КликБук выглядит привычно для клиентов и дает бизнесу ощущение контроля над каждой записью."
-        />
+        <SectionTitle kicker="отзывы" title="Спокойнее для команды, проще для клиента" />
 
-        <motion.div variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.18 }} className="mt-14 grid gap-6 lg:grid-cols-3">
-          {testimonials.map((item) => (
-            <motion.figure
-              key={item.name}
-              variants={fadeUp}
-              className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/60 transition duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-2xl hover:shadow-blue-100/70"
-            >
-              <div className="mb-5 flex gap-1 text-amber-400">
-                {Array.from({ length: 5 }).map((_, index) => (
-                  <Star key={index} className="h-5 w-5 fill-current" />
-                ))}
-              </div>
-              <blockquote className="leading-8 text-slate-700">“{item.quote}”</blockquote>
-              <figcaption className="mt-6 flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-violet-600 text-sm font-black text-white shadow-lg shadow-blue-500/20">
-                  {item.name
-                    .split(' ')
-                    .map((part) => part[0])
-                    .join('')}
+        <div className="mt-14 grid gap-5 lg:grid-cols-3">
+          {testimonials.map((item, index) => (
+            <Reveal key={item.name} delay={index * 0.06}>
+              <figure className="h-full rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-100 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/60">
+                <div className="flex gap-1 text-slate-950">
+                  {Array.from({ length: 5 }).map((_, starIndex) => (
+                    <Star key={starIndex} className="h-4 w-4 fill-current" />
+                  ))}
                 </div>
-                <div>
-                  <p className="font-black text-slate-950">{item.name}</p>
-                  <p className="text-sm font-medium text-slate-500">{item.role}</p>
-                </div>
-              </figcaption>
-            </motion.figure>
+                <blockquote className="mt-6 leading-8 text-slate-700">“{item.text}”</blockquote>
+                <figcaption className="mt-8 border-t border-slate-100 pt-5">
+                  <p className="font-semibold text-slate-950">{item.name}</p>
+                  <p className="mt-1 text-sm text-slate-500">{item.role}</p>
+                </figcaption>
+              </figure>
+            </Reveal>
           ))}
-        </motion.div>
-      </Container>
-    </section>
-  );
-}
-
-function FAQ() {
-  const [openIndex, setOpenIndex] = useState(0);
-
-  return (
-    <section id="faq" className="bg-slate-50 py-20 sm:py-24 lg:py-32">
-      <Container>
-        <div className="grid gap-12 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
-          <SectionHeading
-            centered={false}
-            eyebrow="FAQ"
-            title="Частые вопросы о КликБук"
-            text="Собрали основные ответы, которые помогают быстро понять, как сервис впишется в ежедневную работу бизнеса."
-          />
-
-          <motion.div variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.15 }} className="space-y-4">
-            {faqs.map((item, index) => {
-              const isOpen = openIndex === index;
-              return (
-                <motion.div key={item.q} variants={fadeUp} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                  <button type="button" onClick={() => setOpenIndex(isOpen ? -1 : index)} className="flex w-full items-center justify-between gap-4 px-5 py-5 text-left">
-                    <span className="text-base font-black text-slate-950 sm:text-lg">{item.q}</span>
-                    <ChevronDown className={`h-5 w-5 shrink-0 text-blue-700 transition duration-300 ${isOpen ? 'rotate-180' : ''}`} />
-                  </button>
-                  {isOpen ? (
-                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} transition={{ duration: 0.25 }} className="px-5 pb-5">
-                      <p className="leading-7 text-slate-600">{item.a}</p>
-                    </motion.div>
-                  ) : null}
-                </motion.div>
-              );
-            })}
-          </motion.div>
         </div>
       </Container>
     </section>
   );
 }
 
-function FinalCTA() {
+function FAQ() {
+  const [active, setActive] = useState(0);
+
+  return (
+    <section id="faq" className="bg-[#fbfbfc] py-20 sm:py-24 lg:py-32">
+      <Container>
+        <div className="grid gap-12 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
+          <Reveal>
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-blue-600">faq</p>
+            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-5xl">Ответы на частые вопросы</h2>
+            <p className="mt-5 text-lg leading-8 text-slate-600">Коротко о запуске, настройках, команде и уведомлениях.</p>
+          </Reveal>
+
+          <div className="space-y-3">
+            {faqs.map((item, index) => {
+              const opened = active === index;
+              return (
+                <Reveal key={item.q} delay={index * 0.035}>
+                  <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white">
+                    <button
+                      type="button"
+                      onClick={() => setActive(opened ? -1 : index)}
+                      className="flex w-full items-center justify-between gap-4 px-5 py-5 text-left"
+                    >
+                      <span className="font-semibold text-slate-950">{item.q}</span>
+                      <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform ${opened ? 'rotate-180' : ''}`} />
+                    </button>
+                    {opened ? (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        transition={{ duration: 0.28, ease: 'easeOut' }}
+                        className="px-5 pb-5"
+                      >
+                        <p className="leading-7 text-slate-600">{item.a}</p>
+                      </motion.div>
+                    ) : null}
+                  </div>
+                </Reveal>
+              );
+            })}
+          </div>
+        </div>
+      </Container>
+    </section>
+  );
+}
+
+function FinalCta() {
   return (
     <section className="bg-white py-20 sm:py-24 lg:py-32">
       <Container>
-        <motion.div
-          initial={{ opacity: 0, y: 28 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.3 }}
-          transition={{ duration: 0.7, ease: 'easeOut' }}
-          className="relative overflow-hidden rounded-[2.5rem] bg-slate-950 px-6 py-14 text-center text-white shadow-2xl shadow-slate-950/20 sm:px-10 lg:px-20 lg:py-20"
-        >
-          <div className="absolute -left-20 top-0 h-72 w-72 rounded-full bg-blue-500/30 blur-3xl" />
-          <div className="absolute -right-24 bottom-0 h-72 w-72 rounded-full bg-violet-500/30 blur-3xl" />
-          <div className="relative mx-auto max-w-3xl">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm font-bold text-blue-100 backdrop-blur">
-              <MessageCircle className="h-4 w-4" />
-              Меньше звонков — больше записей
-            </div>
-            <h2 className="text-3xl font-black tracking-tight sm:text-4xl lg:text-6xl">Запустите онлайн-запись уже сегодня</h2>
-            <p className="mt-6 text-lg leading-8 text-slate-300">Создайте удобный способ бронирования для клиентов и освободите себя от лишних звонков.</p>
-            <div className="mt-9">
-              <PrimaryButton href="#pricing" className="bg-white text-blue-700 shadow-none hover:shadow-white/10">
-                Начать бесплатно
-              </PrimaryButton>
+        <Reveal>
+          <div className="relative overflow-hidden rounded-[2.5rem] border border-slate-200 bg-[#fbfbfc] px-6 py-14 text-center sm:px-10 lg:px-16 lg:py-20">
+            <div className="absolute left-1/2 top-0 h-56 w-56 -translate-x-1/2 rounded-full bg-blue-100 blur-3xl" />
+            <div className="relative mx-auto max-w-2xl">
+              <div className="mx-auto mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <h2 className="text-3xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-5xl">Запустите онлайн-запись уже сегодня</h2>
+              <p className="mt-5 text-lg leading-8 text-slate-600">
+                Создайте удобный способ бронирования для клиентов и освободите себя от лишних звонков.
+              </p>
+              <div className="mt-8">
+                <Button>Начать бесплатно</Button>
+              </div>
             </div>
           </div>
-        </motion.div>
+        </Reveal>
       </Container>
     </section>
   );
@@ -896,52 +748,41 @@ function Footer() {
         <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-md">
             <Logo />
-            <p className="mt-4 leading-7 text-slate-600">КликБук — онлайн-сервис для удобного бронирования услуг, управления расписанием, клиентами и заявками.</p>
+            <p className="mt-4 leading-7 text-slate-600">КликБук — минималистичный сервис онлайн-записи для бизнеса, команды и клиентов.</p>
           </div>
-
           <div className="flex flex-wrap gap-x-6 gap-y-3">
             {[
+              ['Продукт', '#product'],
               ['Возможности', '#features'],
               ['Тарифы', '#pricing'],
               ['FAQ', '#faq'],
               ['Контакты', 'mailto:hello@clickbook.example'],
             ].map(([label, href]) => (
-              <a key={label} href={href} className="text-sm font-bold text-slate-600 transition hover:text-blue-700">
+              <a key={label} href={href} className="text-sm font-medium text-slate-500 transition-colors hover:text-slate-950">
                 {label}
               </a>
             ))}
           </div>
         </div>
-
-        <div className="mt-8 flex flex-col gap-3 border-t border-slate-100 pt-6 text-sm font-medium text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-          <p>© 2026 КликБук. Все права защищены.</p>
-          <p>Сделано для современного сервиса онлайн-записи.</p>
-        </div>
+        <div className="mt-8 border-t border-slate-100 pt-6 text-sm text-slate-500">© 2026 КликБук. Все права защищены.</div>
       </Container>
     </footer>
   );
 }
 
 export default function LandingPage() {
-  const pageSections = useMemo(
-    () => [
-      <Hero key="hero" />,
-      <Features key="features" />,
-      <Audience key="audience" />,
-      <HowItWorks key="how" />,
-      <DashboardDemo key="demo" />,
-      <Pricing key="pricing" />,
-      <Testimonials key="testimonials" />,
-      <FAQ key="faq" />,
-      <FinalCTA key="cta" />,
-    ],
-    [],
-  );
-
   return (
-    <main className="min-h-screen scroll-smooth bg-white font-sans text-slate-900 antialiased">
+    <main className="min-h-screen scroll-smooth bg-white font-sans text-slate-950 antialiased">
       <Header />
-      {pageSections}
+      <Hero />
+      <Product />
+      <Features />
+      <Audience />
+      <Workflow />
+      <Pricing />
+      <Testimonials />
+      <FAQ />
+      <FinalCta />
       <Footer />
     </main>
   );
