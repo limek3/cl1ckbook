@@ -3607,104 +3607,276 @@ export default function DashboardChatsPage() {
 
   return (
     <WorkspaceShell>
-      <main className={cn('h-[calc(100dvh-68px)] overflow-hidden px-4 pb-4 pt-5 md:px-7 md:pt-6', pageBg(isLight))}>
-        <div className="mx-auto grid h-full min-h-0 w-full max-w-[var(--page-max-width)] grid-rows-[auto_minmax(0,1fr)] gap-4">
-          <header
+      <main
+        className={cn(
+          'h-[calc(100dvh-68px)] overflow-hidden px-4 pb-4 pt-5 md:px-7 md:pt-6',
+          pageBg(isLight),
+        )}
+      >
+        <div className="mx-auto flex h-full min-h-0 w-full max-w-[var(--page-max-width)] flex-col">
+          <section
             className={cn(
-              'shrink-0 overflow-hidden rounded-[24px] border px-5 py-4',
-              isLight ? 'border-black/[0.07] bg-white/68' : 'border-white/[0.08] bg-white/[0.025]',
+              'flex min-h-0 flex-1 flex-col overflow-hidden rounded-[22px] border',
+              isLight
+                ? 'border-black/[0.07] bg-white shadow-[0_18px_60px_rgba(17,17,17,0.045)]'
+                : 'border-white/[0.08] bg-[#101010]',
             )}
           >
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_520px] xl:items-end">
-              <div className="min-w-0">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <MicroLabel light={isLight} active={demoMode}>
+            <header
+              className={cn(
+                'shrink-0 border-b px-4 py-3.5',
+                borderTone(isLight),
+                isLight ? 'bg-white' : 'bg-[#101010]',
+              )}
+            >
+              <div className="grid gap-3 xl:grid-cols-[270px_minmax(0,1fr)_auto] xl:items-center">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h1
+                      className={cn(
+                        'truncate text-[24px] font-semibold tracking-[-0.07em] md:text-[30px]',
+                        pageText(isLight),
+                      )}
+                    >
+                      {labels.title}
+                    </h1>
+
+                    {unreadTotal > 0 ? (
+                      <span
+                        className="grid size-6 shrink-0 place-items-center rounded-[8px] text-[10px] font-semibold text-white"
+                        style={{ background: accentColor }}
+                      >
+                        {unreadTotal}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <p className={cn('mt-1 truncate text-[11px]', mutedText(isLight))}>
+                    {threads.length} {labels.allThreads.toLowerCase()} · {priorityTotal}{' '}
+                    {locale === 'ru' ? 'важных' : 'priority'}
+                  </p>
+                </div>
+
+                <label
+                  className={cn(
+                    searchFieldClass(isLight),
+                    'h-9 max-w-[620px] justify-self-stretch xl:justify-self-center',
+                  )}
+                  style={{ background: 'transparent', backgroundColor: 'transparent', boxShadow: 'none' }}
+                >
+                  <Search className="size-4 shrink-0 opacity-70" />
+                  <input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder={labels.search}
+                    className="block h-full min-w-0 flex-1 appearance-none rounded-none border-0 p-0 text-[12px] font-medium text-current outline-none placeholder:text-current/50 [background:transparent!important] [box-shadow:none!important]"
+                    style={{
+                      background: 'transparent',
+                      backgroundColor: 'transparent',
+                      boxShadow: 'none',
+                      WebkitAppearance: 'none',
+                      appearance: 'none',
+                    }}
+                  />
+                </label>
+
+                <div className="flex items-center justify-end gap-2">
+                  <MicroLabel light={isLight} active={demoMode} className="hidden md:inline-flex">
                     <Bot className="size-3.5" />
                     {demoMode ? labels.demo : labels.live}
                   </MicroLabel>
-                  <MicroLabel light={isLight}>
-                    {filteredThreads.length}/{threads.length}
-                  </MicroLabel>
-                  {unreadTotal > 0 ? (
-                    <MicroLabel light={isLight} active>
-                      {unreadTotal} {labels.unread}
-                    </MicroLabel>
-                  ) : null}
+
+                  <button
+                    type="button"
+                    className={cn(buttonBase(isLight, showCreatePanel), 'h-9')}
+                    onClick={() => setShowCreatePanel((current) => !current)}
+                  >
+                    <Plus className="size-3.5" />
+                    {showCreatePanel ? labels.closeCreate : labels.createThread}
+                  </button>
                 </div>
-
-                <h1 className={cn('text-[30px] font-semibold tracking-[-0.075em] md:text-[40px]', pageText(isLight))}>
-                  {labels.title}
-                </h1>
-
-                <p className={cn('mt-1.5 max-w-[760px] text-[12.5px] leading-5', mutedText(isLight))}>
-                  {labels.description}
-                </p>
               </div>
+            </header>
 
-              <div className="grid gap-2 sm:grid-cols-3">
-                {[
-                  { label: labels.workspaceTitle, value: threads.length, hint: labels.allThreads },
-                  { label: labels.unread, value: unreadTotal, hint: locale === 'ru' ? 'требуют ответа' : 'need reply' },
-                  { label: locale === 'ru' ? 'Активный' : 'Current', value: activeThreadIndex || '—', hint: activeThread?.clientName ?? labels.emptyThread },
-                ].map((item) => (
-                  <div key={item.label} className={cn('min-w-0 rounded-[16px] border px-3 py-2.5', isLight ? 'border-black/[0.06] bg-white/72' : 'border-white/[0.07] bg-white/[0.035]')}>
-                    <div className={cn('truncate text-[10px] font-medium', faintText(isLight))}>{item.label}</div>
-                    <div className={cn('mt-1 truncate text-[20px] font-semibold leading-none tracking-[-0.055em]', pageText(isLight))}>{item.value}</div>
-                    <div className={cn('mt-1 truncate text-[9.5px]', mutedText(isLight))}>{item.hint}</div>
+            <div className="grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[310px_minmax(0,1fr)] 2xl:grid-cols-[320px_minmax(0,1fr)_306px]">
+              <aside
+                className={cn(
+                  'flex min-h-0 flex-col border-b lg:border-b-0 lg:border-r',
+                  borderTone(isLight),
+                  isLight ? 'bg-[#fbfbfa]' : 'bg-[#0d0d0d]',
+                )}
+              >
+                <div className={cn('shrink-0 space-y-3 border-b p-3', borderTone(isLight))}>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {segmentOptions.slice(0, 3).map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setSegmentFilter(option.value)}
+                        className={cn(
+                          'h-8 rounded-[9px] border px-2 text-[10.5px] font-semibold transition active:scale-[0.985]',
+                          segmentFilter === option.value
+                            ? 'cb-accent-pill-active'
+                            : isLight
+                              ? 'border-black/[0.07] bg-white text-black/45 hover:text-black'
+                              : 'border-white/[0.07] bg-white/[0.035] text-white/42 hover:text-white',
+                        )}
+                      >
+                        <span className="block truncate">{option.label}</span>
+                      </button>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
-          </header>
 
-          <div className="grid min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_405px]">
-            <section
-              className={cn(
-                'grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-[24px] border',
-                isLight ? 'border-black/[0.07] bg-white' : 'border-white/[0.08] bg-[#111111]',
-              )}
-            >
-              {renderChatHeader(false)}
+                  <div className="grid grid-cols-2 gap-2">
+                    <Select
+                      value={channelFilter}
+                      onValueChange={(value) => setChannelFilter(value as ChannelFilter)}
+                    >
+                      <SelectTrigger className={cn(selectTriggerClass(isLight), 'h-9 text-[11px]')}>
+                        <SelectValue />
+                      </SelectTrigger>
 
-              <div
-                ref={desktopMessageScrollRef}
-                className={cn(
-                  'min-h-0 overflow-y-auto px-5 py-5',
-                  isLight ? 'bg-[#f7f6f2]/62' : 'bg-black/20',
-                )}
-              >
-                {renderMessageFeed(false)}
-              </div>
+                      <SelectContent
+                        className={selectContentClass(isLight)}
+                        style={glassMenuSurfaceStyle(isLight, accentColor)}
+                      >
+                        {channelOptions.map((option) => {
+                          const active = channelFilter === option.value;
 
-              {renderComposer(false)}
-            </section>
+                          return (
+                            <SelectItem
+                              key={option.value}
+                              value={option.value}
+                              className={dropdownItemTone(isLight, active)}
+                            >
+                              <DropdownOption label={option.label} active={active} light={isLight} minWidth="100%" />
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
 
-            <aside className="grid min-h-0 gap-4 xl:grid-rows-[minmax(0,1.05fr)_minmax(280px,0.95fr)]">
-              <section
-                className={cn(
-                  'flex min-h-0 flex-col overflow-hidden rounded-[24px] border',
-                  isLight ? 'border-black/[0.07] bg-white/72' : 'border-white/[0.08] bg-[#111111]',
-                )}
-              >
-                <div className={cn('shrink-0 border-b p-3', borderTone(isLight))}>
-                  {renderFilters(false)}
+                    <Select value={sortMode} onValueChange={(value) => setSortMode(value as SortMode)}>
+                      <SelectTrigger className={cn(selectTriggerClass(isLight), 'h-9 text-[11px]')}>
+                        <SelectValue />
+                      </SelectTrigger>
+
+                      <SelectContent
+                        className={selectContentClass(isLight)}
+                        style={glassMenuSurfaceStyle(isLight, accentColor)}
+                      >
+                        {sortOptions.map((option) => {
+                          const active = sortMode === option.value;
+
+                          return (
+                            <SelectItem
+                              key={option.value}
+                              value={option.value}
+                              className={dropdownItemTone(isLight, active)}
+                            >
+                              <DropdownOption label={option.label} active={active} light={isLight} minWidth="100%" />
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {showCreatePanel ? (
+                    <Panel light={isLight} className="grid gap-2 p-2.5">
+                      <div className={cn('text-[10px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>
+                        {labels.createInline}
+                      </div>
+
+                      <Input
+                        value={newClientName}
+                        onChange={(event) => setNewClientName(event.target.value)}
+                        placeholder={labels.clientName}
+                        className={cn('h-9 rounded-[9px] text-[12px]', inputTone(isLight))}
+                      />
+
+                      <Input
+                        value={newClientPhone}
+                        onChange={(event) => setNewClientPhone(event.target.value)}
+                        placeholder={labels.clientPhone}
+                        className={cn('h-9 rounded-[9px] text-[12px]', inputTone(isLight))}
+                      />
+
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          className={buttonBase(isLight)}
+                          onClick={() => setShowCreatePanel(false)}
+                        >
+                          {labels.cancel}
+                        </button>
+
+                        <button type="button" className={buttonBase(isLight, true)} onClick={handleCreateThread}>
+                          <Plus className="size-3.5" />
+                          {labels.create}
+                        </button>
+                      </div>
+                    </Panel>
+                  ) : null}
+
+                  {error ? (
+                    <div className="rounded-[9px] border border-destructive/20 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
+                      {error}
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="min-h-0 flex-1 overflow-y-auto p-2.5">
                   {renderThreadList(false)}
                 </div>
-              </section>
+              </aside>
 
               <section
                 className={cn(
-                  'min-h-0 overflow-y-auto rounded-[24px] border p-3',
-                  isLight ? 'border-black/[0.07] bg-white/58' : 'border-white/[0.08] bg-white/[0.025]',
+                  'grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto]',
+                  isLight ? 'bg-white' : 'bg-[#101010]',
                 )}
               >
-                {renderAssistantPanel(false)}
+                {renderChatHeader(false)}
+
+                <div
+                  ref={desktopMessageScrollRef}
+                  className={cn(
+                    'min-h-0 overflow-y-auto px-4 py-4',
+                    isLight ? 'bg-[#f7f6f2]/54' : 'bg-black/16',
+                  )}
+                >
+                  {renderMessageFeed(false)}
+                </div>
+
+                {renderComposer(false)}
               </section>
-            </aside>
-          </div>
+
+              <aside
+                className={cn(
+                  'hidden min-h-0 flex-col border-l 2xl:flex',
+                  borderTone(isLight),
+                  isLight ? 'bg-[#fbfbfa]' : 'bg-[#0d0d0d]',
+                )}
+              >
+                <div className={cn('shrink-0 border-b px-4 py-3', borderTone(isLight))}>
+                  <div className={cn('text-[11px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>
+                    {labels.assistant}
+                  </div>
+                  <div className={cn('mt-1 truncate text-[16px] font-semibold tracking-[-0.025em]', pageText(isLight))}>
+                    {assistantSummary.title}
+                  </div>
+                  <p className={cn('mt-1.5 line-clamp-2 text-[11px] leading-5', mutedText(isLight))}>
+                    {assistantSummary.detail}
+                  </p>
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto p-3">
+                  {renderAssistantPanel(false)}
+                </div>
+              </aside>
+            </div>
+          </section>
         </div>
 
         {contextMenuPortal}
