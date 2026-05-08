@@ -184,7 +184,8 @@ const ThemeCtx = createContext<ThemeCtxValue>({
 
 export function ThemeProvider({ initialMode = 'dark', children }: { initialMode?: ThemeMode; children: ReactNode }) {
   const stored = readStoredAppearance();
-  const [mode, setMode] = useState<ThemeMode>(stored.mode ?? initialMode);
+  const storedMode = initialMode === 'light' && stored.mode === 'dark' ? undefined : stored.mode;
+  const [mode, setMode] = useState<ThemeMode>(storedMode ?? initialMode);
   const [accentTone, setAccentToneState] = useState<AccentTone>(stored.accentTone ?? 'teal');
   const [radius, setRadiusState] = useState<RadiusMode>(stored.radius ?? 'medium');
 

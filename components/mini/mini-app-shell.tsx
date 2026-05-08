@@ -472,12 +472,14 @@ function readMiniNotificationIds(): string[] {
 // ─── Tab definitions ─────────────────────────
 type TabId = 'home' | 'appts' | 'chats' | 'clients' | 'more';
 
-const TABS: { id: TabId; label: string; icon: string }[] = [
-  { id: 'home',     label: 'Главная',  icon: 'home' },
-  { id: 'appts',    label: 'Записи',   icon: 'calendar' },
-  { id: 'chats',    label: 'Чаты',     icon: 'message-square' },
-  { id: 'clients',  label: 'Клиенты',  icon: 'users' },
-  { id: 'more',     label: 'Ещё',      icon: 'more-horizontal' },
+type BottomNavItem = { id: TabId | 'create'; route?: TabId; label: string; icon: string; center?: boolean };
+
+const BOTTOM_NAV_ITEMS: BottomNavItem[] = [
+  { id: 'home',     label: 'Главная', icon: 'home' },
+  { id: 'appts',    label: 'Записи',  icon: 'calendar' },
+  { id: 'create',   label: '',        icon: 'plus', center: true, route: 'appts' },
+  { id: 'clients',  label: 'Клиенты', icon: 'users' },
+  { id: 'more',     label: 'Ещё',     icon: 'menu' },
 ];
 
 function miniGlass(mode: ThemeMode, edge: 'top' | 'bottom' = 'top'): CSSProperties {
@@ -505,9 +507,11 @@ interface SubRoute {
 }
 
 // ─── Bottom Nav ──────────────────────────────
-function BottomNav({ active, onChange, chatUnreadCount = 0 }: { active: TabId; onChange: (id: TabId) => void; chatUnreadCount?: number }) {
-  const { T, mode } = useTheme();
-  const dark = mode === 'dark';
+function BottomNav({ active, onChange }: { active: TabId; onChange: (id: TabId) => void; chatUnreadCount?: number }) {
+  const activeColor = '#ee6f91';
+  const muted = '#747780';
+  const border = 'rgba(24, 24, 27, 0.075)';
+
   return (
     <div style={{
       position: 'fixed',
@@ -516,73 +520,91 @@ function BottomNav({ active, onChange, chatUnreadCount = 0 }: { active: TabId; o
       transform: 'translateX(-50%)',
       width: '100%',
       maxWidth: 390,
-      padding: '4px 10px calc(2px + var(--miniapp-safe-bottom, var(--tg-content-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)))))',
+      padding: '0 14px calc(8px + var(--miniapp-safe-bottom, var(--tg-content-safe-bottom, var(--tg-safe-bottom, env(safe-area-inset-bottom, 0px)))))',
       zIndex: 80,
       pointerEvents: 'auto',
     }}>
       <div style={{
-        ...miniGlass(mode, 'bottom'),
+        height: 72,
         display: 'grid',
         gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
-        gap: 3,
-        padding: 4,
-        border: `1px solid ${dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.045)'}`,
-        borderRadius: 20,
-        backgroundColor: dark ? 'rgba(17,17,17,0.58)' : 'rgba(255,255,255,0.54)',
-        boxShadow: dark
-          ? '0 -16px 44px rgba(0,0,0,0.46), inset 0 1px 0 rgba(255,255,255,0.045)'
-          : '0 -16px 44px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.78)',
+        alignItems: 'center',
+        gap: 2,
+        padding: '7px 10px 8px',
+        border: `1px solid ${border}`,
+        borderRadius: 28,
+        background: 'rgba(255,255,255,0.88)',
+        boxShadow: '0 -8px 28px rgba(55, 48, 68, 0.055)',
+        backdropFilter: 'blur(18px)',
+        WebkitBackdropFilter: 'blur(18px)',
       }}>
-        {TABS.map((t) => {
-          const isActive = active === t.id;
-          const showBadge = t.id === 'chats' && chatUnreadCount > 0;
+        {BOTTOM_NAV_ITEMS.map((item) => {
+          const target = item.route ?? (item.id as TabId);
+          const isCenter = Boolean(item.center);
+          const isActive = !isCenter && active === item.id;
+
+          if (isCenter) {
+            return (
+              <button
+                key={item.id}
+                onClick={() => { haptic('light'); onChange(target); }}
+                aria-label="Создать запись"
+                style={{
+                  width: 54,
+                  height: 54,
+                  border: 'none',
+                  borderRadius: 18,
+                  margin: '0 auto 6px',
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#fff',
+                  background: 'linear-gradient(180deg, #fb7f95 0%, #ec6f8e 100%)',
+                  boxShadow: '0 8px 18px rgba(238, 111, 145, 0.24)',
+                  fontFamily: 'inherit',
+                }}
+              >
+                <Icon name={item.icon} size={28} color="#fff" stroke={1.75} />
+              </button>
+            );
+          }
+
           return (
-            <button key={t.id} onClick={() => { haptic('light'); onChange(t.id); }} style={{
-              border: `1px solid ${isActive ? (dark ? 'rgba(255,255,255,0.075)' : 'rgba(0,0,0,0.06)') : 'transparent'}`,
-              cursor: 'pointer',
-              height: 46,
-              minWidth: 0,
-              borderRadius: 14,
-              padding: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 3,
-              fontFamily: 'inherit',
-              WebkitTapHighlightColor: 'transparent',
-              background: isActive
-                ? (dark ? 'rgba(255,255,255,0.065)' : 'rgba(0,0,0,0.045)')
-                : 'transparent',
-              color: isActive ? T.accent : T.text3,
-              boxShadow: isActive ? 'inset 0 1px 0 rgba(255,255,255,0.05), 0 8px 22px rgba(0,0,0,0.24)' : 'none',
-              transition: 'background 0.18s ease, color 0.18s ease, transform 0.12s ease, border-color 0.18s ease',
-            }}>
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name={t.icon} size={17} stroke={isActive ? 2.05 : 1.6} />
-                {showBadge && (
-                  <span style={{
-                    position: 'absolute', top: -8, right: -12, minWidth: 16, height: 16,
-                    padding: '0 4px', borderRadius: 999,
-                    background: T.danger, color: '#fff',
-                    border: `2px solid ${dark ? 'rgba(17,17,17,0.92)' : 'rgba(255,255,255,0.95)'}`,
-                    fontSize: 8, fontWeight: 800,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontVariantNumeric: 'tabular-nums',
-                    boxShadow: `0 4px 10px ${T.danger}44`,
-                  }}>{chatUnreadCount > 9 ? '9+' : chatUnreadCount}</span>
-                )}
-              </div>
+            <button
+              key={item.id}
+              onClick={() => { haptic('light'); onChange(target); }}
+              style={{
+                border: 'none',
+                cursor: 'pointer',
+                height: 54,
+                minWidth: 0,
+                borderRadius: 16,
+                padding: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 5,
+                fontFamily: 'inherit',
+                WebkitTapHighlightColor: 'transparent',
+                background: 'transparent',
+                color: isActive ? activeColor : muted,
+                transition: 'color 0.18s ease, transform 0.12s ease',
+              }}
+            >
+              <Icon name={item.icon} size={22} color={isActive ? activeColor : muted} stroke={isActive ? 1.9 : 1.65} />
               <span style={{
                 maxWidth: '100%',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
-                fontSize: 9,
+                fontSize: 11,
                 lineHeight: 1,
                 fontWeight: isActive ? 600 : 500,
-                letterSpacing: '-0.04em',
-              }}>{t.label}</span>
+                letterSpacing: '-0.035em',
+              }}>{item.label}</span>
             </button>
           );
         })}
@@ -835,6 +857,8 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
 
   // Chat thread = full height (no global mini header/nav)
   const isFullHeight = Boolean(sub && sub.kind === 'thread');
+  const useInlineHomeHeader = !sub && tab === 'home';
+  const showGlobalHeader = !isFullHeight && !useInlineHomeHeader;
 
   return (
     <ToastCtx.Provider value={toastApi}>
@@ -1007,7 +1031,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
           .cb-miniapp ::placeholder { color: ${T.text3}; opacity: 1; -webkit-text-fill-color: ${T.text3}; }
           .cb-miniapp { --miniapp-accent: ${T.accent}; --mini-control-border: ${T.border}; }
         `}</style>
-        {!isFullHeight && (
+        {showGlobalHeader && (
           <TgHeader
             onToggleTheme={toggle}
             onNotifications={() => setSub({ kind: 'notifications' })}
@@ -1037,7 +1061,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
               minHeight: 0,
               overflowY: 'auto',
               overflowX: 'hidden',
-              paddingTop: 'calc(100px + var(--miniapp-safe-top, 0px))',
+              paddingTop: showGlobalHeader ? 'calc(100px + var(--miniapp-safe-top, 0px))' : 'calc(4px + var(--miniapp-safe-top, 0px))',
               paddingBottom: 'calc(76px + var(--miniapp-safe-bottom, 0px))',
               WebkitOverflowScrolling: 'touch',
             }}
@@ -1060,9 +1084,13 @@ export interface MiniAppProps {
   mode?: ThemeMode;
 }
 
-export function MiniApp({ initialTab = 'home', initialSub = null, mode = 'dark' }: MiniAppProps) {
+export function MiniApp({ initialTab = 'home', initialSub = null, mode = 'light' }: MiniAppProps) {
+  // Новый визуальный стиль мини-аппа — светлый по умолчанию.
+  // Даже если старый page.tsx передаёт mode="dark", первый экран не уедет в тёмную тему.
+  const initialMode: ThemeMode = mode === 'dark' ? 'light' : mode;
+
   return (
-    <ThemeProvider initialMode={mode}>
+    <ThemeProvider initialMode={initialMode}>
       <MiniAppInner initialTab={initialTab} initialSub={initialSub} />
     </ThemeProvider>
   );
