@@ -1,38 +1,28 @@
 // app/dashboard/chats/page.tsx
 'use client';
 
+import Link from 'next/link';
 import {
+  type CSSProperties,
+  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
-  type PointerEvent as ReactPointerEvent,
-  type ReactNode,
 } from 'react';
-import { createPortal } from 'react-dom';
-import { motion, useMotionValue, useSpring } from 'framer-motion';
 import { useTheme } from 'next-themes';
-import { useBrowserSearchParams } from '@/hooks/use-browser-search-params';
-import { useMobile } from '@/hooks/use-mobile';
 import {
-  AlertTriangle,
   ArrowRightLeft,
   Bot,
   CalendarClock,
-  CalendarDays,
   Check,
   CheckCheck,
   ChevronLeft,
-  ChevronRight,
-  Clock3,
   Download,
-  GripVertical,
-  MessageSquareQuote,
-  MoreHorizontal,
-  MoreVertical,
+  MessageCircle,
+  PhoneCall,
   Pin,
   Plus,
   Search,
@@ -41,10 +31,10 @@ import {
   Star,
   Trash2,
   UserRound,
+  X,
 } from 'lucide-react';
 
 import { WorkspaceShell } from '@/components/shared/workspace-shell';
-import { useOwnedWorkspaceData } from '@/hooks/use-owned-workspace-data';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -55,8 +45,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useBrowserSearchParams } from '@/hooks/use-browser-search-params';
+import { useMobile } from '@/hooks/use-mobile';
+import { useOwnedWorkspaceData } from '@/hooks/use-owned-workspace-data';
 import { useAppearance } from '@/lib/appearance-context';
 import { accentPalette } from '@/lib/appearance-palette';
 import type {
@@ -73,164 +64,8 @@ import { cn } from '@/lib/utils';
 type ThemeMode = 'light' | 'dark';
 type SegmentFilter = 'all' | ChatThreadRecord['segment'];
 type ChannelFilter = 'all' | ChatThreadRecord['channel'];
-type SortMode = 'manual' | 'recent' | 'priority' | 'unread';
+type SortMode = 'recent' | 'unread' | 'priority';
 type BotFlow = 'confirm' | 'reschedule' | 'followup';
-
-type ThreadContextMenuState = {
-  threadId: string;
-  x: number;
-  y: number;
-};
-
-type ThreadDragState = {
-  id: string;
-  pointerId: number;
-  startY: number;
-  startX: number;
-  originIndex: number;
-  active: boolean;
-  cardRect: {
-    top: number;
-    left: number;
-    width: number;
-    height: number;
-  };
-};
-
-function arrayMove<T>(items: T[], from: number, to: number) {
-  if (from === to || from < 0 || from >= items.length || to < 0) {
-    return items;
-  }
-
-  const next = [...items];
-  const [item] = next.splice(from, 1);
-
-  if (!item) return items;
-
-  const insertIndex = Math.max(0, Math.min(to, next.length));
-  next.splice(insertIndex, 0, item);
-
-  return next;
-}
-
-function isOptimisticMessage(message: ChatMessageRecord) {
-  return message.id.startsWith('local-') || message.metadata?.optimistic === true;
-}
-
-function isSameMessageContent(left: ChatMessageRecord, right: ChatMessageRecord) {
-  if (left.author !== right.author) return false;
-
-  const leftBody = (left.body ?? '').replace(/\s+/g, ' ').trim();
-  const rightBody = (right.body ?? '').replace(/\s+/g, ' ').trim();
-  if (!leftBody || leftBody !== rightBody) return false;
-
-  const leftTime = new Date(left.createdAt).getTime();
-  const rightTime = new Date(right.createdAt).getTime();
-
-  if (!Number.isFinite(leftTime) || !Number.isFinite(rightTime)) return true;
-  return Math.abs(leftTime - rightTime) < 3 * 60 * 1000;
-}
-
-function preferMessageRecord(left: ChatMessageRecord, right: ChatMessageRecord) {
-  if (isOptimisticMessage(left) && !isOptimisticMessage(right)) return right;
-  if (!isOptimisticMessage(left) && isOptimisticMessage(right)) return left;
-
-  const leftTime = new Date(left.createdAt).getTime();
-  const rightTime = new Date(right.createdAt).getTime();
-  const newer = Number.isFinite(rightTime) && (!Number.isFinite(leftTime) || rightTime >= leftTime) ? right : left;
-
-  return {
-    ...left,
-    ...newer,
-    deliveryState: newer.deliveryState ?? left.deliveryState,
-    metadata: {
-      ...(left.metadata ?? {}),
-      ...(newer.metadata ?? {}),
-      dedupedFrom: left.id === newer.id ? left.metadata?.dedupedFrom : left.id,
-    },
-  } satisfies ChatMessageRecord;
-}
-
-function dedupeMessages(messages: ChatMessageRecord[]) {
-  const sorted = [...messages].sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-  );
-  const result: ChatMessageRecord[] = [];
-
-  for (const message of sorted) {
-    const duplicateIndex = result.findIndex((item) => isSameMessageContent(item, message));
-
-    if (duplicateIndex >= 0) {
-      result[duplicateIndex] = preferMessageRecord(result[duplicateIndex], message);
-    } else {
-      result.push(message);
-    }
-  }
-
-  return result.sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-  );
-}
-
-function mergeThreadMessages(
-  currentMessages: ChatMessageRecord[],
-  incomingMessages: ChatMessageRecord[],
-) {
-  const incoming = [...incomingMessages];
-  const map = new Map<string, ChatMessageRecord>();
-
-  for (const message of currentMessages) {
-    if (isOptimisticMessage(message) && incoming.some((incomingMessage) => isSameMessageContent(message, incomingMessage))) {
-      continue;
-    }
-
-    map.set(message.id, message);
-  }
-
-  for (const message of incoming) {
-    const current = map.get(message.id);
-    map.set(message.id, current ? preferMessageRecord(current, message) : message);
-  }
-
-  return dedupeMessages(Array.from(map.values()));
-}
-
-function mergeThreadSnapshots(
-  currentThreads: ChatThreadRecord[],
-  incomingThreads: ChatThreadRecord[],
-  sortMode: SortMode,
-) {
-  const currentMap = new Map(currentThreads.map((thread) => [thread.id, thread]));
-  const merged = incomingThreads.map((thread) => {
-    const current = currentMap.get(thread.id);
-    if (!current) return thread;
-
-    return {
-      ...current,
-      ...thread,
-      messages: mergeThreadMessages(current.messages ?? [], thread.messages ?? []),
-    } satisfies ChatThreadRecord;
-  });
-
-  const compactMerged = mergeThreadsByClientForUi(merged);
-
-  if (sortMode !== 'manual') {
-    return sortThreads(compactMerged, 'recent');
-  }
-
-  const ordered: ChatThreadRecord[] = [];
-  const used = new Set<string>();
-
-  for (const thread of currentThreads) {
-    const next = compactMerged.find((item) => item.id === thread.id);
-    if (!next) continue;
-    ordered.push(next);
-    used.add(next.id);
-  }
-
-  const fresh = compactMerged.filter((thread) => !used.has(thread.id));
-  return [...sortThreads(fresh, 'recent'), ...ordered];
-}
 
 function pageBg(light: boolean) {
   return light ? 'bg-[#f4f4f2]' : 'bg-[#090909]';
@@ -253,26 +88,22 @@ function borderTone(light: boolean) {
 }
 
 function cardTone(light: boolean) {
-  return light
-    ? 'border-black/[0.08] bg-[#fbfbfa]'
-    : 'border-white/[0.08] bg-[#101010]';
+  return light ? 'border-black/[0.08] bg-[#fbfbfa]' : 'border-white/[0.08] bg-[#101010]';
 }
 
 function insetTone(light: boolean) {
-  return light
-    ? 'border-black/[0.07] bg-black/[0.025]'
-    : 'border-white/[0.07] bg-white/[0.035]';
+  return light ? 'border-black/[0.07] bg-black/[0.025]' : 'border-white/[0.07] bg-white/[0.035]';
 }
 
 function inputTone(light: boolean) {
   return light
-    ? 'border-black/[0.08] bg-white text-black placeholder:text-black/32'
+    ? 'border-black/[0.08] bg-white text-black placeholder:text-black/34'
     : 'border-white/[0.08] bg-white/[0.035] text-white placeholder:text-white/30';
 }
 
 function buttonBase(light: boolean, active = false) {
   return cn(
-    'inline-flex h-8 items-center justify-center gap-2 rounded-[9px] border px-3 text-[12px] font-medium shadow-none transition-[background,border-color,color,opacity,transform] duration-150 active:scale-[0.985]',
+    'inline-flex h-8 items-center justify-center gap-2 rounded-[9px] border px-3 text-[12px] font-medium shadow-none transition-[background,border-color,color,opacity,transform] duration-150 active:scale-[0.985] disabled:pointer-events-none disabled:opacity-45',
     active
       ? light
         ? 'cb-neutral-primary cb-neutral-primary-light hover:opacity-[0.98]'
@@ -283,198 +114,70 @@ function buttonBase(light: boolean, active = false) {
   );
 }
 
-type ThreadActiveAlert = {
-  type?: string;
-  status?: string;
-  bookingId?: string;
-  channel?: string;
-  createdAt?: string;
-  message?: string;
-};
-
-function getThreadActiveAlert(thread?: ChatThreadRecord | null): ThreadActiveAlert | null {
-  const raw = thread?.metadata?.activeAlert;
-  if (!raw || typeof raw !== 'object') return null;
-
-  const alert = raw as ThreadActiveAlert;
-  if (alert.type !== 'reschedule_request') return null;
-  if (alert.status && alert.status !== 'open') return null;
-
-  return alert;
-}
-
-function warningTone(light: boolean) {
-  return light
-    ? 'border-amber-500/24 bg-amber-500/[0.075] text-amber-950'
-    : 'border-amber-300/20 bg-amber-300/[0.08] text-amber-100';
-}
-
-/**
- * ЕДИНЫЙ РЕФЕРЕНС ДЛЯ ВСЕХ МЕНЮ НА ЭТОЙ СТРАНИЦЕ:
- * - матовое стекло как на скрине;
- * - без тяжёлых теней;
- * - обычный текст без accent-цвета;
- * - выбранный пункт выделяется мягкой плашкой;
- * - accent-цвет только у галочки справа.
- */
-function glassMenuContentClass(light: boolean) {
-  return cn(
-    'relative z-[80] overflow-hidden rounded-[10px] border p-1 shadow-none outline-none',
-    'backdrop-blur-[28px] [-webkit-backdrop-filter:blur(28px)_saturate(1.45)]',
-    light
-      ? 'border-black/[0.08] bg-[#f7f7f4]/80 text-black'
-      : 'border-white/[0.10] bg-[#252525]/72 text-white',
-  );
-}
-
-function glassMenuSurfaceStyle(light: boolean, accentColor: string): CSSProperties {
+function accentPillStyle(color: string, light: boolean): CSSProperties {
   return {
     background: light
-      ? `
-        linear-gradient(135deg, rgba(255,255,255,0.78), rgba(238,238,234,0.68)),
-        radial-gradient(circle at 14% 0%, color-mix(in srgb, ${accentColor} 5%, transparent) 0%, transparent 42%),
-        rgba(247,247,244,0.72)
-      `
-      : `
-        linear-gradient(135deg, rgba(58,58,58,0.74), rgba(30,30,30,0.70)),
-        radial-gradient(circle at 16% 0%, color-mix(in srgb, ${accentColor} 6%, transparent) 0%, transparent 42%),
-        rgba(34,34,34,0.72)
-      `,
-    boxShadow: 'none',
-    backdropFilter: 'blur(28px) saturate(1.45)',
-    WebkitBackdropFilter: 'blur(28px) saturate(1.45)',
-    ['--menu-accent' as string]: accentColor,
+      ? `color-mix(in srgb, ${color} 10%, #ffffff)`
+      : `color-mix(in srgb, ${color} 20%, #141414)`,
+    borderColor: light
+      ? `color-mix(in srgb, ${color} 24%, rgba(0,0,0,0.1))`
+      : `color-mix(in srgb, ${color} 34%, rgba(255,255,255,0.1))`,
+    color: light
+      ? `color-mix(in srgb, ${color} 70%, #101010)`
+      : `color-mix(in srgb, ${color} 18%, #ffffff)`,
   };
 }
 
-function selectTriggerClass(light: boolean) {
-  return cn(
-    'h-10 w-full justify-between rounded-[9px] border px-3 text-[12.5px] font-semibold shadow-none outline-none transition active:scale-[0.985]',
-    'focus:ring-0 focus:ring-offset-0',
-    light
-      ? 'border-black/[0.08] bg-white text-black/72 hover:border-black/[0.13] hover:bg-white'
-      : 'border-white/[0.08] bg-white/[0.04] text-white/72 hover:border-white/[0.14] hover:bg-white/[0.06]',
-  );
+function Card({ children, light, className }: { children: ReactNode; light: boolean; className?: string }) {
+  return <section className={cn('rounded-[14px] border', cardTone(light), className)}>{children}</section>;
 }
 
-function searchFieldClass(light: boolean) {
-  return cn(
-    'flex h-10 min-w-0 items-center gap-2 rounded-[9px] border px-3 shadow-none outline-none',
-    '!bg-transparent bg-transparent bg-none transition-[border-color,color] duration-150',
-    'focus-within:ring-0 focus-within:ring-offset-0',
-    light
-      ? 'border-black/[0.08] text-black/56 hover:border-black/[0.13] focus-within:border-black/[0.16] focus-within:text-black'
-      : 'border-white/[0.08] text-white/48 hover:border-white/[0.13] focus-within:border-white/[0.16] focus-within:text-white',
-  );
+function Panel({ children, light, className }: { children: ReactNode; light: boolean; className?: string }) {
+  return <div className={cn('rounded-[12px] border', insetTone(light), className)}>{children}</div>;
 }
 
-function selectContentClass(light: boolean) {
-  return cn(glassMenuContentClass(light), 'min-w-[var(--radix-select-trigger-width)]');
-}
-
-function glassMenuItemClass(light: boolean, active = false, danger = false) {
-  return cn(
-    'relative flex w-full cursor-pointer select-none items-center rounded-[8px] border border-transparent',
-    'px-3 py-2.5 text-[12px] font-medium outline-none shadow-none',
-    'transition-[background,color,transform] duration-150 active:scale-[0.992]',
-    'data-[disabled]:pointer-events-none data-[disabled]:opacity-40',
-    danger
-      ? light
-        ? 'text-red-500 hover:bg-red-500/10 data-[highlighted]:bg-red-500/10 data-[highlighted]:text-red-600 focus:bg-red-500/10 focus:text-red-600'
-        : 'text-red-300 hover:bg-red-400/10 data-[highlighted]:bg-red-400/10 data-[highlighted]:text-red-200 focus:bg-red-400/10 focus:text-red-200'
-      : light
-        ? 'text-black/62 hover:bg-black/[0.045] hover:text-black data-[highlighted]:bg-black/[0.045] data-[highlighted]:text-black focus:bg-black/[0.045] focus:text-black'
-        : 'text-white/64 hover:bg-white/[0.075] hover:text-white data-[highlighted]:bg-white/[0.075] data-[highlighted]:text-white focus:bg-white/[0.075] focus:text-white',
-    active &&
-      !danger &&
-      (light
-        ? 'bg-black/[0.045] !text-black'
-        : 'bg-white/[0.085] !text-white'),
-  );
-}
-
-function dropdownItemTone(light: boolean, active?: boolean) {
-  return cn(
-    glassMenuItemClass(light, Boolean(active)),
-    'pr-9',
-    '[&>span:first-child]:left-auto [&>span:first-child]:right-3',
-    '[&>span:first-child]:flex [&>span:first-child]:h-full [&>span:first-child]:items-center',
-    '[&>span:first-child]:!text-[var(--menu-accent)]',
-  );
-}
-
-function DropdownOption({
-  label,
-  active,
+function MicroLabel({
+  children,
   light,
-  minWidth = '100%',
+  active,
+  accentColor,
+  className,
 }: {
-  label: string;
-  active: boolean;
+  children: ReactNode;
   light: boolean;
-  minWidth?: number | string;
+  active?: boolean;
+  accentColor?: string;
+  className?: string;
 }) {
   return (
-    <div
-      className="flex w-full min-w-0 items-center"
-      style={{
-        minWidth: typeof minWidth === 'number' ? `${minWidth}px` : minWidth,
-      }}
-    >
-      <span
-        className={cn(
-          'block min-w-0 truncate',
-          active && 'font-semibold',
-          active
+    <span
+      style={active && accentColor ? accentPillStyle(accentColor, light) : undefined}
+      className={cn(
+        'inline-flex h-7 items-center gap-1.5 rounded-[9px] border px-2.5 text-[10.5px] font-medium',
+        active && !accentColor
+          ? 'cb-accent-pill-active'
+          : !active
             ? light
-              ? 'text-black'
-              : 'text-white'
-            : light
-              ? 'text-black/62'
-              : 'text-white/64',
-        )}
-      >
-        {label}
-      </span>
-    </div>
+              ? 'border-black/[0.08] bg-white text-black/50'
+              : 'border-white/[0.08] bg-white/[0.04] text-white/42'
+            : '',
+        className,
+      )}
+    >
+      {children}
+    </span>
   );
 }
 
-function menuSeparatorClass(light: boolean) {
-  return cn('my-1 h-px', light ? 'bg-black/[0.07]' : 'bg-white/[0.08]');
-}
-
-function getInitials(value: string) {
+function EmptyState({ title, hint, light }: { title: string; hint?: string; light: boolean }) {
   return (
-    value
-      .trim()
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase() ?? '')
-      .join('') || 'S'
+    <Panel light={light} className="grid min-h-[180px] place-items-center p-6 text-center">
+      <div>
+        <div className={cn('text-[14px] font-semibold', pageText(light))}>{title}</div>
+        {hint ? <div className={cn('mx-auto mt-2 max-w-[320px] text-[11.5px] leading-5', mutedText(light))}>{hint}</div> : null}
+      </div>
+    </Panel>
   );
-}
-
-function formatTimeLabel(value: string, locale: 'ru' | 'en') {
-  return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value));
-}
-
-function formatDateLabel(value: string, locale: 'ru' | 'en') {
-  return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
-    day: 'numeric',
-    month: 'short',
-  }).format(new Date(value));
-}
-
-function formatLongDateLabel(value: string, locale: 'ru' | 'en') {
-  return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
-    day: 'numeric',
-    month: 'long',
-    weekday: 'short',
-  }).format(new Date(value));
 }
 
 function toLocalIsoDate(date: Date) {
@@ -488,20 +191,54 @@ function addDaysIso(offset: number) {
   return toLocalIsoDate(date);
 }
 
-function formatPickerDateLabel(value: string, locale: 'ru' | 'en') {
-  const normalized = value.slice(0, 10);
-
-  return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
-    day: 'numeric',
-    month: 'long',
-  }).format(new Date(`${normalized}T00:00:00`));
+function formatTimeLabel(value: string, locale: 'ru' | 'en') {
+  try {
+    return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(value));
+  } catch {
+    return value.slice(11, 16);
+  }
 }
 
-const TIME_OPTIONS = Array.from({ length: 24 }, (_, index) => {
-  const hour = 9 + Math.floor(index / 2);
-  const minute = index % 2 === 0 ? '00' : '30';
-  return `${String(hour).padStart(2, '0')}:${minute}`;
-});
+function formatDateLabel(value: string, locale: 'ru' | 'en') {
+  const normalized = value.includes('T') ? value : `${value.slice(0, 10)}T12:00:00`;
+
+  try {
+    return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
+      day: 'numeric',
+      month: 'short',
+    }).format(new Date(normalized));
+  } catch {
+    return value.slice(0, 10);
+  }
+}
+
+function formatLongDateLabel(value: string, locale: 'ru' | 'en') {
+  const normalized = value.includes('T') ? value : `${value.slice(0, 10)}T12:00:00`;
+
+  try {
+    return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
+      day: 'numeric',
+      month: 'long',
+      weekday: 'short',
+    }).format(new Date(normalized));
+  } catch {
+    return value.slice(0, 10);
+  }
+}
+
+function getInitials(value: string) {
+  return (
+    value
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? '')
+      .join('') || 'CB'
+  );
+}
 
 function deliveryLabel(value: ChatDeliveryState | null | undefined, locale: 'ru' | 'en') {
   if (!value) return null;
@@ -513,7 +250,7 @@ function deliveryLabel(value: ChatDeliveryState | null | undefined, locale: 'ru'
           sent: 'Отправлено',
           delivered: 'Доставлено',
           read: 'Прочитано',
-          failed: 'Не доставлено',
+          failed: 'Ошибка',
         }
       : {
           queued: 'Queued',
@@ -526,69 +263,78 @@ function deliveryLabel(value: ChatDeliveryState | null | undefined, locale: 'ru'
   return labels[value];
 }
 
-function buildBotDraft(
-  flow: BotFlow,
-  thread: ChatThreadRecord,
-  locale: 'ru' | 'en',
-  nextVisit?: string,
-) {
-  if (flow === 'confirm') {
-    return locale === 'ru'
-      ? `Здравствуйте, ${thread.clientName}! Отправляю детали вашей записи. Если планы поменяются, просто ответьте в этот чат.`
-      : `Hi ${thread.clientName}! Here are your booking details. If anything changes, just reply in this chat.`;
-  }
-
-  if (flow === 'reschedule') {
-    return locale === 'ru'
-      ? `Здравствуйте, ${thread.clientName}!\n\nПредлагаю перенести запись на ${nextVisit ?? 'новое время'}.\n\nЕсли время подходит — нажмите «Подтвердить перенос». Если нет — нажмите «Не подходит».`
-      : `Hi ${thread.clientName}!\n\nI suggest rescheduling to ${nextVisit ?? 'a new time'}.\n\nPress “Confirm reschedule” if it works, or “Doesn’t work” if it does not.`;
-  }
-
-  return locale === 'ru'
-    ? `Спасибо за визит, ${thread.clientName}! Когда будете готовы, я пришлю ближайшие удобные слоты прямо сюда.`
-    : `Thanks for visiting, ${thread.clientName}! When you are ready, I can send the nearest convenient slots here.`;
+function channelLabel(value: ChatThreadRecord['channel'], locale: 'ru' | 'en') {
+  if (locale !== 'ru') return value;
+  if (value === 'Telegram') return 'ТГ';
+  if (value === 'Instagram') return 'Инстаграм';
+  if (value === 'VK') return 'ВК';
+  return value;
 }
 
-function fillTemplateContent(
-  content: string,
-  thread: ChatThreadRecord | null,
-  locale: 'ru' | 'en',
-  publicHref: string,
-) {
-  if (!thread) return content;
+function segmentLabel(value: ChatThreadRecord['segment'], locale: 'ru' | 'en') {
+  if (locale === 'ru') {
+    if (value === 'new') return 'Новый';
+    if (value === 'active') return 'В работе';
+    return 'Повтор';
+  }
 
-  const fallbackDate = locale === 'ru' ? 'ближайшую дату' : 'the next date';
-  const fallbackTime = locale === 'ru' ? 'удобное время' : 'a convenient time';
-  const fallbackService = locale === 'ru' ? 'визит' : 'appointment';
+  if (value === 'new') return 'New';
+  if (value === 'active') return 'Active';
+  return 'Repeat';
+}
 
-  const rawService =
-    thread.metadata && typeof thread.metadata['service'] === 'string'
-      ? String(thread.metadata['service'])
-      : null;
+function createLocalMessage(threadId: string, body: string, author: 'master' | 'system', viaBot: boolean): ChatMessageRecord {
+  const now = new Date().toISOString();
 
-  const rawNextVisit = thread.nextVisit ?? null;
-  const normalizedNextVisit = rawNextVisit
-    ? rawNextVisit.includes('T')
-      ? rawNextVisit
-      : rawNextVisit.includes(' ')
-        ? rawNextVisit.replace(' ', 'T')
-        : `${rawNextVisit}T12:00:00`
-    : null;
+  return {
+    id: `local-${crypto.randomUUID()}`,
+    threadId,
+    author,
+    body,
+    viaBot,
+    deliveryState: 'sent',
+    createdAt: now,
+    metadata: { optimistic: true },
+  };
+}
 
-  const visitDateLabel = normalizedNextVisit
-    ? formatDateLabel(normalizedNextVisit, locale)
-    : fallbackDate;
+function createLocalThread(locale: 'ru' | 'en', clientName: string, clientPhone: string): ChatThreadRecord {
+  const now = new Date().toISOString();
 
-  const visitTimeLabel = normalizedNextVisit
-    ? formatTimeLabel(normalizedNextVisit, locale)
-    : fallbackTime;
+  return {
+    id: crypto.randomUUID(),
+    workspaceId: 'local-workspace',
+    clientName,
+    clientPhone,
+    channel: 'Telegram',
+    segment: 'new',
+    source: locale === 'ru' ? 'Ручное добавление' : 'Manual add',
+    nextVisit: null,
+    isPriority: false,
+    botConnected: true,
+    lastMessagePreview: locale === 'ru' ? 'Новый чат создан вручную.' : 'New chat created manually.',
+    lastMessageAt: now,
+    unreadCount: 0,
+    createdAt: now,
+    updatedAt: now,
+    messages: [],
+  };
+}
 
-  return content
-    .replaceAll('{{имя}}', thread.clientName)
-    .replaceAll('{{дата}}', visitDateLabel)
-    .replaceAll('{{время}}', visitTimeLabel)
-    .replaceAll('{{услуга}}', rawService ?? fallbackService)
-    .replaceAll('{{ссылка}}', publicHref);
+function sortThreads(items: ChatThreadRecord[], sortMode: SortMode, pinnedIds: string[]) {
+  const pinnedSet = new Set(pinnedIds);
+
+  return [...items].sort((left, right) => {
+    const leftPinned = pinnedSet.has(left.id);
+    const rightPinned = pinnedSet.has(right.id);
+
+    if (leftPinned !== rightPinned) return leftPinned ? -1 : 1;
+
+    if (sortMode === 'priority' && left.isPriority !== right.isPriority) return left.isPriority ? -1 : 1;
+    if (sortMode === 'unread' && left.unreadCount !== right.unreadCount) return right.unreadCount - left.unreadCount;
+
+    return new Date(right.lastMessageAt).getTime() - new Date(left.lastMessageAt).getTime();
+  });
 }
 
 function getThreadServices(thread: ChatThreadRecord | null) {
@@ -606,47 +352,30 @@ function getThreadServices(thread: ChatThreadRecord | null) {
   return [] as string[];
 }
 
-function getThreadContextLine(thread: ChatThreadRecord | null, locale: 'ru' | 'en') {
-  if (!thread) return null;
-
+function getThreadServiceLabel(thread: ChatThreadRecord | null) {
   const services = getThreadServices(thread);
-  const service = services.length > 1
-    ? `${services[0]} +${services.length - 1}`
-    : services[0] ?? null;
-  const date = typeof thread.metadata?.bookingDate === 'string'
-    ? thread.metadata.bookingDate
-    : thread.nextVisit ?? null;
-  const time = typeof thread.metadata?.bookingTime === 'string'
-    ? thread.metadata.bookingTime
-    : null;
-  const master = typeof thread.metadata?.masterName === 'string'
-    ? thread.metadata.masterName
-    : null;
-  const code = typeof thread.metadata?.bookingCode === 'string'
-    ? thread.metadata.bookingCode
-    : null;
-
-  const dateLabel = date ? formatDateLabel(date, locale) : null;
-
-  return [code, service, dateLabel && time ? `${dateLabel} · ${time}` : dateLabel, master].filter(Boolean).join(' · ') || null;
-}
-
-function getThreadClientKey(thread: ChatThreadRecord | null) {
-  if (!thread) return '';
-  const phone = thread.clientPhone.replace(/\D+/g, '');
-  return phone || thread.clientName.trim().toLowerCase();
+  if (!services.length) return null;
+  return services.length > 1 ? `${services[0]} +${services.length - 1}` : services[0];
 }
 
 function getThreadBookingCode(thread: ChatThreadRecord | null) {
   return typeof thread?.metadata?.bookingCode === 'string' ? thread.metadata.bookingCode : null;
 }
 
-function getThreadServiceLabel(thread: ChatThreadRecord | null) {
-  const services = getThreadServices(thread);
-  if (services.length === 0) return null;
-  return services.length > 1 ? `${services[0]} +${services.length - 1}` : services[0];
-}
+function getThreadContextLine(thread: ChatThreadRecord | null, locale: 'ru' | 'en') {
+  if (!thread) return null;
 
+  const service = getThreadServiceLabel(thread);
+  const date =
+    typeof thread.metadata?.bookingDate === 'string'
+      ? thread.metadata.bookingDate
+      : thread.nextVisit ?? null;
+  const time = typeof thread.metadata?.bookingTime === 'string' ? thread.metadata.bookingTime : null;
+  const code = getThreadBookingCode(thread);
+  const dateLabel = date ? formatDateLabel(date, locale) : null;
+
+  return [code, service, dateLabel && time ? `${dateLabel} · ${time}` : dateLabel].filter(Boolean).join(' · ') || null;
+}
 
 type ThreadBookingContext = {
   id: string;
@@ -655,7 +384,6 @@ type ThreadBookingContext = {
   services?: string[];
   date?: string | null;
   time?: string | null;
-  masterName?: string | null;
 };
 
 function getThreadBookingContexts(thread: ChatThreadRecord | null) {
@@ -667,9 +395,11 @@ function getThreadBookingContexts(thread: ChatThreadRecord | null) {
   if (Array.isArray(raw)) {
     raw.forEach((item) => {
       if (!item || typeof item !== 'object') return;
+
       const row = item as Record<string, unknown>;
       const id = typeof row.id === 'string' ? row.id : typeof row.bookingId === 'string' ? row.bookingId : '';
       if (!id) return;
+
       contexts.push({
         id,
         code: typeof row.code === 'string' ? row.code : typeof row.bookingCode === 'string' ? row.bookingCode : null,
@@ -681,7 +411,6 @@ function getThreadBookingContexts(thread: ChatThreadRecord | null) {
             : [],
         date: typeof row.date === 'string' ? row.date : typeof row.bookingDate === 'string' ? row.bookingDate : null,
         time: typeof row.time === 'string' ? row.time : typeof row.bookingTime === 'string' ? row.bookingTime : null,
-        masterName: typeof row.masterName === 'string' ? row.masterName : null,
       });
     });
   }
@@ -696,7 +425,6 @@ function getThreadBookingContexts(thread: ChatThreadRecord | null) {
       services,
       date: typeof thread.metadata.bookingDate === 'string' ? thread.metadata.bookingDate : thread.nextVisit ?? null,
       time: typeof thread.metadata.bookingTime === 'string' ? thread.metadata.bookingTime : null,
-      masterName: typeof thread.metadata.masterName === 'string' ? thread.metadata.masterName : null,
     });
   }
 
@@ -704,618 +432,48 @@ function getThreadBookingContexts(thread: ChatThreadRecord | null) {
 }
 
 function getBookingContextLabel(context: ThreadBookingContext, locale: 'ru' | 'en') {
-  const firstService = context.services?.[0] || context.service || (locale === 'ru' ? 'запись' : 'booking');
-  const serviceLabel = context.services && context.services.length > 1 ? `${firstService} +${context.services.length - 1}` : firstService;
+  const service = context.services?.[0] || context.service || (locale === 'ru' ? 'запись' : 'booking');
+  const serviceLabel = context.services && context.services.length > 1 ? `${service} +${context.services.length - 1}` : service;
   const dateLabel = context.date ? formatDateLabel(context.date, locale) : null;
-  const timeLabel = context.time ?? null;
-  return [context.code, serviceLabel, dateLabel && timeLabel ? `${dateLabel} · ${timeLabel}` : dateLabel].filter(Boolean).join(' · ');
+  return [context.code, serviceLabel, dateLabel && context.time ? `${dateLabel} · ${context.time}` : dateLabel].filter(Boolean).join(' · ');
 }
 
-function getBookingContextShortLabel(context: ThreadBookingContext, locale: 'ru' | 'en') {
-  const firstService = context.services?.[0] || context.service || (locale === 'ru' ? 'запись' : 'booking');
-  const serviceLabel = context.services && context.services.length > 1 ? `${firstService} +${context.services.length - 1}` : firstService;
-  const dateLabel = context.date ? formatDateLabel(context.date, locale) : null;
-  return [context.code ?? 'CB', serviceLabel, dateLabel].filter(Boolean).join(' · ');
-}
-
-
-function sortThreads(
-  items: ChatThreadRecord[],
-  sortMode: SortMode,
-  pinnedThreadIds: string[] = [],
-) {
-  const next = [...items];
-  const pinnedSet = new Set(pinnedThreadIds);
-
-  next.sort((left, right) => {
-    const leftPinned = pinnedSet.has(left.id);
-    const rightPinned = pinnedSet.has(right.id);
-
-    if (leftPinned !== rightPinned) {
-      return leftPinned ? -1 : 1;
-    }
-
-    if (sortMode === 'manual') return 0;
-
-    if (sortMode === 'priority' && left.isPriority !== right.isPriority) {
-      return left.isPriority ? -1 : 1;
-    }
-
-    if (sortMode === 'unread' && left.unreadCount !== right.unreadCount) {
-      return right.unreadCount - left.unreadCount;
-    }
-
-    return new Date(right.lastMessageAt).getTime() - new Date(left.lastMessageAt).getTime();
-  });
-
-  return next;
-}
-
-function replaceThread(
-  items: ChatThreadRecord[],
-  threadId: string,
-  updater: (thread: ChatThreadRecord) => ChatThreadRecord,
-) {
-  return items.map((item) => (item.id === threadId ? updater(item) : item));
-}
-
-function createLocalMessage(
-  threadId: string,
-  body: string,
-  author: 'master' | 'system',
-  viaBot: boolean,
-): ChatMessageRecord {
-  const now = new Date().toISOString();
-
-  return {
-    id: `local-${crypto.randomUUID()}`,
-    threadId,
-    author,
-    body,
-    viaBot,
-    deliveryState: author === 'master' || author === 'system' ? 'sent' : null,
-    createdAt: now,
-    metadata: { optimistic: true },
-  };
-}
-
-
-function chatThreadMetaString(value: unknown) {
-  if (typeof value === 'number' && Number.isFinite(value)) return String(Math.trunc(value));
-  if (typeof value === 'string' && value.trim()) return value.trim();
-  return '';
-}
-
-function normalizedClientNameForMerge(value?: string | null) {
-  return String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
-}
-
-function threadClientMergeKeys(thread: ChatThreadRecord) {
-  const keys = new Set<string>();
-  const phone = thread.clientPhone.replace(/\D+/g, '');
-  const name = normalizedClientNameForMerge(thread.clientName);
-  const telegramChatId = chatThreadMetaString(thread.metadata?.clientTelegramChatId);
-  const vkPeerId = chatThreadMetaString(thread.metadata?.clientVkPeerId);
-  const vkUserId = chatThreadMetaString(thread.metadata?.clientVkUserId);
-
-  if (phone) keys.add(`phone:${phone}`);
-  if (telegramChatId) keys.add(`tg:${telegramChatId}`);
-  if (vkPeerId) keys.add(`vkpeer:${vkPeerId}`);
-  if (vkUserId) keys.add(`vk:${vkUserId}`);
-  if (name) keys.add(`name:${name}`);
-
-  return Array.from(keys);
-}
-
-function mergeBookingContextsForUi(contexts: ThreadBookingContext[]) {
-  const map = new Map<string, ThreadBookingContext>();
-
-  contexts.forEach((context) => {
-    if (!context.id) return;
-    const current = map.get(context.id);
-    const services = Array.from(new Set([...(current?.services ?? []), ...(context.services ?? []), context.service ?? ''].filter(Boolean)));
-    map.set(context.id, { ...(current ?? {}), ...context, services });
-  });
-
-  return Array.from(map.values()).sort((left, right) => `${right.date ?? ''} ${right.time ?? ''}`.localeCompare(`${left.date ?? ''} ${left.time ?? ''}`));
-}
-
-function mergeThreadsByClientForUi(items: ChatThreadRecord[]) {
-  const groups: ChatThreadRecord[][] = [];
-  const keyToGroupIndex = new Map<string, number>();
-
-  items.forEach((thread) => {
-    const keys = threadClientMergeKeys(thread);
-    if (keys.length === 0) {
-      groups.push([thread]);
-      return;
-    }
-
-    const indexes = Array.from(new Set(keys.map((key) => keyToGroupIndex.get(key)).filter((index): index is number => typeof index === 'number')));
-
-    if (indexes.length === 0) {
-      const index = groups.length;
-      groups.push([thread]);
-      keys.forEach((key) => keyToGroupIndex.set(key, index));
-      return;
-    }
-
-    const primaryIndex = indexes[0];
-    groups[primaryIndex].push(thread);
-    keys.forEach((key) => keyToGroupIndex.set(key, primaryIndex));
-  });
-
-  return groups.map((group) => {
-    const sorted = [...group].sort((left, right) => new Date(right.lastMessageAt).getTime() - new Date(left.lastMessageAt).getTime());
-    const primary = sorted[0];
-    const messages = dedupeMessages(sorted.flatMap((thread) => thread.messages ?? []));
-    const lastMessage = messages.at(-1);
-    const contexts = mergeBookingContextsForUi(sorted.flatMap((thread) => getThreadBookingContexts(thread)));
-    const bookingIds = Array.from(new Set([
-      ...sorted.flatMap((thread) => Array.isArray(thread.metadata?.bookingIds) ? thread.metadata.bookingIds.filter((item): item is string => typeof item === 'string') : []),
-      ...contexts.map((context) => context.id),
-      ...sorted.map((thread) => typeof thread.metadata?.bookingId === 'string' ? thread.metadata.bookingId : ''),
-    ].filter(Boolean)));
-
-    const bestPhone = sorted.find((thread) => thread.clientPhone.replace(/\D+/g, ''))?.clientPhone ?? primary.clientPhone;
-    const bestName = sorted.find((thread) => normalizedClientNameForMerge(thread.clientName))?.clientName ?? primary.clientName;
-    const bestChannel = sorted.find((thread) => thread.channel !== 'Web')?.channel ?? primary.channel;
-
-    return {
-      ...primary,
-      clientName: bestName,
-      clientPhone: bestPhone,
-      channel: bestChannel,
-      botConnected: sorted.some((thread) => thread.botConnected),
-      isPriority: sorted.some((thread) => thread.isPriority),
-      unreadCount: sorted.reduce((sum, thread) => sum + (thread.unreadCount ?? 0), 0),
-      lastMessagePreview: lastMessage?.body ?? primary.lastMessagePreview,
-      lastMessageAt: lastMessage?.createdAt ?? primary.lastMessageAt,
-      messages,
-      metadata: {
-        ...(primary.metadata ?? {}),
-        bookingId: typeof primary.metadata?.bookingId === 'string' ? primary.metadata.bookingId : bookingIds[0] ?? undefined,
-        bookingIds,
-        bookingContexts: contexts,
-        mergedThreadIds: sorted.map((thread) => thread.id),
-        clientTelegramChatId: sorted.find((thread) => thread.metadata?.clientTelegramChatId)?.metadata?.clientTelegramChatId ?? primary.metadata?.clientTelegramChatId,
-        clientVkPeerId: sorted.find((thread) => thread.metadata?.clientVkPeerId)?.metadata?.clientVkPeerId ?? primary.metadata?.clientVkPeerId,
-        clientVkUserId: sorted.find((thread) => thread.metadata?.clientVkUserId)?.metadata?.clientVkUserId ?? primary.metadata?.clientVkUserId,
-      },
-    } satisfies ChatThreadRecord;
-  }).sort((left, right) => new Date(right.lastMessageAt).getTime() - new Date(left.lastMessageAt).getTime());
-}
-
-function createLocalThread(
-  locale: 'ru' | 'en',
-  clientName: string,
-  clientPhone: string,
-): ChatThreadRecord {
-  const now = new Date().toISOString();
-
-  return {
-    id: crypto.randomUUID(),
-    workspaceId: 'local-workspace',
-    clientName,
-    clientPhone,
-    channel: 'Telegram',
-    segment: 'new',
-    source: locale === 'ru' ? 'Ручное добавление' : 'Manual add',
-    nextVisit: null,
-    isPriority: false,
-    botConnected: true,
-    lastMessagePreview:
-      locale === 'ru' ? 'Новый чат создан вручную.' : 'New chat created manually.',
-    lastMessageAt: now,
-    unreadCount: 0,
-    createdAt: now,
-    updatedAt: now,
-    messages: [],
-  };
-}
-
-function segmentBadgeLabel(segment: ChatThreadRecord['segment'], locale: 'ru' | 'en') {
-  if (locale === 'ru') {
-    return {
-      new: 'Новый',
-      active: 'В работе',
-      followup: 'Повтор',
-    }[segment] ?? String(segment);
+function buildBotDraft(flow: BotFlow, thread: ChatThreadRecord, locale: 'ru' | 'en', nextVisit?: string) {
+  if (flow === 'confirm') {
+    return locale === 'ru'
+      ? `Здравствуйте, ${thread.clientName}! Отправляю детали вашей записи. Если планы поменяются, просто ответьте в этот чат.`
+      : `Hi ${thread.clientName}! Here are your booking details. If anything changes, just reply in this chat.`;
   }
 
-  return {
-    new: 'New',
-    active: 'Active',
-    followup: 'Repeat',
-  }[segment] ?? String(segment);
+  if (flow === 'reschedule') {
+    return locale === 'ru'
+      ? `Здравствуйте, ${thread.clientName}!\n\nПредлагаю перенести запись на ${nextVisit ?? 'новое время'}.\n\nЕсли время подходит — подтвердите перенос. Если нет — напишите удобный вариант.`
+      : `Hi ${thread.clientName}!\n\nI suggest rescheduling to ${nextVisit ?? 'a new time'}.\n\nIf it works, confirm the reschedule. If not, send a better option.`;
+  }
+
+  return locale === 'ru'
+    ? `Спасибо за визит, ${thread.clientName}! Могу предложить ближайшие удобные окна для следующей записи.`
+    : `Thanks for visiting, ${thread.clientName}! I can offer the nearest convenient slots for your next appointment.`;
 }
 
-function Card({
-  children,
-  light,
-  className,
-}: {
-  children: ReactNode;
-  light: boolean;
-  className?: string;
-}) {
-  return (
-    <section className={cn('rounded-[11px] border', cardTone(light), className)}>
-      {children}
-    </section>
-  );
-}
+function fillTemplateContent(content: string, thread: ChatThreadRecord | null, locale: 'ru' | 'en', publicHref: string) {
+  if (!thread) return content;
 
-function CardTitle({
-  title,
-  description,
-  action,
-  light,
-}: {
-  title: string;
-  description?: string;
-  action?: ReactNode;
-  light: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        'flex min-h-[58px] shrink-0 items-center justify-between gap-4 border-b px-4 py-3',
-        borderTone(light),
-      )}
-    >
-      <div className="min-w-0">
-        <h2 className={cn('truncate text-[13px] font-semibold tracking-[-0.018em]', pageText(light))}>
-          {title}
-        </h2>
+  const service = getThreadServiceLabel(thread) ?? (locale === 'ru' ? 'визит' : 'appointment');
+  const nextVisit = thread.nextVisit;
+  const date = nextVisit ? formatDateLabel(nextVisit, locale) : locale === 'ru' ? 'ближайшую дату' : 'the next date';
+  const time = nextVisit ? formatTimeLabel(nextVisit, locale) : locale === 'ru' ? 'удобное время' : 'a convenient time';
 
-        {description ? (
-          <p className={cn('mt-1 truncate text-[11px]', mutedText(light))}>{description}</p>
-        ) : null}
-      </div>
-
-      {action ? <div className="shrink-0">{action}</div> : null}
-    </div>
-  );
-}
-
-function Panel({
-  children,
-  light,
-  className,
-}: {
-  children: ReactNode;
-  light: boolean;
-  className?: string;
-}) {
-  return <div className={cn('rounded-[10px] border', insetTone(light), className)}>{children}</div>;
-}
-
-function MicroLabel({
-  children,
-  light,
-  active,
-  className,
-}: {
-  children: ReactNode;
-  light: boolean;
-  active?: boolean;
-  className?: string;
-}) {
-  return (
-    <span
-      className={cn(
-        'inline-flex h-7 items-center gap-1.5 rounded-[9px] border px-2.5 text-[10.5px] font-medium',
-        active
-          ? 'cb-accent-pill-active'
-          : light
-            ? 'border-black/[0.08] bg-white text-black/50'
-            : 'border-white/[0.08] bg-white/[0.04] text-white/42',
-        className,
-      )}
-    >
-      {children}
-    </span>
-  );
-}
-
-function ControlGroup({
-  children,
-  light,
-  className,
-}: {
-  children: ReactNode;
-  light: boolean;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        'inline-flex max-w-full shrink-0 items-center overflow-hidden rounded-[12px] border p-0',
-        light
-          ? 'border-black/[0.08] bg-white'
-          : 'border-white/[0.08] bg-white/[0.045]',
-        className,
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
-function FilterChip({
-  label,
-  active,
-  onClick,
-  light,
-  accentColor,
-  className,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-  light: boolean;
-  accentColor: string;
-  className?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'group relative inline-flex h-10 min-w-[64px] shrink-0 items-center justify-center border-r px-3 text-[11px] font-semibold tracking-[-0.015em] transition-colors duration-150 last:border-r-0 active:scale-[0.985]',
-        light ? 'border-black/[0.07]' : 'border-white/[0.07]',
-        active
-          ? light
-            ? 'text-black'
-            : 'text-white'
-          : light
-            ? 'text-black/40 hover:text-black/70'
-            : 'text-white/36 hover:text-white/70',
-        className,
-      )}
-    >
-      <span className="relative z-10 truncate">{label}</span>
-
-      <span
-        style={active ? { background: accentColor } : undefined}
-        className={cn(
-          'absolute bottom-1.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full transition-all duration-200',
-          active
-            ? 'opacity-100'
-            : light
-              ? 'bg-black/0 opacity-0 group-hover:bg-black/18 group-hover:opacity-100'
-              : 'bg-white/0 opacity-0 group-hover:bg-white/18 group-hover:opacity-100',
-        )}
-      />
-    </button>
-  );
-}
-
-function EmptyState({
-  text,
-  hint,
-  light,
-}: {
-  text: string;
-  hint?: string;
-  light: boolean;
-}) {
-  return (
-    <Panel light={light} className="px-4 py-5">
-      <div className={cn('text-[12px] font-semibold', pageText(light))}>{text}</div>
-      {hint ? <div className={cn('mt-1 text-[11px] leading-5', mutedText(light))}>{hint}</div> : null}
-    </Panel>
-  );
-}
-
-function GlassMenuItem({
-  label,
-  icon,
-  active,
-  danger,
-  light,
-  accentColor,
-  onClick,
-}: {
-  label: string;
-  icon?: ReactNode;
-  active?: boolean;
-  danger?: boolean;
-  light: boolean;
-  accentColor: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={glassMenuItemClass(light, Boolean(active), Boolean(danger))}
-      onClick={onClick}
-    >
-      <span className="flex min-w-0 flex-1 items-center gap-2">
-        {icon ? (
-          <span
-            className={cn(
-              'flex size-5 shrink-0 items-center justify-center',
-              danger
-                ? light
-                  ? 'text-red-500'
-                  : 'text-red-300'
-                : light
-                  ? 'text-black/42'
-                  : 'text-white/42',
-            )}
-          >
-            {icon}
-          </span>
-        ) : null}
-
-        <span className="min-w-0 truncate text-current">{label}</span>
-      </span>
-
-      <span className="ml-auto flex size-5 shrink-0 items-center justify-center">
-        {active ? <Check className="size-3.5" style={{ color: danger ? undefined : accentColor }} /> : null}
-      </span>
-    </button>
-  );
-}
-
-function ThreadContextMenu({
-  menu,
-  thread,
-  light,
-  accentColor,
-  labels,
-  onClose,
-  onToggleBot,
-  onTogglePin,
-  onTogglePriority,
-  onExport,
-  onDelete,
-}: {
-  menu: ThreadContextMenuState | null;
-  thread: (ChatThreadRecord & { __pinned?: boolean }) | null;
-  light: boolean;
-  accentColor: string;
-  labels: {
-    botConnected: string;
-    botOff: string;
-    priorityOn: string;
-    priorityOff: string;
-    pinThread: string;
-    unpinThread: string;
-    export: string;
-    deleteChat: string;
-  };
-  onClose: () => void;
-  onToggleBot: () => void;
-  onTogglePin: () => void;
-  onTogglePriority: () => void;
-  onExport: () => void;
-  onDelete: () => void;
-}) {
-  useEffect(() => {
-    if (!menu) return;
-
-    const close = () => onClose();
-
-    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    window.addEventListener('pointerdown', close);
-    window.addEventListener('scroll', close, true);
-    window.addEventListener('resize', close);
-    window.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      window.removeEventListener('pointerdown', close);
-      window.removeEventListener('scroll', close, true);
-      window.removeEventListener('resize', close);
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [menu, onClose]);
-
-  if (!menu || !thread || typeof document === 'undefined') return null;
-
-  const width = 260;
-  const left =
-    typeof window !== 'undefined'
-      ? Math.min(menu.x, window.innerWidth - width - 12)
-      : menu.x;
-  const top =
-    typeof window !== 'undefined'
-      ? Math.min(menu.y, window.innerHeight - 274)
-      : menu.y;
-
-  const pinned = Boolean(thread.__pinned);
-
-  return createPortal(
-    <div
-      className="fixed z-[140]"
-      style={{ left, top, width }}
-      onPointerDown={(event) => event.stopPropagation()}
-      onContextMenu={(event) => event.preventDefault()}
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.98, y: -3 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.12, ease: [0.22, 1, 0.36, 1] }}
-        className={glassMenuContentClass(light)}
-        style={glassMenuSurfaceStyle(light, accentColor)}
-      >
-        <GlassMenuItem
-          light={light}
-          accentColor={accentColor}
-          label={thread.botConnected ? labels.botConnected : labels.botOff}
-          icon={<Bot className="size-3.5" />}
-          active={thread.botConnected}
-          onClick={() => {
-            onToggleBot();
-            onClose();
-          }}
-        />
-
-        <GlassMenuItem
-          light={light}
-          accentColor={accentColor}
-          label={pinned ? labels.unpinThread : labels.pinThread}
-          icon={<Pin className={cn('size-3.5', pinned && 'fill-current')} />}
-          active={pinned}
-          onClick={() => {
-            onTogglePin();
-            onClose();
-          }}
-        />
-
-        <GlassMenuItem
-          light={light}
-          accentColor={accentColor}
-          label={thread.isPriority ? labels.priorityOn : labels.priorityOff}
-          icon={<Star className={cn('size-3.5', thread.isPriority && 'fill-current')} />}
-          active={thread.isPriority}
-          onClick={() => {
-            onTogglePriority();
-            onClose();
-          }}
-        />
-
-        <GlassMenuItem
-          light={light}
-          accentColor={accentColor}
-          label={labels.export}
-          icon={<Download className="size-3.5" />}
-          onClick={() => {
-            onExport();
-            onClose();
-          }}
-        />
-
-        <div className={menuSeparatorClass(light)} />
-
-        <GlassMenuItem
-          light={light}
-          accentColor={accentColor}
-          label={labels.deleteChat}
-          icon={<Trash2 className="size-3.5" />}
-          danger
-          onClick={() => {
-            onDelete();
-            onClose();
-          }}
-        />
-      </motion.div>
-    </div>,
-    document.body,
-  );
+  return content
+    .replaceAll('{{имя}}', thread.clientName)
+    .replaceAll('{{дата}}', date)
+    .replaceAll('{{время}}', time)
+    .replaceAll('{{услуга}}', service)
+    .replaceAll('{{ссылка}}', publicHref);
 }
 
 export default function DashboardChatsPage() {
-  const { hasHydrated, ownedProfile, locale, dataset, demoMode: demoModeFromHook } =
-    useOwnedWorkspaceData();
-
+  const { hasHydrated, ownedProfile, locale, dataset, demoMode: demoModeFromHook } = useOwnedWorkspaceData();
   const { resolvedTheme } = useTheme();
   const { settings } = useAppearance();
   const searchParams = useBrowserSearchParams();
@@ -1323,8 +481,6 @@ export default function DashboardChatsPage() {
 
   const [mounted, setMounted] = useState(false);
   const demoMode = demoModeFromHook || isDashboardDemoEnabled(searchParams);
-  const targetBookingId = searchParams.get('bookingId');
-  const targetThreadId = searchParams.get('threadId');
   const demoStorageKey = getDashboardDemoStorageKey('chats');
   const pinnedStorageKey = `${demoStorageKey}:pinned`;
 
@@ -1338,41 +494,30 @@ export default function DashboardChatsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
-  const [selectedBookingByThreadId, setSelectedBookingByThreadId] = useState<Record<string, string>>({});
+  const [mobileThreadOpen, setMobileThreadOpen] = useState(false);
+
+  const [query, setQuery] = useState('');
   const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>('all');
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>('all');
   const [sortMode, setSortMode] = useState<SortMode>('recent');
-  const [query, setQuery] = useState('');
-  const [draft, setDraft] = useState('');
-  const [selectedTemplateId, setSelectedTemplateId] = useState('custom');
+
   const [showCreatePanel, setShowCreatePanel] = useState(false);
   const [newClientName, setNewClientName] = useState('');
   const [newClientPhone, setNewClientPhone] = useState('');
+
+  const [draft, setDraft] = useState('');
+  const [selectedTemplateId, setSelectedTemplateId] = useState('custom');
   const [composerFlow, setComposerFlow] = useState<BotFlow | null>(null);
   const [transferDate, setTransferDate] = useState('');
   const [transferTime, setTransferTime] = useState('12:30');
   const [isSending, setIsSending] = useState(false);
-  const [mobileThreadOpen, setMobileThreadOpen] = useState(false);
-  const [pinnedThreadIds, setPinnedThreadIds] = useState<string[]>([]);
-  const [pinStateHydrated, setPinStateHydrated] = useState(false);
-  const [threadContextMenu, setThreadContextMenu] = useState<ThreadContextMenuState | null>(null);
-  const [dragState, setDragState] = useState<ThreadDragState | null>(null);
-  const [dropIndex, setDropIndex] = useState<number | null>(null);
 
-  const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const suppressCardClickRef = useRef(false);
-  const dragOffsetX = useMotionValue(0);
-  const dragOffsetY = useMotionValue(0);
-  const dragSpringX = useSpring(dragOffsetX, { stiffness: 820, damping: 54, mass: 0.52 });
-  const dragSpringY = useSpring(dragOffsetY, { stiffness: 820, damping: 54, mass: 0.52 });
-  const dragFrameRef = useRef<number | null>(null);
-  const dragOffsetRef = useRef(0);
-  const dragOverIndexRef = useRef<number | null>(null);
-  const dragThresholdRef = useRef(6);
-  const threadsRefreshInFlightRef = useRef(false);
+  const [pinnedThreadIds, setPinnedThreadIds] = useState<string[]>([]);
+  const [selectedBookingByThreadId, setSelectedBookingByThreadId] = useState<Record<string, string>>({});
+
+  const messageBottomRef = useRef<HTMLDivElement | null>(null);
   const desktopMessageScrollRef = useRef<HTMLDivElement | null>(null);
   const mobileMessageScrollRef = useRef<HTMLDivElement | null>(null);
-  const messageBottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -1382,334 +527,189 @@ export default function DashboardChatsPage() {
   const isLight = currentTheme === 'light';
   const accentColor = accentPalette[settings.accentTone].solid;
 
-  const labels =
+  const copy =
     locale === 'ru'
       ? {
           title: 'Чаты',
-          description:
-            'Входящие, быстрые ответы, переносы и ассистент в одном спокойном рабочем экране.',
-          workspaceTitle: 'Диалоги',
-          workspaceDescription:
-            'Список чатов, переписка, шаблоны и сценарии собраны в одном рабочем блоке.',
-          search: 'Поиск по имени, номеру или тексту',
-          allThreads: 'Все',
-          newThreads: 'Новые',
-          activeThreads: 'В работе',
-          followupThreads: 'Повтор',
-          allChannels: 'Канал',
-          recentSort: 'Новые',
-          prioritySort: 'Приоритет',
-          unreadSort: 'Непрочит.',
+          description: 'Новый чистый inbox: клиенты, переписка, шаблоны и быстрые действия.',
+          search: 'Поиск',
+          all: 'Все',
+          new: 'Новые',
+          active: 'В работе',
+          followup: 'Повтор',
+          channel: 'Канал',
+          recent: 'Новые',
+          unread: 'Непрочит.',
+          priority: 'Приоритет',
           demo: 'Демо',
           live: 'Рабочие',
           createThread: 'Новый чат',
-          createInline: 'Новый клиент',
+          createClient: 'Новый клиент',
           clientName: 'Имя клиента',
           clientPhone: 'Телефон',
           cancel: 'Отмена',
           create: 'Создать',
-          botConnected: 'Бот включён',
+          emptyList: 'Чаты не найдены',
+          emptyListHint: 'Измените фильтр или создайте новый чат.',
+          emptyThread: 'Выберите диалог',
+          emptyThreadHint: 'Слева список клиентов. Справа откроется переписка и действия.',
+          noMessages: 'История пока пустая',
+          noMessagesHint: 'Напишите первое сообщение или используйте быстрый сценарий.',
+          template: 'Шаблон',
+          message: 'Сообщение клиенту…',
+          clear: 'Очистить',
+          send: 'Отправить',
+          confirm: 'Детали',
+          reschedule: 'Перенос',
+          followupAction: 'Повтор',
+          date: 'Дата',
+          time: 'Время',
+          applyTransfer: 'Подготовить',
+          botOn: 'Бот включён',
           botOff: 'Бот выключен',
-          priorityOn: 'В приоритете',
+          pin: 'Закрепить',
+          unpin: 'Открепить',
+          priorityOn: 'Приоритет',
           priorityOff: 'Обычный',
-          pinThread: 'Закрепить',
-          unpinThread: 'Открепить',
-          pinned: 'Закреплён',
-          dragThread: 'Перетащить чат',
-          dropHere: 'Отпустите, чтобы вставить',
-          dropEnd: 'Отпустите, чтобы перенести в конец',
+          export: 'Экспорт',
+          delete: 'Удалить',
+          call: 'Позвонить',
+          openProfile: 'Профиль',
           source: 'Источник',
           nextVisit: 'Следующий визит',
           notScheduled: 'Не назначен',
-          emptyList: 'Чаты по этому фильтру пока не найдены.',
-          emptyListHint: 'Попробуйте другой фильтр или добавьте новый чат.',
-          emptyThread: 'Выберите чат',
-          emptyThreadHint: 'Откройте диалог, чтобы ответить клиенту.',
-          emptyHistory: 'История пока пустая',
-          emptyHistoryHint: 'Напишите первое сообщение или используйте быстрый сценарий ниже.',
-          template: 'Шаблон',
-          messagePlaceholder: 'Сообщение клиенту…',
-          clear: 'Очистить',
-          send: 'Отправить',
-          export: 'Экспорт',
-          deleteChat: 'Удалить чат',
-          moreActions: 'Ещё',
-          confirm: 'Детали записи',
-          reschedule: 'Перенос',
-          followup: 'Повторный контакт',
-          date: 'Дата',
-          time: 'Время',
-          applyTransfer: 'Подготовить перенос',
-          addClientError: 'Нужно заполнить имя и телефон.',
           loadError: 'Не удалось загрузить чаты.',
           sendError: 'Не удалось отправить сообщение.',
-          byBot: 'через бот КликБук',
-          unread: 'Непрочитано',
-          openThread: 'Открыть чат',
-          closeCreate: 'Скрыть',
-          assistant: 'Ассистент',
-          nextStep: 'Следующий шаг',
-          quickScenarios: 'Быстрые сценарии',
-          quickReschedule: 'Быстрый перенос',
-          clientCard: 'Карточка клиента',
-          newSlot: 'Новый слот',
-          sort: 'Сортировка',
-          filters: 'Фильтры',
-          details: 'Детали',
-          rescheduleAlert: 'Клиент хочет перенос',
-          rescheduleAlertText: 'Слот освобождён. Подберите новое время и ответьте клиенту в этом чате.',
-          rescheduleAlertShort: 'Перенос',
+          addClientError: 'Нужно заполнить имя и телефон.',
+          byBot: 'бот',
         }
       : {
           title: 'Chats',
-          description: 'Inbox, quick replies, reschedules, and assistant actions in one calm workspace.',
-          workspaceTitle: 'Dialogues',
-          workspaceDescription:
-            'Thread list, replies, templates, and scenarios live in one workspace.',
-          search: 'Search by name, phone, or message',
-          allThreads: 'All',
-          newThreads: 'New',
-          activeThreads: 'Active',
-          followupThreads: 'Repeat',
-          allChannels: 'Channel',
-          recentSort: 'Newest',
-          prioritySort: 'Priority',
-          unreadSort: 'Unread',
+          description: 'A clean inbox: clients, messages, templates, and quick actions.',
+          search: 'Search',
+          all: 'All',
+          new: 'New',
+          active: 'Active',
+          followup: 'Repeat',
+          channel: 'Channel',
+          recent: 'Newest',
+          unread: 'Unread',
+          priority: 'Priority',
           demo: 'Demo',
           live: 'Live',
           createThread: 'New chat',
-          createInline: 'New client',
+          createClient: 'New client',
           clientName: 'Client name',
           clientPhone: 'Phone',
           cancel: 'Cancel',
           create: 'Create',
-          botConnected: 'Bot on',
+          emptyList: 'No chats found',
+          emptyListHint: 'Change filters or create a new chat.',
+          emptyThread: 'Choose a dialogue',
+          emptyThreadHint: 'Clients are on the left. Messages and actions open on the right.',
+          noMessages: 'No history yet',
+          noMessagesHint: 'Write the first message or use a quick scenario.',
+          template: 'Template',
+          message: 'Message to the client…',
+          clear: 'Clear',
+          send: 'Send',
+          confirm: 'Details',
+          reschedule: 'Reschedule',
+          followupAction: 'Follow-up',
+          date: 'Date',
+          time: 'Time',
+          applyTransfer: 'Prepare',
+          botOn: 'Bot on',
           botOff: 'Bot off',
+          pin: 'Pin',
+          unpin: 'Unpin',
           priorityOn: 'Priority',
           priorityOff: 'Standard',
-          pinThread: 'Pin',
-          unpinThread: 'Unpin',
-          pinned: 'Pinned',
-          dragThread: 'Drag chat',
-          dropHere: 'Release to place',
-          dropEnd: 'Drop to move to the end',
+          export: 'Export',
+          delete: 'Delete',
+          call: 'Call',
+          openProfile: 'Profile',
           source: 'Source',
           nextVisit: 'Next visit',
           notScheduled: 'Not scheduled',
-          emptyList: 'No chats match this filter yet.',
-          emptyListHint: 'Try another filter or add a new chat.',
-          emptyThread: 'Choose a chat',
-          emptyThreadHint: 'Open a thread to reply.',
-          emptyHistory: 'No messages yet',
-          emptyHistoryHint: 'Write the first message or use a quick scenario below.',
-          template: 'Template',
-          messagePlaceholder: 'Message to the client…',
-          clear: 'Clear',
-          send: 'Send',
-          export: 'Export',
-          deleteChat: 'Delete chat',
-          moreActions: 'More',
-          confirm: 'Confirm',
-          reschedule: 'Reschedule',
-          followup: 'Follow-up',
-          date: 'Date',
-          time: 'Time',
-          applyTransfer: 'Prepare reschedule',
-          addClientError: 'Client name and phone are required.',
           loadError: 'Could not load chats.',
           sendError: 'Could not send the message.',
-          byBot: 'via ClickBook bot',
-          unread: 'Unread',
-          openThread: 'Open chat',
-          closeCreate: 'Hide',
-          assistant: 'Assistant',
-          nextStep: 'Next step',
-          quickScenarios: 'Quick scenarios',
-          quickReschedule: 'Quick reschedule',
-          clientCard: 'Client card',
-          newSlot: 'New slot',
-          sort: 'Sort',
-          filters: 'Filters',
-          details: 'Details',
-          rescheduleAlert: 'Client wants to reschedule',
-          rescheduleAlertText: 'The slot is released. Pick a new time and reply in this chat.',
-          rescheduleAlertShort: 'Reschedule',
+          addClientError: 'Client name and phone are required.',
+          byBot: 'bot',
         };
 
   const templateOptions = useMemo(() => dataset?.templates ?? [], [dataset?.templates]);
-  const pinnedSet = useMemo(() => new Set(pinnedThreadIds), [pinnedThreadIds]);
+  const activeThread = useMemo(() => threads.find((thread) => thread.id === activeThreadId) ?? null, [activeThreadId, threads]);
 
-  const activeThread = useMemo(() => {
-    return threads.find((item) => item.id === activeThreadId) ?? null;
-  }, [activeThreadId, threads]);
+  const activeBookingContexts = useMemo(() => getThreadBookingContexts(activeThread), [activeThread]);
+  const selectedBookingId = useMemo(() => {
+    if (!activeThread) return null;
+    const selected = selectedBookingByThreadId[activeThread.id];
+    if (selected && activeBookingContexts.some((context) => context.id === selected)) return selected;
+    return activeBookingContexts[0]?.id ?? (typeof activeThread.metadata?.bookingId === 'string' ? activeThread.metadata.bookingId : null);
+  }, [activeBookingContexts, activeThread, selectedBookingByThreadId]);
 
-  useEffect(() => {
-    if ((!targetBookingId && !targetThreadId) || threads.length === 0) return;
+  const selectedBookingContext = useMemo(() => {
+    if (!selectedBookingId) return activeBookingContexts[0] ?? null;
+    return activeBookingContexts.find((context) => context.id === selectedBookingId) ?? activeBookingContexts[0] ?? null;
+  }, [activeBookingContexts, selectedBookingId]);
 
-    const targetThread = threads.find((thread) => {
-      if (targetThreadId && thread.id === targetThreadId) return true;
+  const unreadTotal = useMemo(() => threads.reduce((sum, thread) => sum + (thread.unreadCount ?? 0), 0), [threads]);
+  const priorityTotal = useMemo(() => threads.filter((thread) => thread.isPriority).length, [threads]);
 
-      const bookingId = typeof thread.metadata?.bookingId === 'string' ? thread.metadata.bookingId : null;
-      const bookingIds = Array.isArray(thread.metadata?.bookingIds)
-        ? thread.metadata.bookingIds.filter((item): item is string => typeof item === 'string')
-        : [];
+  const filteredThreads = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
 
-      return (
-        bookingId === targetBookingId ||
-        (targetBookingId ? bookingIds.includes(targetBookingId) : false) ||
-        (targetBookingId ? thread.id === `booking-thread-${targetBookingId}` : false)
-      );
+    const next = threads.filter((thread) => {
+      if (segmentFilter !== 'all' && thread.segment !== segmentFilter) return false;
+      if (channelFilter !== 'all' && thread.channel !== channelFilter) return false;
+
+      if (!normalizedQuery) return true;
+
+      return [
+        thread.clientName,
+        thread.clientPhone,
+        thread.lastMessagePreview ?? '',
+        getThreadContextLine(thread, locale) ?? '',
+        ...thread.messages.map((message) => message.body),
+      ]
+        .join(' ')
+        .toLowerCase()
+        .includes(normalizedQuery);
     });
 
-    if (targetThread) {
-      if (targetThread.id !== activeThreadId) {
-        setActiveThreadId(targetThread.id);
-      }
+    return sortThreads(next, sortMode, pinnedThreadIds);
+  }, [channelFilter, locale, pinnedThreadIds, query, segmentFilter, sortMode, threads]);
 
-      if (targetBookingId) {
-        setSelectedBookingByThreadId((current) => ({ ...current, [targetThread.id]: targetBookingId }));
-      }
-    }
-  }, [activeThreadId, targetBookingId, targetThreadId, threads]);
+  const channelOptions = [
+    { value: 'all', label: copy.channel },
+    { value: 'Web', label: 'Web' },
+    { value: 'Telegram', label: locale === 'ru' ? 'ТГ' : 'Telegram' },
+    { value: 'Instagram', label: locale === 'ru' ? 'Инстаграм' : 'Instagram' },
+    { value: 'VK', label: locale === 'ru' ? 'ВК' : 'VK' },
+  ] as const;
 
-  const activeMessageSignature = useMemo(() => {
-    if (!activeThread) return 'empty';
+  const segmentOptions = [
+    { value: 'all', label: copy.all },
+    { value: 'new', label: copy.new },
+    { value: 'active', label: copy.active },
+    { value: 'followup', label: copy.followup },
+  ] as const;
 
-    const lastMessage = activeThread.messages.at(-1);
-
-    return [
-      activeThread.id,
-      activeThread.messages.length,
-      lastMessage?.id ?? '',
-      lastMessage?.createdAt ?? '',
-      lastMessage?.deliveryState ?? '',
-    ].join(':');
-  }, [activeThread]);
-
-  const getActiveMessageScrollNode = useCallback(() => {
-    if (isMobile && mobileThreadOpen) {
-      return mobileMessageScrollRef.current;
-    }
-
-    return desktopMessageScrollRef.current;
-  }, [isMobile, mobileThreadOpen]);
-
-  const scrollMessagesToBottom = useCallback(
-    (behavior: ScrollBehavior = 'auto') => {
-      if (typeof window === 'undefined') return;
-
-      const scrollNode = getActiveMessageScrollNode();
-      if (!scrollNode) return;
-
-      const run = () => {
-        scrollNode.scrollTop = scrollNode.scrollHeight;
-        messageBottomRef.current?.scrollIntoView({ block: 'end', behavior });
-      };
-
-      run();
-      window.requestAnimationFrame(run);
-      window.requestAnimationFrame(() => window.setTimeout(run, 0));
-    },
-    [getActiveMessageScrollNode],
+  const quickTransferPresets = useMemo(
+    () => [
+      { id: 'today', label: locale === 'ru' ? 'Сегодня' : 'Today', date: addDaysIso(0), time: '12:30' },
+      { id: 'tomorrow', label: locale === 'ru' ? 'Завтра' : 'Tomorrow', date: addDaysIso(1), time: '13:00' },
+      { id: 'plus-two', label: locale === 'ru' ? 'Через 2 дня' : 'In 2 days', date: addDaysIso(2), time: '15:30' },
+    ],
+    [locale],
   );
-
-  useEffect(() => {
-    scrollMessagesToBottom('auto');
-  }, [activeMessageSignature, activeThreadId, isMobile, mobileThreadOpen, scrollMessagesToBottom]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const scrollNode = getActiveMessageScrollNode();
-    if (!scrollNode) return;
-
-    scrollMessagesToBottom('auto');
-
-    const resizeObserver = new ResizeObserver(() => {
-      scrollMessagesToBottom('auto');
-    });
-
-    resizeObserver.observe(scrollNode);
-
-    if (scrollNode.firstElementChild instanceof HTMLElement) {
-      resizeObserver.observe(scrollNode.firstElementChild);
-    }
-
-    const mutationObserver = new MutationObserver(() => {
-      scrollMessagesToBottom('auto');
-    });
-
-    mutationObserver.observe(scrollNode, {
-      childList: true,
-      subtree: true,
-      characterData: true,
-    });
-
-    return () => {
-      resizeObserver.disconnect();
-      mutationObserver.disconnect();
-    };
-  }, [activeMessageSignature, getActiveMessageScrollNode, scrollMessagesToBottom]);
-
-  const contextThreadRaw = useMemo(() => {
-    if (!threadContextMenu) return null;
-    return threads.find((thread) => thread.id === threadContextMenu.threadId) ?? null;
-  }, [threadContextMenu, threads]);
-
-  const contextThread = useMemo(() => {
-    if (!contextThreadRaw) return null;
-
-    return {
-      ...contextThreadRaw,
-      __pinned: pinnedSet.has(contextThreadRaw.id),
-    } as ChatThreadRecord & { __pinned?: boolean };
-  }, [contextThreadRaw, pinnedSet]);
-
-  const isThreadPinned = useCallback(
-    (threadId: string) => pinnedSet.has(threadId),
-    [pinnedSet],
-  );
-
-  const toggleThreadPin = useCallback((threadId: string) => {
-    setPinnedThreadIds((current) =>
-      current.includes(threadId)
-        ? current.filter((item) => item !== threadId)
-        : [threadId, ...current],
-    );
-  }, []);
-
-  useEffect(() => {
-    if (!hasHydrated || typeof window === 'undefined') return;
-
-    setPinStateHydrated(false);
-
-    try {
-      const raw = window.localStorage.getItem(pinnedStorageKey);
-      const parsed = raw ? (JSON.parse(raw) as unknown) : [];
-
-      if (Array.isArray(parsed)) {
-        setPinnedThreadIds(parsed.filter((item): item is string => typeof item === 'string'));
-      } else {
-        setPinnedThreadIds([]);
-      }
-    } catch {
-      setPinnedThreadIds([]);
-    } finally {
-      setPinStateHydrated(true);
-    }
-  }, [hasHydrated, pinnedStorageKey]);
-
-  useEffect(() => {
-    if (!hasHydrated || !pinStateHydrated || typeof window === 'undefined') return;
-
-    try {
-      window.localStorage.setItem(pinnedStorageKey, JSON.stringify(pinnedThreadIds));
-    } catch {}
-  }, [hasHydrated, pinStateHydrated, pinnedStorageKey, pinnedThreadIds]);
 
   const refreshThreads = useCallback(
     async ({ background = false }: { background?: boolean } = {}) => {
-      if (!hasHydrated || threadsRefreshInFlightRef.current) return;
+      if (!hasHydrated) return;
+
+      if (!background) setIsLoading(true);
 
       if (demoMode) {
         const fallback = getDashboardDemoChatThreads(locale);
@@ -1717,19 +717,14 @@ export default function DashboardChatsPage() {
         try {
           const raw = typeof window !== 'undefined' ? window.localStorage.getItem(demoStorageKey) : null;
           const next = raw ? (JSON.parse(raw) as ChatThreadRecord[]) : fallback;
-
-          setThreads((current) =>
-            background ? mergeThreadSnapshots(current, next, sortMode) : sortThreads(next, 'recent'),
-          );
+          setThreads(next);
           setActiveThreadId((current) => current ?? next[0]?.id ?? null);
           setError(null);
-          setIsLoading(false);
         } catch {
-          setThreads((current) =>
-            background ? mergeThreadSnapshots(current, fallback, sortMode) : sortThreads(fallback, 'recent'),
-          );
+          setThreads(fallback);
           setActiveThreadId((current) => current ?? fallback[0]?.id ?? null);
           setError(null);
+        } finally {
           setIsLoading(false);
         }
 
@@ -1743,12 +738,6 @@ export default function DashboardChatsPage() {
         return;
       }
 
-      threadsRefreshInFlightRef.current = true;
-
-      if (!background) {
-        setIsLoading(true);
-      }
-
       try {
         const response = await fetch('/api/chats', {
           credentials: 'include',
@@ -1756,32 +745,21 @@ export default function DashboardChatsPage() {
           headers: getTelegramAppSessionHeaders(),
         });
 
-        if (!response.ok) {
-          throw new Error('chat_fetch_failed');
-        }
+        if (!response.ok) throw new Error('chat_fetch_failed');
 
         const payload = (await response.json()) as ChatThreadListResponse;
-        const nextThreads = mergeThreadsByClientForUi(payload.threads ?? []);
+        const next = payload.threads ?? [];
 
-        setThreads((current) =>
-          background
-            ? mergeThreadSnapshots(current, nextThreads, sortMode)
-            : sortThreads(nextThreads, 'recent'),
-        );
-        setActiveThreadId((current) => current ?? nextThreads[0]?.id ?? null);
+        setThreads(next);
+        setActiveThreadId((current) => current ?? next[0]?.id ?? null);
         setError(null);
       } catch {
-        if (!background) {
-          setError(labels.loadError);
-        }
+        if (!background) setError(copy.loadError);
       } finally {
-        threadsRefreshInFlightRef.current = false;
-        if (!background) {
-          setIsLoading(false);
-        }
+        setIsLoading(false);
       }
     },
-    [demoMode, demoStorageKey, hasHydrated, labels.loadError, locale, ownedProfile, sortMode],
+    [copy.loadError, demoMode, demoStorageKey, hasHydrated, locale, ownedProfile],
   );
 
   useEffect(() => {
@@ -1789,26 +767,24 @@ export default function DashboardChatsPage() {
   }, [refreshThreads]);
 
   useEffect(() => {
-    if (!hasHydrated || !ownedProfile || demoMode || typeof window === 'undefined') return;
+    if (!hasHydrated || demoMode || !ownedProfile || typeof window === 'undefined') return;
 
     const tick = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       void refreshThreads({ background: true });
     };
 
-    const intervalId = window.setInterval(tick, 4000);
+    const id = window.setInterval(tick, 5000);
     window.addEventListener('focus', tick);
-    document.addEventListener('visibilitychange', tick);
 
     return () => {
-      window.clearInterval(intervalId);
+      window.clearInterval(id);
       window.removeEventListener('focus', tick);
-      document.removeEventListener('visibilitychange', tick);
     };
   }, [demoMode, hasHydrated, ownedProfile, refreshThreads]);
 
   useEffect(() => {
-    if (!demoMode || !hasHydrated) return;
+    if (!demoMode || !hasHydrated || typeof window === 'undefined') return;
 
     try {
       window.localStorage.setItem(demoStorageKey, JSON.stringify(threads));
@@ -1816,23 +792,60 @@ export default function DashboardChatsPage() {
   }, [demoMode, demoStorageKey, hasHydrated, threads]);
 
   useEffect(() => {
+    if (!hasHydrated || typeof window === 'undefined') return;
+
+    try {
+      const raw = window.localStorage.getItem(pinnedStorageKey);
+      const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+      setPinnedThreadIds(Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : []);
+    } catch {
+      setPinnedThreadIds([]);
+    }
+  }, [hasHydrated, pinnedStorageKey]);
+
+  useEffect(() => {
+    if (!hasHydrated || typeof window === 'undefined') return;
+
+    try {
+      window.localStorage.setItem(pinnedStorageKey, JSON.stringify(pinnedThreadIds));
+    } catch {}
+  }, [hasHydrated, pinnedStorageKey, pinnedThreadIds]);
+
+  useEffect(() => {
     if (!threads.length) {
       setActiveThreadId(null);
       return;
     }
 
-    if (!activeThreadId || !threads.some((item) => item.id === activeThreadId)) {
+    if (!activeThreadId || !threads.some((thread) => thread.id === activeThreadId)) {
       setActiveThreadId(threads[0].id);
     }
   }, [activeThreadId, threads]);
 
-  const applyLocalThreadPatch = async (threadId: string, patch: Partial<ChatThreadRecord>) => {
+  useEffect(() => {
+    const node = isMobile && mobileThreadOpen ? mobileMessageScrollRef.current : desktopMessageScrollRef.current;
+    if (!node) return;
+
+    const scroll = () => {
+      node.scrollTop = node.scrollHeight;
+      messageBottomRef.current?.scrollIntoView({ block: 'end' });
+    };
+
+    scroll();
+    window.requestAnimationFrame(scroll);
+  }, [activeThread?.id, activeThread?.messages.length, isMobile, mobileThreadOpen]);
+
+  async function patchThread(threadId: string, patch: Partial<ChatThreadRecord>) {
     setThreads((current) =>
-      replaceThread(current, threadId, (thread) => ({
-        ...thread,
-        ...patch,
-        updatedAt: new Date().toISOString(),
-      })),
+      current.map((thread) =>
+        thread.id === threadId
+          ? {
+              ...thread,
+              ...patch,
+              updatedAt: new Date().toISOString(),
+            }
+          : thread,
+      ),
     );
 
     if (demoMode) return;
@@ -1845,368 +858,30 @@ export default function DashboardChatsPage() {
         'Content-Type': 'application/json',
         ...getTelegramAppSessionHeaders(),
       },
-      body: JSON.stringify({
-        threadId,
-        patch,
-      }),
+      body: JSON.stringify({ threadId, patch }),
     }).catch(() => undefined);
-  };
+  }
 
-  const handleDeleteThread = useCallback(
-    (threadId: string) => {
-      const nextThreads = threads.filter((thread) => thread.id !== threadId);
+  function selectThread(thread: ChatThreadRecord) {
+    setActiveThreadId(thread.id);
 
-      setThreads(nextThreads);
-      setPinnedThreadIds((current) => current.filter((item) => item !== threadId));
-
-      if (activeThreadId === threadId) {
-        setActiveThreadId(nextThreads[0]?.id ?? null);
-      }
-
-      if (threadContextMenu?.threadId === threadId) {
-        setThreadContextMenu(null);
-      }
-
-      if (isMobile && activeThreadId === threadId) {
-        setMobileThreadOpen(false);
-      }
-
-      if (!demoMode) {
-        fetch('/api/chats', {
-          method: 'DELETE',
-          credentials: 'include',
-          cache: 'no-store',
-          headers: {
-            'Content-Type': 'application/json',
-            ...getTelegramAppSessionHeaders(),
-          },
-          body: JSON.stringify({ threadId }),
-        }).catch(() => undefined);
-      }
-    },
-    [activeThreadId, demoMode, isMobile, threadContextMenu?.threadId, threads],
-  );
-
-  const filteredThreads = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-
-    const next = threads.filter((thread) => {
-      if (segmentFilter !== 'all' && thread.segment !== segmentFilter) return false;
-      if (channelFilter !== 'all' && thread.channel !== channelFilter) return false;
-      if (!normalizedQuery) return true;
-
-      return [
-        thread.clientName,
-        thread.clientPhone,
-        thread.lastMessagePreview ?? '',
-        ...thread.messages.map((message) => message.body),
-      ]
-        .join(' ')
-        .toLowerCase()
-        .includes(normalizedQuery);
-    });
-
-    return sortThreads(next, sortMode, pinnedThreadIds);
-  }, [channelFilter, pinnedThreadIds, query, segmentFilter, sortMode, threads]);
-
-  const relatedThreadsByClientKey = useMemo(() => {
-    const map = new Map<string, ChatThreadRecord[]>();
-
-    threads.forEach((thread) => {
-      const key = getThreadClientKey(thread);
-      if (!key) return;
-      const list = map.get(key) ?? [];
-      list.push(thread);
-      map.set(key, list);
-    });
-
-    map.forEach((items, key) => {
-      map.set(key, sortThreads(items, 'recent'));
-    });
-
-    return map;
-  }, [threads]);
-
-  const activeRelatedThreads = useMemo(() => {
-    if (!activeThread) return [] as ChatThreadRecord[];
-    return relatedThreadsByClientKey.get(getThreadClientKey(activeThread)) ?? [];
-  }, [activeThread, relatedThreadsByClientKey]);
-
-
-  const activeBookingContexts = useMemo(() => getThreadBookingContexts(activeThread), [activeThread]);
-
-  const selectedBookingId = useMemo(() => {
-    if (!activeThread) return null;
-    const selected = selectedBookingByThreadId[activeThread.id];
-    if (selected && activeBookingContexts.some((context) => context.id === selected)) return selected;
-    return activeBookingContexts[0]?.id ?? (typeof activeThread.metadata?.bookingId === 'string' ? activeThread.metadata.bookingId : null);
-  }, [activeBookingContexts, activeThread, selectedBookingByThreadId]);
-
-  const selectedBookingContext = useMemo(() => {
-    if (!selectedBookingId) return activeBookingContexts[0] ?? null;
-    return activeBookingContexts.find((context) => context.id === selectedBookingId) ?? activeBookingContexts[0] ?? null;
-  }, [activeBookingContexts, selectedBookingId]);
-
-
-  const setThreadItemRef = useMemo(
-    () => (id: string) => (node: HTMLDivElement | null) => {
-      itemRefs.current[id] = node;
-    },
-    [],
-  );
-
-  const draggedId = dragState?.active ? dragState.id : null;
-  const draggedThread = draggedId
-    ? filteredThreads.find((thread) => thread.id === draggedId) ??
-      threads.find((thread) => thread.id === draggedId) ??
-      null
-    : null;
-
-  const getDropIndexFromPoint = useCallback(
-    (clientX: number, clientY: number, draggedThreadId: string) => {
-      const visibleItems = filteredThreads
-        .map((thread, index) => ({
-          thread,
-          index,
-          node: itemRefs.current[thread.id],
-        }))
-        .filter((item) => item.node && item.thread.id !== draggedThreadId);
-
-      if (!visibleItems.length) return 0;
-
-      const firstBounds = visibleItems[0]?.node?.getBoundingClientRect();
-      const secondBounds = visibleItems[1]?.node?.getBoundingClientRect();
-      const horizontalDeck = Boolean(
-        firstBounds &&
-          secondBounds &&
-          Math.abs(firstBounds.top - secondBounds.top) < Math.min(firstBounds.height, secondBounds.height) * 0.45 &&
-          Math.abs(firstBounds.left - secondBounds.left) > 24,
-      );
-
-      for (const item of visibleItems) {
-        const bounds = item.node!.getBoundingClientRect();
-
-        if (horizontalDeck) {
-          if (clientX < bounds.left + bounds.width / 2) return item.index;
-        } else if (clientY < bounds.top + bounds.height / 2) {
-          return item.index;
-        }
-      }
-
-      return filteredThreads.length;
-    },
-    [filteredThreads],
-  );
-
-  const commitThreadDrop = useCallback(
-    (state: ThreadDragState | null, targetIndex: number | null) => {
-      if (!state || targetIndex === null) return;
-
-      setThreads((current) => {
-        const display = filteredThreads.filter((thread) =>
-          current.some((currentThread) => currentThread.id === thread.id),
-        );
-
-        const from = display.findIndex((thread) => thread.id === state.id);
-
-        if (from < 0) return current;
-
-        let to = targetIndex;
-
-        if (to > from) {
-          to -= 1;
-        }
-
-        to = Math.max(0, Math.min(to, display.length - 1));
-
-        if (to === from) return current;
-
-        const reorderedDisplay = arrayMove(display, from, to);
-        const visibleIds = new Set(display.map((thread) => thread.id));
-        const queue = [...reorderedDisplay];
-
-        return current.map((thread) => {
-          if (!visibleIds.has(thread.id)) return thread;
-          return queue.shift() ?? thread;
-        });
-      });
-
-      setSortMode('manual');
-    },
-    [filteredThreads],
-  );
-
-  const beginThreadDrag = (
-    event: ReactPointerEvent<HTMLButtonElement>,
-    threadId: string,
-    index: number,
-  ) => {
-    if (event.pointerType === 'mouse' && event.button !== 0) return;
-
-    const cardNode = itemRefs.current[threadId];
-    const cardRect = cardNode?.getBoundingClientRect();
-
-    if (!cardRect) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-    suppressCardClickRef.current = false;
-
-    try {
-      event.currentTarget.setPointerCapture(event.pointerId);
-    } catch {}
-
-    setActiveThreadId(threadId);
-    dragOffsetX.set(0);
-    dragOffsetY.set(0);
-    dragOffsetRef.current = 0;
-    dragOverIndexRef.current = null;
-    setDropIndex(null);
-
-    setDragState({
-      id: threadId,
-      pointerId: event.pointerId,
-      startY: event.clientY,
-      startX: event.clientX,
-      originIndex: index,
-      active: false,
-      cardRect: {
-        top: cardRect.top,
-        left: cardRect.left,
-        width: cardRect.width,
-        height: cardRect.height,
-      },
-    });
-  };
-
-  const flushDragFrame = useCallback(() => {
-    if (dragFrameRef.current !== null) {
-      window.cancelAnimationFrame(dragFrameRef.current);
-      dragFrameRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!dragState) {
-      dragOffsetX.set(0);
-      dragOffsetY.set(0);
-      dragOffsetRef.current = 0;
-      dragOverIndexRef.current = null;
-      setDropIndex(null);
-      flushDragFrame();
-      return;
+    if (getThreadBookingContexts(thread).length && !selectedBookingByThreadId[thread.id]) {
+      setSelectedBookingByThreadId((current) => ({ ...current, [thread.id]: getThreadBookingContexts(thread)[0].id }));
     }
 
-    const previousUserSelect = document.body.style.userSelect;
-    const previousTouchAction = document.body.style.touchAction;
-    const previousCursor = document.body.style.cursor;
+    if (thread.unreadCount > 0) {
+      void patchThread(thread.id, { unreadCount: 0 });
+    }
 
-    document.body.style.userSelect = 'none';
-    document.body.style.touchAction = dragState.active ? 'none' : previousTouchAction;
-    document.body.style.cursor = dragState.active ? 'grabbing' : previousCursor;
+    if (isMobile) setMobileThreadOpen(true);
+  }
 
-    const handlePointerMove = (event: PointerEvent) => {
-      if (event.pointerId !== dragState.pointerId) return;
-
-      const deltaX = event.clientX - dragState.startX;
-      const deltaY = event.clientY - dragState.startY;
-
-      if (!dragState.active) {
-        if (
-          Math.abs(deltaX) < dragThresholdRef.current &&
-          Math.abs(deltaY) < dragThresholdRef.current
-        ) {
-          return;
-        }
-
-        suppressCardClickRef.current = true;
-        dragOverIndexRef.current = dragState.originIndex;
-        setDropIndex(dragState.originIndex);
-        setDragState((current) =>
-          current && current.pointerId === dragState.pointerId
-            ? { ...current, active: true }
-            : current,
-        );
-        return;
-      }
-
-      suppressCardClickRef.current = true;
-      dragOffsetX.set(deltaX);
-      dragOffsetRef.current = deltaY;
-
-      if (dragFrameRef.current !== null) return;
-
-      dragFrameRef.current = window.requestAnimationFrame(() => {
-        dragFrameRef.current = null;
-        dragOffsetY.set(dragOffsetRef.current);
-
-        const nextOverIndex = getDropIndexFromPoint(event.clientX, event.clientY, dragState.id);
-
-        if (dragOverIndexRef.current === nextOverIndex) return;
-
-        dragOverIndexRef.current = nextOverIndex;
-        setDropIndex(nextOverIndex);
-      });
-    };
-
-    const finishDrag = (event: PointerEvent) => {
-      if (event.pointerId !== dragState.pointerId) return;
-
-      flushDragFrame();
-
-      if (dragState.active) {
-        const targetIndex = dragOverIndexRef.current ?? dragState.originIndex;
-        commitThreadDrop(dragState, targetIndex);
-      }
-
-      setDragState(null);
-      setDropIndex(null);
-
-      window.setTimeout(() => {
-        suppressCardClickRef.current = false;
-      }, 60);
-    };
-
-    const cancelDrag = (event: PointerEvent) => {
-      if (event.pointerId !== dragState.pointerId) return;
-
-      flushDragFrame();
-      setDragState(null);
-      setDropIndex(null);
-
-      window.setTimeout(() => {
-        suppressCardClickRef.current = false;
-      }, 60);
-    };
-
-    window.addEventListener('pointermove', handlePointerMove, { passive: true });
-    window.addEventListener('pointerup', finishDrag);
-    window.addEventListener('pointercancel', cancelDrag);
-
-    return () => {
-      document.body.style.userSelect = previousUserSelect;
-      document.body.style.touchAction = previousTouchAction;
-      document.body.style.cursor = previousCursor;
-      flushDragFrame();
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', finishDrag);
-      window.removeEventListener('pointercancel', cancelDrag);
-    };
-  }, [
-    commitThreadDrop,
-    dragOffsetX,
-    dragOffsetY,
-    dragState,
-    flushDragFrame,
-    getDropIndexFromPoint,
-  ]);
-
-  const handleCreateThread = async () => {
+  async function handleCreateThread() {
     const clientName = newClientName.trim();
     const clientPhone = newClientPhone.trim();
 
     if (!clientName || !clientPhone) {
-      setError(labels.addClientError);
+      setError(copy.addClientError);
       return;
     }
 
@@ -2227,7 +902,10 @@ export default function DashboardChatsPage() {
         method: 'POST',
         credentials: 'include',
         cache: 'no-store',
-        headers: { 'Content-Type': 'application/json', ...getTelegramAppSessionHeaders() },
+        headers: {
+          'Content-Type': 'application/json',
+          ...getTelegramAppSessionHeaders(),
+        },
         body: JSON.stringify({ type: 'thread', clientName, clientPhone, channel: 'Telegram' }),
       });
 
@@ -2242,43 +920,41 @@ export default function DashboardChatsPage() {
       setNewClientPhone('');
       setShowCreatePanel(false);
     } catch {
-      setError(labels.addClientError);
+      setError(copy.addClientError);
     }
-  };
+  }
 
-  const handleSendMessage = async () => {
+  async function handleSendMessage() {
     if (!activeThread || !draft.trim()) return;
 
     const body = draft.trim();
-    const activeComposerFlow = composerFlow;
-    const activeTransferDate = transferDate;
-    const activeTransferTime = transferTime || '12:30';
-    const viaBot = activeComposerFlow !== null;
-    const localMessage = createLocalMessage(
-      activeThread.id,
-      body,
-      viaBot ? 'system' : 'master',
-      viaBot,
-    );
+    const viaBot = composerFlow !== null;
+    const localMessage = createLocalMessage(activeThread.id, body, viaBot ? 'system' : 'master', viaBot);
+    const flow = composerFlow;
+    const date = transferDate;
+    const time = transferTime || '12:30';
 
     setIsSending(true);
-    setError(null);
-
-    setThreads((current) =>
-      replaceThread(current, activeThread.id, (thread) => ({
-        ...thread,
-        segment: viaBot ? (activeComposerFlow === 'followup' ? 'followup' : 'active') : 'active',
-        lastMessagePreview: body,
-        lastMessageAt: localMessage.createdAt,
-        unreadCount: 0,
-        messages: [...thread.messages, localMessage],
-        updatedAt: localMessage.createdAt,
-      })),
-    );
-
     setDraft('');
     setSelectedTemplateId('custom');
     setComposerFlow(null);
+    setError(null);
+
+    setThreads((current) =>
+      current.map((thread) =>
+        thread.id === activeThread.id
+          ? {
+              ...thread,
+              segment: viaBot ? (flow === 'followup' ? 'followup' : 'active') : 'active',
+              lastMessagePreview: body,
+              lastMessageAt: localMessage.createdAt,
+              unreadCount: 0,
+              messages: [...thread.messages, localMessage],
+              updatedAt: localMessage.createdAt,
+            }
+          : thread,
+      ),
+    );
 
     if (demoMode) {
       setIsSending(false);
@@ -2290,7 +966,10 @@ export default function DashboardChatsPage() {
         method: 'POST',
         credentials: 'include',
         cache: 'no-store',
-        headers: { 'Content-Type': 'application/json', ...getTelegramAppSessionHeaders() },
+        headers: {
+          'Content-Type': 'application/json',
+          ...getTelegramAppSessionHeaders(),
+        },
         body: JSON.stringify({
           type: 'message',
           threadId: activeThread.id,
@@ -2300,116 +979,51 @@ export default function DashboardChatsPage() {
           viaBot,
           clientMessageKey: localMessage.id,
           ...(selectedBookingId ? { bookingId: selectedBookingId } : {}),
-          ...(activeComposerFlow === 'reschedule' && activeTransferDate
-            ? { rescheduleProposal: { date: activeTransferDate, time: activeTransferTime } }
-            : {}),
+          ...(flow === 'reschedule' && date ? { rescheduleProposal: { date, time } } : {}),
         }),
       });
 
       if (!response.ok) throw new Error('send_failed');
     } catch {
-      setError(labels.sendError);
+      setError(copy.sendError);
     } finally {
       setIsSending(false);
     }
-  };
+  }
 
-  const handleComposerKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+  function handleComposerKeyDown(event: ReactKeyboardEvent<HTMLTextAreaElement>) {
     if (event.key !== 'Enter' || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return;
 
     event.preventDefault();
-
     if (!activeThread || !draft.trim() || isSending) return;
     void handleSendMessage();
-  };
+  }
 
-  const handleApplyBotFlow = (flow: BotFlow) => {
-    if (!activeThread) return;
+  function handleDeleteThread(threadId: string) {
+    const next = threads.filter((thread) => thread.id !== threadId);
+    setThreads(next);
+    setPinnedThreadIds((current) => current.filter((id) => id !== threadId));
 
-    const nextVisit =
-      flow === 'reschedule' && transferDate
-        ? `${transferDate}${transferTime ? ` ${transferTime}` : ''}`
-        : activeThread.nextVisit ?? undefined;
+    if (activeThreadId === threadId) {
+      setActiveThreadId(next[0]?.id ?? null);
+      setMobileThreadOpen(false);
+    }
 
-    setComposerFlow(flow);
-    setDraft(buildBotDraft(flow, activeThread, locale, nextVisit));
-  };
+    if (!demoMode) {
+      fetch('/api/chats', {
+        method: 'DELETE',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getTelegramAppSessionHeaders(),
+        },
+        body: JSON.stringify({ threadId }),
+      }).catch(() => undefined);
+    }
+  }
 
-  const handleApplyTransfer = () => {
-    if (!activeThread || !transferDate) return;
-
-    const nextVisit = `${transferDate} ${transferTime}`.trim();
-    const nextVisitIso = `${transferDate}T${transferTime || '12:30'}:00`;
-
-    void applyLocalThreadPatch(activeThread.id, {
-      nextVisit: nextVisitIso,
-      segment: 'active',
-    });
-
-    setComposerFlow('reschedule');
-    setDraft(buildBotDraft('reschedule', activeThread, locale, nextVisit));
-  };
-
-  const handleTemplateChange = (value: string) => {
-    setSelectedTemplateId(value);
-
-    if (value === 'custom') return;
-
-    const selectedTemplate = templateOptions.find((item) => item.id === value);
-    if (!selectedTemplate) return;
-
-    setComposerFlow(null);
-    setDraft(fillTemplateContent(selectedTemplate.content, activeThread, locale, publicPageHref));
-  };
-
-  const quickTransferPresets = useMemo(
-    () => [
-      { id: 'today', label: locale === 'ru' ? 'Сегодня' : 'Today', date: addDaysIso(0), time: '12:30' },
-      { id: 'tomorrow', label: locale === 'ru' ? 'Завтра' : 'Tomorrow', date: addDaysIso(1), time: '13:00' },
-      { id: 'plus-two', label: locale === 'ru' ? 'Через 2 дня' : 'In 2 days', date: addDaysIso(2), time: '15:30' },
-    ],
-    [locale],
-  );
-
-  useEffect(() => {
-    if (composerFlow !== 'reschedule' || transferDate) return;
-
-    const fallbackPreset = quickTransferPresets[0];
-    if (!fallbackPreset) return;
-
-    setTransferDate(fallbackPreset.date);
-    setTransferTime(fallbackPreset.time);
-  }, [composerFlow, quickTransferPresets, transferDate]);
-
-  useEffect(() => {
-    if (composerFlow !== 'reschedule' || !activeThread || !transferDate) return;
-
-    const nextVisit = `${transferDate}${transferTime ? ` ${transferTime}` : ''}`.trim();
-    setDraft(buildBotDraft('reschedule', activeThread, locale, nextVisit));
-  }, [activeThread, composerFlow, locale, transferDate, transferTime]);
-
-  const assistantSlots = useMemo(() => {
-    const nextDate = activeThread?.nextVisit ? activeThread.nextVisit.slice(0, 10) : addDaysIso(1);
-    const altDate = addDaysIso(2);
-
-    return [
-      { id: 'slot-1', date: nextDate, time: '12:30' },
-      { id: 'slot-2', date: nextDate, time: '15:00' },
-      { id: 'slot-3', date: altDate, time: '18:00' },
-    ];
-  }, [activeThread?.nextVisit]);
-
-  const channelLabel = (value: ChatThreadRecord['channel']) => {
-    if (locale !== 'ru') return value;
-    if (value === 'Telegram') return 'ТГ';
-    if (value === 'Instagram') return 'Инстаграм';
-    if (value === 'VK') return 'ВК';
-    if (value === 'Web') return 'Web';
-    return value;
-  };
-
-  const handleExportThreadById = (threadId: string) => {
-    const thread = threads.find((item) => item.id === threadId);
+  function handleExportThread(thread: ChatThreadRecord | null) {
     if (!thread || typeof window === 'undefined') return;
 
     const safeName =
@@ -2419,54 +1033,22 @@ export default function DashboardChatsPage() {
         .replace(/[^a-zа-я0-9]+/gi, '-')
         .replace(/^-+|-+$/g, '') || 'thread';
 
-    const lines =
-      locale === 'ru'
-        ? [
-            `Клиент: ${thread.clientName}`,
-            `Телефон: ${thread.clientPhone}`,
-            `Канал: ${channelLabel(thread.channel)}`,
-            `Источник: ${thread.source || '—'}`,
-            `Следующий визит: ${
-              thread.nextVisit ? formatDateLabel(thread.nextVisit, locale) : labels.notScheduled
-            }`,
-            '',
-            ...thread.messages.map((message) => {
-              const author =
-                message.author === 'client'
-                  ? thread.clientName
-                  : message.author === 'system'
-                    ? 'Бот'
-                    : 'Мастер';
+    const lines = [
+      `${copy.clientName}: ${thread.clientName}`,
+      `${copy.clientPhone}: ${thread.clientPhone}`,
+      `${copy.channel}: ${channelLabel(thread.channel, locale)}`,
+      '',
+      ...thread.messages.map((message) => {
+        const author =
+          message.author === 'client'
+            ? thread.clientName
+            : message.author === 'system'
+              ? 'Bot'
+              : 'Master';
 
-              return `[${formatLongDateLabel(message.createdAt, locale)} ${formatTimeLabel(
-                message.createdAt,
-                locale,
-              )}] ${author}: ${message.body}`;
-            }),
-          ]
-        : [
-            `Client: ${thread.clientName}`,
-            `Phone: ${thread.clientPhone}`,
-            `Channel: ${channelLabel(thread.channel)}`,
-            `Source: ${thread.source || '—'}`,
-            `Next visit: ${
-              thread.nextVisit ? formatDateLabel(thread.nextVisit, locale) : labels.notScheduled
-            }`,
-            '',
-            ...thread.messages.map((message) => {
-              const author =
-                message.author === 'client'
-                  ? thread.clientName
-                  : message.author === 'system'
-                    ? 'Bot'
-                    : 'Master';
-
-              return `[${formatLongDateLabel(message.createdAt, locale)} ${formatTimeLabel(
-                message.createdAt,
-                locale,
-              )}] ${author}: ${message.body}`;
-            }),
-          ];
+        return `[${formatLongDateLabel(message.createdAt, locale)} ${formatTimeLabel(message.createdAt, locale)}] ${author}: ${message.body}`;
+      }),
+    ];
 
     const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
     const url = window.URL.createObjectURL(blob);
@@ -2477,2649 +1059,172 @@ export default function DashboardChatsPage() {
     link.click();
 
     window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
-  };
+  }
 
-  const handleExportThread = () => {
+  function handleTemplateChange(value: string) {
+    setSelectedTemplateId(value);
+    if (value === 'custom') return;
+
+    const template = templateOptions.find((item) => item.id === value);
+    if (!template) return;
+
+    setComposerFlow(null);
+    setDraft(fillTemplateContent(template.content, activeThread, locale, publicPageHref));
+  }
+
+  function applyBotFlow(flow: BotFlow) {
     if (!activeThread) return;
-    handleExportThreadById(activeThread.id);
-  };
 
-  const assistantSummary = useMemo(() => {
-    if (!activeThread) {
-      return locale === 'ru'
-        ? { title: 'Выберите чат', detail: 'Ассистент покажет следующий шаг, быстрые ответы и перенос.' }
-        : { title: 'Choose a chat', detail: 'The assistant will suggest the next step, quick replies, and reschedule slots.' };
-    }
+    const nextVisit =
+      flow === 'reschedule' && transferDate
+        ? `${transferDate}${transferTime ? ` ${transferTime}` : ''}`
+        : activeThread.nextVisit ?? undefined;
 
-    if (activeThread.unreadCount > 0) {
-      return locale === 'ru'
-        ? { title: 'Нужно ответить клиенту', detail: 'Сначала ответьте на вопрос клиента, затем предложите подтверждение или другое время.' }
-        : { title: 'Reply to the client', detail: 'Answer the incoming question first, then offer a confirmation or reschedule.' };
-    }
+    setComposerFlow(flow);
+    setDraft(buildBotDraft(flow, activeThread, locale, nextVisit));
+  }
 
-    if (activeThread.segment === 'new') {
-      return locale === 'ru'
-        ? { title: 'Помогите завершить запись', detail: 'Короткий ответ и один понятный следующий шаг помогают быстрее получить подтверждение.' }
-        : { title: 'Guide the chat to confirmation', detail: 'A short confirmation with one clear next step works best here.' };
-    }
-
-    if (activeThread.segment === 'followup') {
-      return locale === 'ru'
-        ? { title: 'Верните клиента в запись', detail: 'Покажите два ближайших окна и отправьте напоминание.' }
-        : { title: 'Bring the client back', detail: 'Show two nearest slots and keep the post-visit message short.' };
-    }
-
-    return locale === 'ru'
-      ? { title: 'Диалог под контролем', detail: 'Можно отправить детали записи, уточнить время или быстро предложить новое окно.' }
-      : { title: 'The chat is under control', detail: 'You can send booking details, clarify the time, or prepare a reschedule.' };
-  }, [activeThread, locale]);
-
-  const applyQuickTransfer = (date: string, time: string) => {
+  function applyQuickTransfer(date: string, time: string) {
     setTransferDate(date);
     setTransferTime(time);
     setComposerFlow('reschedule');
 
-    if (!activeThread) return;
-
-    const nextVisit = `${date} ${time}`.trim();
-    setDraft(buildBotDraft('reschedule', activeThread, locale, nextVisit));
-  };
-
-  const handleAssistantScenario = (kind: 'confirm' | 'clarify' | 'slots') => {
-    if (!activeThread) return;
-
-    if (kind === 'confirm') {
-      handleApplyBotFlow('confirm');
-      return;
+    if (activeThread) {
+      setDraft(buildBotDraft('reschedule', activeThread, locale, `${date} ${time}`));
     }
-
-    if (kind === 'clarify') {
-      setComposerFlow(null);
-      setDraft(
-        locale === 'ru'
-          ? `Здравствуйте, ${activeThread.clientName}! Подскажите, пожалуйста, какое время вам сейчас удобнее: первая половина дня или ближе к вечеру?`
-          : `Hi ${activeThread.clientName}! Please let me know which time works better for you right now: earlier in the day or closer to the evening?`,
-      );
-      return;
-    }
-
-    setComposerFlow('followup');
-    setDraft(
-      locale === 'ru'
-        ? `Здравствуйте, ${activeThread.clientName}! Могу предложить ближайшие окна: ${assistantSlots
-            .slice(0, 2)
-            .map((slot) => `${formatPickerDateLabel(slot.date, locale)}, ${slot.time}`)
-            .join(' или ')}. Какой вариант вам удобнее?`
-        : `Hi ${activeThread.clientName}! I can offer the nearest slots: ${assistantSlots
-            .slice(0, 2)
-            .map((slot) => `${formatPickerDateLabel(slot.date, locale)}, ${slot.time}`)
-            .join(' or ')}. Which option works better for you?`,
-    );
-  };
-
-  const handleSelectThread = (thread: ChatThreadRecord) => {
-    if (suppressCardClickRef.current) {
-      suppressCardClickRef.current = false;
-      return;
-    }
-
-    setActiveThreadId(thread.id);
-
-    const contexts = getThreadBookingContexts(thread);
-    if (contexts.length && !selectedBookingByThreadId[thread.id]) {
-      setSelectedBookingByThreadId((current) => ({ ...current, [thread.id]: contexts[0].id }));
-    }
-
-    if (typeof window !== 'undefined' && window.location.search) {
-      const currentUrl = new URL(window.location.href);
-      if (currentUrl.searchParams.has('bookingId') || currentUrl.searchParams.has('threadId')) {
-        currentUrl.searchParams.delete('bookingId');
-        currentUrl.searchParams.delete('threadId');
-        window.history.replaceState({}, '', `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`);
-      }
-    }
-
-    if (thread.unreadCount > 0) {
-      void applyLocalThreadPatch(thread.id, { unreadCount: 0 });
-    }
-
-    if (isMobile) {
-      setMobileThreadOpen(true);
-    }
-  };
-
-  useEffect(() => {
-    if (!isMobile) {
-      setMobileThreadOpen(false);
-      return;
-    }
-
-    if (!mobileThreadOpen) return;
-
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    return () => {
-      document.body.style.overflow = previous;
-    };
-  }, [isMobile, mobileThreadOpen]);
-
-  const segmentOptions = [
-    { value: 'all', label: labels.allThreads },
-    { value: 'new', label: labels.newThreads },
-    { value: 'active', label: labels.activeThreads },
-    { value: 'followup', label: labels.followupThreads },
-  ] as const;
-
-  const channelOptions = [
-    { value: 'all', label: labels.allChannels },
-    { value: 'Web', label: 'Web' },
-    { value: 'Telegram', label: locale === 'ru' ? 'ТГ' : 'Telegram' },
-    { value: 'Instagram', label: locale === 'ru' ? 'Инстаграм' : 'Instagram' },
-    { value: 'VK', label: locale === 'ru' ? 'ВК' : 'VK' },
-  ] as const;
-
-  const sortOptions = [
-    { value: 'recent', label: labels.recentSort },
-    { value: 'unread', label: labels.unreadSort },
-    { value: 'priority', label: labels.prioritySort },
-  ] as const;
-
-  const handleThreadKeyboardSelect = (
-    event: ReactKeyboardEvent<HTMLDivElement>,
-    thread: ChatThreadRecord,
-  ) => {
-    if (event.target !== event.currentTarget) return;
-
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      handleSelectThread(thread);
-    }
-  };
-
-  if (!hasHydrated || !mounted) {
-    return null;
   }
 
-  const miniActionClass = (active = false) =>
-    cn(
-      'inline-flex h-8 items-center justify-center gap-1.5 rounded-[9px] border px-2.5 text-[11px] font-semibold transition-[background,border-color,color,transform] duration-150 active:scale-[0.985]',
-      active
-        ? 'cb-accent-pill-active'
-        : isLight
-          ? 'border-black/[0.08] bg-white/70 text-black/54 hover:border-black/[0.14] hover:bg-white hover:text-black'
-          : 'border-white/[0.08] bg-white/[0.035] text-white/50 hover:border-white/[0.14] hover:bg-white/[0.06] hover:text-white',
-    );
-
-  const renderThreadCard = (
-    thread: ChatThreadRecord,
-    index: number,
-    options?: {
-      mobile?: boolean;
-      dragging?: boolean;
-      preview?: boolean;
-    },
-  ) => {
-    const mobile = Boolean(options?.mobile);
-    const preview = Boolean(options?.preview);
-    const active = thread.id === activeThreadId;
-    const pinned = isThreadPinned(thread.id);
-    const activeAlert = getThreadActiveAlert(thread);
-    const bookingContextCount = getThreadBookingContexts(thread).length;
-    const canDrag = !mobile && filteredThreads.length > 1 && !preview;
-    const serviceLabel = getThreadServiceLabel(thread);
-    const bookingCode = getThreadBookingCode(thread);
-    const contextLine = getThreadContextLine(thread, locale);
-
-    return (
-      <div
-        ref={preview ? undefined : setThreadItemRef(thread.id)}
-        role={preview ? undefined : 'button'}
-        tabIndex={preview ? undefined : 0}
-        onClick={preview ? undefined : () => handleSelectThread(thread)}
-        onKeyDown={preview ? undefined : (event) => handleThreadKeyboardSelect(event, thread)}
-        onContextMenu={
-          preview
-            ? undefined
-            : (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                setActiveThreadId(thread.id);
-                setThreadContextMenu({ threadId: thread.id, x: event.clientX, y: event.clientY });
-              }
-        }
-        className={cn(
-          'group relative overflow-hidden rounded-[13px] border text-left outline-none transition-[background,border-color,box-shadow,opacity,transform,filter] duration-150',
-          mobile ? 'px-3 py-2.5' : 'px-3 py-2.5',
-          active
-            ? isLight
-              ? 'border-black/[0.14] bg-white shadow-[0_10px_26px_rgba(17,17,17,0.045)]'
-              : 'border-white/[0.14] bg-white/[0.07] shadow-[0_12px_28px_rgba(0,0,0,0.22)]'
-            : isLight
-              ? 'border-black/[0.06] bg-transparent hover:border-black/[0.1] hover:bg-white/72'
-              : 'border-white/[0.06] bg-transparent hover:border-white/[0.1] hover:bg-white/[0.04]',
-          pinned && !active && (isLight ? 'bg-white/45' : 'bg-white/[0.032]'),
-          activeAlert && warningTone(isLight),
-        )}
-        aria-label={labels.openThread}
-      >
-        {active ? (
-          <span
-            className="absolute bottom-2 left-1 top-2 w-[3px] rounded-full"
-            style={{ background: accentColor }}
-          />
-        ) : null}
-
-        <div className="flex min-w-0 items-start gap-2.5 pl-1">
-          {canDrag ? (
-            <button
-              type="button"
-              title={labels.dragThread}
-              aria-label={labels.dragThread}
-              className={cn(
-                'mt-1 hidden size-6 shrink-0 cursor-grab items-center justify-center rounded-[8px] border opacity-0 transition group-hover:flex group-hover:opacity-100 active:cursor-grabbing',
-                isLight
-                  ? 'border-black/[0.06] bg-white text-black/28 hover:text-black/58'
-                  : 'border-white/[0.07] bg-white/[0.035] text-white/28 hover:text-white/58',
-              )}
-              onClick={(event) => event.stopPropagation()}
-              onPointerDown={(event) => beginThreadDrag(event, thread.id, index)}
-            >
-              <GripVertical className="size-3.5" />
-            </button>
-          ) : null}
-
-          <div
-            className={cn(
-              'relative grid size-9 shrink-0 place-items-center rounded-full border text-[11px] font-semibold tracking-[-0.02em]',
-              isLight
-                ? 'border-black/[0.07] bg-black/[0.025] text-black'
-                : 'border-white/[0.08] bg-white/[0.04] text-white',
-            )}
-          >
-            {getInitials(thread.clientName)}
-
-            {thread.unreadCount > 0 ? (
-              <span
-                className="absolute -right-1 -top-1 grid min-w-[16px] place-items-center rounded-full px-1 py-[1px] text-[8px] font-semibold text-white"
-                style={{ background: accentColor }}
-              >
-                {thread.unreadCount}
-              </span>
-            ) : null}
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <div className="flex min-w-0 items-center gap-1.5">
-                  <div className={cn('truncate text-[12.5px] font-semibold tracking-[-0.018em]', pageText(isLight))}>
-                    {thread.clientName}
-                  </div>
-
-                  {pinned ? <Pin className="size-3 shrink-0 fill-current" style={{ color: accentColor }} /> : null}
-                  {thread.isPriority ? <Star className="size-3 shrink-0 fill-current" style={{ color: accentColor }} /> : null}
-                </div>
-
-                <div className={cn('mt-0.5 truncate text-[10px] font-semibold', mutedText(isLight))}>
-                  {bookingCode ? `${bookingCode} · ` : ''}
-                  {serviceLabel ?? contextLine ?? (locale === 'ru' ? 'Запись' : 'Booking')}
-                </div>
-              </div>
-
-              <div className="flex shrink-0 items-center gap-1">
-                {bookingContextCount > 1 ? (
-                  <span
-                    className={cn(
-                      'inline-flex h-5 items-center gap-1 rounded-full border px-1.5 text-[8.5px] font-semibold',
-                      isLight
-                        ? 'border-black/[0.07] bg-white text-black/45'
-                        : 'border-white/[0.08] bg-white/[0.035] text-white/45',
-                    )}
-                  >
-                    <CalendarClock className="size-2.5" />
-                    {bookingContextCount}
-                  </span>
-                ) : null}
-
-                <button
-                  type="button"
-                  className={cn(
-                    'flex size-7 items-center justify-center rounded-full border opacity-50 transition hover:opacity-100',
-                    isLight
-                      ? 'border-black/[0.06] bg-white/70 text-black/36 hover:text-black/70'
-                      : 'border-white/[0.07] bg-white/[0.03] text-white/34 hover:text-white/70',
-                  )}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    const rect = (event.currentTarget as HTMLButtonElement).getBoundingClientRect();
-                    setActiveThreadId(thread.id);
-                    setThreadContextMenu({ threadId: thread.id, x: rect.left, y: rect.bottom + 6 });
-                  }}
-                  aria-label={labels.moreActions}
-                  title={labels.moreActions}
-                >
-                  <MoreHorizontal className="size-3.5" />
-                </button>
-              </div>
-            </div>
-
-            {thread.lastMessagePreview ? (
-              <div className={cn('mt-1 line-clamp-1 text-[10.5px] leading-4', mutedText(isLight))}>
-                {thread.lastMessagePreview}
-              </div>
-            ) : null}
-
-            <div className="mt-2 flex min-w-0 items-center gap-1.5 overflow-hidden">
-              <span
-                className={cn(
-                  'inline-flex h-5 max-w-[74px] shrink-0 items-center rounded-full border px-2 text-[8.5px] font-semibold',
-                  isLight
-                    ? 'border-black/[0.06] bg-white/55 text-black/42'
-                    : 'border-white/[0.07] bg-white/[0.032] text-white/42',
-                )}
-              >
-                <span className="truncate">{channelLabel(thread.channel)}</span>
-              </span>
-
-              <span className={cn('shrink-0 text-[9.5px]', faintText(isLight))}>
-                {formatTimeLabel(thread.lastMessageAt, locale)}
-              </span>
-
-              {thread.botConnected ? (
-                <span className={cn('inline-flex h-5 shrink-0 items-center gap-1 rounded-full px-1.5 text-[8.5px]', isLight ? 'bg-black/[0.025] text-black/42' : 'bg-white/[0.032] text-white/40')}>
-                  <Bot className="size-2.5" />
-                  {locale === 'ru' ? 'бот' : 'bot'}
-                </span>
-              ) : null}
-
-              {activeAlert ? (
-                <span className={cn('inline-flex h-5 shrink-0 items-center gap-1 rounded-full border px-1.5 text-[8.5px]', warningTone(isLight))}>
-                  <AlertTriangle className="size-2.5" />
-                  {labels.rescheduleAlertShort}
-                </span>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderThreadList = (mobile = false) => {
-    if (isLoading) {
-      return (
-        <div className={cn('space-y-2.5', mobile && 'space-y-2')}>
-          {Array.from({ length: mobile ? 5 : 7 }).map((_, index) => (
-            <Panel key={index} light={isLight} className={cn('animate-pulse rounded-[16px]', mobile ? 'h-[84px]' : 'h-[98px]')} />
-          ))}
-        </div>
-      );
-    }
-
-    if (filteredThreads.length === 0) {
-      return <EmptyState text={labels.emptyList} hint={labels.emptyListHint} light={isLight} />;
-    }
-
-    return (
-      <>
-        <div
-          className={cn(
-            'relative space-y-2.5 transition-[filter,opacity] duration-150',
-            mobile && 'space-y-2',
-            dragState?.active && 'select-none',
-          )}
-        >
-          {filteredThreads.map((thread, index) => {
-            const isDragged = draggedId === thread.id;
-            const dragSlotHeight = isDragged
-              ? dragState?.cardRect.height ?? itemRefs.current[thread.id]?.getBoundingClientRect().height ?? 104
-              : undefined;
-
-            return (
-              <div
-                key={thread.id}
-                className={cn('relative', isDragged && 'opacity-30 blur-[1px]')}
-                style={dragSlotHeight ? { minHeight: dragSlotHeight } : undefined}
-              >
-                {dragState?.active && dropIndex === index ? (
-                  <div className="px-1 py-1">
-                    <div
-                      className={cn(
-                        'flex h-10 items-center justify-center rounded-[12px] border border-dashed text-[9.5px] font-semibold uppercase tracking-[0.14em]',
-                        isLight ? 'text-black/42' : 'text-white/45',
-                      )}
-                      style={{
-                        borderColor: `color-mix(in srgb, ${accentColor} 45%, transparent)`,
-                        background: `color-mix(in srgb, ${accentColor} ${isLight ? '7%' : '10%'}, transparent)`,
-                      }}
-                    >
-                      {labels.dropHere}
-                    </div>
-                  </div>
-                ) : null}
-
-                <motion.div layout="position" transition={{ type: 'spring', stiffness: 520, damping: 42, mass: 0.72 }}>
-                  {renderThreadCard(thread, index, { mobile })}
-                </motion.div>
-              </div>
-            );
-          })}
-
-          {dragState?.active && dropIndex === filteredThreads.length ? (
-            <div className="px-1 py-1">
-              <div
-                className={cn(
-                  'flex h-10 items-center justify-center rounded-[12px] border border-dashed text-[9.5px] font-semibold uppercase tracking-[0.14em]',
-                  isLight ? 'text-black/42' : 'text-white/45',
-                )}
-                style={{
-                  borderColor: `color-mix(in srgb, ${accentColor} 45%, transparent)`,
-                  background: `color-mix(in srgb, ${accentColor} ${isLight ? '7%' : '10%'}, transparent)`,
-                }}
-              >
-                {labels.dropEnd}
-              </div>
-            </div>
-          ) : null}
-        </div>
-
-        {dragState?.active && draggedThread && typeof document !== 'undefined'
-          ? createPortal(
-              <motion.div
-                className="pointer-events-none fixed"
-                style={{
-                  top: dragState.cardRect.top,
-                  left: dragState.cardRect.left,
-                  width: dragState.cardRect.width,
-                  x: dragSpringX,
-                  y: dragSpringY,
-                  zIndex: 90,
-                }}
-                initial={false}
-                animate={{ scale: 1.018, rotate: 0.25 }}
-                transition={{ type: 'spring', stiffness: 680, damping: 42, mass: 0.5 }}
-              >
-                <div
-                  className={cn(
-                    'absolute -inset-2 rounded-[20px] border backdrop-blur-[18px]',
-                    isLight
-                      ? 'border-black/[0.08] bg-white/45 shadow-[0_26px_90px_rgba(15,15,15,0.18)]'
-                      : 'border-white/[0.10] bg-black/35 shadow-[0_26px_90px_rgba(0,0,0,0.45)]',
-                  )}
-                  style={{
-                    background: `linear-gradient(135deg, color-mix(in srgb, ${accentColor} ${isLight ? '10%' : '16%'}, transparent), ${
-                      isLight ? 'rgba(255,255,255,0.48)' : 'rgba(10,10,10,0.48)'
-                    })`,
-                  }}
-                />
-                <div className="relative">{renderThreadCard(draggedThread, dragState.originIndex, { preview: true })}</div>
-              </motion.div>,
-              document.body,
-            )
-          : null}
-      </>
-    );
-  };
-
-  const renderMessageFeed = (mobile = false) => {
-    if (!activeThread) {
-      return (
-        <div className={cn('grid h-full place-items-center rounded-[18px] border border-dashed px-5 text-center', borderTone(isLight))}>
-          <div>
-            <div className={cn('text-[14px] font-semibold', pageText(isLight))}>{labels.emptyThread}</div>
-            <div className={cn('mt-2 max-w-[420px] text-[11px] leading-5', mutedText(isLight))}>{labels.emptyThreadHint}</div>
-          </div>
-        </div>
-      );
-    }
-
-    if (activeThread.messages.length === 0) {
-      return (
-        <div className={cn('grid h-full place-items-center rounded-[18px] border border-dashed px-5 text-center', borderTone(isLight))}>
-          <div>
-            <div className={cn('text-[14px] font-semibold', pageText(isLight))}>{labels.emptyHistory}</div>
-            <div className={cn('mt-2 max-w-[420px] text-[11px] leading-5', mutedText(isLight))}>{labels.emptyHistoryHint}</div>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className={cn('mx-auto flex min-h-full w-full flex-col justify-end gap-3', mobile ? 'max-w-full' : 'max-w-[760px]')}>
-        {activeThread.messages.map((message, index) => {
-          const mine = message.author === 'master' || message.author === 'system';
-          const status = deliveryLabel(message.deliveryState, locale);
-          const currentDay = message.createdAt.slice(0, 10);
-          const previousDay = activeThread.messages[index - 1]?.createdAt.slice(0, 10);
-          const showDayDivider = currentDay !== previousDay;
-
-          return (
-            <div key={message.id} className="space-y-2">
-              {showDayDivider ? (
-                <div className="flex items-center gap-2.5 py-1.5">
-                  <div className={cn('h-px flex-1', isLight ? 'bg-black/[0.07]' : 'bg-white/[0.07]')} />
-                  <div className={cn('text-[9.5px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>
-                    {formatLongDateLabel(message.createdAt, locale)}
-                  </div>
-                  <div className={cn('h-px flex-1', isLight ? 'bg-black/[0.07]' : 'bg-white/[0.07]')} />
-                </div>
-              ) : null}
-
-              <div className={cn('flex items-end gap-2', mine ? 'justify-end' : 'justify-start')}>
-                {!mine ? (
-                  <div className={cn('mb-1 grid size-7 shrink-0 place-items-center rounded-[10px] text-[10px] font-semibold', isLight ? 'bg-black/[0.04] text-black' : 'bg-white/[0.055] text-white')}>
-                    {getInitials(activeThread.clientName)}
-                  </div>
-                ) : null}
-
-                <div
-                  className={cn(
-                    'rounded-[18px] border',
-                    mobile ? 'max-w-[88%] px-3 py-2.5' : 'max-w-[72%] px-4 py-3',
-                    mine
-                      ? isLight
-                        ? 'border-black/[0.08] bg-[#111] text-white'
-                        : 'border-white/[0.10] bg-white text-black'
-                      : isLight
-                        ? 'border-black/[0.07] bg-white text-black shadow-[0_10px_26px_rgba(17,17,17,0.035)]'
-                        : 'border-white/[0.08] bg-white/[0.045] text-white',
-                  )}
-                  style={
-                    mine && (message.viaBot || message.author === 'system')
-                      ? {
-                          background: `color-mix(in srgb, ${accentColor} ${isLight ? '22%' : '26%'}, ${isLight ? '#111111' : '#ffffff'})`,
-                        }
-                      : undefined
-                  }
-                >
-                  <div className={cn('whitespace-pre-wrap', mobile ? 'text-[12px] leading-[1.15rem]' : 'text-[13px] leading-5')}>
-                    {message.body}
-                  </div>
-
-                  <div className={cn('mt-2 flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-[9.5px]', mine ? (isLight ? 'text-white/62' : 'text-black/58') : mutedText(isLight))}>
-                    {message.viaBot ? (
-                      <span className="inline-flex items-center gap-1">
-                        <Bot className="size-3" />
-                        {labels.byBot}
-                      </span>
-                    ) : null}
-                    {status ? (
-                      <span className="inline-flex items-center gap-1">
-                        <CheckCheck className="size-3" />
-                        {status}
-                      </span>
-                    ) : null}
-                    <span>{formatTimeLabel(message.createdAt, locale)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-        <div ref={messageBottomRef} className="h-px shrink-0" aria-hidden />
-      </div>
-    );
-  };
-
-  const renderRescheduleBlock = (mobile = false) => {
-    if (composerFlow !== 'reschedule') return null;
-
-    return (
-      <div className={cn('rounded-[16px] border p-3', insetTone(isLight), mobile && 'p-2.5')}>
-        <div className={cn('mb-2 text-[10px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>{labels.newSlot}</div>
-        <div className="mb-2 flex flex-wrap gap-1.5">
-          {quickTransferPresets.map((preset) => (
-            <button key={preset.id} type="button" className={miniActionClass(transferDate === preset.date)} onClick={() => applyQuickTransfer(preset.date, preset.time)}>
-              {preset.label}
-            </button>
-          ))}
-        </div>
-
-        <div className={cn('grid gap-2', mobile ? 'grid-cols-1' : 'grid-cols-[minmax(0,1fr)_140px_auto]')}>
-          {mobile ? (
-            <Input type="date" value={transferDate} onChange={(event) => setTransferDate(event.target.value)} className={cn('h-10 rounded-[10px]', inputTone(isLight))} />
-          ) : (
-            <Popover>
-              <PopoverTrigger asChild>
-                <button type="button" className={cn('flex h-10 w-full items-center justify-between gap-3 rounded-[10px] border px-3 text-[12px] font-semibold', inputTone(isLight))}>
-                  <span className="inline-flex min-w-0 items-center gap-2">
-                    <CalendarDays className={cn('size-4 shrink-0', mutedText(isLight))} />
-                    <span className="truncate">{transferDate ? formatPickerDateLabel(transferDate, locale) : labels.date}</span>
-                  </span>
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className={cn('w-auto p-1', glassMenuContentClass(isLight))} style={glassMenuSurfaceStyle(isLight, accentColor)} align="start">
-                <Calendar
-                  mode="single"
-                  selected={transferDate ? new Date(`${transferDate}T00:00:00`) : undefined}
-                  onSelect={(date) => {
-                    if (!date) return;
-                    setTransferDate(toLocalIsoDate(date));
-                  }}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          )}
-
-          {mobile ? (
-            <Input type="time" step="1800" value={transferTime} onChange={(event) => setTransferTime(event.target.value)} className={cn('h-10 rounded-[10px]', inputTone(isLight))} />
-          ) : (
-            <Select value={transferTime} onValueChange={setTransferTime}>
-              <SelectTrigger className={selectTriggerClass(isLight)}>
-                <div className="flex w-full items-center justify-between gap-2">
-                  <span className="inline-flex min-w-0 items-center gap-2">
-                    <Clock3 className="size-4 shrink-0" />
-                    <span className="truncate">{transferTime || labels.time}</span>
-                  </span>
-                </div>
-              </SelectTrigger>
-              <SelectContent className={selectContentClass(isLight)} style={glassMenuSurfaceStyle(isLight, accentColor)}>
-                {TIME_OPTIONS.map((value) => {
-                  const active = transferTime === value;
-                  return (
-                    <SelectItem key={value} value={value} className={dropdownItemTone(isLight, active)}>
-                      <DropdownOption label={value} active={active} light={isLight} minWidth="100%" />
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-          )}
-
-          <button type="button" onClick={handleApplyTransfer} disabled={!activeThread || !transferDate} className={cn(buttonBase(isLight, true), 'h-10 disabled:pointer-events-none disabled:opacity-45')}>
-            <CalendarClock className="size-3.5" />
-            {labels.applyTransfer}
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  const renderComposer = (mobile = false) => (
-    <footer
-      className={cn(
-        'shrink-0 border-t',
-        borderTone(isLight),
-        isLight ? 'bg-white/92' : 'bg-[#101010]/95',
-        mobile ? 'px-3 py-2.5 pb-[calc(env(safe-area-inset-bottom,0px)+0.65rem)]' : 'px-4 py-3',
-      )}
-    >
-      <div className="space-y-2.5">
-        <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-          <button type="button" className={miniActionClass(composerFlow === 'confirm')} disabled={!activeThread} onClick={() => handleApplyBotFlow('confirm')}>
-            <CheckCheck className="size-3.5" />
-            {labels.confirm}
-          </button>
-          <button
-            type="button"
-            className={miniActionClass(composerFlow === 'reschedule')}
-            disabled={!activeThread}
-            onClick={() => {
-              if (composerFlow === 'reschedule') {
-                setComposerFlow(null);
-                return;
-              }
-              const fallbackPreset = quickTransferPresets[0];
-              if (fallbackPreset) applyQuickTransfer(fallbackPreset.date, fallbackPreset.time);
-              else setComposerFlow('reschedule');
-            }}
-          >
-            <ArrowRightLeft className="size-3.5" />
-            {labels.reschedule}
-          </button>
-          <button type="button" className={miniActionClass(composerFlow === 'followup')} disabled={!activeThread} onClick={() => handleApplyBotFlow('followup')}>
-            <Sparkles className="size-3.5" />
-            {labels.followup}
-          </button>
-        </div>
-
-        {renderRescheduleBlock(mobile)}
-
-        <div className={cn('grid gap-2', mobile ? 'grid-cols-1' : 'grid-cols-[176px_minmax(0,1fr)]')}>
-          {!mobile ? (
-            <Select value={selectedTemplateId} onValueChange={handleTemplateChange}>
-              <SelectTrigger className={selectTriggerClass(isLight)}>
-                <SelectValue placeholder={labels.template} />
-              </SelectTrigger>
-              <SelectContent className={selectContentClass(isLight)} style={glassMenuSurfaceStyle(isLight, accentColor)}>
-                <SelectItem value="custom" className={dropdownItemTone(isLight, selectedTemplateId === 'custom')}>
-                  <DropdownOption label={labels.template} active={selectedTemplateId === 'custom'} light={isLight} minWidth="100%" />
-                </SelectItem>
-                {templateOptions.map((template) => {
-                  const active = selectedTemplateId === template.id;
-                  return (
-                    <SelectItem key={template.id} value={template.id} className={dropdownItemTone(isLight, active)}>
-                      <DropdownOption label={template.title} active={active} light={isLight} minWidth="100%" />
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-          ) : null}
-
-          <div className="grid gap-2">
-            {mobile && activeThread && templateOptions.length ? (
-              <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-                {templateOptions.slice(0, 3).map((template) => (
-                  <button
-                    key={template.id}
-                    type="button"
-                    className={cn(
-                      'h-7 shrink-0 rounded-[9px] border px-3 text-[10px] font-semibold transition',
-                      selectedTemplateId === template.id
-                        ? 'cb-accent-pill-active'
-                        : isLight
-                          ? 'border-black/[0.08] bg-white text-black/50'
-                          : 'border-white/[0.08] bg-white/[0.04] text-white/44',
-                    )}
-                    onClick={() => handleTemplateChange(template.id)}
-                  >
-                    {template.title}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-
-            <div className={cn('rounded-[16px] border p-2', isLight ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.035]')}>
-              <Textarea
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={handleComposerKeyDown}
-                placeholder={labels.messagePlaceholder}
-                className={cn(
-                  'min-h-[52px] resize-none border-0 bg-transparent px-1 py-1 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0',
-                  mobile ? 'text-[12px]' : 'text-[13px]',
-                  pageText(isLight),
-                )}
-                disabled={!activeThread}
-              />
-
-              <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
-                <div className={cn('flex items-center gap-1.5 text-[10px]', mutedText(isLight))}>
-                  <UserRound className="size-3.5" />
-                  <span>{activeThread ? activeThread.clientName : '—'}</span>
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  <button type="button" className={miniActionClass(false)} onClick={() => setDraft('')} disabled={!draft}>
-                    {labels.clear}
-                  </button>
-                  <button type="button" className={miniActionClass(true)} onClick={handleSendMessage} disabled={!activeThread || !draft.trim() || isSending}>
-                    <SendHorizonal className="size-3.5" />
-                    {labels.send}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {error ? <div className="text-[11px] text-destructive">{error}</div> : null}
-      </div>
-    </footer>
-  );
-
-  const renderChatHeader = (mobile = false) => {
-    if (!activeThread) {
-      return (
-        <header className={cn('shrink-0 border-b px-4 py-3', borderTone(isLight), isLight ? 'bg-white' : 'bg-[#101010]')}>
-          <div className={cn('text-[14px] font-semibold', pageText(isLight))}>{labels.emptyThread}</div>
-        </header>
-      );
-    }
-
-    const activePinned = isThreadPinned(activeThread.id);
-    const activeAlert = getThreadActiveAlert(activeThread);
-
-    return (
-      <header className={cn('shrink-0 border-b px-4 py-3', borderTone(isLight), isLight ? 'bg-white/92' : 'bg-[#101010]/95')}>
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-3">
-            {mobile ? (
-              <button type="button" className={cn('size-9 px-0', buttonBase(isLight))} onClick={() => setMobileThreadOpen(false)}>
-                <ChevronLeft className="size-4" />
-              </button>
-            ) : null}
-
-            <div className={cn('grid size-10 shrink-0 place-items-center rounded-[14px] border text-[12px] font-semibold', isLight ? 'border-black/[0.07] bg-black/[0.025] text-black' : 'border-white/[0.08] bg-white/[0.045] text-white')}>
-              {getInitials(activeThread.clientName)}
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                <div className={cn('truncate text-[18px] font-semibold tracking-[-0.035em]', pageText(isLight))}>{activeThread.clientName}</div>
-                <MicroLabel light={isLight} className="h-6 px-2 py-0 text-[9px]">{channelLabel(activeThread.channel)}</MicroLabel>
-                <MicroLabel light={isLight} active className="h-6 px-2 py-0 text-[9px]">{segmentBadgeLabel(activeThread.segment, locale)}</MicroLabel>
-                {activePinned ? <MicroLabel light={isLight} active className="h-6 px-2 py-0 text-[9px]"><Pin className="size-3 fill-current" />{labels.pinned}</MicroLabel> : null}
-              </div>
-
-              {selectedBookingContext ? (
-                <div className={cn('mt-1 truncate text-[11.5px] font-semibold', pageText(isLight))}>{getBookingContextLabel(selectedBookingContext, locale)}</div>
-              ) : getThreadContextLine(activeThread, locale) ? (
-                <div className={cn('mt-1 truncate text-[11.5px] font-semibold', pageText(isLight))}>{getThreadContextLine(activeThread, locale)}</div>
-              ) : null}
-
-              {activeBookingContexts.length > 1 ? (
-                <div className="mt-2 flex max-w-full gap-1.5 overflow-x-auto pb-1">
-                  {activeBookingContexts.map((context) => {
-                    const selected = context.id === selectedBookingId;
-                    return (
-                      <button
-                        key={context.id}
-                        type="button"
-                        onClick={() => setSelectedBookingByThreadId((current) => ({ ...current, [activeThread.id]: context.id }))}
-                        className={cn(
-                          'inline-flex max-w-[220px] shrink-0 items-center gap-1.5 rounded-[9px] border px-2 py-1 text-[10px] font-semibold transition active:scale-[0.985]',
-                          selected
-                            ? 'cb-accent-pill-active'
-                            : isLight
-                              ? 'border-black/[0.08] bg-white text-black/48 hover:text-black'
-                              : 'border-white/[0.08] bg-white/[0.04] text-white/42 hover:text-white',
-                        )}
-                        title={getBookingContextLabel(context, locale)}
-                      >
-                        <span className="truncate">{getBookingContextShortLabel(context, locale)}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : null}
-
-              <div className={cn('mt-2 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 text-[10.5px]', mutedText(isLight))}>
-                <span className="inline-flex items-center gap-1.5"><Bot className="size-3.5" />{activeThread.botConnected ? (locale === 'ru' ? 'КликБук бот' : 'ClickBook bot') : labels.botOff}</span>
-                <span className={faintText(isLight)}>•</span>
-                <span className="truncate">{labels.clientPhone}: {activeThread.clientPhone}</span>
-                <span className={faintText(isLight)}>•</span>
-                <span className="truncate">{labels.nextVisit}: {activeThread.nextVisit ? formatDateLabel(activeThread.nextVisit, locale) : labels.notScheduled}</span>
-              </div>
-
-              {activeAlert ? (
-                <div className={cn('mt-3 rounded-[13px] border px-3 py-2.5', warningTone(isLight))}>
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                    <div className="min-w-0">
-                      <div className="text-[12px] font-semibold tracking-[-0.02em]">{labels.rescheduleAlert}</div>
-                      <div className={cn('mt-1 text-[10.5px] leading-4', isLight ? 'text-amber-950/70' : 'text-amber-100/70')}>
-                        {activeAlert.message || labels.rescheduleAlertText}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-1.5">
-            <button type="button" className={miniActionClass(false)} onClick={handleExportThread} disabled={!activeThread}>
-              <Download className="size-3.5" />
-              {!mobile ? labels.export : null}
-            </button>
-            <Popover>
-              <PopoverTrigger asChild>
-                <button type="button" className={cn(miniActionClass(false), 'px-2.5')}>
-                  <MoreVertical className="size-4" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className={cn('w-[240px]', glassMenuContentClass(isLight))} style={glassMenuSurfaceStyle(isLight, accentColor)}>
-                <GlassMenuItem light={isLight} accentColor={accentColor} icon={<Bot className="size-3.5" />} label={activeThread.botConnected ? labels.botConnected : labels.botOff} active={activeThread.botConnected} onClick={() => void applyLocalThreadPatch(activeThread.id, { botConnected: !activeThread.botConnected })} />
-                <GlassMenuItem light={isLight} accentColor={accentColor} icon={<Pin className={cn('size-3.5', activePinned && 'fill-current')} />} label={activePinned ? labels.unpinThread : labels.pinThread} active={activePinned} onClick={() => toggleThreadPin(activeThread.id)} />
-                <GlassMenuItem light={isLight} accentColor={accentColor} icon={<Star className={cn('size-3.5', activeThread.isPriority && 'fill-current')} />} label={activeThread.isPriority ? labels.priorityOn : labels.priorityOff} active={activeThread.isPriority} onClick={() => void applyLocalThreadPatch(activeThread.id, { isPriority: !activeThread.isPriority })} />
-                <div className={menuSeparatorClass(isLight)} />
-                <GlassMenuItem light={isLight} accentColor={accentColor} icon={<Trash2 className="size-3.5" />} label={labels.deleteChat} danger onClick={() => handleDeleteThread(activeThread.id)} />
-              </PopoverContent>
-            </Popover>
-          </div>
-        </div>
-      </header>
-    );
-  };
-
-  const renderFilters = (mobile = false) => (
-    <div className={cn('grid gap-2.5', mobile ? '' : '')}>
-      <div className="flex items-center gap-2">
-        <label className={cn(searchFieldClass(isLight), 'h-9 flex-1 rounded-[12px]')} style={{ background: 'transparent', backgroundColor: 'transparent', boxShadow: 'none' }}>
-          <Search className="size-4 shrink-0 opacity-70" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={labels.search}
-            className="block h-full min-w-0 flex-1 appearance-none rounded-none border-0 p-0 text-[12px] font-medium text-current outline-none placeholder:text-current/55 [background:transparent!important] [box-shadow:none!important]"
-            style={{ background: 'transparent', backgroundColor: 'transparent', boxShadow: 'none', WebkitAppearance: 'none', appearance: 'none' }}
-          />
-        </label>
-
-        <button type="button" className={cn(miniActionClass(showCreatePanel), 'size-9 px-0')} onClick={() => setShowCreatePanel((current) => !current)} title={labels.createThread}>
-          <Plus className="size-4" />
-        </button>
-      </div>
-
-      <ControlGroup light={isLight} className="h-9 w-full overflow-x-auto rounded-[12px]">
-        {segmentOptions.map((option) => (
-          <FilterChip key={option.value} label={option.label} light={isLight} active={segmentFilter === option.value} onClick={() => setSegmentFilter(option.value)} accentColor={accentColor} className="h-9 flex-1" />
-        ))}
-      </ControlGroup>
-
-      <div className="grid grid-cols-2 gap-2">
-        <Select value={channelFilter} onValueChange={(value) => setChannelFilter(value as ChannelFilter)}>
-          <SelectTrigger className={cn(selectTriggerClass(isLight), 'h-9 rounded-[12px]')}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className={selectContentClass(isLight)} style={glassMenuSurfaceStyle(isLight, accentColor)}>
-            {channelOptions.map((option) => {
-              const active = channelFilter === option.value;
-              return (
-                <SelectItem key={option.value} value={option.value} className={dropdownItemTone(isLight, active)}>
-                  <DropdownOption label={option.label} active={active} light={isLight} minWidth="100%" />
-                </SelectItem>
-              );
-            })}
-          </SelectContent>
-        </Select>
-
-        <Select value={sortMode} onValueChange={(value) => setSortMode(value as SortMode)}>
-          <SelectTrigger className={cn(selectTriggerClass(isLight), 'h-9 rounded-[12px]')}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className={selectContentClass(isLight)} style={glassMenuSurfaceStyle(isLight, accentColor)}>
-            {sortOptions.map((option) => {
-              const active = sortMode === option.value;
-              return (
-                <SelectItem key={option.value} value={option.value} className={dropdownItemTone(isLight, active)}>
-                  <DropdownOption label={option.label} active={active} light={isLight} minWidth="100%" />
-                </SelectItem>
-              );
-            })}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {showCreatePanel ? (
-        <div className={cn('grid gap-2 rounded-[16px] border p-2.5', insetTone(isLight))}>
-          <div className={cn('text-[10px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>{labels.createInline}</div>
-          <Input value={newClientName} onChange={(event) => setNewClientName(event.target.value)} placeholder={labels.clientName} className={cn('h-9 rounded-[10px]', inputTone(isLight))} />
-          <Input value={newClientPhone} onChange={(event) => setNewClientPhone(event.target.value)} placeholder={labels.clientPhone} className={cn('h-9 rounded-[10px]', inputTone(isLight))} />
-          <div className="flex items-center justify-end gap-1.5">
-            <button type="button" className={miniActionClass(false)} onClick={() => setShowCreatePanel(false)}>{labels.cancel}</button>
-            <button type="button" className={miniActionClass(true)} onClick={handleCreateThread}><Plus className="size-3.5" />{labels.create}</button>
-          </div>
-        </div>
-      ) : null}
-
-      {error ? <div className="rounded-[10px] border border-destructive/20 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">{error}</div> : null}
-    </div>
-  );
-
-  const renderAssistantPanel = (mobile = false) => (
-    <div className={cn('space-y-3', mobile && 'space-y-2.5')}>
-      <div className={cn('rounded-[18px] border p-4', isLight ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.035]')}>
-        <div className={cn('text-[10px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>{labels.assistant}</div>
-        <div className={cn('mt-2 text-[18px] font-semibold tracking-[-0.04em]', pageText(isLight))}>{assistantSummary.title}</div>
-        <p className={cn('mt-2 text-[12px] leading-5', mutedText(isLight))}>{assistantSummary.detail}</p>
-      </div>
-
-      <div className={cn('rounded-[18px] border p-3', isLight ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.035]')}>
-        <div className={cn('mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>
-          <MessageSquareQuote className="size-3.5" />
-          {labels.quickScenarios}
-        </div>
-        <div className="grid gap-1.5">
-          <button type="button" className={cn(miniActionClass(false), 'h-9 justify-between')} disabled={!activeThread} onClick={() => handleAssistantScenario('confirm')}>
-            {locale === 'ru' ? 'Детали записи' : 'Booking details'}
-            <ChevronRight className="size-4" />
-          </button>
-          <button type="button" className={cn(miniActionClass(false), 'h-9 justify-between')} disabled={!activeThread} onClick={() => handleAssistantScenario('clarify')}>
-            {locale === 'ru' ? 'Уточнить время' : 'Clarify time'}
-            <ChevronRight className="size-4" />
-          </button>
-          <button type="button" className={cn(miniActionClass(false), 'h-9 justify-between')} disabled={!activeThread} onClick={() => handleAssistantScenario('slots')}>
-            {locale === 'ru' ? '2 ближайших окна' : '2 nearest slots'}
-            <ChevronRight className="size-4" />
-          </button>
-        </div>
-      </div>
-
-      <div className={cn('rounded-[18px] border p-3', isLight ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.035]')}>
-        <div className={cn('mb-2 text-[10px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>{labels.quickReschedule}</div>
-        <div className="grid gap-1.5">
-          {assistantSlots.map((slot) => (
-            <button
-              key={slot.id}
-              type="button"
-              onClick={() => applyQuickTransfer(slot.date, slot.time)}
-              className={cn(
-                'flex items-center justify-between rounded-[12px] border px-3 py-2.5 text-left transition active:scale-[0.992]',
-                isLight ? 'border-black/[0.07] bg-white/72 hover:bg-black/[0.018]' : 'border-white/[0.07] bg-white/[0.035] hover:bg-white/[0.055]',
-              )}
-              disabled={!activeThread}
-            >
-              <div className="min-w-0">
-                <div className={cn('truncate text-[12px] font-semibold', pageText(isLight))}>{formatPickerDateLabel(slot.date, locale)}</div>
-                <div className={cn('mt-0.5 text-[10.5px]', mutedText(isLight))}>{slot.time}</div>
-              </div>
-              <ChevronRight className={cn('size-4', mutedText(isLight))} />
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className={cn('rounded-[18px] border p-3', isLight ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.035]')}>
-        <div className={cn('mb-2 text-[10px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>{labels.clientCard}</div>
-        <div className="space-y-2 text-[12px]">
-          {[
-            { label: labels.clientPhone, value: activeThread?.clientPhone ?? '—' },
-            { label: labels.source, value: activeThread?.source ?? '—' },
-            { label: labels.nextVisit, value: activeThread?.nextVisit ? formatLongDateLabel(activeThread.nextVisit, locale) : labels.notScheduled },
-            { label: labels.unread, value: String(activeThread?.unreadCount ?? 0) },
-          ].map((item) => (
-            <div key={item.label} className="flex items-center justify-between gap-3">
-              <span className={mutedText(isLight)}>{item.label}</span>
-              <span className={cn('max-w-[170px] truncate text-right font-medium', pageText(isLight))}>{item.value}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-
-  const contextMenuPortal = (
-    <ThreadContextMenu
-      menu={threadContextMenu}
-      thread={contextThread}
-      light={isLight}
-      accentColor={accentColor}
-      labels={labels}
-      onClose={() => setThreadContextMenu(null)}
-      onToggleBot={() => {
-        if (!contextThread) return;
-        void applyLocalThreadPatch(contextThread.id, { botConnected: !contextThread.botConnected });
-      }}
-      onTogglePin={() => {
-        if (!contextThread) return;
-        toggleThreadPin(contextThread.id);
-      }}
-      onTogglePriority={() => {
-        if (!contextThread) return;
-        void applyLocalThreadPatch(contextThread.id, { isPriority: !contextThread.isPriority });
-      }}
-      onExport={() => {
-        if (!contextThread) return;
-        handleExportThreadById(contextThread.id);
-      }}
-      onDelete={() => {
-        if (!contextThread) return;
-        handleDeleteThread(contextThread.id);
-      }}
-    />
-  );
-
-  const unreadTotal = threads.reduce((sum, thread) => sum + (thread.unreadCount ?? 0), 0);
-  const priorityTotal = threads.filter((thread) => thread.isPriority).length;
-  const activeThreadIndex = activeThread
-    ? Math.max(0, filteredThreads.findIndex((thread) => thread.id === activeThread.id)) + 1
-    : 0;
-
-  const boardStats = [
-    { id: 'all', label: labels.allThreads, value: threads.length, onClick: () => setSegmentFilter('all' as SegmentFilter), active: segmentFilter === 'all' },
-    { id: 'new', label: labels.newThreads, value: threads.filter((thread) => thread.segment === 'new').length, onClick: () => setSegmentFilter('new' as SegmentFilter), active: segmentFilter === 'new' },
-    { id: 'active', label: labels.activeThreads, value: threads.filter((thread) => thread.segment === 'active').length, onClick: () => setSegmentFilter('active' as SegmentFilter), active: segmentFilter === 'active' },
-    { id: 'unread', label: labels.unread, value: unreadTotal, onClick: () => setSortMode('unread'), active: sortMode === 'unread' },
+  function handleApplyTransfer() {
+    if (!activeThread || !transferDate) return;
+
+    const nextVisitIso = `${transferDate}T${transferTime || '12:30'}:00`;
+    void patchThread(activeThread.id, { nextVisit: nextVisitIso, segment: 'active' });
+    applyBotFlow('reschedule');
+  }
+
+  function togglePin(threadId: string) {
+    setPinnedThreadIds((current) => (current.includes(threadId) ? current.filter((id) => id !== threadId) : [threadId, ...current]));
+  }
+
+  if (!hasHydrated || !mounted) return null;
+
+  const selectedThread = activeThread;
+  const hasThreads = filteredThreads.length > 0;
+
+  const stats = [
+    { label: copy.all, value: threads.length, active: segmentFilter === 'all', action: () => setSegmentFilter('all') },
+    { label: copy.unread, value: unreadTotal, active: sortMode === 'unread', action: () => setSortMode('unread') },
+    { label: copy.priority, value: priorityTotal, active: sortMode === 'priority', action: () => setSortMode('priority') },
   ];
 
-  const renderCreatePanel = (compact = false) =>
-    showCreatePanel ? (
-      <div
-        className={cn(
-          'grid gap-2 rounded-[18px] border p-3',
-          isLight ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.035]',
-          compact && 'rounded-[14px] p-2.5',
-        )}
-      >
-        <div className={cn('text-[10px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>
-          {labels.createInline}
-        </div>
-
-        <Input
-          value={newClientName}
-          onChange={(event) => setNewClientName(event.target.value)}
-          placeholder={labels.clientName}
-          className={cn('h-9 rounded-[10px] text-[12px]', inputTone(isLight))}
-        />
-
-        <Input
-          value={newClientPhone}
-          onChange={(event) => setNewClientPhone(event.target.value)}
-          placeholder={labels.clientPhone}
-          className={cn('h-9 rounded-[10px] text-[12px]', inputTone(isLight))}
-        />
-
-        <div className="flex items-center justify-end gap-2">
-          <button type="button" className={buttonBase(isLight)} onClick={() => setShowCreatePanel(false)}>
-            {labels.cancel}
-          </button>
-
-          <button type="button" className={buttonBase(isLight, true)} onClick={handleCreateThread}>
-            <Plus className="size-3.5" />
-            {labels.create}
-          </button>
-        </div>
-      </div>
-    ) : null;
-
-  const renderBoardControls = (compact = false) => (
-    <div className={cn('grid gap-2.5', compact && 'gap-2')}>
-      <div className={cn('grid gap-2', compact ? 'grid-cols-[minmax(0,1fr)_40px]' : 'grid-cols-[minmax(0,1fr)_auto]')}>
-        <label
-          className={cn(searchFieldClass(isLight), compact ? 'h-9 rounded-[12px]' : 'h-10 rounded-[14px]')}
-          style={{ background: 'transparent', backgroundColor: 'transparent', boxShadow: 'none' }}
-        >
-          <Search className="size-4 shrink-0 opacity-70" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={labels.search}
-            className="block h-full min-w-0 flex-1 appearance-none rounded-none border-0 p-0 text-[12px] font-medium text-current outline-none placeholder:text-current/55 [background:transparent!important] [box-shadow:none!important]"
-            style={{ background: 'transparent', backgroundColor: 'transparent', boxShadow: 'none', WebkitAppearance: 'none', appearance: 'none' }}
-          />
-        </label>
-
-        <button
-          type="button"
-          className={cn(buttonBase(isLight, showCreatePanel), compact ? 'size-9 px-0' : 'h-10 rounded-[12px]')}
-          onClick={() => setShowCreatePanel((current) => !current)}
-        >
-          <Plus className="size-3.5" />
-          {compact ? null : showCreatePanel ? labels.closeCreate : labels.createThread}
-        </button>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 xl:grid-cols-[minmax(0,1fr)_120px_120px]">
-        <ControlGroup light={isLight} className="h-9 w-full overflow-x-auto rounded-[12px]">
-          {segmentOptions.map((option) => (
-            <FilterChip
-              key={option.value}
-              label={option.label}
-              light={isLight}
-              active={segmentFilter === option.value}
-              onClick={() => setSegmentFilter(option.value)}
-              accentColor={accentColor}
-              className="h-9 flex-1"
-            />
-          ))}
-        </ControlGroup>
-
-        <Select value={channelFilter} onValueChange={(value) => setChannelFilter(value as ChannelFilter)}>
-          <SelectTrigger className={cn(selectTriggerClass(isLight), 'h-9 rounded-[12px] text-[11px]')}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className={selectContentClass(isLight)} style={glassMenuSurfaceStyle(isLight, accentColor)}>
-            {channelOptions.map((option) => {
-              const active = channelFilter === option.value;
-              return (
-                <SelectItem key={option.value} value={option.value} className={dropdownItemTone(isLight, active)}>
-                  <DropdownOption label={option.label} active={active} light={isLight} minWidth="100%" />
-                </SelectItem>
-              );
-            })}
-          </SelectContent>
-        </Select>
-
-        <Select value={sortMode} onValueChange={(value) => setSortMode(value as SortMode)}>
-          <SelectTrigger className={cn(selectTriggerClass(isLight), 'h-9 rounded-[12px] text-[11px]')}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className={selectContentClass(isLight)} style={glassMenuSurfaceStyle(isLight, accentColor)}>
-            {sortOptions.map((option) => {
-              const active = sortMode === option.value;
-              return (
-                <SelectItem key={option.value} value={option.value} className={dropdownItemTone(isLight, active)}>
-                  <DropdownOption label={option.label} active={active} light={isLight} minWidth="100%" />
-                </SelectItem>
-              );
-            })}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {renderCreatePanel(compact)}
-
-      {error ? (
-        <div className="rounded-[10px] border border-destructive/20 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
-          {error}
-        </div>
-      ) : null}
-    </div>
-  );
-
-  const renderThreadDeck = (mobile = false) => {
-    if (isLoading) {
-      return (
-        <div className="flex gap-2 overflow-hidden">
-          {Array.from({ length: mobile ? 3 : 5 }).map((_, index) => (
-            <div key={index} className={cn('h-[96px] shrink-0 animate-pulse rounded-[18px] border', mobile ? 'w-[260px]' : 'w-[292px]', insetTone(isLight))} />
-          ))}
-        </div>
-      );
-    }
-
-    if (!filteredThreads.length) {
-      return <EmptyState text={labels.emptyList} hint={labels.emptyListHint} light={isLight} />;
-    }
-
-    return (
-      <div className="relative">
-        <div className="flex snap-x gap-2.5 overflow-x-auto pb-1 pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {filteredThreads.map((thread, index) => {
-            const isDragged = draggedId === thread.id;
-
-            return (
-              <div
-                key={thread.id}
-                className={cn('shrink-0 snap-start', mobile ? 'w-[278px]' : 'w-[304px]', isDragged && 'opacity-35 blur-[1px]')}
-              >
-                {dragState?.active && dropIndex === index ? (
-                  <div className="mb-2 h-1 rounded-full" style={{ background: accentColor }} />
-                ) : null}
-                <motion.div layout="position" transition={{ type: 'spring', stiffness: 520, damping: 42, mass: 0.72 }}>
-                  {renderThreadCard(thread, index, { mobile })}
-                </motion.div>
-              </div>
-            );
-          })}
-
-          {dragState?.active && dropIndex === filteredThreads.length ? (
-            <div className="flex w-[72px] shrink-0 items-center justify-center rounded-[16px] border border-dashed" style={{ borderColor: `color-mix(in srgb, ${accentColor} 45%, transparent)` }}>
-              <span className={cn('text-[10px] font-medium', mutedText(isLight))}>{labels.dropEnd}</span>
-            </div>
-          ) : null}
-        </div>
-
-        {dragState?.active && draggedThread && typeof document !== 'undefined'
-          ? createPortal(
-              <motion.div
-                className="pointer-events-none fixed"
-                style={{
-                  top: dragState.cardRect.top,
-                  left: dragState.cardRect.left,
-                  width: dragState.cardRect.width,
-                  x: dragSpringX,
-                  y: dragSpringY,
-                  zIndex: 90,
-                }}
-                initial={false}
-                animate={{ scale: 1.018, rotate: 0.25 }}
-                transition={{ type: 'spring', stiffness: 680, damping: 42, mass: 0.5 }}
-              >
-                <div
-                  className={cn(
-                    'absolute -inset-2 rounded-[18px] border backdrop-blur-[18px]',
-                    isLight
-                      ? 'border-black/[0.08] bg-white/45 shadow-[0_26px_90px_rgba(15,15,15,0.18)]'
-                      : 'border-white/[0.10] bg-black/35 shadow-[0_26px_90px_rgba(0,0,0,0.45)]',
-                  )}
-                />
-                <div className="relative">{renderThreadCard(draggedThread, dragState.originIndex, { dragging: true, preview: true })}</div>
-              </motion.div>,
-              document.body,
-            )
-          : null}
-      </div>
-    );
-  };
-
-  const renderDockButton = ({
-    icon,
-    label,
-    active,
-    value,
-    onClick,
-  }: {
-    icon: ReactNode;
-    label: string;
-    active?: boolean;
-    value?: number;
-    onClick: () => void;
-  }) => (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'group relative flex h-[58px] w-full flex-col items-center justify-center gap-1 rounded-[16px] border text-[9px] font-semibold transition active:scale-[0.985]',
-        active
-          ? 'cb-accent-pill-active'
-          : isLight
-            ? 'border-black/[0.07] bg-white/62 text-black/45 hover:bg-white hover:text-black'
-            : 'border-white/[0.07] bg-white/[0.035] text-white/42 hover:bg-white/[0.06] hover:text-white',
-      )}
-      title={label}
-    >
-      <span className="relative">
-        {icon}
-        {typeof value === 'number' && value > 0 ? (
-          <span className="absolute -right-2 -top-2 grid min-w-[16px] place-items-center rounded-[6px] px-1 py-[1px] text-[8px] text-white" style={{ background: accentColor }}>
-            {value}
-          </span>
-        ) : null}
-      </span>
-      <span className="max-w-full truncate px-1">{label}</span>
-    </button>
-  );
-
-  const renderClientInspector = (mobile = false) => (
-    <div className={cn('grid gap-3', mobile && 'gap-2.5')}>
-      <div
-        className={cn(
-          'rounded-[22px] border p-4',
-          isLight ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.035]',
-        )}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className={cn('text-[10px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>
-              {labels.clientCard}
-            </div>
-            <div className={cn('mt-2 truncate text-[22px] font-semibold tracking-[-0.06em]', pageText(isLight))}>
-              {activeThread?.clientName ?? labels.emptyThread}
-            </div>
-            <div className={cn('mt-1 truncate text-[11px]', mutedText(isLight))}>
-              {activeThread ? [channelLabel(activeThread.channel), activeThread.clientPhone].filter(Boolean).join(' · ') : labels.emptyThreadHint}
-            </div>
-          </div>
-
-          <div className={cn('grid size-11 place-items-center rounded-[15px] border text-[12px] font-semibold', isLight ? 'border-black/[0.07] bg-black/[0.025] text-black' : 'border-white/[0.07] bg-white/[0.035] text-white')}>
-            {activeThread ? getInitials(activeThread.clientName) : <UserRound className="size-4" />}
-          </div>
-        </div>
-
-        <div className="mt-4 grid gap-2 text-[12px]">
-          {[
-            { label: labels.source, value: activeThread?.source ?? '—' },
-            { label: labels.nextVisit, value: activeThread?.nextVisit ? formatLongDateLabel(activeThread.nextVisit, locale) : labels.notScheduled },
-            { label: labels.unread, value: String(activeThread?.unreadCount ?? 0) },
-          ].map((item) => (
-            <div key={item.label} className="flex items-center justify-between gap-3">
-              <span className={mutedText(isLight)}>{item.label}</span>
-              <span className={cn('max-w-[180px] truncate text-right font-medium', pageText(isLight))}>{item.value}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div
-        className={cn(
-          'rounded-[22px] border p-4',
-          isLight ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.035]',
-        )}
-      >
-        <div className={cn('text-[10px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>
-          {labels.assistant}
-        </div>
-        <div className={cn('mt-2 text-[17px] font-semibold tracking-[-0.035em]', pageText(isLight))}>
-          {assistantSummary.title}
-        </div>
-        <p className={cn('mt-2 text-[12px] leading-5', mutedText(isLight))}>{assistantSummary.detail}</p>
-
-        <div className="mt-3 grid gap-1.5">
-          <button type="button" className={cn(buttonBase(isLight), 'h-9 justify-between rounded-[12px]')} disabled={!activeThread} onClick={() => handleAssistantScenario('confirm')}>
-            {locale === 'ru' ? 'Детали записи' : 'Booking details'}
-            <ChevronRight className="size-4" />
-          </button>
-          <button type="button" className={cn(buttonBase(isLight), 'h-9 justify-between rounded-[12px]')} disabled={!activeThread} onClick={() => handleAssistantScenario('clarify')}>
-            {locale === 'ru' ? 'Уточнить время' : 'Clarify time'}
-            <ChevronRight className="size-4" />
-          </button>
-          <button type="button" className={cn(buttonBase(isLight), 'h-9 justify-between rounded-[12px]')} disabled={!activeThread} onClick={() => handleAssistantScenario('slots')}>
-            {locale === 'ru' ? 'Предложить окна' : 'Offer slots'}
-            <ChevronRight className="size-4" />
-          </button>
-        </div>
-      </div>
-
-      <div
-        className={cn(
-          'rounded-[22px] border p-3',
-          isLight ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.035]',
-        )}
-      >
-        <div className={cn('mb-2 text-[10px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>
-          {labels.quickReschedule}
-        </div>
-        <div className="grid gap-1.5">
-          {assistantSlots.map((slot) => (
-            <button
-              key={slot.id}
-              type="button"
-              onClick={() => applyQuickTransfer(slot.date, slot.time)}
-              className={cn(
-                'flex items-center justify-between rounded-[14px] border px-3 py-2.5 text-left transition active:scale-[0.992]',
-                isLight ? 'border-black/[0.07] bg-white/72 hover:bg-black/[0.018]' : 'border-white/[0.07] bg-white/[0.035] hover:bg-white/[0.055]',
-              )}
-              disabled={!activeThread}
-            >
-              <div className="min-w-0">
-                <div className={cn('truncate text-[12px] font-semibold', pageText(isLight))}>{formatPickerDateLabel(slot.date, locale)}</div>
-                <div className={cn('mt-0.5 text-[10.5px]', mutedText(isLight))}>{slot.time}</div>
-              </div>
-              <ChevronRight className={cn('size-4', mutedText(isLight))} />
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-
-
-  const laneDefs = [
-    {
-      id: 'new' as const,
-      title: labels.newThreads,
-      hint: locale === 'ru' ? 'новые заявки и первые ответы' : 'new requests and first replies',
-      items: filteredThreads.filter((thread) => thread.segment === 'new'),
-    },
-    {
-      id: 'active' as const,
-      title: labels.activeThreads,
-      hint: locale === 'ru' ? 'живые диалоги и переносы' : 'live dialogues and reschedules',
-      items: filteredThreads.filter((thread) => thread.segment === 'active'),
-    },
-    {
-      id: 'followup' as const,
-      title: labels.followupThreads,
-      hint: locale === 'ru' ? 'повторы и возврат клиентов' : 'follow-ups and returning clients',
-      items: filteredThreads.filter((thread) => thread.segment === 'followup'),
-    },
-  ];
-
-  const focusThread = activeThread ?? filteredThreads[0] ?? null;
-
-  const boardMeta = [
-    {
-      label: labels.allThreads,
-      value: threads.length,
-      active: segmentFilter === 'all',
-      onClick: () => setSegmentFilter('all'),
-    },
-    {
-      label: labels.unread,
-      value: unreadTotal,
-      active: sortMode === 'unread',
-      onClick: () => setSortMode('unread'),
-    },
-    {
-      label: labels.prioritySort,
-      value: priorityTotal,
-      active: sortMode === 'priority',
-      onClick: () => setSortMode('priority'),
-    },
-  ];
-
-  const renderTicketCard = (
-    thread: ChatThreadRecord,
-    index: number,
-    compact = false,
-  ) => {
+  const renderThreadRow = (thread: ChatThreadRecord) => {
     const active = thread.id === activeThreadId;
-    const pinned = isThreadPinned(thread.id);
-    const activeAlert = getThreadActiveAlert(thread);
-    const bookingContextCount = getThreadBookingContexts(thread).length;
-    const serviceLabel = getThreadServiceLabel(thread);
-    const bookingCode = getThreadBookingCode(thread);
-    const canDrag = filteredThreads.length > 1;
-    const isDragged = draggedId === thread.id;
+    const pinned = pinnedThreadIds.includes(thread.id);
+    const context = getThreadContextLine(thread, locale);
+    const service = getThreadServiceLabel(thread);
 
     return (
-      <div
+      <button
         key={thread.id}
-        ref={setThreadItemRef(thread.id)}
-        role="button"
-        tabIndex={0}
-        onClick={() => handleSelectThread(thread)}
-        onKeyDown={(event) => handleThreadKeyboardSelect(event, thread)}
-        onContextMenu={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          setActiveThreadId(thread.id);
-          setThreadContextMenu({
-            threadId: thread.id,
-            x: event.clientX,
-            y: event.clientY,
-          });
-        }}
+        type="button"
+        onClick={() => selectThread(thread)}
         className={cn(
-          'group relative overflow-hidden rounded-[18px] border text-left outline-none transition-[background,border-color,box-shadow,opacity,transform] duration-150',
-          compact ? 'p-3' : 'p-3.5',
+          'group grid w-full grid-cols-[44px_minmax(0,1fr)_auto] items-start gap-3 px-3 py-3 text-left transition-colors',
           active
             ? isLight
-              ? 'border-black/[0.16] bg-white shadow-[0_18px_45px_rgba(17,17,17,0.07)]'
-              : 'border-white/[0.15] bg-white/[0.07] shadow-[0_20px_60px_rgba(0,0,0,0.34)]'
+              ? 'bg-black/[0.045]'
+              : 'bg-white/[0.07]'
             : isLight
-              ? 'border-black/[0.07] bg-white/72 hover:border-black/[0.12] hover:bg-white hover:shadow-[0_14px_36px_rgba(17,17,17,0.045)]'
-              : 'border-white/[0.07] bg-white/[0.035] hover:border-white/[0.12] hover:bg-white/[0.055]',
-          pinned && (isLight ? 'bg-white' : 'bg-white/[0.06]'),
-          activeAlert && warningTone(isLight),
-          isDragged && 'opacity-35 blur-[1px]',
+              ? 'hover:bg-black/[0.025]'
+              : 'hover:bg-white/[0.04]',
         )}
       >
-        {active ? (
-          <span
-            className="absolute inset-x-3 top-0 h-[2px] rounded-b-full"
-            style={{ background: accentColor }}
-          />
-        ) : null}
-
-        <div className="flex items-start gap-3">
-          <div
-            className={cn(
-              'relative grid shrink-0 place-items-center rounded-[15px] border font-semibold',
-              compact ? 'size-10 text-[11px]' : 'size-11 text-[12px]',
-              isLight
-                ? 'border-black/[0.07] bg-black/[0.025] text-black'
-                : 'border-white/[0.08] bg-white/[0.045] text-white',
-            )}
-          >
-            {getInitials(thread.clientName)}
-            {thread.unreadCount > 0 ? (
-              <span
-                className="absolute -right-1 -top-1 grid min-w-[17px] place-items-center rounded-[7px] px-1 py-[1px] text-[8px] text-white"
-                style={{ background: accentColor }}
-              >
-                {thread.unreadCount}
-              </span>
-            ) : null}
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-start justify-between gap-2">
-              <div className="min-w-0">
-                <div className="flex min-w-0 items-center gap-1.5">
-                  <div className={cn('truncate text-[13px] font-semibold tracking-[-0.02em]', pageText(isLight))}>
-                    {thread.clientName}
-                  </div>
-
-                  {thread.isPriority ? (
-                    <Star className="size-3.5 shrink-0 fill-current" style={{ color: accentColor }} />
-                  ) : null}
-
-                  {pinned ? (
-                    <Pin className={cn('size-3.5 shrink-0 fill-current', mutedText(isLight))} />
-                  ) : null}
-                </div>
-
-                <div className={cn('mt-1 truncate text-[10.5px] font-semibold', pageText(isLight))}>
-                  {bookingCode ? `${bookingCode} · ` : ''}
-                  {serviceLabel ?? getThreadContextLine(thread, locale) ?? (locale === 'ru' ? 'Запись' : 'Booking')}
-                </div>
-              </div>
-
-              <button
-                type="button"
-                className={cn(
-                  'grid size-8 shrink-0 place-items-center rounded-[10px] border opacity-0 transition group-hover:opacity-100',
-                  active && 'opacity-100',
-                  isLight
-                    ? 'border-black/[0.07] bg-white/80 text-black/42 hover:text-black'
-                    : 'border-white/[0.08] bg-black/20 text-white/42 hover:text-white',
-                )}
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  const rect = event.currentTarget.getBoundingClientRect();
-                  setActiveThreadId(thread.id);
-                  setThreadContextMenu({ threadId: thread.id, x: rect.left, y: rect.bottom + 6 });
-                }}
-                aria-label={labels.moreActions}
-              >
-                <MoreHorizontal className="size-4" />
-              </button>
-            </div>
-
-            <div className={cn('mt-2 line-clamp-2 text-[11px] leading-4', mutedText(isLight))}>
-              {thread.lastMessagePreview || (locale === 'ru' ? 'Сообщений пока нет' : 'No messages yet')}
-            </div>
-
-            <div className="mt-3 flex min-w-0 flex-wrap items-center gap-1.5">
-              <MicroLabel light={isLight} className="h-5 px-1.5 py-0 text-[8.5px]">
-                {channelLabel(thread.channel)}
-              </MicroLabel>
-
-              <MicroLabel light={isLight} className="h-5 px-1.5 py-0 text-[8.5px]">
-                {formatTimeLabel(thread.lastMessageAt, locale)}
-              </MicroLabel>
-
-              {thread.botConnected ? (
-                <MicroLabel light={isLight} className="h-5 px-1.5 py-0 text-[8.5px]">
-                  <Bot className="size-2.5" />
-                  bot
-                </MicroLabel>
-              ) : null}
-
-              {bookingContextCount > 1 ? (
-                <MicroLabel light={isLight} active className="h-5 px-1.5 py-0 text-[8.5px]">
-                  <CalendarClock className="size-2.5" />
-                  {bookingContextCount}
-                </MicroLabel>
-              ) : null}
-
-              {activeAlert ? (
-                <MicroLabel light={isLight} className={cn('h-5 px-1.5 py-0 text-[8.5px]', warningTone(isLight))}>
-                  <AlertTriangle className="size-2.5" />
-                  {labels.rescheduleAlertShort}
-                </MicroLabel>
-              ) : null}
-            </div>
-          </div>
-
-          {canDrag ? (
-            <button
-              type="button"
-              title={labels.dragThread}
-              aria-label={labels.dragThread}
-              className={cn(
-                'absolute bottom-3 right-3 grid size-7 cursor-grab place-items-center rounded-[10px] border opacity-0 transition group-hover:opacity-100 active:cursor-grabbing',
-                isLight
-                  ? 'border-black/[0.07] bg-white text-black/34'
-                  : 'border-white/[0.08] bg-black/30 text-white/34',
-              )}
-              onClick={(event) => event.stopPropagation()}
-              onPointerDown={(event) => beginThreadDrag(event, thread.id, index)}
-            >
-              <GripVertical className="size-3.5" />
-            </button>
-          ) : null}
-        </div>
-      </div>
-    );
-  };
-
-  const renderLane = (
-    lane: (typeof laneDefs)[number],
-    compact = false,
-  ) => (
-    <section
-      key={lane.id}
-      className={cn(
-        'flex min-h-0 flex-col overflow-hidden rounded-[24px] border',
-        isLight
-          ? 'border-black/[0.07] bg-white/55'
-          : 'border-white/[0.08] bg-white/[0.025]',
-      )}
-    >
-      <div className={cn('shrink-0 border-b px-3.5 py-3', borderTone(isLight))}>
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className={cn('truncate text-[13px] font-semibold tracking-[-0.02em]', pageText(isLight))}>
-              {lane.title}
-            </div>
-            <div className={cn('mt-0.5 truncate text-[10.5px]', mutedText(isLight))}>
-              {lane.hint}
-            </div>
-          </div>
-
-          <div
-            className={cn(
-              'grid size-7 shrink-0 place-items-center rounded-[10px] text-[11px] font-semibold',
-              isLight ? 'bg-black/[0.045] text-black/58' : 'bg-white/[0.07] text-white/62',
-            )}
-          >
-            {lane.items.length}
-          </div>
-        </div>
-      </div>
-
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2.5">
-        {isLoading ? (
-          Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className={cn('h-[112px] animate-pulse rounded-[18px] border', insetTone(isLight))} />
-          ))
-        ) : lane.items.length ? (
-          lane.items.map((thread, index) => renderTicketCard(thread, index, compact))
-        ) : (
-          <div className={cn('rounded-[18px] border border-dashed px-3 py-5 text-center text-[11px]', borderTone(isLight), mutedText(isLight))}>
-            {labels.emptyList}
-          </div>
-        )}
-      </div>
-    </section>
-  );
-
-  const renderCreateCard = (compact = false) =>
-    showCreatePanel ? (
-      <div
-        className={cn(
-          'rounded-[24px] border p-3',
-          isLight ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.04]',
-        )}
-      >
-        <div className={cn('text-[10px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>
-          {labels.createInline}
-        </div>
-
-        <div className={cn('mt-3 grid gap-2', compact ? 'grid-cols-1' : 'sm:grid-cols-[1fr_1fr_auto]')}>
-          <Input
-            value={newClientName}
-            onChange={(event) => setNewClientName(event.target.value)}
-            placeholder={labels.clientName}
-            className={cn('h-10 rounded-[11px]', inputTone(isLight))}
-          />
-
-          <Input
-            value={newClientPhone}
-            onChange={(event) => setNewClientPhone(event.target.value)}
-            placeholder={labels.clientPhone}
-            className={cn('h-10 rounded-[11px]', inputTone(isLight))}
-          />
-
-          <div className="flex items-center gap-2">
-            <button type="button" className={buttonBase(isLight)} onClick={() => setShowCreatePanel(false)}>
-              {labels.cancel}
-            </button>
-            <button type="button" className={buttonBase(isLight, true)} onClick={handleCreateThread}>
-              <Plus className="size-3.5" />
-              {labels.create}
-            </button>
-          </div>
-        </div>
-      </div>
-    ) : null;
-
-  const renderFocusRoom = (mobile = false) => (
-    <div
-      className={cn(
-        'grid min-h-0 overflow-hidden border',
-        mobile
-          ? 'h-full grid-rows-[auto_minmax(0,1fr)_auto] rounded-none border-0'
-          : 'h-full grid-rows-[auto_minmax(0,1fr)_auto] rounded-[28px]',
-        isLight ? 'border-black/[0.08] bg-white' : 'border-white/[0.09] bg-[#101010]',
-      )}
-    >
-      {renderChatHeader(mobile)}
-
-      <div
-        ref={mobile ? mobileMessageScrollRef : desktopMessageScrollRef}
-        className={cn(
-          'min-h-0 overflow-y-auto',
-          mobile ? 'px-3 py-3' : 'px-5 py-5',
-          isLight ? 'bg-[#f7f6f2]/55' : 'bg-black/20',
-        )}
-      >
-        {renderMessageFeed(mobile)}
-      </div>
-
-      {renderComposer(mobile)}
-    </div>
-  );
-
-
-  const renderStudioCaseCard = (
-    thread: ChatThreadRecord,
-    index: number,
-    compact = false,
-  ) => {
-    const active = thread.id === activeThreadId;
-    const pinned = isThreadPinned(thread.id);
-    const activeAlert = getThreadActiveAlert(thread);
-    const bookingContextCount = getThreadBookingContexts(thread).length;
-    const serviceLabel = getThreadServiceLabel(thread);
-    const bookingCode = getThreadBookingCode(thread);
-    const isDragged = draggedId === thread.id;
-    const canDrag = filteredThreads.length > 1;
-
-    return (
-      <article
-        key={thread.id}
-        ref={setThreadItemRef(thread.id)}
-        role="button"
-        tabIndex={0}
-        onClick={() => handleSelectThread(thread)}
-        onKeyDown={(event) => handleThreadKeyboardSelect(event, thread)}
-        onContextMenu={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          setActiveThreadId(thread.id);
-          setThreadContextMenu({
-            threadId: thread.id,
-            x: event.clientX,
-            y: event.clientY,
-          });
-        }}
-        className={cn(
-          'group relative overflow-hidden rounded-[24px] border p-4 text-left outline-none transition-[background,border-color,box-shadow,opacity,transform] duration-200 active:scale-[0.992]',
-          compact && 'rounded-[22px] p-3.5',
-          active
-            ? isLight
-              ? 'border-black/[0.15] bg-white shadow-[0_22px_70px_rgba(17,17,17,0.085)]'
-              : 'border-white/[0.16] bg-white/[0.075] shadow-[0_24px_80px_rgba(0,0,0,0.42)]'
-            : isLight
-              ? 'border-black/[0.07] bg-white/70 hover:border-black/[0.12] hover:bg-white hover:shadow-[0_18px_54px_rgba(17,17,17,0.052)]'
-              : 'border-white/[0.075] bg-white/[0.032] hover:border-white/[0.13] hover:bg-white/[0.055]',
-          pinned && (isLight ? 'bg-white' : 'bg-white/[0.06]'),
-          activeAlert && warningTone(isLight),
-          isDragged && 'opacity-30 blur-[1px]',
-        )}
-      >
-        <div
-          className="pointer-events-none absolute inset-x-4 top-0 h-px opacity-70"
-          style={{
-            background: active || thread.isPriority || thread.unreadCount > 0
-              ? accentColor
-              : isLight
-                ? 'rgba(0,0,0,0.08)'
-                : 'rgba(255,255,255,0.10)',
-          }}
-        />
-
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-3">
-            <div
-              className={cn(
-                'relative grid shrink-0 place-items-center rounded-[18px] border font-semibold',
-                compact ? 'size-11 text-[12px]' : 'size-12 text-[13px]',
-                isLight
-                  ? 'border-black/[0.07] bg-black/[0.025] text-black'
-                  : 'border-white/[0.08] bg-white/[0.045] text-white',
-              )}
-            >
-              {getInitials(thread.clientName)}
-
-              {thread.unreadCount > 0 ? (
-                <span
-                  className="absolute -right-1 -top-1 grid min-w-[18px] place-items-center rounded-[8px] px-1 py-[1px] text-[8.5px] text-white"
-                  style={{ background: accentColor }}
-                >
-                  {thread.unreadCount}
-                </span>
-              ) : null}
-            </div>
-
-            <div className="min-w-0">
-              <div className="flex min-w-0 items-center gap-1.5">
-                <h3 className={cn('truncate text-[14px] font-semibold tracking-[-0.025em]', pageText(isLight))}>
-                  {thread.clientName}
-                </h3>
-
-                {thread.isPriority ? (
-                  <Star className="size-3.5 shrink-0 fill-current" style={{ color: accentColor }} />
-                ) : null}
-
-                {pinned ? (
-                  <Pin className={cn('size-3.5 shrink-0 fill-current', mutedText(isLight))} />
-                ) : null}
-              </div>
-
-              <div className={cn('mt-1 truncate text-[10.5px] font-semibold', pageText(isLight))}>
-                {bookingCode ? `${bookingCode} · ` : ''}
-                {serviceLabel ?? getThreadContextLine(thread, locale) ?? (locale === 'ru' ? 'Запись' : 'Booking')}
-              </div>
-
-              <div className={cn('mt-1 truncate text-[10px]', mutedText(isLight))}>
-                {[channelLabel(thread.channel), formatDateLabel(thread.lastMessageAt, locale), formatTimeLabel(thread.lastMessageAt, locale)]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </div>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            className={cn(
-              'grid size-8 shrink-0 place-items-center rounded-[12px] border opacity-0 transition group-hover:opacity-100',
-              active && 'opacity-100',
-              isLight
-                ? 'border-black/[0.07] bg-white text-black/40 hover:text-black'
-                : 'border-white/[0.08] bg-black/20 text-white/42 hover:text-white',
-            )}
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              const rect = event.currentTarget.getBoundingClientRect();
-              setActiveThreadId(thread.id);
-              setThreadContextMenu({
-                threadId: thread.id,
-                x: rect.left,
-                y: rect.bottom + 6,
-              });
-            }}
-            aria-label={labels.moreActions}
-          >
-            <MoreHorizontal className="size-4" />
-          </button>
-        </div>
-
-        <div className={cn('mt-4 line-clamp-2 text-[12px] leading-5', mutedText(isLight))}>
-          {thread.lastMessagePreview || (locale === 'ru' ? 'История пока пустая' : 'No history yet')}
-        </div>
-
-        <div className="mt-4 flex min-w-0 flex-wrap items-center gap-1.5">
-          <MicroLabel light={isLight} className="h-6 px-2 py-0 text-[9px]">
-            {segmentBadgeLabel(thread.segment, locale)}
-          </MicroLabel>
-
-          {thread.botConnected ? (
-            <MicroLabel light={isLight} className="h-6 px-2 py-0 text-[9px]">
-              <Bot className="size-3" />
-              bot
-            </MicroLabel>
-          ) : null}
-
-          {thread.nextVisit ? (
-            <MicroLabel light={isLight} className="h-6 px-2 py-0 text-[9px]">
-              <CalendarClock className="size-3" />
-              {formatDateLabel(thread.nextVisit, locale)}
-            </MicroLabel>
-          ) : null}
-
-          {bookingContextCount > 1 ? (
-            <MicroLabel light={isLight} active className="h-6 px-2 py-0 text-[9px]">
-              <CalendarClock className="size-3" />
-              {bookingContextCount}
-            </MicroLabel>
-          ) : null}
-
-          {activeAlert ? (
-            <MicroLabel light={isLight} className={cn('h-6 px-2 py-0 text-[9px]', warningTone(isLight))}>
-              <AlertTriangle className="size-3" />
-              {labels.rescheduleAlertShort}
-            </MicroLabel>
-          ) : null}
-        </div>
-
-        {canDrag ? (
-          <button
-            type="button"
-            title={labels.dragThread}
-            aria-label={labels.dragThread}
-            className={cn(
-              'absolute bottom-3 right-3 grid size-7 cursor-grab place-items-center rounded-[11px] border opacity-0 transition group-hover:opacity-100 active:cursor-grabbing',
-              isLight
-                ? 'border-black/[0.07] bg-white text-black/34'
-                : 'border-white/[0.08] bg-black/30 text-white/34',
-            )}
-            onClick={(event) => event.stopPropagation()}
-            onPointerDown={(event) => beginThreadDrag(event, thread.id, index)}
-          >
-            <GripVertical className="size-3.5" />
-          </button>
-        ) : null}
-      </article>
-    );
-  };
-
-  const renderStudioGrid = (compact = false) => {
-    if (isLoading) {
-      return (
-        <div className={cn('grid gap-3', compact ? 'grid-cols-1' : 'md:grid-cols-2 2xl:grid-cols-3')}>
-          {Array.from({ length: compact ? 6 : 9 }).map((_, index) => (
-            <div
-              key={index}
-              className={cn('h-[154px] animate-pulse rounded-[24px] border', insetTone(isLight))}
-            />
-          ))}
-        </div>
-      );
-    }
-
-    if (!filteredThreads.length) {
-      return <EmptyState text={labels.emptyList} hint={labels.emptyListHint} light={isLight} />;
-    }
-
-    return (
-      <div className="relative">
-        <div className={cn('grid gap-3', compact ? 'grid-cols-1' : 'md:grid-cols-2 2xl:grid-cols-3')}>
-          {filteredThreads.map((thread, index) => (
-            <div key={thread.id} className="relative">
-              {dragState?.active && dropIndex === index ? (
-                <div
-                  className="mb-2 h-1 rounded-full"
-                  style={{ background: accentColor }}
-                />
-              ) : null}
-
-              {renderStudioCaseCard(thread, index, compact)}
-            </div>
-          ))}
-
-          {dragState?.active && dropIndex === filteredThreads.length ? (
-            <div
-              className={cn(
-                'flex min-h-[154px] items-center justify-center rounded-[24px] border border-dashed text-[10px] font-semibold uppercase tracking-[0.16em]',
-                mutedText(isLight),
-              )}
-              style={{
-                borderColor: `color-mix(in srgb, ${accentColor} 45%, transparent)`,
-                background: `color-mix(in srgb, ${accentColor} ${isLight ? '6%' : '10%'}, transparent)`,
-              }}
-            >
-              {labels.dropEnd}
-            </div>
-          ) : null}
-        </div>
-
-        {dragState?.active && draggedThread && typeof document !== 'undefined'
-          ? createPortal(
-              <motion.div
-                className="pointer-events-none fixed"
-                style={{
-                  top: dragState.cardRect.top,
-                  left: dragState.cardRect.left,
-                  width: dragState.cardRect.width,
-                  x: dragSpringX,
-                  y: dragSpringY,
-                  zIndex: 90,
-                }}
-                initial={false}
-                animate={{ scale: 1.018, rotate: -0.2 }}
-                transition={{ type: 'spring', stiffness: 680, damping: 42, mass: 0.5 }}
-              >
-                <div
-                  className={cn(
-                    'absolute -inset-2 rounded-[28px] border backdrop-blur-[18px]',
-                    isLight
-                      ? 'border-black/[0.08] bg-white/45 shadow-[0_26px_90px_rgba(15,15,15,0.18)]'
-                      : 'border-white/[0.10] bg-black/35 shadow-[0_26px_90px_rgba(0,0,0,0.45)]',
-                  )}
-                  style={{
-                    background: `linear-gradient(135deg, color-mix(in srgb, ${accentColor} ${isLight ? '10%' : '16%'}, transparent), ${
-                      isLight ? 'rgba(255,255,255,0.48)' : 'rgba(10,10,10,0.48)'
-                    })`,
-                  }}
-                />
-                <div className="relative">
-                  {renderStudioCaseCard(draggedThread, dragState.originIndex, true)}
-                </div>
-              </motion.div>,
-              document.body,
-            )
-          : null}
-      </div>
-    );
-  };
-
-  const renderStudioCreate = (compact = false) =>
-    showCreatePanel ? (
-      <div
-        className={cn(
-          'rounded-[24px] border p-3',
-          isLight ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.04]',
-        )}
-      >
-        <div className={cn('text-[10px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>
-          {labels.createInline}
-        </div>
-
-        <div className={cn('mt-3 grid gap-2', compact ? 'grid-cols-1' : 'sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]')}>
-          <Input
-            value={newClientName}
-            onChange={(event) => setNewClientName(event.target.value)}
-            placeholder={labels.clientName}
-            className={cn('h-10 rounded-[12px]', inputTone(isLight))}
-          />
-
-          <Input
-            value={newClientPhone}
-            onChange={(event) => setNewClientPhone(event.target.value)}
-            placeholder={labels.clientPhone}
-            className={cn('h-10 rounded-[12px]', inputTone(isLight))}
-          />
-
-          <div className="flex items-center gap-2">
-            <button type="button" className={buttonBase(isLight)} onClick={() => setShowCreatePanel(false)}>
-              {labels.cancel}
-            </button>
-            <button type="button" className={buttonBase(isLight, true)} onClick={handleCreateThread}>
-              <Plus className="size-3.5" />
-              {labels.create}
-            </button>
-          </div>
-        </div>
-      </div>
-    ) : null;
-
-  const renderStudioControls = (compact = false) => (
-    <div className={cn('grid gap-2.5', compact && 'gap-2')}>
-      <div className={cn('grid gap-2', compact ? 'grid-cols-[minmax(0,1fr)_40px]' : 'grid-cols-[minmax(0,1fr)_auto]')}>
-        <label
-          className={cn(searchFieldClass(isLight), compact ? 'h-10 rounded-[14px]' : 'h-11 rounded-[16px]')}
-          style={{ background: 'transparent', backgroundColor: 'transparent', boxShadow: 'none' }}
-        >
-          <Search className="size-4 shrink-0 opacity-70" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={labels.search}
-            className="block h-full min-w-0 flex-1 appearance-none rounded-none border-0 p-0 text-[12px] font-medium text-current outline-none placeholder:text-current/55 [background:transparent!important] [box-shadow:none!important]"
-            style={{
-              background: 'transparent',
-              backgroundColor: 'transparent',
-              boxShadow: 'none',
-              WebkitAppearance: 'none',
-              appearance: 'none',
-            }}
-          />
-        </label>
-
-        <button
-          type="button"
-          className={cn(buttonBase(isLight, showCreatePanel), compact ? 'size-10 px-0' : 'h-11 rounded-[14px] px-4')}
-          onClick={() => setShowCreatePanel((current) => !current)}
-        >
-          <Plus className="size-3.5" />
-          {compact ? null : showCreatePanel ? labels.closeCreate : labels.createThread}
-        </button>
-      </div>
-
-      <div className={cn('grid gap-2', compact ? 'grid-cols-1' : 'xl:grid-cols-[minmax(0,1fr)_170px]')}>
-        <ControlGroup light={isLight} className="w-full overflow-x-auto rounded-[14px]">
-          {segmentOptions.map((option) => (
-            <FilterChip
-              key={option.value}
-              label={option.label}
-              light={isLight}
-              active={segmentFilter === option.value}
-              onClick={() => setSegmentFilter(option.value)}
-              accentColor={accentColor}
-              className="h-9 flex-1"
-            />
-          ))}
-        </ControlGroup>
-
-        <Select
-          value={channelFilter}
-          onValueChange={(value) => setChannelFilter(value as ChannelFilter)}
-        >
-          <SelectTrigger className={selectTriggerClass(isLight)}>
-            <SelectValue />
-          </SelectTrigger>
-
-          <SelectContent
-            className={selectContentClass(isLight)}
-            style={glassMenuSurfaceStyle(isLight, accentColor)}
-          >
-            {channelOptions.map((option) => {
-              const active = channelFilter === option.value;
-
-              return (
-                <SelectItem key={option.value} value={option.value} className={dropdownItemTone(isLight, active)}>
-                  <DropdownOption label={option.label} active={active} light={isLight} minWidth="100%" />
-                </SelectItem>
-              );
-            })}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <ControlGroup light={isLight} className="w-full overflow-x-auto rounded-[14px]">
-        {sortOptions.map((option) => (
-          <FilterChip
-            key={option.value}
-            label={option.label}
-            light={isLight}
-            active={sortMode === option.value}
-            onClick={() => setSortMode(option.value)}
-            accentColor={accentColor}
-            className="h-9 flex-1"
-          />
-        ))}
-      </ControlGroup>
-    </div>
-  );
-
-  const renderStudioConversation = (mobile = false) => {
-    const activePinned = activeThread ? isThreadPinned(activeThread.id) : false;
-    const activeAlert = getThreadActiveAlert(activeThread);
-
-    return (
-      <section
-        className={cn(
-          'grid min-h-0 overflow-hidden border',
-          mobile
-            ? 'h-full grid-rows-[auto_minmax(0,1fr)_auto] rounded-none border-0'
-            : 'h-full grid-rows-[auto_minmax(0,1fr)_auto] rounded-[30px]',
-          isLight ? 'border-black/[0.08] bg-white' : 'border-white/[0.09] bg-[#101010]',
-        )}
-      >
-        <header className={cn('shrink-0 border-b px-4 py-3.5', borderTone(isLight), isLight ? 'bg-white' : 'bg-[#101010]')}>
-          {activeThread ? (
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 items-start gap-3">
-                {mobile ? (
-                  <button
-                    type="button"
-                    className={cn('size-9 px-0', buttonBase(isLight))}
-                    onClick={() => setMobileThreadOpen(false)}
-                  >
-                    <ChevronLeft className="size-4" />
-                  </button>
-                ) : null}
-
-                <div className={cn('grid size-11 shrink-0 place-items-center rounded-[17px] border text-[13px] font-semibold', isLight ? 'border-black/[0.07] bg-black/[0.025] text-black' : 'border-white/[0.08] bg-white/[0.045] text-white')}>
-                  {getInitials(activeThread.clientName)}
-                </div>
-
-                <div className="min-w-0">
-                  <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                    <div className={cn('truncate text-[18px] font-semibold tracking-[-0.04em]', pageText(isLight))}>
-                      {activeThread.clientName}
-                    </div>
-
-                    <MicroLabel light={isLight} className="h-6 px-2 py-0 text-[9px]">
-                      {channelLabel(activeThread.channel)}
-                    </MicroLabel>
-
-                    {activePinned ? (
-                      <MicroLabel light={isLight} active className="h-6 px-2 py-0 text-[9px]">
-                        <Pin className="size-3 fill-current" />
-                        {labels.pinned}
-                      </MicroLabel>
-                    ) : null}
-                  </div>
-
-                  {selectedBookingContext ? (
-                    <div className={cn('mt-1 truncate text-[11.5px] font-semibold', pageText(isLight))}>
-                      {getBookingContextLabel(selectedBookingContext, locale)}
-                    </div>
-                  ) : null}
-
-                  <div className={cn('mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px]', mutedText(isLight))}>
-                    <span>{activeThread.clientPhone}</span>
-                    <span className={faintText(isLight)}>•</span>
-                    <span>{activeThread.nextVisit ? formatDateLabel(activeThread.nextVisit, locale) : labels.notScheduled}</span>
-                  </div>
-
-                  {activeAlert ? (
-                    <div className={cn('mt-3 rounded-[14px] border px-3 py-2', warningTone(isLight))}>
-                      <div className="flex items-start gap-2">
-                        <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                        <div className="min-w-0">
-                          <div className="text-[12px] font-semibold">{labels.rescheduleAlert}</div>
-                          <div className={cn('mt-1 text-[10.5px] leading-4', isLight ? 'text-amber-950/70' : 'text-amber-100/70')}>
-                            {activeAlert.message || labels.rescheduleAlertText}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button type="button" className={cn('size-9 px-0', buttonBase(isLight))}>
-                    <MoreVertical className="size-4" />
-                  </button>
-                </PopoverTrigger>
-
-                <PopoverContent
-                  align="end"
-                  className={cn('w-[240px]', glassMenuContentClass(isLight))}
-                  style={glassMenuSurfaceStyle(isLight, accentColor)}
-                >
-                  <GlassMenuItem
-                    light={isLight}
-                    accentColor={accentColor}
-                    label={activeThread.botConnected ? labels.botConnected : labels.botOff}
-                    icon={<Bot className="size-3.5" />}
-                    active={activeThread.botConnected}
-                    onClick={() => void applyLocalThreadPatch(activeThread.id, { botConnected: !activeThread.botConnected })}
-                  />
-                  <GlassMenuItem
-                    light={isLight}
-                    accentColor={accentColor}
-                    label={activePinned ? labels.unpinThread : labels.pinThread}
-                    icon={<Pin className={cn('size-3.5', activePinned && 'fill-current')} />}
-                    active={activePinned}
-                    onClick={() => toggleThreadPin(activeThread.id)}
-                  />
-                  <GlassMenuItem
-                    light={isLight}
-                    accentColor={accentColor}
-                    label={activeThread.isPriority ? labels.priorityOn : labels.priorityOff}
-                    icon={<Star className={cn('size-3.5', activeThread.isPriority && 'fill-current')} />}
-                    active={activeThread.isPriority}
-                    onClick={() => void applyLocalThreadPatch(activeThread.id, { isPriority: !activeThread.isPriority })}
-                  />
-                  <GlassMenuItem
-                    light={isLight}
-                    accentColor={accentColor}
-                    label={labels.export}
-                    icon={<Download className="size-3.5" />}
-                    onClick={handleExportThread}
-                  />
-                  <div className={menuSeparatorClass(isLight)} />
-                  <GlassMenuItem
-                    light={isLight}
-                    accentColor={accentColor}
-                    label={labels.deleteChat}
-                    icon={<Trash2 className="size-3.5" />}
-                    danger
-                    onClick={() => handleDeleteThread(activeThread.id)}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-          ) : (
-            <div className="flex min-h-[72px] items-center">
-              <div>
-                <div className={cn('text-[15px] font-semibold', pageText(isLight))}>{labels.emptyThread}</div>
-                <div className={cn('mt-1 text-[11px]', mutedText(isLight))}>{labels.emptyThreadHint}</div>
-              </div>
-            </div>
-          )}
-        </header>
-
-        <div
-          ref={mobile ? mobileMessageScrollRef : desktopMessageScrollRef}
-          className={cn(
-            'min-h-0 overflow-y-auto',
-            mobile ? 'px-3 py-3' : 'px-5 py-5',
-            isLight ? 'bg-[#f7f6f2]/55' : 'bg-black/20',
-          )}
-        >
-          {renderMessageFeed(mobile)}
-        </div>
-
-        {renderComposer(mobile)}
-      </section>
-    );
-  };
-
-  const contextMenuPortalNode = contextMenuPortal;
-
-
-  const renderTelegramThreadRow = (
-    thread: ChatThreadRecord,
-    index: number,
-    compact = false,
-  ) => {
-    const active = thread.id === activeThreadId;
-    const pinned = isThreadPinned(thread.id);
-    const activeAlert = getThreadActiveAlert(thread);
-    const bookingContextCount = getThreadBookingContexts(thread).length;
-    const serviceLabel = getThreadServiceLabel(thread);
-    const bookingCode = getThreadBookingCode(thread);
-    const canDrag = !compact && filteredThreads.length > 1;
-    const isDragged = draggedId === thread.id;
-
-    return (
-      <div
-        key={thread.id}
-        ref={setThreadItemRef(thread.id)}
-        role="button"
-        tabIndex={0}
-        onClick={() => handleSelectThread(thread)}
-        onKeyDown={(event) => handleThreadKeyboardSelect(event, thread)}
-        onContextMenu={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          setActiveThreadId(thread.id);
-          setThreadContextMenu({
-            threadId: thread.id,
-            x: event.clientX,
-            y: event.clientY,
-          });
-        }}
-        className={cn(
-          'group relative grid cursor-pointer grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5 outline-none transition-[background,opacity,filter] duration-150',
-          active
-            ? isLight
-              ? 'bg-black/[0.055]'
-              : 'bg-white/[0.085]'
-            : isLight
-              ? 'hover:bg-black/[0.035]'
-              : 'hover:bg-white/[0.055]',
-          activeAlert && (isLight ? 'bg-amber-500/[0.075]' : 'bg-amber-300/[0.08]'),
-          isDragged && 'opacity-30 blur-[1px]',
-        )}
-        aria-label={labels.openThread}
-      >
-        {active ? (
-          <span className="absolute bottom-1.5 left-1 top-1.5 w-[3px] rounded-full" style={{ background: accentColor }} />
-        ) : null}
-
         <div
           className={cn(
             'relative grid size-11 place-items-center rounded-full border text-[12px] font-semibold',
-            isLight
-              ? 'border-black/[0.07] bg-black/[0.035] text-black'
-              : 'border-white/[0.08] bg-white/[0.06] text-white',
+            isLight ? 'border-black/[0.07] bg-black/[0.025] text-black' : 'border-white/[0.08] bg-white/[0.045] text-white',
           )}
         >
           {getInitials(thread.clientName)}
 
-          {thread.botConnected ? (
-            <span
-              className={cn(
-                'absolute bottom-0 right-0 grid size-4 place-items-center rounded-full border',
-                isLight ? 'border-white bg-white text-black/42' : 'border-[#141414] bg-[#141414] text-white/42',
-              )}
-            >
-              <Bot className="size-2.5" />
-            </span>
-          ) : null}
-        </div>
-
-        <div className="min-w-0 border-b border-transparent py-0.5">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <div className={cn('truncate text-[13px] font-semibold leading-5 tracking-[-0.018em]', pageText(isLight))}>
-              {thread.clientName}
-            </div>
-
-            {pinned ? (
-              <Pin className={cn('size-3 shrink-0 fill-current', mutedText(isLight))} />
-            ) : null}
-
-            {thread.isPriority ? (
-              <Star className="size-3 shrink-0 fill-current" style={{ color: accentColor }} />
-            ) : null}
-
-            {bookingContextCount > 1 ? (
-              <span
-                className={cn(
-                  'inline-flex h-4 shrink-0 items-center rounded-[5px] px-1 text-[8px] font-semibold',
-                  isLight ? 'bg-black/[0.055] text-black/50' : 'bg-white/[0.08] text-white/52',
-                )}
-              >
-                {bookingContextCount}
-              </span>
-            ) : null}
-          </div>
-
-          <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
-            {activeAlert ? (
-              <AlertTriangle className={cn('size-3 shrink-0', isLight ? 'text-amber-700' : 'text-amber-200')} />
-            ) : null}
-
-            <div className={cn('truncate text-[11px] leading-4', activeAlert ? (isLight ? 'text-amber-800' : 'text-amber-100') : mutedText(isLight))}>
-              {bookingCode ? `${bookingCode} · ` : ''}
-              {serviceLabel ?? getThreadContextLine(thread, locale) ?? thread.lastMessagePreview ?? (locale === 'ru' ? 'Сообщений пока нет' : 'No messages yet')}
-            </div>
-          </div>
-
-          {thread.lastMessagePreview ? (
-            <div className={cn('mt-0.5 truncate text-[10.5px] leading-4', faintText(isLight))}>
-              {thread.lastMessagePreview}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="flex h-full min-w-[42px] flex-col items-end justify-start gap-1 pt-0.5">
-          <div className={cn('text-[9.5px] font-medium tabular-nums', mutedText(isLight))}>
-            {formatTimeLabel(thread.lastMessageAt, locale)}
-          </div>
-
           {thread.unreadCount > 0 ? (
-            <span
-              className="grid min-w-[18px] place-items-center rounded-full px-1.5 py-[2px] text-[9px] font-semibold text-white"
-              style={{ background: accentColor }}
-            >
+            <span className="absolute -right-1 -top-1 grid min-w-[18px] place-items-center rounded-full px-1.5 py-[1px] text-[8.5px] font-semibold text-white" style={{ background: accentColor }}>
               {thread.unreadCount}
             </span>
-          ) : (
-            <span className={cn('text-[9px]', faintText(isLight))}>{channelLabel(thread.channel)}</span>
-          )}
-
-          <button
-            type="button"
-            className={cn(
-              'mt-auto grid size-7 place-items-center rounded-full opacity-0 transition group-hover:opacity-100',
-              isLight ? 'text-black/40 hover:bg-black/[0.045] hover:text-black' : 'text-white/42 hover:bg-white/[0.07] hover:text-white',
-            )}
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              const rect = event.currentTarget.getBoundingClientRect();
-              setActiveThreadId(thread.id);
-              setThreadContextMenu({
-                threadId: thread.id,
-                x: rect.left,
-                y: rect.bottom + 6,
-              });
-            }}
-            aria-label={labels.moreActions}
-          >
-            <MoreVertical className="size-3.5" />
-          </button>
+          ) : null}
         </div>
 
-        {canDrag ? (
-          <button
-            type="button"
-            title={labels.dragThread}
-            aria-label={labels.dragThread}
-            className={cn(
-              'absolute bottom-2 left-2 grid size-6 cursor-grab place-items-center rounded-full opacity-0 transition group-hover:opacity-100 active:cursor-grabbing',
-              isLight ? 'text-black/26 hover:bg-black/[0.04]' : 'text-white/28 hover:bg-white/[0.06]',
-            )}
-            onClick={(event) => event.stopPropagation()}
-            onPointerDown={(event) => beginThreadDrag(event, thread.id, index)}
-          >
-            <GripVertical className="size-3" />
-          </button>
-        ) : null}
-      </div>
-    );
-  };
-
-  const renderTelegramThreadList = (compact = false) => {
-    if (isLoading) {
-      return (
-        <div className="divide-y divide-black/[0.05] dark:divide-white/[0.06]">
-          {Array.from({ length: compact ? 7 : 10 }).map((_, index) => (
-            <div key={index} className="grid grid-cols-[44px_minmax(0,1fr)_42px] gap-3 px-3 py-2.5">
-              <div className={cn('size-11 animate-pulse rounded-full', isLight ? 'bg-black/[0.055]' : 'bg-white/[0.07]')} />
-              <div className="space-y-2 py-1.5">
-                <div className={cn('h-3 w-2/3 animate-pulse rounded-full', isLight ? 'bg-black/[0.055]' : 'bg-white/[0.07]')} />
-                <div className={cn('h-2.5 w-full animate-pulse rounded-full', isLight ? 'bg-black/[0.04]' : 'bg-white/[0.05]')} />
-              </div>
-              <div className={cn('mt-1 h-2.5 w-8 animate-pulse rounded-full', isLight ? 'bg-black/[0.04]' : 'bg-white/[0.05]')} />
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <div className={cn('truncate text-[13px] font-semibold tracking-[-0.018em]', pageText(isLight))}>
+              {thread.clientName}
             </div>
-          ))}
-        </div>
-      );
-    }
-
-    if (!filteredThreads.length) {
-      return (
-        <div className="p-3">
-          <EmptyState text={labels.emptyList} hint={labels.emptyListHint} light={isLight} />
-        </div>
-      );
-    }
-
-    return (
-      <div className={cn('relative divide-y', isLight ? 'divide-black/[0.055]' : 'divide-white/[0.06]')}>
-        {filteredThreads.map((thread, index) => (
-          <div key={thread.id} className="relative">
-            {dragState?.active && dropIndex === index ? (
-              <div className="mx-3 h-1 rounded-full" style={{ background: accentColor }} />
-            ) : null}
-
-            {renderTelegramThreadRow(thread, index, compact)}
+            {pinned ? <Pin className={cn('size-3 shrink-0 fill-current', mutedText(isLight))} /> : null}
+            {thread.isPriority ? <Star className="size-3 shrink-0 fill-current" style={{ color: accentColor }} /> : null}
           </div>
-        ))}
 
-        {dragState?.active && dropIndex === filteredThreads.length ? (
-          <div
-            className={cn(
-              'mx-3 my-2 flex h-9 items-center justify-center rounded-[10px] border border-dashed text-[9.5px] font-medium uppercase tracking-[0.14em]',
-              mutedText(isLight),
-            )}
-            style={{
-              borderColor: `color-mix(in srgb, ${accentColor} 45%, transparent)`,
-              background: `color-mix(in srgb, ${accentColor} ${isLight ? '6%' : '10%'}, transparent)`,
-            }}
-          >
-            {labels.dropEnd}
+          <div className={cn('mt-0.5 truncate text-[10.5px] font-semibold', pageText(isLight))}>
+            {getThreadBookingCode(thread) ? `${getThreadBookingCode(thread)} · ` : ''}
+            {service ?? context ?? segmentLabel(thread.segment, locale)}
           </div>
-        ) : null}
 
-        {dragState?.active && draggedThread && typeof document !== 'undefined'
-          ? createPortal(
-              <motion.div
-                className="pointer-events-none fixed"
-                style={{
-                  top: dragState.cardRect.top,
-                  left: dragState.cardRect.left,
-                  width: dragState.cardRect.width,
-                  x: dragSpringX,
-                  y: dragSpringY,
-                  zIndex: 90,
-                }}
-                initial={false}
-                animate={{ scale: 1.012 }}
-                transition={{ type: 'spring', stiffness: 680, damping: 42, mass: 0.5 }}
-              >
-                <div
-                  className={cn(
-                    'overflow-hidden rounded-[18px] border backdrop-blur-[18px]',
-                    isLight
-                      ? 'border-black/[0.08] bg-white shadow-[0_24px_80px_rgba(15,15,15,0.18)]'
-                      : 'border-white/[0.10] bg-[#181818] shadow-[0_24px_80px_rgba(0,0,0,0.45)]',
-                  )}
-                >
-                  {renderTelegramThreadRow(draggedThread, dragState.originIndex, true)}
-                </div>
-              </motion.div>,
-              document.body,
-            )
-          : null}
-      </div>
+          <div className={cn('mt-0.5 line-clamp-1 text-[10.5px]', mutedText(isLight))}>
+            {thread.lastMessagePreview || (locale === 'ru' ? 'Сообщений пока нет' : 'No messages yet')}
+          </div>
+        </div>
+
+        <div className="flex min-w-[46px] flex-col items-end gap-1">
+          <span className={cn('text-[9.5px] font-medium tabular-nums', faintText(isLight))}>
+            {formatTimeLabel(thread.lastMessageAt, locale)}
+          </span>
+          <span className={cn('text-[9px]', faintText(isLight))}>
+            {channelLabel(thread.channel, locale)}
+          </span>
+        </div>
+      </button>
     );
   };
 
-  const renderTelegramControls = (compact = false) => (
-    <div className="space-y-2.5">
-      <div className="grid grid-cols-[minmax(0,1fr)_40px] gap-2">
-        <label
-          className={cn(searchFieldClass(isLight), 'h-10 rounded-full px-3')}
-          style={{ background: 'transparent', backgroundColor: 'transparent', boxShadow: 'none' }}
-        >
-          <Search className="size-4 shrink-0 opacity-70" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={labels.search}
-            className="block h-full min-w-0 flex-1 appearance-none rounded-none border-0 p-0 text-[12.5px] font-medium text-current outline-none placeholder:text-current/55 [background:transparent!important] [box-shadow:none!important]"
-            style={{
-              background: 'transparent',
-              backgroundColor: 'transparent',
-              boxShadow: 'none',
-              WebkitAppearance: 'none',
-              appearance: 'none',
-            }}
-          />
-        </label>
+  const renderThreadList = () => (
+    <div className={cn('min-h-0 flex-1 overflow-y-auto divide-y', isLight ? 'divide-black/[0.055]' : 'divide-white/[0.06]')}>
+      {isLoading ? (
+        Array.from({ length: 8 }).map((_, index) => (
+          <div key={index} className="grid grid-cols-[44px_minmax(0,1fr)_40px] gap-3 px-3 py-3">
+            <div className={cn('size-11 animate-pulse rounded-full', isLight ? 'bg-black/[0.055]' : 'bg-white/[0.07]')} />
+            <div className="space-y-2 py-1">
+              <div className={cn('h-3 w-2/3 animate-pulse rounded-full', isLight ? 'bg-black/[0.055]' : 'bg-white/[0.07]')} />
+              <div className={cn('h-2.5 w-full animate-pulse rounded-full', isLight ? 'bg-black/[0.04]' : 'bg-white/[0.05]')} />
+            </div>
+          </div>
+        ))
+      ) : hasThreads ? (
+        filteredThreads.map(renderThreadRow)
+      ) : (
+        <div className="p-3">
+          <EmptyState title={copy.emptyList} hint={copy.emptyListHint} light={isLight} />
+        </div>
+      )}
+    </div>
+  );
 
-        <button
-          type="button"
-          className={cn('size-10 rounded-full px-0', buttonBase(isLight, showCreatePanel))}
-          onClick={() => setShowCreatePanel((current) => !current)}
-          aria-label={labels.createThread}
-        >
-          <Plus className="size-4" />
-        </button>
-      </div>
+  const renderFilters = () => (
+    <div className="space-y-2.5">
+      <label
+        className={cn(
+          'flex h-10 min-w-0 items-center gap-2 rounded-full border px-3 shadow-none outline-none transition-colors',
+          isLight
+            ? 'border-black/[0.08] bg-black/[0.02] text-black/56 focus-within:border-black/[0.15]'
+            : 'border-white/[0.08] bg-white/[0.04] text-white/52 focus-within:border-white/[0.15]',
+        )}
+      >
+        <Search className="size-4 shrink-0 opacity-70" />
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={copy.search}
+          className="block h-full min-w-0 flex-1 appearance-none border-0 bg-transparent p-0 text-[12.5px] font-medium text-current outline-none placeholder:text-current/55"
+        />
+      </label>
 
       <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {segmentOptions.map((option) => (
@@ -5139,384 +1244,456 @@ export default function DashboardChatsPage() {
             {option.label}
           </button>
         ))}
-
-        {sortOptions.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => setSortMode(option.value)}
-            className={cn(
-              'h-8 shrink-0 rounded-full border px-3 text-[11px] font-semibold transition',
-              sortMode === option.value
-                ? 'cb-accent-pill-active'
-                : isLight
-                  ? 'border-black/[0.07] bg-white text-black/46 hover:text-black'
-                  : 'border-white/[0.08] bg-white/[0.04] text-white/42 hover:text-white',
-            )}
-          >
-            {option.label}
-          </button>
-        ))}
       </div>
 
-      <Select
-        value={channelFilter}
-        onValueChange={(value) => setChannelFilter(value as ChannelFilter)}
-      >
-        <SelectTrigger className={cn(selectTriggerClass(isLight), 'h-9 rounded-full')}>
-          <SelectValue />
-        </SelectTrigger>
-
-        <SelectContent
-          className={selectContentClass(isLight)}
-          style={glassMenuSurfaceStyle(isLight, accentColor)}
-        >
-          {channelOptions.map((option) => {
-            const active = channelFilter === option.value;
-
-            return (
-              <SelectItem key={option.value} value={option.value} className={dropdownItemTone(isLight, active)}>
-                <DropdownOption label={option.label} active={active} light={isLight} minWidth="100%" />
+      <div className="grid grid-cols-2 gap-2">
+        <Select value={channelFilter} onValueChange={(value) => setChannelFilter(value as ChannelFilter)}>
+          <SelectTrigger className={cn('h-9 rounded-full text-[11px]', inputTone(isLight))}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {channelOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
               </SelectItem>
-            );
-          })}
-        </SelectContent>
-      </Select>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={sortMode} onValueChange={(value) => setSortMode(value as SortMode)}>
+          <SelectTrigger className={cn('h-9 rounded-full text-[11px]', inputTone(isLight))}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="recent">{copy.recent}</SelectItem>
+            <SelectItem value="unread">{copy.unread}</SelectItem>
+            <SelectItem value="priority">{copy.priority}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
     </div>
   );
 
-  const renderTelegramCreatePanel = () =>
+  const renderCreatePanel = () =>
     showCreatePanel ? (
-      <div className={cn('border-b p-3', borderTone(isLight), isLight ? 'bg-white' : 'bg-[#101010]')}>
+      <div className={cn('border-t p-3', borderTone(isLight))}>
         <Panel light={isLight} className="grid gap-2 p-3">
           <div className={cn('text-[10px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>
-            {labels.createInline}
+            {copy.createClient}
           </div>
 
-          <Input
-            value={newClientName}
-            onChange={(event) => setNewClientName(event.target.value)}
-            placeholder={labels.clientName}
-            className={cn('h-10 rounded-[11px]', inputTone(isLight))}
-          />
-
-          <Input
-            value={newClientPhone}
-            onChange={(event) => setNewClientPhone(event.target.value)}
-            placeholder={labels.clientPhone}
-            className={cn('h-10 rounded-[11px]', inputTone(isLight))}
-          />
+          <Input value={newClientName} onChange={(event) => setNewClientName(event.target.value)} placeholder={copy.clientName} className={cn('h-10 rounded-[10px]', inputTone(isLight))} />
+          <Input value={newClientPhone} onChange={(event) => setNewClientPhone(event.target.value)} placeholder={copy.clientPhone} className={cn('h-10 rounded-[10px]', inputTone(isLight))} />
 
           <div className="flex justify-end gap-2">
             <button type="button" className={buttonBase(isLight)} onClick={() => setShowCreatePanel(false)}>
-              {labels.cancel}
+              {copy.cancel}
             </button>
-
             <button type="button" className={buttonBase(isLight, true)} onClick={handleCreateThread}>
               <Plus className="size-3.5" />
-              {labels.create}
+              {copy.create}
             </button>
           </div>
         </Panel>
-
-        {error ? (
-          <div className="mt-2 rounded-[10px] border border-destructive/20 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
-            {error}
-          </div>
-        ) : null}
       </div>
     ) : null;
 
-  const renderTelegramChatHeader = (mobile = false) => {
-    if (!activeThread) {
-      return (
-        <header className={cn('flex h-[64px] shrink-0 items-center border-b px-4', borderTone(isLight), isLight ? 'bg-white' : 'bg-[#101010]')}>
-          <div>
-            <div className={cn('text-[14px] font-semibold', pageText(isLight))}>{labels.emptyThread}</div>
-            <div className={cn('mt-0.5 text-[11px]', mutedText(isLight))}>{labels.emptyThreadHint}</div>
-          </div>
-        </header>
-      );
+  const renderMessages = (mobile = false) => {
+    if (!selectedThread) {
+      return <EmptyState title={copy.emptyThread} hint={copy.emptyThreadHint} light={isLight} />;
     }
 
-    const activePinned = isThreadPinned(activeThread.id);
-    const activeAlert = getThreadActiveAlert(activeThread);
+    if (!selectedThread.messages.length) {
+      return <EmptyState title={copy.noMessages} hint={copy.noMessagesHint} light={isLight} />;
+    }
 
     return (
-      <header className={cn('shrink-0 border-b px-3 py-2.5', borderTone(isLight), isLight ? 'bg-white' : 'bg-[#101010]')}>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            {mobile ? (
-              <button
-                type="button"
-                className={cn('size-9 rounded-full px-0', buttonBase(isLight))}
-                onClick={() => setMobileThreadOpen(false)}
-              >
-                <ChevronLeft className="size-4" />
-              </button>
-            ) : null}
+      <div className={cn('mx-auto flex min-h-full w-full max-w-[820px] flex-col justify-end gap-2.5', mobile && 'max-w-full')}>
+        {selectedThread.messages.map((message, index) => {
+          const mine = message.author === 'master' || message.author === 'system';
+          const status = deliveryLabel(message.deliveryState, locale);
+          const currentDay = message.createdAt.slice(0, 10);
+          const previousDay = selectedThread.messages[index - 1]?.createdAt.slice(0, 10);
+          const showDayDivider = currentDay !== previousDay;
 
-            <div className={cn('grid size-11 shrink-0 place-items-center rounded-full border text-[13px] font-semibold', isLight ? 'border-black/[0.07] bg-black/[0.035] text-black' : 'border-white/[0.08] bg-white/[0.06] text-white')}>
-              {getInitials(activeThread.clientName)}
-            </div>
-
-            <div className="min-w-0">
-              <div className="flex min-w-0 items-center gap-1.5">
-                <div className={cn('truncate text-[14px] font-semibold leading-5', pageText(isLight))}>
-                  {activeThread.clientName}
+          return (
+            <div key={message.id} className="space-y-1.5">
+              {showDayDivider ? (
+                <div className="flex items-center gap-2.5 py-2">
+                  <div className={cn('h-px flex-1', isLight ? 'bg-black/[0.08]' : 'bg-white/[0.08]')} />
+                  <div className={cn('text-[9.5px] font-medium uppercase tracking-[0.14em]', mutedText(isLight))}>
+                    {formatLongDateLabel(message.createdAt, locale)}
+                  </div>
+                  <div className={cn('h-px flex-1', isLight ? 'bg-black/[0.08]' : 'bg-white/[0.08]')} />
                 </div>
+              ) : null}
 
-                {activePinned ? (
-                  <Pin className={cn('size-3.5 shrink-0 fill-current', mutedText(isLight))} />
-                ) : null}
-
-                {activeThread.isPriority ? (
-                  <Star className="size-3.5 shrink-0 fill-current" style={{ color: accentColor }} />
-                ) : null}
-              </div>
-
-              <div className={cn('mt-0.5 truncate text-[10.5px]', mutedText(isLight))}>
-                {selectedBookingContext
-                  ? getBookingContextLabel(selectedBookingContext, locale)
-                  : activeThread.nextVisit
-                    ? `${labels.nextVisit}: ${formatDateLabel(activeThread.nextVisit, locale)}`
-                    : `${channelLabel(activeThread.channel)} · ${activeThread.clientPhone}`}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-1">
-            {activeAlert ? (
-              <span className={cn('hidden h-8 items-center gap-1.5 rounded-full border px-2.5 text-[10px] font-semibold md:inline-flex', warningTone(isLight))}>
-                <AlertTriangle className="size-3.5" />
-                {labels.rescheduleAlertShort}
-              </span>
-            ) : null}
-
-            <Popover>
-              <PopoverTrigger asChild>
-                <button type="button" className={cn('size-9 rounded-full px-0', buttonBase(isLight))}>
-                  <MoreVertical className="size-4" />
-                </button>
-              </PopoverTrigger>
-
-              <PopoverContent
-                align="end"
-                className={cn('w-[250px]', glassMenuContentClass(isLight))}
-                style={glassMenuSurfaceStyle(isLight, accentColor)}
-              >
-                <GlassMenuItem
-                  light={isLight}
-                  accentColor={accentColor}
-                  label={activeThread.botConnected ? labels.botConnected : labels.botOff}
-                  icon={<Bot className="size-3.5" />}
-                  active={activeThread.botConnected}
-                  onClick={() => void applyLocalThreadPatch(activeThread.id, { botConnected: !activeThread.botConnected })}
-                />
-                <GlassMenuItem
-                  light={isLight}
-                  accentColor={accentColor}
-                  label={activePinned ? labels.unpinThread : labels.pinThread}
-                  icon={<Pin className={cn('size-3.5', activePinned && 'fill-current')} />}
-                  active={activePinned}
-                  onClick={() => toggleThreadPin(activeThread.id)}
-                />
-                <GlassMenuItem
-                  light={isLight}
-                  accentColor={accentColor}
-                  label={activeThread.isPriority ? labels.priorityOn : labels.priorityOff}
-                  icon={<Star className={cn('size-3.5', activeThread.isPriority && 'fill-current')} />}
-                  active={activeThread.isPriority}
-                  onClick={() => void applyLocalThreadPatch(activeThread.id, { isPriority: !activeThread.isPriority })}
-                />
-                <GlassMenuItem
-                  light={isLight}
-                  accentColor={accentColor}
-                  label={labels.export}
-                  icon={<Download className="size-3.5" />}
-                  onClick={handleExportThread}
-                />
-                <div className={menuSeparatorClass(isLight)} />
-                <GlassMenuItem
-                  light={isLight}
-                  accentColor={accentColor}
-                  label={labels.deleteChat}
-                  icon={<Trash2 className="size-3.5" />}
-                  danger
-                  onClick={() => handleDeleteThread(activeThread.id)}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-        </div>
-
-        {activeBookingContexts.length > 1 ? (
-          <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {activeBookingContexts.map((context) => {
-              const selected = context.id === selectedBookingId;
-
-              return (
-                <button
-                  key={context.id}
-                  type="button"
-                  onClick={() => setSelectedBookingByThreadId((current) => ({ ...current, [activeThread.id]: context.id }))}
+              <div className={cn('flex', mine ? 'justify-end' : 'justify-start')}>
+                <div
                   className={cn(
-                    'inline-flex max-w-[220px] shrink-0 items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold transition',
-                    selected
-                      ? 'cb-accent-pill-active'
+                    'rounded-[16px] border px-3.5 py-2.5',
+                    mobile ? 'max-w-[88%]' : 'max-w-[76%]',
+                    mine
+                      ? isLight
+                        ? 'border-black/[0.07] bg-black/[0.04] text-black'
+                        : 'border-white/[0.075] bg-white/[0.07] text-white'
                       : isLight
-                        ? 'border-black/[0.07] bg-white text-black/46 hover:text-black'
-                        : 'border-white/[0.08] bg-white/[0.04] text-white/42 hover:text-white',
+                        ? 'border-black/[0.07] bg-white text-black'
+                        : 'border-white/[0.075] bg-[#101010] text-white',
                   )}
-                  title={getBookingContextLabel(context, locale)}
+                  style={mine && message.viaBot ? accentPillStyle(accentColor, isLight) : undefined}
                 >
-                  <span className="truncate">{getBookingContextShortLabel(context, locale)}</span>
-                </button>
-              );
-            })}
-          </div>
-        ) : null}
-
-        {activeAlert ? (
-          <div className={cn('mt-2 rounded-[12px] border px-3 py-2 md:hidden', warningTone(isLight))}>
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-              <div className="min-w-0">
-                <div className="text-[11.5px] font-semibold">{labels.rescheduleAlert}</div>
-                <div className={cn('mt-0.5 text-[10px] leading-4', isLight ? 'text-amber-950/70' : 'text-amber-100/70')}>
-                  {activeAlert.message || labels.rescheduleAlertText}
+                  <div className={cn('whitespace-pre-wrap text-[13px] leading-5', pageText(isLight))}>{message.body}</div>
+                  <div className={cn('mt-1.5 flex items-center justify-end gap-2 text-[9.5px]', mutedText(isLight))}>
+                    {message.viaBot ? <span>{copy.byBot}</span> : null}
+                    {status ? <span>{status}</span> : null}
+                    <span>{formatTimeLabel(message.createdAt, locale)}</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ) : null}
-      </header>
+          );
+        })}
+        <div ref={messageBottomRef} className="h-px shrink-0" aria-hidden />
+      </div>
     );
   };
 
-  const renderTelegramConversation = (mobile = false) => (
-    <section className={cn('grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto]', isLight ? 'bg-[#f5f2eb]' : 'bg-[#0b0b0b]')}>
-      {renderTelegramChatHeader(mobile)}
-
-      <div
-        ref={mobile ? mobileMessageScrollRef : desktopMessageScrollRef}
-        className={cn(
-          'min-h-0 overflow-y-auto',
-          mobile ? 'px-2.5 py-3' : 'px-5 py-5',
-          isLight
-            ? "bg-[radial-gradient(circle_at_20%_10%,rgba(0,0,0,0.035)_0,transparent_24%),linear-gradient(135deg,#f7f3ea,#f3f1eb)]"
-            : "bg-[radial-gradient(circle_at_20%_10%,rgba(255,255,255,0.045)_0,transparent_24%),linear-gradient(135deg,#0b0b0b,#111)]",
-        )}
-      >
-        {renderMessageFeed(mobile)}
-      </div>
-
-      {renderComposer(mobile)}
-    </section>
-  );
-
-  if (isMobile) {
-    return (
-      <WorkspaceShell>
-        <main className={cn('h-[calc(100dvh-68px)] overflow-hidden px-0 pb-0 pt-0', pageBg(isLight))}>
-          <section className={cn('grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)]', isLight ? 'bg-white' : 'bg-[#101010]')}>
-            <header className={cn('shrink-0 border-b px-4 pb-3 pt-4', borderTone(isLight))}>
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <h1 className={cn('truncate text-[24px] font-semibold tracking-[-0.06em]', pageText(isLight))}>
-                    {labels.title}
-                  </h1>
-                  <p className={cn('mt-0.5 text-[10.5px]', mutedText(isLight))}>
-                    {demoMode ? labels.demo : labels.live} · {filteredThreads.length}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  className={cn('size-10 rounded-full px-0', buttonBase(isLight, showCreatePanel))}
-                  onClick={() => setShowCreatePanel((current) => !current)}
-                  aria-label={labels.createThread}
-                >
-                  <Plus className="size-4" />
-                </button>
-              </div>
-
-              <div className="mt-3">
-                {renderTelegramControls(true)}
-              </div>
-            </header>
-
-            {renderTelegramCreatePanel()}
-
-            <div className="min-h-0 overflow-y-auto">
-              {renderTelegramThreadList(true)}
-            </div>
-          </section>
-
-          {mobileThreadOpen && activeThread ? (
-            <div className={cn('fixed inset-0 z-[70]', pageBg(isLight))}>
-              {renderTelegramConversation(true)}
-            </div>
-          ) : null}
-
-          {contextMenuPortal}
-        </main>
-      </WorkspaceShell>
-    );
-  }
-
-  return (
-    <WorkspaceShell>
-      <main className={cn('h-[calc(100dvh-68px)] overflow-hidden px-4 pb-4 pt-5 md:px-7 md:pt-6', pageBg(isLight))}>
-        <div
-          className={cn(
-            'mx-auto grid h-full min-h-0 w-full max-w-[var(--page-max-width)] overflow-hidden rounded-[18px] border',
-            'lg:grid-cols-[370px_minmax(0,1fr)] xl:grid-cols-[390px_minmax(0,1fr)]',
-            isLight
-              ? 'border-black/[0.08] bg-white shadow-[0_18px_70px_rgba(17,17,17,0.045)]'
-              : 'border-white/[0.09] bg-[#101010]',
-          )}
-        >
-          <aside className={cn('grid min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] border-r', borderTone(isLight), isLight ? 'bg-white' : 'bg-[#101010]')}>
-            <header className={cn('border-b px-4 py-3.5', borderTone(isLight))}>
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <h1 className={cn('truncate text-[24px] font-semibold tracking-[-0.065em]', pageText(isLight))}>
-                    {labels.title}
-                  </h1>
-                  <p className={cn('mt-0.5 truncate text-[10.5px]', mutedText(isLight))}>
-                    {demoMode ? labels.demo : labels.live} · {filteredThreads.length}
-                    {unreadTotal > 0 ? ` · ${unreadTotal} ${labels.unread}` : ''}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  className={cn('size-10 rounded-full px-0', buttonBase(isLight, showCreatePanel))}
-                  onClick={() => setShowCreatePanel((current) => !current)}
-                  aria-label={labels.createThread}
-                >
-                  <Plus className="size-4" />
-                </button>
-              </div>
-
-              <div className="mt-3">
-                {renderTelegramControls(false)}
-              </div>
-            </header>
-
-            {renderTelegramCreatePanel()}
-
-            <div className="min-h-0 overflow-y-auto">
-              {renderTelegramThreadList(false)}
-            </div>
-          </aside>
-
-          {renderTelegramConversation(false)}
+  const renderComposer = () => (
+    <footer className={cn('shrink-0 border-t p-3', borderTone(isLight), isLight ? 'bg-white' : 'bg-[#101010]')}>
+      <div className="space-y-2.5">
+        <div className="flex flex-wrap gap-1.5">
+          <button type="button" className={buttonBase(isLight, composerFlow === 'confirm')} disabled={!selectedThread} onClick={() => applyBotFlow('confirm')}>
+            <CheckCheck className="size-3.5" />
+            {copy.confirm}
+          </button>
+          <button
+            type="button"
+            className={buttonBase(isLight, composerFlow === 'reschedule')}
+            disabled={!selectedThread}
+            onClick={() => {
+              const preset = quickTransferPresets[0];
+              if (preset) applyQuickTransfer(preset.date, preset.time);
+              else applyBotFlow('reschedule');
+            }}
+          >
+            <ArrowRightLeft className="size-3.5" />
+            {copy.reschedule}
+          </button>
+          <button type="button" className={buttonBase(isLight, composerFlow === 'followup')} disabled={!selectedThread} onClick={() => applyBotFlow('followup')}>
+            <Sparkles className="size-3.5" />
+            {copy.followupAction}
+          </button>
         </div>
 
-        {contextMenuPortal}
-      </main>
-    </WorkspaceShell>
+        {composerFlow === 'reschedule' ? (
+          <Panel light={isLight} className="grid gap-2 p-3 md:grid-cols-[1fr_132px_auto]">
+            <Input type="date" value={transferDate} onChange={(event) => setTransferDate(event.target.value)} className={cn('h-10 rounded-[10px]', inputTone(isLight))} />
+            <Input type="time" step="1800" value={transferTime} onChange={(event) => setTransferTime(event.target.value)} className={cn('h-10 rounded-[10px]', inputTone(isLight))} />
+            <button type="button" className={buttonBase(isLight, true)} onClick={handleApplyTransfer} disabled={!selectedThread || !transferDate}>
+              <CalendarClock className="size-3.5" />
+              {copy.applyTransfer}
+            </button>
+          </Panel>
+        ) : null}
+
+        <div className="grid gap-2 xl:grid-cols-[184px_minmax(0,1fr)]">
+          <Select value={selectedTemplateId} onValueChange={handleTemplateChange}>
+            <SelectTrigger className={cn('h-10 rounded-[10px]', inputTone(isLight))}>
+              <SelectValue placeholder={copy.template} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="custom">{copy.template}</SelectItem>
+              {templateOptions.map((template) => (
+                <SelectItem key={template.id} value={template.id}>
+                  {template.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <div className="grid gap-2">
+            <Textarea
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={handleComposerKeyDown}
+              placeholder={copy.message}
+              className={cn('min-h-[68px] resize-none rounded-[12px] px-3 py-2.5 text-[13px]', inputTone(isLight))}
+              disabled={!selectedThread}
+            />
+
+            <div className="flex items-center justify-between gap-2">
+              <div className={cn('truncate text-[10.5px]', mutedText(isLight))}>
+                {selectedThread ? selectedThread.clientName : '—'}
+              </div>
+
+              <div className="flex gap-1.5">
+                <button type="button" className={buttonBase(isLight)} onClick={() => setDraft('')} disabled={!draft}>
+                  {copy.clear}
+                </button>
+                <button type="button" className={buttonBase(isLight, true)} onClick={handleSendMessage} disabled={!selectedThread || !draft.trim() || isSending}>
+                  <SendHorizonal className="size-3.5" />
+                  {copy.send}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {error ? <div className="text-[11px] text-destructive">{error}</div> : null}
+      </div>
+    </footer>
   );
+
+  const renderChatHeader = (mobile = false) => (
+    <header className={cn('shrink-0 border-b px-3 py-3', borderTone(isLight), isLight ? 'bg-white' : 'bg-[#101010]')}>
+      {selectedThread ? (
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            {mobile ? (
+              <Button type="button" className={cn('size-9 shrink-0 px-0', buttonBase(isLight))} onClick={() => setMobileThreadOpen(false)}>
+                <ChevronLeft className="size-4" />
+              </Button>
+            ) : null}
+
+            <div className={cn('grid size-11 shrink-0 place-items-center rounded-full border text-[13px] font-semibold', isLight ? 'border-black/[0.07] bg-black/[0.025] text-black' : 'border-white/[0.08] bg-white/[0.045] text-white')}>
+              {getInitials(selectedThread.clientName)}
+            </div>
+
+            <div className="min-w-0">
+              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                <div className={cn('truncate text-[16px] font-semibold tracking-[-0.025em]', pageText(isLight))}>
+                  {selectedThread.clientName}
+                </div>
+                <MicroLabel light={isLight} className="h-6 px-2 py-0 text-[9px]">{channelLabel(selectedThread.channel, locale)}</MicroLabel>
+                <MicroLabel light={isLight} active accentColor={accentColor} className="h-6 px-2 py-0 text-[9px]">{segmentLabel(selectedThread.segment, locale)}</MicroLabel>
+              </div>
+
+              <div className={cn('mt-1 truncate text-[11px] font-medium', pageText(isLight))}>
+                {selectedBookingContext ? getBookingContextLabel(selectedBookingContext, locale) : getThreadContextLine(selectedThread, locale) ?? selectedThread.clientPhone}
+              </div>
+
+              {activeBookingContexts.length > 1 ? (
+                <div className="mt-2 flex max-w-full gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {activeBookingContexts.map((context) => (
+                    <button
+                      key={context.id}
+                      type="button"
+                      onClick={() => setSelectedBookingByThreadId((current) => ({ ...current, [selectedThread.id]: context.id }))}
+                      className={cn(
+                        'max-w-[200px] shrink-0 truncate rounded-full border px-2 py-1 text-[9.5px] font-semibold transition',
+                        context.id === selectedBookingId
+                          ? 'cb-accent-pill-active'
+                          : isLight
+                            ? 'border-black/[0.07] bg-white text-black/46'
+                            : 'border-white/[0.08] bg-white/[0.04] text-white/42',
+                      )}
+                    >
+                      {getBookingContextLabel(context, locale)}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Button asChild className={cn('size-9 px-0', buttonBase(isLight))}>
+              <Link href={`tel:${selectedThread.clientPhone}`}>
+                <PhoneCall className="size-4" />
+              </Link>
+            </Button>
+
+            <button
+              type="button"
+              className={cn('size-9 px-0', buttonBase(isLight, pinnedThreadIds.includes(selectedThread.id)))}
+              onClick={() => togglePin(selectedThread.id)}
+              title={pinnedThreadIds.includes(selectedThread.id) ? copy.unpin : copy.pin}
+            >
+              <Pin className={cn('size-4', pinnedThreadIds.includes(selectedThread.id) && 'fill-current')} />
+            </button>
+
+            <button
+              type="button"
+              className={cn('size-9 px-0', buttonBase(isLight, selectedThread.isPriority))}
+              onClick={() => void patchThread(selectedThread.id, { isPriority: !selectedThread.isPriority })}
+              title={selectedThread.isPriority ? copy.priorityOn : copy.priorityOff}
+            >
+              <Star className={cn('size-4', selectedThread.isPriority && 'fill-current')} />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <div className={cn('text-[14px] font-semibold', pageText(isLight))}>{copy.emptyThread}</div>
+          <div className={cn('mt-1 text-[11px]', mutedText(isLight))}>{copy.emptyThreadHint}</div>
+        </div>
+      )}
+    </header>
+  );
+
+  const renderClientPanel = () => (
+    <aside className={cn('hidden min-h-0 flex-col border-l xl:flex', borderTone(isLight), isLight ? 'bg-white' : 'bg-[#101010]')}>
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        <div className="space-y-3">
+          <Panel light={isLight} className="p-4">
+            <div className={cn('text-[10px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>
+              {copy.openProfile}
+            </div>
+
+            <div className={cn('mt-2 text-[22px] font-semibold tracking-[-0.06em]', pageText(isLight))}>
+              {selectedThread?.clientName ?? copy.emptyThread}
+            </div>
+
+            <div className={cn('mt-1 text-[11px]', mutedText(isLight))}>
+              {selectedThread?.clientPhone ?? copy.emptyThreadHint}
+            </div>
+          </Panel>
+
+          {selectedThread ? (
+            <>
+              <Panel light={isLight} className="divide-y overflow-hidden">
+                {[
+                  { label: copy.source, value: selectedThread.source || channelLabel(selectedThread.channel, locale) },
+                  { label: copy.nextVisit, value: selectedThread.nextVisit ? formatLongDateLabel(selectedThread.nextVisit, locale) : copy.notScheduled },
+                  { label: copy.unread, value: String(selectedThread.unreadCount) },
+                  { label: 'Bot', value: selectedThread.botConnected ? copy.botOn : copy.botOff },
+                ].map((item) => (
+                  <div key={item.label} className={cn('flex items-center justify-between gap-3 px-3 py-2.5', isLight ? 'divide-black/[0.08]' : 'divide-white/[0.08]')}>
+                    <span className={cn('text-[11px]', mutedText(isLight))}>{item.label}</span>
+                    <span className={cn('max-w-[160px] truncate text-right text-[11px] font-medium', pageText(isLight))}>{item.value}</span>
+                  </div>
+                ))}
+              </Panel>
+
+              <div className="grid gap-2">
+                <button type="button" className={buttonBase(isLight, selectedThread.botConnected)} onClick={() => void patchThread(selectedThread.id, { botConnected: !selectedThread.botConnected })}>
+                  <Bot className="size-3.5" />
+                  {selectedThread.botConnected ? copy.botOn : copy.botOff}
+                </button>
+
+                <button type="button" className={buttonBase(isLight)} onClick={() => handleExportThread(selectedThread)}>
+                  <Download className="size-3.5" />
+                  {copy.export}
+                </button>
+
+                <button type="button" className={buttonBase(isLight)} onClick={() => handleDeleteThread(selectedThread.id)}>
+                  <Trash2 className="size-3.5" />
+                  {copy.delete}
+                </button>
+              </div>
+
+              <Panel light={isLight} className="p-3">
+                <div className={cn('text-[10px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>
+                  {copy.reschedule}
+                </div>
+
+                <div className="mt-3 grid gap-2">
+                  {quickTransferPresets.map((preset) => (
+                    <button key={preset.id} type="button" className={buttonBase(isLight)} onClick={() => applyQuickTransfer(preset.date, preset.time)}>
+                      <CalendarClock className="size-3.5" />
+                      {preset.label} · {preset.time}
+                    </button>
+                  ))}
+                </div>
+              </Panel>
+            </>
+          ) : null}
+        </div>
+      </div>
+    </aside>
+  );
+
+  const desktopLayout = (
+    <main className={cn('h-[calc(100dvh-68px)] overflow-hidden px-4 pb-4 pt-5 md:px-7 md:pt-6', pageBg(isLight))}>
+      <div className={cn('mx-auto grid h-full min-h-0 w-full max-w-[var(--page-max-width)] overflow-hidden rounded-[18px] border lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[370px_minmax(0,1fr)_300px]', isLight ? 'border-black/[0.08] bg-white shadow-[0_18px_70px_rgba(17,17,17,0.045)]' : 'border-white/[0.09] bg-[#101010]')}>
+        <aside className={cn('grid min-h-0 grid-rows-[auto_auto_auto_minmax(0,1fr)] border-r', borderTone(isLight), isLight ? 'bg-white' : 'bg-[#101010]')}>
+          <header className={cn('border-b px-4 py-3.5', borderTone(isLight))}>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h1 className={cn('truncate text-[24px] font-semibold tracking-[-0.065em]', pageText(isLight))}>{copy.title}</h1>
+                <p className={cn('mt-0.5 truncate text-[10.5px]', mutedText(isLight))}>
+                  {demoMode ? copy.demo : copy.live} · {filteredThreads.length}
+                  {unreadTotal > 0 ? ` · ${unreadTotal} ${copy.unread}` : ''}
+                </p>
+              </div>
+
+              <button type="button" className={cn('size-10 rounded-full px-0', buttonBase(isLight, showCreatePanel))} onClick={() => setShowCreatePanel((current) => !current)}>
+                <Plus className="size-4" />
+              </button>
+            </div>
+
+            <div className="mt-3">{renderFilters()}</div>
+          </header>
+
+          <div className={cn('grid grid-cols-3 gap-1.5 border-b p-3', borderTone(isLight))}>
+            {stats.map((item) => (
+              <button key={item.label} type="button" onClick={item.action} className={cn('rounded-[12px] border px-2 py-2 text-left transition', item.active ? 'cb-accent-pill-active' : isLight ? 'border-black/[0.07] bg-black/[0.015]' : 'border-white/[0.08] bg-white/[0.035]')}>
+                <div className={cn('text-[9px] font-medium', mutedText(isLight))}>{item.label}</div>
+                <div className={cn('mt-1 text-[17px] font-semibold tracking-[-0.06em]', pageText(isLight))}>{item.value}</div>
+              </button>
+            ))}
+          </div>
+
+          {renderCreatePanel()}
+          {renderThreadList()}
+        </aside>
+
+        <section className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto]">
+          {renderChatHeader(false)}
+          <div ref={desktopMessageScrollRef} className={cn('min-h-0 overflow-y-auto px-4 py-4', isLight ? 'bg-[#f7f6f2]/55' : 'bg-black/20')}>
+            {renderMessages(false)}
+          </div>
+          {renderComposer()}
+        </section>
+
+        {renderClientPanel()}
+      </div>
+    </main>
+  );
+
+  const mobileLayout = (
+    <main className={cn('h-[calc(100dvh-68px)] overflow-hidden', pageBg(isLight))}>
+      <section className={cn('grid h-full min-h-0 grid-rows-[auto_auto_auto_minmax(0,1fr)]', isLight ? 'bg-white' : 'bg-[#101010]')}>
+        <header className={cn('border-b px-4 pb-3 pt-4', borderTone(isLight))}>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className={cn('truncate text-[24px] font-semibold tracking-[-0.06em]', pageText(isLight))}>{copy.title}</h1>
+              <p className={cn('mt-0.5 text-[10.5px]', mutedText(isLight))}>{demoMode ? copy.demo : copy.live} · {filteredThreads.length}</p>
+            </div>
+
+            <button type="button" className={cn('size-10 rounded-full px-0', buttonBase(isLight, showCreatePanel))} onClick={() => setShowCreatePanel((current) => !current)}>
+              <Plus className="size-4" />
+            </button>
+          </div>
+
+          <div className="mt-3">{renderFilters()}</div>
+        </header>
+
+        <div className={cn('grid grid-cols-3 gap-1.5 border-b p-3', borderTone(isLight))}>
+          {stats.map((item) => (
+            <button key={item.label} type="button" onClick={item.action} className={cn('rounded-[12px] border px-2 py-2 text-left transition', item.active ? 'cb-accent-pill-active' : isLight ? 'border-black/[0.07] bg-black/[0.015]' : 'border-white/[0.08] bg-white/[0.035]')}>
+              <div className={cn('text-[9px] font-medium', mutedText(isLight))}>{item.label}</div>
+              <div className={cn('mt-1 text-[17px] font-semibold tracking-[-0.06em]', pageText(isLight))}>{item.value}</div>
+            </button>
+          ))}
+        </div>
+
+        {renderCreatePanel()}
+        {renderThreadList()}
+      </section>
+
+      {mobileThreadOpen && selectedThread ? (
+        <div className={cn('fixed inset-0 z-[70] grid grid-rows-[auto_minmax(0,1fr)_auto]', pageBg(isLight))}>
+          {renderChatHeader(true)}
+          <div ref={mobileMessageScrollRef} className={cn('min-h-0 overflow-y-auto px-3 py-3', isLight ? 'bg-[#f7f6f2]/55' : 'bg-black/20')}>
+            {renderMessages(true)}
+          </div>
+          {renderComposer()}
+        </div>
+      ) : null}
+    </main>
+  );
+
+  return <WorkspaceShell>{isMobile ? mobileLayout : desktopLayout}</WorkspaceShell>;
 }
