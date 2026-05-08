@@ -55,27 +55,27 @@ export const TOKENS: Record<ThemeMode, ThemeTokens> = {
     skeleton: 'rgba(255,255,255,0.04)',
   },
   light: {
-    bg: '#fafaf9',
-    bgSoft: '#f7f6f2',
-    card: '#ffffff',
+    bg: '#f8f2ea',
+    bgSoft: '#fff8f1',
+    card: '#fffdfa',
     cardElev: '#ffffff',
-    cardHover: '#f8f8f6',
-    border: 'rgba(10,10,10,0.06)',
-    borderStrong: 'rgba(10,10,10,0.10)',
-    text: '#0a0a0a',
-    text2: 'rgba(10,10,10,0.5)',
-    text3: 'rgba(10,10,10,0.3)',
-    accent: '#0f766e',
-    accentSoft: 'rgba(15,118,110,0.10)',
-    danger: '#dc2626',
-    success: '#16a34a',
-    warn: '#d97706',
-    inputBg: '#f3f2ef',
-    cardShadow: '0 1px 2px rgba(0,0,0,0.04)',
-    overlayBg: 'rgba(10,10,10,0.4)',
-    sheetBg: '#ffffff',
-    msgIn: '#f0efed',
-    skeleton: 'rgba(0,0,0,0.04)',
+    cardHover: '#fff6ef',
+    border: 'rgba(54,43,34,0.10)',
+    borderStrong: 'rgba(54,43,34,0.16)',
+    text: '#2d2926',
+    text2: 'rgba(45,41,38,0.62)',
+    text3: 'rgba(45,41,38,0.38)',
+    accent: '#e96f59',
+    accentSoft: 'rgba(233,111,89,0.12)',
+    danger: '#dc4f4b',
+    success: '#148556',
+    warn: '#b88354',
+    inputBg: '#fffaf5',
+    cardShadow: '0 12px 28px rgba(80,55,35,0.07)',
+    overlayBg: 'rgba(54,43,34,0.32)',
+    sheetBg: '#fffdfa',
+    msgIn: '#fff4ec',
+    skeleton: 'rgba(54,43,34,0.06)',
   },
 };
 
@@ -184,8 +184,7 @@ const ThemeCtx = createContext<ThemeCtxValue>({
 
 export function ThemeProvider({ initialMode = 'dark', children }: { initialMode?: ThemeMode; children: ReactNode }) {
   const stored = readStoredAppearance();
-  const storedMode = initialMode === 'light' && stored.mode === 'dark' ? undefined : stored.mode;
-  const [mode, setMode] = useState<ThemeMode>(storedMode ?? initialMode);
+  const [mode, setMode] = useState<ThemeMode>('light');
   const [accentTone, setAccentToneState] = useState<AccentTone>(stored.accentTone ?? 'teal');
   const [radius, setRadiusState] = useState<RadiusMode>(stored.radius ?? 'medium');
 
