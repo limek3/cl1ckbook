@@ -475,7 +475,7 @@ type TabId = 'home' | 'appts' | 'chats' | 'clients' | 'more';
 const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: 'home',     label: 'Главная',  icon: 'home' },
   { id: 'appts',    label: 'Записи',   icon: 'calendar' },
-  { id: 'chats',    label: '',         icon: 'plus' },
+  { id: 'chats',    label: 'Чаты',     icon: 'message-square' },
   { id: 'clients',  label: 'Клиенты',  icon: 'users' },
   { id: 'more',     label: 'Ещё',      icon: 'more-horizontal' },
 ];
@@ -534,39 +534,32 @@ function BottomNav({ active, onChange, chatUnreadCount = 0 }: { active: TabId; o
           : '0 -16px 44px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.78)',
       }}>
         {TABS.map((t) => {
-          const isCenterAction = t.id === 'chats';
-          const isActive = !isCenterAction && active === t.id;
-          const showBadge = false;
-          const accent = mode === 'dark' ? T.accent : '#e96f59';
+          const isActive = active === t.id;
+          const showBadge = t.id === 'chats' && chatUnreadCount > 0;
           return (
-            <button key={t.id} onClick={() => { haptic('light'); onChange(isCenterAction ? 'appts' : t.id); }} style={{
-              border: `1px solid ${isActive ? (dark ? 'rgba(255,255,255,0.075)' : 'rgba(233,111,89,0.18)') : 'transparent'}`,
+            <button key={t.id} onClick={() => { haptic('light'); onChange(t.id); }} style={{
+              border: `1px solid ${isActive ? (dark ? 'rgba(255,255,255,0.075)' : 'rgba(0,0,0,0.06)') : 'transparent'}`,
               cursor: 'pointer',
-              height: 50,
+              height: 46,
               minWidth: 0,
-              borderRadius: isCenterAction ? 999 : 14,
+              borderRadius: 14,
               padding: 0,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 4,
+              gap: 3,
               fontFamily: 'inherit',
               WebkitTapHighlightColor: 'transparent',
-              background: isCenterAction
-                ? (dark ? 'linear-gradient(135deg, #d7aa63, #9b6e2f)' : 'linear-gradient(135deg, #ef7a64, #df604b)')
-                : isActive
-                  ? (dark ? 'rgba(255,255,255,0.065)' : 'rgba(233,111,89,0.075)')
-                  : 'transparent',
-              color: isCenterAction ? '#fff' : (isActive ? accent : T.text3),
-              boxShadow: isCenterAction
-                ? (dark ? '0 12px 28px rgba(199,151,76,0.28), inset 0 1px 0 rgba(255,255,255,0.38)' : '0 12px 24px rgba(233,111,89,0.23), inset 0 1px 0 rgba(255,255,255,0.45)')
-                : isActive ? 'inset 0 1px 0 rgba(255,255,255,0.08)' : 'none',
-              transform: isCenterAction ? 'translateY(-10px)' : undefined,
+              background: isActive
+                ? (dark ? 'rgba(255,255,255,0.065)' : 'rgba(0,0,0,0.045)')
+                : 'transparent',
+              color: isActive ? T.accent : T.text3,
+              boxShadow: isActive ? 'inset 0 1px 0 rgba(255,255,255,0.05), 0 8px 22px rgba(0,0,0,0.24)' : 'none',
               transition: 'background 0.18s ease, color 0.18s ease, transform 0.12s ease, border-color 0.18s ease',
             }}>
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name={t.icon} size={isCenterAction ? 26 : 18} stroke={isCenterAction ? 1.8 : isActive ? 2.05 : 1.7} color={isCenterAction ? '#fff' : undefined} />
+                <Icon name={t.icon} size={17} stroke={isActive ? 2.05 : 1.6} />
                 {showBadge && (
                   <span style={{
                     position: 'absolute', top: -8, right: -12, minWidth: 16, height: 16,
@@ -580,16 +573,16 @@ function BottomNav({ active, onChange, chatUnreadCount = 0 }: { active: TabId; o
                   }}>{chatUnreadCount > 9 ? '9+' : chatUnreadCount}</span>
                 )}
               </div>
-              {!isCenterAction && <span style={{
+              <span style={{
                 maxWidth: '100%',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
-                fontSize: 10,
+                fontSize: 9,
                 lineHeight: 1,
-                fontWeight: isActive ? 700 : 500,
+                fontWeight: isActive ? 600 : 500,
                 letterSpacing: '-0.04em',
-              }}>{t.label}</span>}
+              }}>{t.label}</span>
             </button>
           );
         })}
@@ -842,7 +835,6 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
 
   // Chat thread = full height (no global mini header/nav)
   const isFullHeight = Boolean(sub && sub.kind === 'thread');
-  const usesEmbeddedHomeHeader = !sub && tab === 'home';
 
   return (
     <ToastCtx.Provider value={toastApi}>
@@ -1015,7 +1007,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
           .cb-miniapp ::placeholder { color: ${T.text3}; opacity: 1; -webkit-text-fill-color: ${T.text3}; }
           .cb-miniapp { --miniapp-accent: ${T.accent}; --mini-control-border: ${T.border}; }
         `}</style>
-        {!isFullHeight && !usesEmbeddedHomeHeader && (
+        {!isFullHeight && (
           <TgHeader
             onToggleTheme={toggle}
             onNotifications={() => setSub({ kind: 'notifications' })}
@@ -1045,7 +1037,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
               minHeight: 0,
               overflowY: 'auto',
               overflowX: 'hidden',
-              paddingTop: usesEmbeddedHomeHeader ? 'calc(10px + var(--miniapp-safe-top, 0px))' : 'calc(100px + var(--miniapp-safe-top, 0px))',
+              paddingTop: 'calc(100px + var(--miniapp-safe-top, 0px))',
               paddingBottom: 'calc(76px + var(--miniapp-safe-bottom, 0px))',
               WebkitOverflowScrolling: 'touch',
             }}
