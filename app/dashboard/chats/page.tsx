@@ -2678,31 +2678,38 @@ export default function DashboardChatsPage() {
               }
         }
         className={cn(
-          'group relative overflow-hidden rounded-[16px] border text-left outline-none transition-[background,border-color,box-shadow,opacity,transform,filter] duration-150',
-          mobile ? 'p-3' : 'p-3.5',
+          'group relative overflow-hidden rounded-[13px] border text-left outline-none transition-[background,border-color,box-shadow,opacity,transform,filter] duration-150',
+          mobile ? 'px-3 py-2.5' : 'px-3 py-2.5',
           active
             ? isLight
-              ? 'border-black/[0.16] bg-white shadow-[0_16px_36px_rgba(17,17,17,0.065)]'
-              : 'border-white/[0.16] bg-white/[0.075] shadow-[0_16px_38px_rgba(0,0,0,0.25)]'
+              ? 'border-black/[0.14] bg-white shadow-[0_10px_26px_rgba(17,17,17,0.045)]'
+              : 'border-white/[0.14] bg-white/[0.07] shadow-[0_12px_28px_rgba(0,0,0,0.22)]'
             : isLight
-              ? 'border-black/[0.07] bg-white/54 hover:border-black/[0.12] hover:bg-white'
-              : 'border-white/[0.07] bg-white/[0.026] hover:border-white/[0.12] hover:bg-white/[0.052]',
-          pinned && (isLight ? 'bg-white' : 'bg-white/[0.06]'),
+              ? 'border-black/[0.06] bg-transparent hover:border-black/[0.1] hover:bg-white/72'
+              : 'border-white/[0.06] bg-transparent hover:border-white/[0.1] hover:bg-white/[0.04]',
+          pinned && !active && (isLight ? 'bg-white/45' : 'bg-white/[0.032]'),
           activeAlert && warningTone(isLight),
         )}
         aria-label={labels.openThread}
       >
-        <div className="flex items-start gap-3">
+        {active ? (
+          <span
+            className="absolute bottom-2 left-1 top-2 w-[3px] rounded-full"
+            style={{ background: accentColor }}
+          />
+        ) : null}
+
+        <div className="flex min-w-0 items-start gap-2.5 pl-1">
           {canDrag ? (
             <button
               type="button"
               title={labels.dragThread}
               aria-label={labels.dragThread}
               className={cn(
-                'mt-1 flex size-7 shrink-0 cursor-grab items-center justify-center rounded-[9px] border opacity-0 transition group-hover:opacity-100 active:cursor-grabbing',
+                'mt-1 hidden size-6 shrink-0 cursor-grab items-center justify-center rounded-[8px] border opacity-0 transition group-hover:flex group-hover:opacity-100 active:cursor-grabbing',
                 isLight
-                  ? 'border-black/[0.07] bg-white text-black/30 hover:text-black/60'
-                  : 'border-white/[0.07] bg-white/[0.035] text-white/30 hover:text-white/60',
+                  ? 'border-black/[0.06] bg-white text-black/28 hover:text-black/58'
+                  : 'border-white/[0.07] bg-white/[0.035] text-white/28 hover:text-white/58',
               )}
               onClick={(event) => event.stopPropagation()}
               onPointerDown={(event) => beginThreadDrag(event, thread.id, index)}
@@ -2713,24 +2720,17 @@ export default function DashboardChatsPage() {
 
           <div
             className={cn(
-              'relative grid size-10 shrink-0 place-items-center rounded-[14px] border text-[12px] font-semibold tracking-[-0.02em]',
+              'relative grid size-9 shrink-0 place-items-center rounded-full border text-[11px] font-semibold tracking-[-0.02em]',
               isLight
                 ? 'border-black/[0.07] bg-black/[0.025] text-black'
-                : 'border-white/[0.08] bg-white/[0.045] text-white',
+                : 'border-white/[0.08] bg-white/[0.04] text-white',
             )}
           >
             {getInitials(thread.clientName)}
 
-            {active ? (
-              <span
-                className="absolute -bottom-0.5 left-1/2 h-1 w-5 -translate-x-1/2 rounded-full"
-                style={{ background: accentColor }}
-              />
-            ) : null}
-
             {thread.unreadCount > 0 ? (
               <span
-                className="absolute -right-1.5 -top-1.5 inline-flex min-w-[18px] items-center justify-center rounded-[7px] px-1 py-[2px] text-[8px] font-semibold text-white"
+                className="absolute -right-1 -top-1 grid min-w-[16px] place-items-center rounded-full px-1 py-[1px] text-[8px] font-semibold text-white"
                 style={{ background: accentColor }}
               >
                 {thread.unreadCount}
@@ -2742,87 +2742,89 @@ export default function DashboardChatsPage() {
             <div className="flex min-w-0 items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-center gap-1.5">
-                  <div className={cn('truncate text-[13px] font-semibold tracking-[-0.018em]', pageText(isLight))}>
+                  <div className={cn('truncate text-[12.5px] font-semibold tracking-[-0.018em]', pageText(isLight))}>
                     {thread.clientName}
                   </div>
 
                   {pinned ? <Pin className="size-3 shrink-0 fill-current" style={{ color: accentColor }} /> : null}
                   {thread.isPriority ? <Star className="size-3 shrink-0 fill-current" style={{ color: accentColor }} /> : null}
-
-                  {bookingContextCount > 1 ? (
-                    <span
-                      className={cn(
-                        'inline-flex h-5 shrink-0 items-center gap-1 rounded-[7px] border px-1.5 text-[9px] font-semibold',
-                        isLight
-                          ? 'border-black/[0.08] bg-black/[0.025] text-black/56'
-                          : 'border-white/[0.08] bg-white/[0.045] text-white/56',
-                      )}
-                    >
-                      <CalendarClock className="size-3" />
-                      {bookingContextCount}
-                    </span>
-                  ) : null}
                 </div>
 
-                <div className={cn('mt-1 truncate text-[10.5px] font-semibold', pageText(isLight))}>
+                <div className={cn('mt-0.5 truncate text-[10px] font-semibold', mutedText(isLight))}>
                   {bookingCode ? `${bookingCode} · ` : ''}
                   {serviceLabel ?? contextLine ?? (locale === 'ru' ? 'Запись' : 'Booking')}
                 </div>
               </div>
 
-              <button
-                type="button"
-                className={cn(
-                  'flex size-8 shrink-0 items-center justify-center rounded-[10px] border opacity-60 transition hover:opacity-100',
-                  isLight
-                    ? 'border-black/[0.07] bg-white/70 text-black/40 hover:text-black/70'
-                    : 'border-white/[0.07] bg-white/[0.035] text-white/36 hover:text-white/70',
-                )}
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  const rect = (event.currentTarget as HTMLButtonElement).getBoundingClientRect();
-                  setActiveThreadId(thread.id);
-                  setThreadContextMenu({ threadId: thread.id, x: rect.left, y: rect.bottom + 6 });
-                }}
-                aria-label={labels.moreActions}
-                title={labels.moreActions}
-              >
-                <MoreHorizontal className="size-4" />
-              </button>
+              <div className="flex shrink-0 items-center gap-1">
+                {bookingContextCount > 1 ? (
+                  <span
+                    className={cn(
+                      'inline-flex h-5 items-center gap-1 rounded-full border px-1.5 text-[8.5px] font-semibold',
+                      isLight
+                        ? 'border-black/[0.07] bg-white text-black/45'
+                        : 'border-white/[0.08] bg-white/[0.035] text-white/45',
+                    )}
+                  >
+                    <CalendarClock className="size-2.5" />
+                    {bookingContextCount}
+                  </span>
+                ) : null}
+
+                <button
+                  type="button"
+                  className={cn(
+                    'flex size-7 items-center justify-center rounded-full border opacity-50 transition hover:opacity-100',
+                    isLight
+                      ? 'border-black/[0.06] bg-white/70 text-black/36 hover:text-black/70'
+                      : 'border-white/[0.07] bg-white/[0.03] text-white/34 hover:text-white/70',
+                  )}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const rect = (event.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                    setActiveThreadId(thread.id);
+                    setThreadContextMenu({ threadId: thread.id, x: rect.left, y: rect.bottom + 6 });
+                  }}
+                  aria-label={labels.moreActions}
+                  title={labels.moreActions}
+                >
+                  <MoreHorizontal className="size-3.5" />
+                </button>
+              </div>
             </div>
 
             {thread.lastMessagePreview ? (
-              <div className={cn('mt-1.5 line-clamp-2 text-[11px] leading-4', mutedText(isLight))}>
+              <div className={cn('mt-1 line-clamp-1 text-[10.5px] leading-4', mutedText(isLight))}>
                 {thread.lastMessagePreview}
               </div>
             ) : null}
 
-            <div className="mt-2.5 flex min-w-0 flex-wrap items-center gap-1.5">
+            <div className="mt-2 flex min-w-0 items-center gap-1.5 overflow-hidden">
               <span
                 className={cn(
-                  'inline-flex h-5 max-w-[86px] items-center gap-1 rounded-[7px] border px-1.5 text-[8.5px] font-semibold',
+                  'inline-flex h-5 max-w-[74px] shrink-0 items-center rounded-full border px-2 text-[8.5px] font-semibold',
                   isLight
-                    ? 'border-black/[0.07] bg-white/70 text-black/48'
-                    : 'border-white/[0.08] bg-white/[0.035] text-white/46',
+                    ? 'border-black/[0.06] bg-white/55 text-black/42'
+                    : 'border-white/[0.07] bg-white/[0.032] text-white/42',
                 )}
               >
                 <span className="truncate">{channelLabel(thread.channel)}</span>
               </span>
 
-              <span className={cn('text-[9.5px]', faintText(isLight))}>
-                {formatDateLabel(thread.lastMessageAt, locale)} · {formatTimeLabel(thread.lastMessageAt, locale)}
+              <span className={cn('shrink-0 text-[9.5px]', faintText(isLight))}>
+                {formatTimeLabel(thread.lastMessageAt, locale)}
               </span>
 
               {thread.botConnected ? (
-                <span className={cn('inline-flex h-5 items-center gap-1 rounded-[7px] px-1.5 text-[8.5px]', isLight ? 'bg-black/[0.025] text-black/46' : 'bg-white/[0.035] text-white/42')}>
+                <span className={cn('inline-flex h-5 shrink-0 items-center gap-1 rounded-full px-1.5 text-[8.5px]', isLight ? 'bg-black/[0.025] text-black/42' : 'bg-white/[0.032] text-white/40')}>
                   <Bot className="size-2.5" />
                   {locale === 'ru' ? 'бот' : 'bot'}
                 </span>
               ) : null}
 
               {activeAlert ? (
-                <span className={cn('inline-flex h-5 items-center gap-1 rounded-[7px] border px-1.5 text-[8.5px]', warningTone(isLight))}>
+                <span className={cn('inline-flex h-5 shrink-0 items-center gap-1 rounded-full border px-1.5 text-[8.5px]', warningTone(isLight))}>
                   <AlertTriangle className="size-2.5" />
                   {labels.rescheduleAlertShort}
                 </span>
@@ -3542,27 +3544,46 @@ export default function DashboardChatsPage() {
     />
   );
 
+  const unreadTotal = threads.reduce((sum, thread) => sum + (thread.unreadCount ?? 0), 0);
+  const priorityTotal = threads.filter((thread) => thread.isPriority).length;
+  const activeThreadIndex = activeThread
+    ? Math.max(0, filteredThreads.findIndex((thread) => thread.id === activeThread.id)) + 1
+    : 0;
+
   if (isMobile) {
     return (
       <WorkspaceShell>
         <main className={cn('h-[calc(100dvh-68px)] overflow-hidden px-3 pb-3 pt-4', pageBg(isLight))}>
           <div className="mx-auto flex h-full min-h-0 w-full max-w-[var(--page-max-width)] flex-col gap-3">
-            <div className="shrink-0">
+            <div className="shrink-0 rounded-[22px] border px-4 py-3" style={{ borderColor: isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.08)', background: isLight ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.025)' }}>
               <div className="flex items-end justify-between gap-3">
                 <div className="min-w-0">
-                  <h1 className={cn('text-[29px] font-semibold tracking-[-0.075em]', pageText(isLight))}>{labels.title}</h1>
-                  <p className={cn('mt-1 max-w-[760px] text-[12px] leading-5', mutedText(isLight))}>{labels.description}</p>
+                  <h1 className={cn('text-[28px] font-semibold tracking-[-0.075em]', pageText(isLight))}>{labels.title}</h1>
+                  <p className={cn('mt-1 max-w-[760px] text-[11.5px] leading-5', mutedText(isLight))}>{labels.description}</p>
                 </div>
                 <MicroLabel light={isLight} active={demoMode} className="shrink-0">
                   <Bot className="size-3.5" />
                   {demoMode ? labels.demo : labels.live}
                 </MicroLabel>
               </div>
+
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {[
+                  { label: labels.allThreads, value: threads.length },
+                  { label: labels.unread, value: unreadTotal },
+                  { label: locale === 'ru' ? 'Важные' : 'Priority', value: priorityTotal },
+                ].map((item) => (
+                  <div key={item.label} className={cn('rounded-[13px] border px-2.5 py-2', isLight ? 'border-black/[0.06] bg-white/64' : 'border-white/[0.07] bg-white/[0.035]')}>
+                    <div className={cn('text-[9px] font-medium', faintText(isLight))}>{item.label}</div>
+                    <div className={cn('mt-0.5 text-[16px] font-semibold leading-none tracking-[-0.05em]', pageText(isLight))}>{item.value}</div>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <div className={cn('flex min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] border', cardTone(isLight))}>
+            <div className={cn('flex min-h-0 flex-1 flex-col overflow-hidden rounded-[22px] border', isLight ? 'border-black/[0.07] bg-white/72' : 'border-white/[0.08] bg-[#111111]')}>
               <div className={cn('shrink-0 border-b p-3', borderTone(isLight))}>{renderFilters(true)}</div>
-              <div className="min-h-0 flex-1 overflow-y-auto p-3">{renderThreadList(true)}</div>
+              <div className="min-h-0 flex-1 overflow-y-auto p-2.5">{renderThreadList(true)}</div>
             </div>
           </div>
 
@@ -3587,42 +3608,101 @@ export default function DashboardChatsPage() {
   return (
     <WorkspaceShell>
       <main className={cn('h-[calc(100dvh-68px)] overflow-hidden px-4 pb-4 pt-5 md:px-7 md:pt-6', pageBg(isLight))}>
-        <div className="mx-auto flex h-full min-h-0 w-full max-w-[var(--page-max-width)] flex-col gap-4">
-          <div className="shrink-0">
-            <div className="flex items-end justify-between gap-4">
+        <div className="mx-auto grid h-full min-h-0 w-full max-w-[var(--page-max-width)] grid-rows-[auto_minmax(0,1fr)] gap-4">
+          <header
+            className={cn(
+              'shrink-0 overflow-hidden rounded-[24px] border px-5 py-4',
+              isLight ? 'border-black/[0.07] bg-white/68' : 'border-white/[0.08] bg-white/[0.025]',
+            )}
+          >
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_520px] xl:items-end">
               <div className="min-w-0">
-                <h1 className={cn('text-[31px] font-semibold tracking-[-0.075em] md:text-[42px]', pageText(isLight))}>{labels.title}</h1>
-                <p className={cn('mt-2 max-w-[760px] text-[13px] leading-5', mutedText(isLight))}>{labels.description}</p>
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <MicroLabel light={isLight} active={demoMode}>
+                    <Bot className="size-3.5" />
+                    {demoMode ? labels.demo : labels.live}
+                  </MicroLabel>
+                  <MicroLabel light={isLight}>
+                    {filteredThreads.length}/{threads.length}
+                  </MicroLabel>
+                  {unreadTotal > 0 ? (
+                    <MicroLabel light={isLight} active>
+                      {unreadTotal} {labels.unread}
+                    </MicroLabel>
+                  ) : null}
+                </div>
+
+                <h1 className={cn('text-[30px] font-semibold tracking-[-0.075em] md:text-[40px]', pageText(isLight))}>
+                  {labels.title}
+                </h1>
+
+                <p className={cn('mt-1.5 max-w-[760px] text-[12.5px] leading-5', mutedText(isLight))}>
+                  {labels.description}
+                </p>
               </div>
 
-              <div className="flex shrink-0 items-center gap-2">
-                <MicroLabel light={isLight} active={demoMode}>
-                  <Bot className="size-3.5" />
-                  {demoMode ? labels.demo : labels.live}
-                </MicroLabel>
-                <MicroLabel light={isLight}>
-                  {filteredThreads.length}/{threads.length}
-                </MicroLabel>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {[
+                  { label: labels.workspaceTitle, value: threads.length, hint: labels.allThreads },
+                  { label: labels.unread, value: unreadTotal, hint: locale === 'ru' ? 'требуют ответа' : 'need reply' },
+                  { label: locale === 'ru' ? 'Активный' : 'Current', value: activeThreadIndex || '—', hint: activeThread?.clientName ?? labels.emptyThread },
+                ].map((item) => (
+                  <div key={item.label} className={cn('min-w-0 rounded-[16px] border px-3 py-2.5', isLight ? 'border-black/[0.06] bg-white/72' : 'border-white/[0.07] bg-white/[0.035]')}>
+                    <div className={cn('truncate text-[10px] font-medium', faintText(isLight))}>{item.label}</div>
+                    <div className={cn('mt-1 truncate text-[20px] font-semibold leading-none tracking-[-0.055em]', pageText(isLight))}>{item.value}</div>
+                    <div className={cn('mt-1 truncate text-[9.5px]', mutedText(isLight))}>{item.hint}</div>
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
+          </header>
 
-          <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[360px_minmax(0,1fr)_320px]">
-            <aside className={cn('flex min-h-0 flex-col overflow-hidden rounded-[20px] border', cardTone(isLight))}>
-              <div className={cn('shrink-0 border-b p-3', borderTone(isLight))}>{renderFilters(false)}</div>
-              <div className="min-h-0 flex-1 overflow-y-auto p-3">{renderThreadList(false)}</div>
-            </aside>
-
-            <section className={cn('grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-[20px] border', cardTone(isLight))}>
+          <div className="grid min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_405px]">
+            <section
+              className={cn(
+                'grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-[24px] border',
+                isLight ? 'border-black/[0.07] bg-white' : 'border-white/[0.08] bg-[#111111]',
+              )}
+            >
               {renderChatHeader(false)}
-              <div ref={desktopMessageScrollRef} className={cn('min-h-0 overflow-y-auto px-4 py-4', isLight ? 'bg-black/[0.012]' : 'bg-white/[0.018]')}>
+
+              <div
+                ref={desktopMessageScrollRef}
+                className={cn(
+                  'min-h-0 overflow-y-auto px-5 py-5',
+                  isLight ? 'bg-[#f7f6f2]/62' : 'bg-black/20',
+                )}
+              >
                 {renderMessageFeed(false)}
               </div>
+
               {renderComposer(false)}
             </section>
 
-            <aside className="hidden min-h-0 overflow-y-auto xl:block">
-              {renderAssistantPanel(false)}
+            <aside className="grid min-h-0 gap-4 xl:grid-rows-[minmax(0,1.05fr)_minmax(280px,0.95fr)]">
+              <section
+                className={cn(
+                  'flex min-h-0 flex-col overflow-hidden rounded-[24px] border',
+                  isLight ? 'border-black/[0.07] bg-white/72' : 'border-white/[0.08] bg-[#111111]',
+                )}
+              >
+                <div className={cn('shrink-0 border-b p-3', borderTone(isLight))}>
+                  {renderFilters(false)}
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto p-2.5">
+                  {renderThreadList(false)}
+                </div>
+              </section>
+
+              <section
+                className={cn(
+                  'min-h-0 overflow-y-auto rounded-[24px] border p-3',
+                  isLight ? 'border-black/[0.07] bg-white/58' : 'border-white/[0.08] bg-white/[0.025]',
+                )}
+              >
+                {renderAssistantPanel(false)}
+              </section>
             </aside>
           </div>
         </div>
