@@ -4251,20 +4251,595 @@ export default function DashboardChatsPage() {
     </div>
   );
 
+
+  const renderStudioCaseCard = (
+    thread: ChatThreadRecord,
+    index: number,
+    compact = false,
+  ) => {
+    const active = thread.id === activeThreadId;
+    const pinned = isThreadPinned(thread.id);
+    const activeAlert = getThreadActiveAlert(thread);
+    const bookingContextCount = getThreadBookingContexts(thread).length;
+    const serviceLabel = getThreadServiceLabel(thread);
+    const bookingCode = getThreadBookingCode(thread);
+    const isDragged = draggedId === thread.id;
+    const canDrag = filteredThreads.length > 1;
+
+    return (
+      <article
+        key={thread.id}
+        ref={setThreadItemRef(thread.id)}
+        role="button"
+        tabIndex={0}
+        onClick={() => handleSelectThread(thread)}
+        onKeyDown={(event) => handleThreadKeyboardSelect(event, thread)}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          setActiveThreadId(thread.id);
+          setThreadContextMenu({
+            threadId: thread.id,
+            x: event.clientX,
+            y: event.clientY,
+          });
+        }}
+        className={cn(
+          'group relative overflow-hidden rounded-[24px] border p-4 text-left outline-none transition-[background,border-color,box-shadow,opacity,transform] duration-200 active:scale-[0.992]',
+          compact && 'rounded-[22px] p-3.5',
+          active
+            ? isLight
+              ? 'border-black/[0.15] bg-white shadow-[0_22px_70px_rgba(17,17,17,0.085)]'
+              : 'border-white/[0.16] bg-white/[0.075] shadow-[0_24px_80px_rgba(0,0,0,0.42)]'
+            : isLight
+              ? 'border-black/[0.07] bg-white/70 hover:border-black/[0.12] hover:bg-white hover:shadow-[0_18px_54px_rgba(17,17,17,0.052)]'
+              : 'border-white/[0.075] bg-white/[0.032] hover:border-white/[0.13] hover:bg-white/[0.055]',
+          pinned && (isLight ? 'bg-white' : 'bg-white/[0.06]'),
+          activeAlert && warningTone(isLight),
+          isDragged && 'opacity-30 blur-[1px]',
+        )}
+      >
+        <div
+          className="pointer-events-none absolute inset-x-4 top-0 h-px opacity-70"
+          style={{
+            background: active || thread.isPriority || thread.unreadCount > 0
+              ? accentColor
+              : isLight
+                ? 'rgba(0,0,0,0.08)'
+                : 'rgba(255,255,255,0.10)',
+          }}
+        />
+
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <div
+              className={cn(
+                'relative grid shrink-0 place-items-center rounded-[18px] border font-semibold',
+                compact ? 'size-11 text-[12px]' : 'size-12 text-[13px]',
+                isLight
+                  ? 'border-black/[0.07] bg-black/[0.025] text-black'
+                  : 'border-white/[0.08] bg-white/[0.045] text-white',
+              )}
+            >
+              {getInitials(thread.clientName)}
+
+              {thread.unreadCount > 0 ? (
+                <span
+                  className="absolute -right-1 -top-1 grid min-w-[18px] place-items-center rounded-[8px] px-1 py-[1px] text-[8.5px] text-white"
+                  style={{ background: accentColor }}
+                >
+                  {thread.unreadCount}
+                </span>
+              ) : null}
+            </div>
+
+            <div className="min-w-0">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <h3 className={cn('truncate text-[14px] font-semibold tracking-[-0.025em]', pageText(isLight))}>
+                  {thread.clientName}
+                </h3>
+
+                {thread.isPriority ? (
+                  <Star className="size-3.5 shrink-0 fill-current" style={{ color: accentColor }} />
+                ) : null}
+
+                {pinned ? (
+                  <Pin className={cn('size-3.5 shrink-0 fill-current', mutedText(isLight))} />
+                ) : null}
+              </div>
+
+              <div className={cn('mt-1 truncate text-[10.5px] font-semibold', pageText(isLight))}>
+                {bookingCode ? `${bookingCode} · ` : ''}
+                {serviceLabel ?? getThreadContextLine(thread, locale) ?? (locale === 'ru' ? 'Запись' : 'Booking')}
+              </div>
+
+              <div className={cn('mt-1 truncate text-[10px]', mutedText(isLight))}>
+                {[channelLabel(thread.channel), formatDateLabel(thread.lastMessageAt, locale), formatTimeLabel(thread.lastMessageAt, locale)]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className={cn(
+              'grid size-8 shrink-0 place-items-center rounded-[12px] border opacity-0 transition group-hover:opacity-100',
+              active && 'opacity-100',
+              isLight
+                ? 'border-black/[0.07] bg-white text-black/40 hover:text-black'
+                : 'border-white/[0.08] bg-black/20 text-white/42 hover:text-white',
+            )}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              const rect = event.currentTarget.getBoundingClientRect();
+              setActiveThreadId(thread.id);
+              setThreadContextMenu({
+                threadId: thread.id,
+                x: rect.left,
+                y: rect.bottom + 6,
+              });
+            }}
+            aria-label={labels.moreActions}
+          >
+            <MoreHorizontal className="size-4" />
+          </button>
+        </div>
+
+        <div className={cn('mt-4 line-clamp-2 text-[12px] leading-5', mutedText(isLight))}>
+          {thread.lastMessagePreview || (locale === 'ru' ? 'История пока пустая' : 'No history yet')}
+        </div>
+
+        <div className="mt-4 flex min-w-0 flex-wrap items-center gap-1.5">
+          <MicroLabel light={isLight} className="h-6 px-2 py-0 text-[9px]">
+            {segmentBadgeLabel(thread.segment, locale)}
+          </MicroLabel>
+
+          {thread.botConnected ? (
+            <MicroLabel light={isLight} className="h-6 px-2 py-0 text-[9px]">
+              <Bot className="size-3" />
+              bot
+            </MicroLabel>
+          ) : null}
+
+          {thread.nextVisit ? (
+            <MicroLabel light={isLight} className="h-6 px-2 py-0 text-[9px]">
+              <CalendarClock className="size-3" />
+              {formatDateLabel(thread.nextVisit, locale)}
+            </MicroLabel>
+          ) : null}
+
+          {bookingContextCount > 1 ? (
+            <MicroLabel light={isLight} active className="h-6 px-2 py-0 text-[9px]">
+              <CalendarClock className="size-3" />
+              {bookingContextCount}
+            </MicroLabel>
+          ) : null}
+
+          {activeAlert ? (
+            <MicroLabel light={isLight} className={cn('h-6 px-2 py-0 text-[9px]', warningTone(isLight))}>
+              <AlertTriangle className="size-3" />
+              {labels.rescheduleAlertShort}
+            </MicroLabel>
+          ) : null}
+        </div>
+
+        {canDrag ? (
+          <button
+            type="button"
+            title={labels.dragThread}
+            aria-label={labels.dragThread}
+            className={cn(
+              'absolute bottom-3 right-3 grid size-7 cursor-grab place-items-center rounded-[11px] border opacity-0 transition group-hover:opacity-100 active:cursor-grabbing',
+              isLight
+                ? 'border-black/[0.07] bg-white text-black/34'
+                : 'border-white/[0.08] bg-black/30 text-white/34',
+            )}
+            onClick={(event) => event.stopPropagation()}
+            onPointerDown={(event) => beginThreadDrag(event, thread.id, index)}
+          >
+            <GripVertical className="size-3.5" />
+          </button>
+        ) : null}
+      </article>
+    );
+  };
+
+  const renderStudioGrid = (compact = false) => {
+    if (isLoading) {
+      return (
+        <div className={cn('grid gap-3', compact ? 'grid-cols-1' : 'md:grid-cols-2 2xl:grid-cols-3')}>
+          {Array.from({ length: compact ? 6 : 9 }).map((_, index) => (
+            <div
+              key={index}
+              className={cn('h-[154px] animate-pulse rounded-[24px] border', insetTone(isLight))}
+            />
+          ))}
+        </div>
+      );
+    }
+
+    if (!filteredThreads.length) {
+      return <EmptyState text={labels.emptyList} hint={labels.emptyListHint} light={isLight} />;
+    }
+
+    return (
+      <div className="relative">
+        <div className={cn('grid gap-3', compact ? 'grid-cols-1' : 'md:grid-cols-2 2xl:grid-cols-3')}>
+          {filteredThreads.map((thread, index) => (
+            <div key={thread.id} className="relative">
+              {dragState?.active && dropIndex === index ? (
+                <div
+                  className="mb-2 h-1 rounded-full"
+                  style={{ background: accentColor }}
+                />
+              ) : null}
+
+              {renderStudioCaseCard(thread, index, compact)}
+            </div>
+          ))}
+
+          {dragState?.active && dropIndex === filteredThreads.length ? (
+            <div
+              className={cn(
+                'flex min-h-[154px] items-center justify-center rounded-[24px] border border-dashed text-[10px] font-semibold uppercase tracking-[0.16em]',
+                mutedText(isLight),
+              )}
+              style={{
+                borderColor: `color-mix(in srgb, ${accentColor} 45%, transparent)`,
+                background: `color-mix(in srgb, ${accentColor} ${isLight ? '6%' : '10%'}, transparent)`,
+              }}
+            >
+              {labels.dropEnd}
+            </div>
+          ) : null}
+        </div>
+
+        {dragState?.active && draggedThread && typeof document !== 'undefined'
+          ? createPortal(
+              <motion.div
+                className="pointer-events-none fixed"
+                style={{
+                  top: dragState.cardRect.top,
+                  left: dragState.cardRect.left,
+                  width: dragState.cardRect.width,
+                  x: dragSpringX,
+                  y: dragSpringY,
+                  zIndex: 90,
+                }}
+                initial={false}
+                animate={{ scale: 1.018, rotate: -0.2 }}
+                transition={{ type: 'spring', stiffness: 680, damping: 42, mass: 0.5 }}
+              >
+                <div
+                  className={cn(
+                    'absolute -inset-2 rounded-[28px] border backdrop-blur-[18px]',
+                    isLight
+                      ? 'border-black/[0.08] bg-white/45 shadow-[0_26px_90px_rgba(15,15,15,0.18)]'
+                      : 'border-white/[0.10] bg-black/35 shadow-[0_26px_90px_rgba(0,0,0,0.45)]',
+                  )}
+                  style={{
+                    background: `linear-gradient(135deg, color-mix(in srgb, ${accentColor} ${isLight ? '10%' : '16%'}, transparent), ${
+                      isLight ? 'rgba(255,255,255,0.48)' : 'rgba(10,10,10,0.48)'
+                    })`,
+                  }}
+                />
+                <div className="relative">
+                  {renderStudioCaseCard(draggedThread, dragState.originIndex, true)}
+                </div>
+              </motion.div>,
+              document.body,
+            )
+          : null}
+      </div>
+    );
+  };
+
+  const renderStudioCreate = (compact = false) =>
+    showCreatePanel ? (
+      <div
+        className={cn(
+          'rounded-[24px] border p-3',
+          isLight ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.04]',
+        )}
+      >
+        <div className={cn('text-[10px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>
+          {labels.createInline}
+        </div>
+
+        <div className={cn('mt-3 grid gap-2', compact ? 'grid-cols-1' : 'sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]')}>
+          <Input
+            value={newClientName}
+            onChange={(event) => setNewClientName(event.target.value)}
+            placeholder={labels.clientName}
+            className={cn('h-10 rounded-[12px]', inputTone(isLight))}
+          />
+
+          <Input
+            value={newClientPhone}
+            onChange={(event) => setNewClientPhone(event.target.value)}
+            placeholder={labels.clientPhone}
+            className={cn('h-10 rounded-[12px]', inputTone(isLight))}
+          />
+
+          <div className="flex items-center gap-2">
+            <button type="button" className={buttonBase(isLight)} onClick={() => setShowCreatePanel(false)}>
+              {labels.cancel}
+            </button>
+            <button type="button" className={buttonBase(isLight, true)} onClick={handleCreateThread}>
+              <Plus className="size-3.5" />
+              {labels.create}
+            </button>
+          </div>
+        </div>
+      </div>
+    ) : null;
+
+  const renderStudioControls = (compact = false) => (
+    <div className={cn('grid gap-2.5', compact && 'gap-2')}>
+      <div className={cn('grid gap-2', compact ? 'grid-cols-[minmax(0,1fr)_40px]' : 'grid-cols-[minmax(0,1fr)_auto]')}>
+        <label
+          className={cn(searchFieldClass(isLight), compact ? 'h-10 rounded-[14px]' : 'h-11 rounded-[16px]')}
+          style={{ background: 'transparent', backgroundColor: 'transparent', boxShadow: 'none' }}
+        >
+          <Search className="size-4 shrink-0 opacity-70" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={labels.search}
+            className="block h-full min-w-0 flex-1 appearance-none rounded-none border-0 p-0 text-[12px] font-medium text-current outline-none placeholder:text-current/55 [background:transparent!important] [box-shadow:none!important]"
+            style={{
+              background: 'transparent',
+              backgroundColor: 'transparent',
+              boxShadow: 'none',
+              WebkitAppearance: 'none',
+              appearance: 'none',
+            }}
+          />
+        </label>
+
+        <button
+          type="button"
+          className={cn(buttonBase(isLight, showCreatePanel), compact ? 'size-10 px-0' : 'h-11 rounded-[14px] px-4')}
+          onClick={() => setShowCreatePanel((current) => !current)}
+        >
+          <Plus className="size-3.5" />
+          {compact ? null : showCreatePanel ? labels.closeCreate : labels.createThread}
+        </button>
+      </div>
+
+      <div className={cn('grid gap-2', compact ? 'grid-cols-1' : 'xl:grid-cols-[minmax(0,1fr)_170px]')}>
+        <ControlGroup light={isLight} className="w-full overflow-x-auto rounded-[14px]">
+          {segmentOptions.map((option) => (
+            <FilterChip
+              key={option.value}
+              label={option.label}
+              light={isLight}
+              active={segmentFilter === option.value}
+              onClick={() => setSegmentFilter(option.value)}
+              accentColor={accentColor}
+              className="h-9 flex-1"
+            />
+          ))}
+        </ControlGroup>
+
+        <Select
+          value={channelFilter}
+          onValueChange={(value) => setChannelFilter(value as ChannelFilter)}
+        >
+          <SelectTrigger className={selectTriggerClass(isLight)}>
+            <SelectValue />
+          </SelectTrigger>
+
+          <SelectContent
+            className={selectContentClass(isLight)}
+            style={glassMenuSurfaceStyle(isLight, accentColor)}
+          >
+            {channelOptions.map((option) => {
+              const active = channelFilter === option.value;
+
+              return (
+                <SelectItem key={option.value} value={option.value} className={dropdownItemTone(isLight, active)}>
+                  <DropdownOption label={option.label} active={active} light={isLight} minWidth="100%" />
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <ControlGroup light={isLight} className="w-full overflow-x-auto rounded-[14px]">
+        {sortOptions.map((option) => (
+          <FilterChip
+            key={option.value}
+            label={option.label}
+            light={isLight}
+            active={sortMode === option.value}
+            onClick={() => setSortMode(option.value)}
+            accentColor={accentColor}
+            className="h-9 flex-1"
+          />
+        ))}
+      </ControlGroup>
+    </div>
+  );
+
+  const renderStudioConversation = (mobile = false) => {
+    const activePinned = activeThread ? isThreadPinned(activeThread.id) : false;
+    const activeAlert = getThreadActiveAlert(activeThread);
+
+    return (
+      <section
+        className={cn(
+          'grid min-h-0 overflow-hidden border',
+          mobile
+            ? 'h-full grid-rows-[auto_minmax(0,1fr)_auto] rounded-none border-0'
+            : 'h-full grid-rows-[auto_minmax(0,1fr)_auto] rounded-[30px]',
+          isLight ? 'border-black/[0.08] bg-white' : 'border-white/[0.09] bg-[#101010]',
+        )}
+      >
+        <header className={cn('shrink-0 border-b px-4 py-3.5', borderTone(isLight), isLight ? 'bg-white' : 'bg-[#101010]')}>
+          {activeThread ? (
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-start gap-3">
+                {mobile ? (
+                  <button
+                    type="button"
+                    className={cn('size-9 px-0', buttonBase(isLight))}
+                    onClick={() => setMobileThreadOpen(false)}
+                  >
+                    <ChevronLeft className="size-4" />
+                  </button>
+                ) : null}
+
+                <div className={cn('grid size-11 shrink-0 place-items-center rounded-[17px] border text-[13px] font-semibold', isLight ? 'border-black/[0.07] bg-black/[0.025] text-black' : 'border-white/[0.08] bg-white/[0.045] text-white')}>
+                  {getInitials(activeThread.clientName)}
+                </div>
+
+                <div className="min-w-0">
+                  <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                    <div className={cn('truncate text-[18px] font-semibold tracking-[-0.04em]', pageText(isLight))}>
+                      {activeThread.clientName}
+                    </div>
+
+                    <MicroLabel light={isLight} className="h-6 px-2 py-0 text-[9px]">
+                      {channelLabel(activeThread.channel)}
+                    </MicroLabel>
+
+                    {activePinned ? (
+                      <MicroLabel light={isLight} active className="h-6 px-2 py-0 text-[9px]">
+                        <Pin className="size-3 fill-current" />
+                        {labels.pinned}
+                      </MicroLabel>
+                    ) : null}
+                  </div>
+
+                  {selectedBookingContext ? (
+                    <div className={cn('mt-1 truncate text-[11.5px] font-semibold', pageText(isLight))}>
+                      {getBookingContextLabel(selectedBookingContext, locale)}
+                    </div>
+                  ) : null}
+
+                  <div className={cn('mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px]', mutedText(isLight))}>
+                    <span>{activeThread.clientPhone}</span>
+                    <span className={faintText(isLight)}>•</span>
+                    <span>{activeThread.nextVisit ? formatDateLabel(activeThread.nextVisit, locale) : labels.notScheduled}</span>
+                  </div>
+
+                  {activeAlert ? (
+                    <div className={cn('mt-3 rounded-[14px] border px-3 py-2', warningTone(isLight))}>
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                        <div className="min-w-0">
+                          <div className="text-[12px] font-semibold">{labels.rescheduleAlert}</div>
+                          <div className={cn('mt-1 text-[10.5px] leading-4', isLight ? 'text-amber-950/70' : 'text-amber-100/70')}>
+                            {activeAlert.message || labels.rescheduleAlertText}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button type="button" className={cn('size-9 px-0', buttonBase(isLight))}>
+                    <MoreVertical className="size-4" />
+                  </button>
+                </PopoverTrigger>
+
+                <PopoverContent
+                  align="end"
+                  className={cn('w-[240px]', glassMenuContentClass(isLight))}
+                  style={glassMenuSurfaceStyle(isLight, accentColor)}
+                >
+                  <GlassMenuItem
+                    light={isLight}
+                    accentColor={accentColor}
+                    label={activeThread.botConnected ? labels.botConnected : labels.botOff}
+                    icon={<Bot className="size-3.5" />}
+                    active={activeThread.botConnected}
+                    onClick={() => void applyLocalThreadPatch(activeThread.id, { botConnected: !activeThread.botConnected })}
+                  />
+                  <GlassMenuItem
+                    light={isLight}
+                    accentColor={accentColor}
+                    label={activePinned ? labels.unpinThread : labels.pinThread}
+                    icon={<Pin className={cn('size-3.5', activePinned && 'fill-current')} />}
+                    active={activePinned}
+                    onClick={() => toggleThreadPin(activeThread.id)}
+                  />
+                  <GlassMenuItem
+                    light={isLight}
+                    accentColor={accentColor}
+                    label={activeThread.isPriority ? labels.priorityOn : labels.priorityOff}
+                    icon={<Star className={cn('size-3.5', activeThread.isPriority && 'fill-current')} />}
+                    active={activeThread.isPriority}
+                    onClick={() => void applyLocalThreadPatch(activeThread.id, { isPriority: !activeThread.isPriority })}
+                  />
+                  <GlassMenuItem
+                    light={isLight}
+                    accentColor={accentColor}
+                    label={labels.export}
+                    icon={<Download className="size-3.5" />}
+                    onClick={handleExportThread}
+                  />
+                  <div className={menuSeparatorClass(isLight)} />
+                  <GlassMenuItem
+                    light={isLight}
+                    accentColor={accentColor}
+                    label={labels.deleteChat}
+                    icon={<Trash2 className="size-3.5" />}
+                    danger
+                    onClick={() => handleDeleteThread(activeThread.id)}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          ) : (
+            <div className="flex min-h-[72px] items-center">
+              <div>
+                <div className={cn('text-[15px] font-semibold', pageText(isLight))}>{labels.emptyThread}</div>
+                <div className={cn('mt-1 text-[11px]', mutedText(isLight))}>{labels.emptyThreadHint}</div>
+              </div>
+            </div>
+          )}
+        </header>
+
+        <div
+          ref={mobile ? mobileMessageScrollRef : desktopMessageScrollRef}
+          className={cn(
+            'min-h-0 overflow-y-auto',
+            mobile ? 'px-3 py-3' : 'px-5 py-5',
+            isLight ? 'bg-[#f7f6f2]/55' : 'bg-black/20',
+          )}
+        >
+          {renderMessageFeed(mobile)}
+        </div>
+
+        {renderComposer(mobile)}
+      </section>
+    );
+  };
+
+  const contextMenuPortalNode = contextMenuPortal;
+
   if (isMobile) {
     return (
       <WorkspaceShell>
         <main className={cn('h-[calc(100dvh-68px)] overflow-hidden px-3 pb-3 pt-4', pageBg(isLight))}>
           <div className="mx-auto flex h-full min-h-0 w-full max-w-[var(--page-max-width)] flex-col gap-3">
-            <div
+            <section
               className={cn(
-                'shrink-0 rounded-[24px] border p-3',
+                'shrink-0 rounded-[28px] border p-3.5',
                 isLight ? 'border-black/[0.07] bg-white' : 'border-white/[0.08] bg-[#101010]',
               )}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <h1 className={cn('truncate text-[28px] font-semibold tracking-[-0.08em]', pageText(isLight))}>
+                  <h1 className={cn('truncate text-[30px] font-semibold tracking-[-0.085em]', pageText(isLight))}>
                     {labels.title}
                   </h1>
                   <p className={cn('mt-1 line-clamp-2 text-[11.5px] leading-4', mutedText(isLight))}>
@@ -4281,52 +4856,22 @@ export default function DashboardChatsPage() {
                 </button>
               </div>
 
-              <div className="mt-3">
-                {renderBoardControls(true)}
-              </div>
+              <div className="mt-3">{renderStudioControls(true)}</div>
+              <div className="mt-3">{renderStudioCreate(true)}</div>
+            </section>
 
-              <div className="mt-3 grid grid-cols-3 gap-1.5">
-                {boardMeta.map((item) => (
-                  <button
-                    key={item.label}
-                    type="button"
-                    onClick={item.onClick}
-                    className={cn(
-                      'rounded-[16px] border px-2 py-2 text-left transition',
-                      item.active
-                        ? isLight
-                          ? 'border-black/[0.12] bg-black/[0.035]'
-                          : 'border-white/[0.14] bg-white/[0.07]'
-                        : isLight
-                          ? 'border-black/[0.07] bg-black/[0.015]'
-                          : 'border-white/[0.08] bg-white/[0.035]',
-                    )}
-                  >
-                    <div className={cn('text-[9px] font-medium', mutedText(isLight))}>{item.label}</div>
-                    <div className={cn('mt-1 text-[17px] font-semibold tracking-[-0.06em]', pageText(isLight))}>
-                      {item.value}
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              {renderCreateCard(true)}
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              <div className="grid gap-3">
-                {laneDefs.map((lane) => renderLane(lane, true))}
-              </div>
-            </div>
+            <section className="min-h-0 flex-1 overflow-y-auto pr-1">
+              {renderStudioGrid(true)}
+            </section>
           </div>
 
-          {mobileThreadOpen && focusThread ? (
+          {mobileThreadOpen && activeThread ? (
             <div className={cn('fixed inset-0 z-[70]', pageBg(isLight))}>
-              {renderFocusRoom(true)}
+              {renderStudioConversation(true)}
             </div>
           ) : null}
 
-          {contextMenuPortal}
+          {contextMenuPortalNode}
         </main>
       </WorkspaceShell>
     );
@@ -4337,15 +4882,15 @@ export default function DashboardChatsPage() {
       <main className={cn('h-[calc(100dvh-68px)] overflow-hidden px-4 pb-4 pt-5 md:px-7 md:pt-6', pageBg(isLight))}>
         <div className="mx-auto grid h-full min-h-0 w-full max-w-[var(--page-max-width)] gap-4 xl:grid-cols-[minmax(0,1fr)_520px]">
           <section className="flex min-h-0 flex-col gap-3 overflow-hidden">
-            <div
+            <section
               className={cn(
-                'shrink-0 rounded-[28px] border p-4',
+                'shrink-0 rounded-[30px] border p-4',
                 isLight
                   ? 'border-black/[0.07] bg-white shadow-[0_18px_60px_rgba(17,17,17,0.035)]'
                   : 'border-white/[0.08] bg-[#101010]',
               )}
             >
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(520px,1.1fr)] xl:items-end">
+              <div className="grid gap-4 2xl:grid-cols-[minmax(0,0.78fr)_minmax(540px,1fr)] 2xl:items-end">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <MicroLabel light={isLight} active={demoMode}>
@@ -4360,7 +4905,7 @@ export default function DashboardChatsPage() {
                     ) : null}
                   </div>
 
-                  <h1 className={cn('mt-3 truncate text-[34px] font-semibold tracking-[-0.085em]', pageText(isLight))}>
+                  <h1 className={cn('mt-3 truncate text-[35px] font-semibold tracking-[-0.09em]', pageText(isLight))}>
                     {labels.title}
                   </h1>
 
@@ -4369,7 +4914,7 @@ export default function DashboardChatsPage() {
                   </p>
                 </div>
 
-                {renderBoardControls(false)}
+                {renderStudioControls(false)}
               </div>
 
               <div className="mt-4 grid gap-2 sm:grid-cols-3">
@@ -4379,7 +4924,7 @@ export default function DashboardChatsPage() {
                     type="button"
                     onClick={item.onClick}
                     className={cn(
-                      'rounded-[18px] border px-3 py-2.5 text-left transition active:scale-[0.99]',
+                      'rounded-[20px] border px-3 py-2.5 text-left transition active:scale-[0.99]',
                       item.active
                         ? isLight
                           ? 'border-black/[0.12] bg-black/[0.035]'
@@ -4399,43 +4944,41 @@ export default function DashboardChatsPage() {
                 ))}
               </div>
 
-              <div className="mt-3">
-                {renderCreateCard(false)}
-              </div>
+              <div className="mt-3">{renderStudioCreate(false)}</div>
 
               {error ? (
-                <div className="mt-3 rounded-[13px] border border-destructive/20 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
+                <div className="mt-3 rounded-[14px] border border-destructive/20 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
                   {error}
                 </div>
               ) : null}
-            </div>
+            </section>
 
-            <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-3">
-              {laneDefs.map((lane) => renderLane(lane, false))}
-            </div>
+            <section className="min-h-0 flex-1 overflow-y-auto pr-1">
+              {renderStudioGrid(false)}
+            </section>
           </section>
 
           <aside className="hidden min-h-0 xl:block">
-            {renderFocusRoom(false)}
+            {renderStudioConversation(false)}
           </aside>
 
           <div className="xl:hidden">
-            {focusThread ? (
+            {activeThread ? (
               <div className="fixed inset-x-4 bottom-4 z-40">
                 <button
                   type="button"
                   onClick={() => setMobileThreadOpen(true)}
                   className={cn(
-                    'flex w-full items-center justify-between gap-3 rounded-[22px] border p-3 text-left shadow-[0_18px_60px_rgba(0,0,0,0.22)]',
+                    'flex w-full items-center justify-between gap-3 rounded-[24px] border p-3 text-left shadow-[0_18px_60px_rgba(0,0,0,0.22)]',
                     isLight ? 'border-black/[0.08] bg-white' : 'border-white/[0.1] bg-[#101010]',
                   )}
                 >
                   <span className="min-w-0">
                     <span className={cn('block truncate text-[13px] font-semibold', pageText(isLight))}>
-                      {focusThread.clientName}
+                      {activeThread.clientName}
                     </span>
                     <span className={cn('mt-0.5 block truncate text-[10.5px]', mutedText(isLight))}>
-                      {focusThread.lastMessagePreview}
+                      {activeThread.lastMessagePreview}
                     </span>
                   </span>
                   <ChevronRight className={cn('size-4 shrink-0', mutedText(isLight))} />
@@ -4445,7 +4988,7 @@ export default function DashboardChatsPage() {
           </div>
         </div>
 
-        {contextMenuPortal}
+        {contextMenuPortalNode}
       </main>
     </WorkspaceShell>
   );
