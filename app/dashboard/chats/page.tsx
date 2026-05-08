@@ -1963,7 +1963,7 @@ export default function DashboardChatsPage() {
     : null;
 
   const getDropIndexFromPoint = useCallback(
-    (clientY: number, draggedThreadId: string) => {
+    (clientX: number, clientY: number, draggedThreadId: string) => {
       const visibleItems = filteredThreads
         .map((thread, index) => ({
           thread,
@@ -1974,10 +1974,21 @@ export default function DashboardChatsPage() {
 
       if (!visibleItems.length) return 0;
 
+      const firstBounds = visibleItems[0]?.node?.getBoundingClientRect();
+      const secondBounds = visibleItems[1]?.node?.getBoundingClientRect();
+      const horizontalDeck = Boolean(
+        firstBounds &&
+          secondBounds &&
+          Math.abs(firstBounds.top - secondBounds.top) < Math.min(firstBounds.height, secondBounds.height) * 0.45 &&
+          Math.abs(firstBounds.left - secondBounds.left) > 24,
+      );
+
       for (const item of visibleItems) {
         const bounds = item.node!.getBoundingClientRect();
 
-        if (clientY < bounds.top + bounds.height / 2) {
+        if (horizontalDeck) {
+          if (clientX < bounds.left + bounds.width / 2) return item.index;
+        } else if (clientY < bounds.top + bounds.height / 2) {
           return item.index;
         }
       }
@@ -2120,7 +2131,7 @@ export default function DashboardChatsPage() {
       }
 
       suppressCardClickRef.current = true;
-      dragOffsetX.set(Math.max(-10, Math.min(deltaX * 0.08, 10)));
+      dragOffsetX.set(deltaX);
       dragOffsetRef.current = deltaY;
 
       if (dragFrameRef.current !== null) return;
@@ -2129,7 +2140,7 @@ export default function DashboardChatsPage() {
         dragFrameRef.current = null;
         dragOffsetY.set(dragOffsetRef.current);
 
-        const nextOverIndex = getDropIndexFromPoint(event.clientY, dragState.id);
+        const nextOverIndex = getDropIndexFromPoint(event.clientX, event.clientY, dragState.id);
 
         if (dragOverIndexRef.current === nextOverIndex) return;
 
@@ -3550,40 +3561,407 @@ export default function DashboardChatsPage() {
     ? Math.max(0, filteredThreads.findIndex((thread) => thread.id === activeThread.id)) + 1
     : 0;
 
+  const boardStats = [
+    { id: 'all', label: labels.allThreads, value: threads.length, onClick: () => setSegmentFilter('all' as SegmentFilter), active: segmentFilter === 'all' },
+    { id: 'new', label: labels.newThreads, value: threads.filter((thread) => thread.segment === 'new').length, onClick: () => setSegmentFilter('new' as SegmentFilter), active: segmentFilter === 'new' },
+    { id: 'active', label: labels.activeThreads, value: threads.filter((thread) => thread.segment === 'active').length, onClick: () => setSegmentFilter('active' as SegmentFilter), active: segmentFilter === 'active' },
+    { id: 'unread', label: labels.unread, value: unreadTotal, onClick: () => setSortMode('unread'), active: sortMode === 'unread' },
+  ];
+
+  const renderCreatePanel = (compact = false) =>
+    showCreatePanel ? (
+      <div
+        className={cn(
+          'grid gap-2 rounded-[18px] border p-3',
+          isLight ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.035]',
+          compact && 'rounded-[14px] p-2.5',
+        )}
+      >
+        <div className={cn('text-[10px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>
+          {labels.createInline}
+        </div>
+
+        <Input
+          value={newClientName}
+          onChange={(event) => setNewClientName(event.target.value)}
+          placeholder={labels.clientName}
+          className={cn('h-9 rounded-[10px] text-[12px]', inputTone(isLight))}
+        />
+
+        <Input
+          value={newClientPhone}
+          onChange={(event) => setNewClientPhone(event.target.value)}
+          placeholder={labels.clientPhone}
+          className={cn('h-9 rounded-[10px] text-[12px]', inputTone(isLight))}
+        />
+
+        <div className="flex items-center justify-end gap-2">
+          <button type="button" className={buttonBase(isLight)} onClick={() => setShowCreatePanel(false)}>
+            {labels.cancel}
+          </button>
+
+          <button type="button" className={buttonBase(isLight, true)} onClick={handleCreateThread}>
+            <Plus className="size-3.5" />
+            {labels.create}
+          </button>
+        </div>
+      </div>
+    ) : null;
+
+  const renderBoardControls = (compact = false) => (
+    <div className={cn('grid gap-2.5', compact && 'gap-2')}>
+      <div className={cn('grid gap-2', compact ? 'grid-cols-[minmax(0,1fr)_40px]' : 'grid-cols-[minmax(0,1fr)_auto]')}>
+        <label
+          className={cn(searchFieldClass(isLight), compact ? 'h-9 rounded-[12px]' : 'h-10 rounded-[14px]')}
+          style={{ background: 'transparent', backgroundColor: 'transparent', boxShadow: 'none' }}
+        >
+          <Search className="size-4 shrink-0 opacity-70" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={labels.search}
+            className="block h-full min-w-0 flex-1 appearance-none rounded-none border-0 p-0 text-[12px] font-medium text-current outline-none placeholder:text-current/55 [background:transparent!important] [box-shadow:none!important]"
+            style={{ background: 'transparent', backgroundColor: 'transparent', boxShadow: 'none', WebkitAppearance: 'none', appearance: 'none' }}
+          />
+        </label>
+
+        <button
+          type="button"
+          className={cn(buttonBase(isLight, showCreatePanel), compact ? 'size-9 px-0' : 'h-10 rounded-[12px]')}
+          onClick={() => setShowCreatePanel((current) => !current)}
+        >
+          <Plus className="size-3.5" />
+          {compact ? null : showCreatePanel ? labels.closeCreate : labels.createThread}
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 xl:grid-cols-[minmax(0,1fr)_120px_120px]">
+        <ControlGroup light={isLight} className="h-9 w-full overflow-x-auto rounded-[12px]">
+          {segmentOptions.map((option) => (
+            <FilterChip
+              key={option.value}
+              label={option.label}
+              light={isLight}
+              active={segmentFilter === option.value}
+              onClick={() => setSegmentFilter(option.value)}
+              accentColor={accentColor}
+              className="h-9 flex-1"
+            />
+          ))}
+        </ControlGroup>
+
+        <Select value={channelFilter} onValueChange={(value) => setChannelFilter(value as ChannelFilter)}>
+          <SelectTrigger className={cn(selectTriggerClass(isLight), 'h-9 rounded-[12px] text-[11px]')}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className={selectContentClass(isLight)} style={glassMenuSurfaceStyle(isLight, accentColor)}>
+            {channelOptions.map((option) => {
+              const active = channelFilter === option.value;
+              return (
+                <SelectItem key={option.value} value={option.value} className={dropdownItemTone(isLight, active)}>
+                  <DropdownOption label={option.label} active={active} light={isLight} minWidth="100%" />
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+
+        <Select value={sortMode} onValueChange={(value) => setSortMode(value as SortMode)}>
+          <SelectTrigger className={cn(selectTriggerClass(isLight), 'h-9 rounded-[12px] text-[11px]')}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className={selectContentClass(isLight)} style={glassMenuSurfaceStyle(isLight, accentColor)}>
+            {sortOptions.map((option) => {
+              const active = sortMode === option.value;
+              return (
+                <SelectItem key={option.value} value={option.value} className={dropdownItemTone(isLight, active)}>
+                  <DropdownOption label={option.label} active={active} light={isLight} minWidth="100%" />
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {renderCreatePanel(compact)}
+
+      {error ? (
+        <div className="rounded-[10px] border border-destructive/20 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
+          {error}
+        </div>
+      ) : null}
+    </div>
+  );
+
+  const renderThreadDeck = (mobile = false) => {
+    if (isLoading) {
+      return (
+        <div className="flex gap-2 overflow-hidden">
+          {Array.from({ length: mobile ? 3 : 5 }).map((_, index) => (
+            <div key={index} className={cn('h-[96px] shrink-0 animate-pulse rounded-[18px] border', mobile ? 'w-[260px]' : 'w-[292px]', insetTone(isLight))} />
+          ))}
+        </div>
+      );
+    }
+
+    if (!filteredThreads.length) {
+      return <EmptyState text={labels.emptyList} hint={labels.emptyListHint} light={isLight} />;
+    }
+
+    return (
+      <div className="relative">
+        <div className="flex snap-x gap-2.5 overflow-x-auto pb-1 pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {filteredThreads.map((thread, index) => {
+            const isDragged = draggedId === thread.id;
+
+            return (
+              <div
+                key={thread.id}
+                className={cn('shrink-0 snap-start', mobile ? 'w-[278px]' : 'w-[304px]', isDragged && 'opacity-35 blur-[1px]')}
+              >
+                {dragState?.active && dropIndex === index ? (
+                  <div className="mb-2 h-1 rounded-full" style={{ background: accentColor }} />
+                ) : null}
+                <motion.div layout="position" transition={{ type: 'spring', stiffness: 520, damping: 42, mass: 0.72 }}>
+                  {renderThreadCard(thread, index, { mobile })}
+                </motion.div>
+              </div>
+            );
+          })}
+
+          {dragState?.active && dropIndex === filteredThreads.length ? (
+            <div className="flex w-[72px] shrink-0 items-center justify-center rounded-[16px] border border-dashed" style={{ borderColor: `color-mix(in srgb, ${accentColor} 45%, transparent)` }}>
+              <span className={cn('text-[10px] font-medium', mutedText(isLight))}>{labels.dropEnd}</span>
+            </div>
+          ) : null}
+        </div>
+
+        {dragState?.active && draggedThread && typeof document !== 'undefined'
+          ? createPortal(
+              <motion.div
+                className="pointer-events-none fixed"
+                style={{
+                  top: dragState.cardRect.top,
+                  left: dragState.cardRect.left,
+                  width: dragState.cardRect.width,
+                  x: dragSpringX,
+                  y: dragSpringY,
+                  zIndex: 90,
+                }}
+                initial={false}
+                animate={{ scale: 1.018, rotate: 0.25 }}
+                transition={{ type: 'spring', stiffness: 680, damping: 42, mass: 0.5 }}
+              >
+                <div
+                  className={cn(
+                    'absolute -inset-2 rounded-[18px] border backdrop-blur-[18px]',
+                    isLight
+                      ? 'border-black/[0.08] bg-white/45 shadow-[0_26px_90px_rgba(15,15,15,0.18)]'
+                      : 'border-white/[0.10] bg-black/35 shadow-[0_26px_90px_rgba(0,0,0,0.45)]',
+                  )}
+                />
+                <div className="relative">{renderThreadCard(draggedThread, dragState.originIndex, { dragging: true, preview: true })}</div>
+              </motion.div>,
+              document.body,
+            )
+          : null}
+      </div>
+    );
+  };
+
+  const renderDockButton = ({
+    icon,
+    label,
+    active,
+    value,
+    onClick,
+  }: {
+    icon: ReactNode;
+    label: string;
+    active?: boolean;
+    value?: number;
+    onClick: () => void;
+  }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'group relative flex h-[58px] w-full flex-col items-center justify-center gap-1 rounded-[16px] border text-[9px] font-semibold transition active:scale-[0.985]',
+        active
+          ? 'cb-accent-pill-active'
+          : isLight
+            ? 'border-black/[0.07] bg-white/62 text-black/45 hover:bg-white hover:text-black'
+            : 'border-white/[0.07] bg-white/[0.035] text-white/42 hover:bg-white/[0.06] hover:text-white',
+      )}
+      title={label}
+    >
+      <span className="relative">
+        {icon}
+        {typeof value === 'number' && value > 0 ? (
+          <span className="absolute -right-2 -top-2 grid min-w-[16px] place-items-center rounded-[6px] px-1 py-[1px] text-[8px] text-white" style={{ background: accentColor }}>
+            {value}
+          </span>
+        ) : null}
+      </span>
+      <span className="max-w-full truncate px-1">{label}</span>
+    </button>
+  );
+
+  const renderClientInspector = (mobile = false) => (
+    <div className={cn('grid gap-3', mobile && 'gap-2.5')}>
+      <div
+        className={cn(
+          'rounded-[22px] border p-4',
+          isLight ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.035]',
+        )}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className={cn('text-[10px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>
+              {labels.clientCard}
+            </div>
+            <div className={cn('mt-2 truncate text-[22px] font-semibold tracking-[-0.06em]', pageText(isLight))}>
+              {activeThread?.clientName ?? labels.emptyThread}
+            </div>
+            <div className={cn('mt-1 truncate text-[11px]', mutedText(isLight))}>
+              {activeThread ? [channelLabel(activeThread.channel), activeThread.clientPhone].filter(Boolean).join(' · ') : labels.emptyThreadHint}
+            </div>
+          </div>
+
+          <div className={cn('grid size-11 place-items-center rounded-[15px] border text-[12px] font-semibold', isLight ? 'border-black/[0.07] bg-black/[0.025] text-black' : 'border-white/[0.07] bg-white/[0.035] text-white')}>
+            {activeThread ? getInitials(activeThread.clientName) : <UserRound className="size-4" />}
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-2 text-[12px]">
+          {[
+            { label: labels.source, value: activeThread?.source ?? '—' },
+            { label: labels.nextVisit, value: activeThread?.nextVisit ? formatLongDateLabel(activeThread.nextVisit, locale) : labels.notScheduled },
+            { label: labels.unread, value: String(activeThread?.unreadCount ?? 0) },
+          ].map((item) => (
+            <div key={item.label} className="flex items-center justify-between gap-3">
+              <span className={mutedText(isLight)}>{item.label}</span>
+              <span className={cn('max-w-[180px] truncate text-right font-medium', pageText(isLight))}>{item.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div
+        className={cn(
+          'rounded-[22px] border p-4',
+          isLight ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.035]',
+        )}
+      >
+        <div className={cn('text-[10px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>
+          {labels.assistant}
+        </div>
+        <div className={cn('mt-2 text-[17px] font-semibold tracking-[-0.035em]', pageText(isLight))}>
+          {assistantSummary.title}
+        </div>
+        <p className={cn('mt-2 text-[12px] leading-5', mutedText(isLight))}>{assistantSummary.detail}</p>
+
+        <div className="mt-3 grid gap-1.5">
+          <button type="button" className={cn(buttonBase(isLight), 'h-9 justify-between rounded-[12px]')} disabled={!activeThread} onClick={() => handleAssistantScenario('confirm')}>
+            {locale === 'ru' ? 'Детали записи' : 'Booking details'}
+            <ChevronRight className="size-4" />
+          </button>
+          <button type="button" className={cn(buttonBase(isLight), 'h-9 justify-between rounded-[12px]')} disabled={!activeThread} onClick={() => handleAssistantScenario('clarify')}>
+            {locale === 'ru' ? 'Уточнить время' : 'Clarify time'}
+            <ChevronRight className="size-4" />
+          </button>
+          <button type="button" className={cn(buttonBase(isLight), 'h-9 justify-between rounded-[12px]')} disabled={!activeThread} onClick={() => handleAssistantScenario('slots')}>
+            {locale === 'ru' ? 'Предложить окна' : 'Offer slots'}
+            <ChevronRight className="size-4" />
+          </button>
+        </div>
+      </div>
+
+      <div
+        className={cn(
+          'rounded-[22px] border p-3',
+          isLight ? 'border-black/[0.08] bg-white' : 'border-white/[0.08] bg-white/[0.035]',
+        )}
+      >
+        <div className={cn('mb-2 text-[10px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>
+          {labels.quickReschedule}
+        </div>
+        <div className="grid gap-1.5">
+          {assistantSlots.map((slot) => (
+            <button
+              key={slot.id}
+              type="button"
+              onClick={() => applyQuickTransfer(slot.date, slot.time)}
+              className={cn(
+                'flex items-center justify-between rounded-[14px] border px-3 py-2.5 text-left transition active:scale-[0.992]',
+                isLight ? 'border-black/[0.07] bg-white/72 hover:bg-black/[0.018]' : 'border-white/[0.07] bg-white/[0.035] hover:bg-white/[0.055]',
+              )}
+              disabled={!activeThread}
+            >
+              <div className="min-w-0">
+                <div className={cn('truncate text-[12px] font-semibold', pageText(isLight))}>{formatPickerDateLabel(slot.date, locale)}</div>
+                <div className={cn('mt-0.5 text-[10.5px]', mutedText(isLight))}>{slot.time}</div>
+              </div>
+              <ChevronRight className={cn('size-4', mutedText(isLight))} />
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
   if (isMobile) {
     return (
       <WorkspaceShell>
         <main className={cn('h-[calc(100dvh-68px)] overflow-hidden px-3 pb-3 pt-4', pageBg(isLight))}>
           <div className="mx-auto flex h-full min-h-0 w-full max-w-[var(--page-max-width)] flex-col gap-3">
-            <div className="shrink-0 rounded-[22px] border px-4 py-3" style={{ borderColor: isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.08)', background: isLight ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.025)' }}>
-              <div className="flex items-end justify-between gap-3">
+            <div
+              className={cn(
+                'shrink-0 rounded-[24px] border p-3',
+                isLight ? 'border-black/[0.07] bg-white/78' : 'border-white/[0.08] bg-white/[0.03]',
+              )}
+            >
+              <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h1 className={cn('text-[28px] font-semibold tracking-[-0.075em]', pageText(isLight))}>{labels.title}</h1>
                   <p className={cn('mt-1 max-w-[760px] text-[11.5px] leading-5', mutedText(isLight))}>{labels.description}</p>
                 </div>
-                <MicroLabel light={isLight} active={demoMode} className="shrink-0">
-                  <Bot className="size-3.5" />
-                  {demoMode ? labels.demo : labels.live}
-                </MicroLabel>
+                <button type="button" className={cn(buttonBase(isLight, showCreatePanel), 'size-9 px-0')} onClick={() => setShowCreatePanel((current) => !current)}>
+                  <Plus className="size-4" />
+                </button>
               </div>
 
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                {[
-                  { label: labels.allThreads, value: threads.length },
-                  { label: labels.unread, value: unreadTotal },
-                  { label: locale === 'ru' ? 'Важные' : 'Priority', value: priorityTotal },
-                ].map((item) => (
-                  <div key={item.label} className={cn('rounded-[13px] border px-2.5 py-2', isLight ? 'border-black/[0.06] bg-white/64' : 'border-white/[0.07] bg-white/[0.035]')}>
-                    <div className={cn('text-[9px] font-medium', faintText(isLight))}>{item.label}</div>
-                    <div className={cn('mt-0.5 text-[16px] font-semibold leading-none tracking-[-0.05em]', pageText(isLight))}>{item.value}</div>
-                  </div>
+              <div className="mt-3 grid grid-cols-4 gap-1.5">
+                {boardStats.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={item.onClick}
+                    className={cn(
+                      'min-w-0 rounded-[14px] border px-2 py-2 text-left transition active:scale-[0.985]',
+                      item.active
+                        ? 'cb-accent-pill-active'
+                        : isLight
+                          ? 'border-black/[0.06] bg-white/70 text-black/50'
+                          : 'border-white/[0.07] bg-white/[0.035] text-white/46',
+                    )}
+                  >
+                    <div className="truncate text-[8.5px] font-medium">{item.label}</div>
+                    <div className={cn('mt-1 text-[15px] font-semibold leading-none tracking-[-0.05em]', item.active ? '' : pageText(isLight))}>{item.value}</div>
+                  </button>
                 ))}
               </div>
             </div>
 
-            <div className={cn('flex min-h-0 flex-1 flex-col overflow-hidden rounded-[22px] border', isLight ? 'border-black/[0.07] bg-white/72' : 'border-white/[0.08] bg-[#111111]')}>
-              <div className={cn('shrink-0 border-b p-3', borderTone(isLight))}>{renderFilters(true)}</div>
-              <div className="min-h-0 flex-1 overflow-y-auto p-2.5">{renderThreadList(true)}</div>
+            <div className={cn('shrink-0 rounded-[24px] border p-3', isLight ? 'border-black/[0.07] bg-white/78' : 'border-white/[0.08] bg-white/[0.03]')}>
+              {renderBoardControls(true)}
+            </div>
+
+            <div className={cn('min-h-0 flex-1 overflow-hidden rounded-[24px] border p-3', isLight ? 'border-black/[0.07] bg-white/78' : 'border-white/[0.08] bg-[#101010]')}>
+              <div className={cn('mb-2 text-[10px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>
+                {labels.workspaceTitle}
+              </div>
+              {renderThreadDeck(true)}
             </div>
           </div>
 
@@ -3607,273 +3985,82 @@ export default function DashboardChatsPage() {
 
   return (
     <WorkspaceShell>
-      <main
-        className={cn(
-          'h-[calc(100dvh-68px)] overflow-hidden px-4 pb-4 pt-5 md:px-7 md:pt-6',
-          pageBg(isLight),
-        )}
-      >
-        <div className="mx-auto flex h-full min-h-0 w-full max-w-[var(--page-max-width)] flex-col">
-          <section
+      <main className={cn('h-[calc(100dvh-68px)] overflow-hidden px-4 pb-4 pt-5 md:px-7 md:pt-6', pageBg(isLight))}>
+        <div className="mx-auto grid h-full min-h-0 w-full max-w-[var(--page-max-width)] grid-cols-[76px_minmax(0,1fr)] gap-3">
+          <aside
             className={cn(
-              'flex min-h-0 flex-1 flex-col overflow-hidden rounded-[22px] border',
-              isLight
-                ? 'border-black/[0.07] bg-white shadow-[0_18px_60px_rgba(17,17,17,0.045)]'
-                : 'border-white/[0.08] bg-[#101010]',
+              'flex min-h-0 flex-col items-center rounded-[26px] border p-2.5',
+              isLight ? 'border-black/[0.07] bg-white/78' : 'border-white/[0.08] bg-[#101010]',
             )}
           >
-            <header
-              className={cn(
-                'shrink-0 border-b px-4 py-3.5',
-                borderTone(isLight),
-                isLight ? 'bg-white' : 'bg-[#101010]',
-              )}
-            >
-              <div className="grid gap-3 xl:grid-cols-[270px_minmax(0,1fr)_auto] xl:items-center">
+            <div className={cn('grid size-11 place-items-center rounded-[18px] border text-[15px] font-semibold', isLight ? 'border-black/[0.08] bg-black text-white' : 'border-white/[0.10] bg-white text-black')}>
+              C
+            </div>
+
+            <div className="mt-4 grid w-full gap-2">
+              {renderDockButton({ icon: <MessageSquareQuote className="size-4" />, label: labels.allThreads, value: threads.length, active: segmentFilter === 'all', onClick: () => setSegmentFilter('all') })}
+              {renderDockButton({ icon: <CheckCheck className="size-4" />, label: labels.unread, value: unreadTotal, active: sortMode === 'unread', onClick: () => setSortMode('unread') })}
+              {renderDockButton({ icon: <Star className="size-4" />, label: locale === 'ru' ? 'Важные' : 'Priority', value: priorityTotal, active: sortMode === 'priority', onClick: () => setSortMode('priority') })}
+              {renderDockButton({ icon: <Bot className="size-4" />, label: demoMode ? labels.demo : labels.live, active: demoMode, onClick: () => undefined })}
+            </div>
+
+            <div className="mt-auto grid w-full gap-2">
+              <button type="button" className={cn(buttonBase(isLight, showCreatePanel), 'h-11 w-full rounded-[16px] px-0')} onClick={() => setShowCreatePanel((current) => !current)} title={labels.createThread}>
+                <Plus className="size-4" />
+              </button>
+              <button type="button" className={cn(buttonBase(isLight), 'h-11 w-full rounded-[16px] px-0')} onClick={handleExportThread} disabled={!activeThread} title={labels.export}>
+                <Download className="size-4" />
+              </button>
+            </div>
+          </aside>
+
+          <section
+            className={cn(
+              'grid min-h-0 overflow-hidden rounded-[26px] border lg:grid-rows-[auto_auto_minmax(0,1fr)]',
+              isLight ? 'border-black/[0.07] bg-white shadow-[0_18px_60px_rgba(17,17,17,0.045)]' : 'border-white/[0.08] bg-[#101010]',
+            )}
+          >
+            <header className={cn('border-b px-4 py-3.5', borderTone(isLight))}>
+              <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.72fr)] xl:items-end">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <h1
-                      className={cn(
-                        'truncate text-[24px] font-semibold tracking-[-0.07em] md:text-[30px]',
-                        pageText(isLight),
-                      )}
-                    >
-                      {labels.title}
-                    </h1>
-
+                    <h1 className={cn('truncate text-[25px] font-semibold tracking-[-0.075em] md:text-[32px]', pageText(isLight))}>{labels.title}</h1>
                     {unreadTotal > 0 ? (
-                      <span
-                        className="grid size-6 shrink-0 place-items-center rounded-[8px] text-[10px] font-semibold text-white"
-                        style={{ background: accentColor }}
-                      >
-                        {unreadTotal}
-                      </span>
+                      <span className="grid size-6 shrink-0 place-items-center rounded-[8px] text-[10px] font-semibold text-white" style={{ background: accentColor }}>{unreadTotal}</span>
                     ) : null}
                   </div>
-
-                  <p className={cn('mt-1 truncate text-[11px]', mutedText(isLight))}>
-                    {threads.length} {labels.allThreads.toLowerCase()} · {priorityTotal}{' '}
-                    {locale === 'ru' ? 'важных' : 'priority'}
+                  <p className={cn('mt-1 truncate text-[11.5px]', mutedText(isLight))}>
+                    {activeThread ? `${activeThreadIndex}/${Math.max(filteredThreads.length, 1)} · ${activeThread.clientName}` : labels.description}
                   </p>
                 </div>
 
-                <label
-                  className={cn(
-                    searchFieldClass(isLight),
-                    'h-9 max-w-[620px] justify-self-stretch xl:justify-self-center',
-                  )}
-                  style={{ background: 'transparent', backgroundColor: 'transparent', boxShadow: 'none' }}
-                >
-                  <Search className="size-4 shrink-0 opacity-70" />
-                  <input
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder={labels.search}
-                    className="block h-full min-w-0 flex-1 appearance-none rounded-none border-0 p-0 text-[12px] font-medium text-current outline-none placeholder:text-current/50 [background:transparent!important] [box-shadow:none!important]"
-                    style={{
-                      background: 'transparent',
-                      backgroundColor: 'transparent',
-                      boxShadow: 'none',
-                      WebkitAppearance: 'none',
-                      appearance: 'none',
-                    }}
-                  />
-                </label>
-
-                <div className="flex items-center justify-end gap-2">
-                  <MicroLabel light={isLight} active={demoMode} className="hidden md:inline-flex">
-                    <Bot className="size-3.5" />
-                    {demoMode ? labels.demo : labels.live}
-                  </MicroLabel>
-
-                  <button
-                    type="button"
-                    className={cn(buttonBase(isLight, showCreatePanel), 'h-9')}
-                    onClick={() => setShowCreatePanel((current) => !current)}
-                  >
-                    <Plus className="size-3.5" />
-                    {showCreatePanel ? labels.closeCreate : labels.createThread}
-                  </button>
-                </div>
+                {renderBoardControls(false)}
               </div>
             </header>
 
-            <div className="grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[310px_minmax(0,1fr)] 2xl:grid-cols-[320px_minmax(0,1fr)_306px]">
-              <aside
-                className={cn(
-                  'flex min-h-0 flex-col border-b lg:border-b-0 lg:border-r',
-                  borderTone(isLight),
-                  isLight ? 'bg-[#fbfbfa]' : 'bg-[#0d0d0d]',
-                )}
-              >
-                <div className={cn('shrink-0 space-y-3 border-b p-3', borderTone(isLight))}>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {segmentOptions.slice(0, 3).map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => setSegmentFilter(option.value)}
-                        className={cn(
-                          'h-8 rounded-[9px] border px-2 text-[10.5px] font-semibold transition active:scale-[0.985]',
-                          segmentFilter === option.value
-                            ? 'cb-accent-pill-active'
-                            : isLight
-                              ? 'border-black/[0.07] bg-white text-black/45 hover:text-black'
-                              : 'border-white/[0.07] bg-white/[0.035] text-white/42 hover:text-white',
-                        )}
-                      >
-                        <span className="block truncate">{option.label}</span>
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <Select
-                      value={channelFilter}
-                      onValueChange={(value) => setChannelFilter(value as ChannelFilter)}
-                    >
-                      <SelectTrigger className={cn(selectTriggerClass(isLight), 'h-9 text-[11px]')}>
-                        <SelectValue />
-                      </SelectTrigger>
-
-                      <SelectContent
-                        className={selectContentClass(isLight)}
-                        style={glassMenuSurfaceStyle(isLight, accentColor)}
-                      >
-                        {channelOptions.map((option) => {
-                          const active = channelFilter === option.value;
-
-                          return (
-                            <SelectItem
-                              key={option.value}
-                              value={option.value}
-                              className={dropdownItemTone(isLight, active)}
-                            >
-                              <DropdownOption label={option.label} active={active} light={isLight} minWidth="100%" />
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-
-                    <Select value={sortMode} onValueChange={(value) => setSortMode(value as SortMode)}>
-                      <SelectTrigger className={cn(selectTriggerClass(isLight), 'h-9 text-[11px]')}>
-                        <SelectValue />
-                      </SelectTrigger>
-
-                      <SelectContent
-                        className={selectContentClass(isLight)}
-                        style={glassMenuSurfaceStyle(isLight, accentColor)}
-                      >
-                        {sortOptions.map((option) => {
-                          const active = sortMode === option.value;
-
-                          return (
-                            <SelectItem
-                              key={option.value}
-                              value={option.value}
-                              className={dropdownItemTone(isLight, active)}
-                            >
-                              <DropdownOption label={option.label} active={active} light={isLight} minWidth="100%" />
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {showCreatePanel ? (
-                    <Panel light={isLight} className="grid gap-2 p-2.5">
-                      <div className={cn('text-[10px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>
-                        {labels.createInline}
-                      </div>
-
-                      <Input
-                        value={newClientName}
-                        onChange={(event) => setNewClientName(event.target.value)}
-                        placeholder={labels.clientName}
-                        className={cn('h-9 rounded-[9px] text-[12px]', inputTone(isLight))}
-                      />
-
-                      <Input
-                        value={newClientPhone}
-                        onChange={(event) => setNewClientPhone(event.target.value)}
-                        placeholder={labels.clientPhone}
-                        className={cn('h-9 rounded-[9px] text-[12px]', inputTone(isLight))}
-                      />
-
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          type="button"
-                          className={buttonBase(isLight)}
-                          onClick={() => setShowCreatePanel(false)}
-                        >
-                          {labels.cancel}
-                        </button>
-
-                        <button type="button" className={buttonBase(isLight, true)} onClick={handleCreateThread}>
-                          <Plus className="size-3.5" />
-                          {labels.create}
-                        </button>
-                      </div>
-                    </Panel>
-                  ) : null}
-
-                  {error ? (
-                    <div className="rounded-[9px] border border-destructive/20 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
-                      {error}
-                    </div>
-                  ) : null}
+            <div className={cn('border-b px-4 py-3', borderTone(isLight), isLight ? 'bg-[#fbfbfa]' : 'bg-black/18')}>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className={cn('text-[10px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>
+                  {labels.workspaceTitle}
                 </div>
-
-                <div className="min-h-0 flex-1 overflow-y-auto p-2.5">
-                  {renderThreadList(false)}
+                <div className={cn('text-[10.5px] font-medium', faintText(isLight))}>
+                  {filteredThreads.length} · {labels.sort}
                 </div>
-              </aside>
+              </div>
+              {renderThreadDeck(false)}
+            </div>
 
-              <section
-                className={cn(
-                  'grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto]',
-                  isLight ? 'bg-white' : 'bg-[#101010]',
-                )}
-              >
+            <div className="grid min-h-0 overflow-hidden xl:grid-cols-[minmax(0,1fr)_340px]">
+              <section className={cn('grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto]', isLight ? 'bg-white' : 'bg-[#101010]')}>
                 {renderChatHeader(false)}
-
-                <div
-                  ref={desktopMessageScrollRef}
-                  className={cn(
-                    'min-h-0 overflow-y-auto px-4 py-4',
-                    isLight ? 'bg-[#f7f6f2]/54' : 'bg-black/16',
-                  )}
-                >
+                <div ref={desktopMessageScrollRef} className={cn('min-h-0 overflow-y-auto px-4 py-4', isLight ? 'bg-[#f7f6f2]/50' : 'bg-black/18')}>
                   {renderMessageFeed(false)}
                 </div>
-
                 {renderComposer(false)}
               </section>
 
-              <aside
-                className={cn(
-                  'hidden min-h-0 flex-col border-l 2xl:flex',
-                  borderTone(isLight),
-                  isLight ? 'bg-[#fbfbfa]' : 'bg-[#0d0d0d]',
-                )}
-              >
-                <div className={cn('shrink-0 border-b px-4 py-3', borderTone(isLight))}>
-                  <div className={cn('text-[11px] font-semibold uppercase tracking-[0.14em]', mutedText(isLight))}>
-                    {labels.assistant}
-                  </div>
-                  <div className={cn('mt-1 truncate text-[16px] font-semibold tracking-[-0.025em]', pageText(isLight))}>
-                    {assistantSummary.title}
-                  </div>
-                  <p className={cn('mt-1.5 line-clamp-2 text-[11px] leading-5', mutedText(isLight))}>
-                    {assistantSummary.detail}
-                  </p>
-                </div>
-
-                <div className="min-h-0 flex-1 overflow-y-auto p-3">
-                  {renderAssistantPanel(false)}
-                </div>
+              <aside className={cn('hidden min-h-0 overflow-y-auto border-l p-3 xl:block', borderTone(isLight), isLight ? 'bg-[#fbfbfa]' : 'bg-[#0d0d0d]')}>
+                {renderClientInspector(false)}
               </aside>
             </div>
           </section>
