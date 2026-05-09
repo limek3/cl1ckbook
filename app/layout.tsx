@@ -50,7 +50,7 @@ export default function RootLayout({
         <Script
           id="telegram-miniapp-sdk"
           src="https://telegram.org/js/telegram-web-app.js"
-          strategy="beforeInteractive"
+          strategy="afterInteractive"
         />
         <TelegramMiniAppViewport />
         <Suspense fallback={null}>

@@ -67,6 +67,11 @@ export function TelegramMiniAppViewport() {
     if (typeof window === 'undefined') return;
 
     const webApp = (window as TelegramWindow).Telegram?.WebApp;
+    const isMiniApp = Boolean(webApp?.initData || webApp?.initDataUnsafe?.user);
+
+    if (!isMiniApp) {
+      return;
+    }
 
     const apply = () => {
       applyDarkMiniChrome(webApp);
