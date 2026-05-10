@@ -4,7 +4,13 @@
       "Bash(npx tsc *)",
       "Bash(claude plugin *)",
       "Bash(grep -v \"\\\\.md$\")",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Bash(ls \"C:\\\\Users\\\\777zv\\\\Downloads\\\\clickbook_all_screens_hq_pack.zip\")",
+      "Bash(mkdir -p /tmp/clickbook_screens)",
+      "Read(//tmp/**)",
+      "Bash(unzip -o \"C:\\\\Users\\\\777zv\\\\Downloads\\\\clickbook_all_screens_hq_pack.zip\")",
+      "Bash(ls \"C:\\\\Users\\\\777zv\\\\Desktop\\\\clickbook_all_screens_hq_pack\\\\05_indexes_and_docs\\\\\" 2>&1; ls \"C:\\\\Users\\\\777zv\\\\Desktop\\\\clickbook_all_screens_hq_pack\\\\05_indexes_and_docs\\\\docs\\\\\" 2>&1)",
+      "Bash(ls \"C:\\\\Users\\\\777zv\\\\Desktop\\\\\" 2>&1 | head -30)"
     ]
   }
 }

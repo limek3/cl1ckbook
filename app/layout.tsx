@@ -2,7 +2,16 @@ import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import { Suspense } from 'react';
 import Script from 'next/script';
+import { Cormorant_Garamond } from 'next/font/google';
 import './globals.css';
+
+const cormorant = Cormorant_Garamond({
+  subsets: ['latin', 'cyrillic'],
+  weight: ['400', '500', '600', '700'],
+  style: ['normal', 'italic'],
+  display: 'swap',
+  variable: '--font-cormorant',
+});
 import { Providers } from '@/components/app/providers';
 import { buildAppearancePreferenceScript } from '@/lib/appearance';
 import { TelegramMiniAppViewport } from '@/components/system/telegram-miniapp-viewport';
@@ -39,7 +48,7 @@ export default function RootLayout({
   children: ReactNode;
 }>) {
   return (
-    <html lang="ru" suppressHydrationWarning>
+    <html lang="ru" suppressHydrationWarning className={cormorant.variable}>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
         <Script id="sloty-appearance-preferences" strategy="beforeInteractive">
           {appearancePreferenceScript}
