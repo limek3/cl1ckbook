@@ -261,16 +261,26 @@
 
 .kb-nav-link {
   position: relative;
-  padding: 8px 14px;
+  padding: 10px 14px;
   font-size: 14px;
   color: var(--kb-text-secondary);
-  border-radius: var(--kb-radius-pill);
   transition: color 120ms ease;
 }
 .kb-nav-link:hover { color: var(--kb-text); }
 .kb-nav-link[data-active="true"] {
   color: var(--kb-text);
-  background: var(--kb-warm-surface);
+  font-weight: 500;
+}
+.kb-nav-link[data-active="true"]::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--kb-coral);
+  transform: translateX(-50%);
 }
 
 /* === Tables === */

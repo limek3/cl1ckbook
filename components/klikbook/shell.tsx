@@ -76,15 +76,18 @@ export function KbTopNav({
               event.preventDefault();
               onSearch?.(query);
             }}
-            className="hidden h-10 w-[280px] items-center gap-2 rounded-[14px] border border-[var(--kb-border)] bg-white/70 px-3 md:flex"
+            className="hidden h-10 w-[300px] items-center gap-2 rounded-[14px] border border-[var(--kb-border)] bg-white/70 px-3 md:flex"
           >
-            <Search size={16} className="text-[var(--kb-text-muted)]" />
+            <Search size={15} className="text-[var(--kb-text-muted)]" />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Поиск по клиентам и записям"
               className="h-full w-full bg-transparent text-[13px] text-[var(--kb-text)] outline-none placeholder:text-[var(--kb-text-muted)]"
             />
+            <kbd className="rounded-md border border-[var(--kb-border)] bg-white px-1.5 py-0.5 text-[10px] font-medium text-[var(--kb-text-muted)]">
+              ⌘K
+            </kbd>
           </form>
 
           {dateRange && (
