@@ -448,13 +448,13 @@ export function getDemoBookings(slug: string, locale: 'ru' | 'en' = 'ru') {
 export function getDashboardDemoAppearance(): AppearanceSettings {
   return {
     ...defaultAppearanceSettings,
-    accentTone: 'teal',
-    neutralTone: 'zinc',
+    accentTone: 'violet',
+    neutralTone: 'pearl',
     density: 'compact',
     radius: 'medium',
     motion: 'smooth',
     cardStyle: 'soft',
-    publicAccent: 'teal',
+    publicAccent: 'lime',
     publicSurface: 'soft',
     publicHeroLayout: 'split',
     publicCardStyle: 'soft',

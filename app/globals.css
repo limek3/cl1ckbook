@@ -1,6 +1,5 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
-@import './klikbook.css';
 @custom-variant dark (&:is(.dark *));
 
 
@@ -12012,4 +12011,304 @@ html[data-tg-miniapp='true'] {
   .workspace-page .workspace-card {
     box-shadow: none !important;
   }
+}
+
+/* === ClickBook 2026 dashboard redesign: strict violet/sage system === */
+:root {
+  --cb-shell-bg: #f7f6f2;
+  --cb-surface: #ffffff;
+  --cb-soft-surface: rgba(124, 92, 255, 0.04);
+  --cb-soft-surface-2: rgba(17, 17, 17, 0.024);
+  --cb-border: #e6e2da;
+  --background: #f7f6f2;
+  --foreground: #111111;
+  --card: #ffffff;
+  --border: #e6e2da;
+  --input: rgba(17, 17, 17, 0.095);
+  --muted-foreground: rgba(17, 17, 17, 0.56);
+  --primary: #7c5cff;
+  --primary-hover: #6f54ef;
+  --accent-solid: #7c5cff;
+  --accent-soft: rgba(124, 92, 255, 0.14);
+  --cb-public-accent: #79a96b;
+  --cb-dashboard-bg: #f7f6f2;
+  --cb-dashboard-sidebar: rgba(247, 246, 242, 0.96);
+  --cb-dashboard-card: #ffffff;
+  --cb-dashboard-card-solid: #ffffff;
+  --cb-dashboard-panel: rgba(17, 17, 17, 0.018);
+  --cb-dashboard-border: #e6e2da;
+  --cb-dashboard-border-soft: rgba(17, 17, 17, 0.075);
+  --cb-dashboard-text: #111111;
+  --cb-dashboard-muted: rgba(17, 17, 17, 0.58);
+  --cb-dashboard-faint: rgba(17, 17, 17, 0.32);
+  --cb-dashboard-shadow: 0 12px 30px rgba(17, 17, 17, 0.035), 0 1px 2px rgba(17, 17, 17, 0.035);
+  --cb-dashboard-shadow-soft: 0 8px 22px rgba(17, 17, 17, 0.025), inset 0 1px 0 rgba(255, 255, 255, 0.74);
+  --cb-dashboard-violet: #7c5cff;
+  --cb-dashboard-violet-soft: rgba(124, 92, 255, 0.12);
+  --cb-dashboard-success: #79a96b;
+}
+
+.dark {
+  --cb-shell-bg: #080808;
+  --cb-surface: #141414;
+  --cb-soft-surface: rgba(255, 255, 255, 0.035);
+  --cb-soft-surface-2: rgba(255, 255, 255, 0.026);
+  --cb-border: rgba(255, 255, 255, 0.08);
+  --background: #080808;
+  --foreground: #f8f7f4;
+  --card: #141414;
+  --border: rgba(255, 255, 255, 0.085);
+  --input: rgba(255, 255, 255, 0.08);
+  --muted-foreground: rgba(248, 247, 244, 0.56);
+  --primary: #8b6cff;
+  --primary-hover: #9b82ff;
+  --accent-solid: #8b6cff;
+  --accent-soft: rgba(139, 108, 255, 0.16);
+  --cb-public-accent: #8fc76b;
+  --cb-dashboard-bg: #080808;
+  --cb-dashboard-sidebar: rgba(8, 8, 8, 0.96);
+  --cb-dashboard-card: #141414;
+  --cb-dashboard-card-solid: #141414;
+  --cb-dashboard-panel: rgba(255, 255, 255, 0.026);
+  --cb-dashboard-border: rgba(255, 255, 255, 0.08);
+  --cb-dashboard-border-soft: rgba(255, 255, 255, 0.065);
+  --cb-dashboard-text: #f8f7f4;
+  --cb-dashboard-muted: rgba(248, 247, 244, 0.58);
+  --cb-dashboard-faint: rgba(248, 247, 244, 0.30);
+  --cb-dashboard-shadow: none;
+  --cb-dashboard-shadow-soft: inset 0 1px 0 rgba(255, 255, 255, 0.024);
+  --cb-dashboard-violet: #8b6cff;
+  --cb-dashboard-violet-soft: rgba(139, 108, 255, 0.18);
+  --cb-dashboard-success: #8fc76b;
+}
+
+html,
+body,
+.workspace-main-shell,
+.workspace-main-shell > main,
+.cb-workspace-main,
+main[data-workspace-route],
+.workspace-page,
+.workspace-page-wide {
+  background: var(--cb-dashboard-bg) !important;
+}
+
+.dark body {
+  background: #080808 !important;
+}
+
+.cb-workspace-sidebar,
+.workspace-sidebar-panel,
+.cb-workspace-mobile-sheet {
+  background:
+    var(--cb-dashboard-sidebar) !important;
+  border-color: var(--cb-dashboard-border) !important;
+}
+
+.dark .cb-workspace-sidebar,
+.dark .workspace-sidebar-panel,
+.dark .cb-workspace-mobile-sheet {
+  background:
+    linear-gradient(180deg, rgba(12, 12, 14, 0.98), rgba(8, 8, 8, 0.98)) !important;
+}
+
+.cb-dash-card {
+  border-color: var(--cb-dashboard-border) !important;
+  background: var(--cb-dashboard-card) !important;
+  box-shadow: var(--cb-dashboard-shadow) !important;
+}
+
+.dark .cb-dash-card {
+  background: #141414 !important;
+}
+
+.cb-dash-hero {
+  background: var(--cb-dashboard-card) !important;
+}
+
+.dark .cb-dash-hero {
+  background: #141414 !important;
+}
+
+.cb-dash-panel,
+.cb-dash-hero-stat {
+  border-color: var(--cb-dashboard-border-soft) !important;
+  background: var(--cb-dashboard-panel) !important;
+  box-shadow: var(--cb-dashboard-shadow-soft) !important;
+}
+
+.dark .cb-dash-panel,
+.dark .cb-dash-hero-stat {
+  background: rgba(255, 255, 255, 0.036) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.028) !important;
+}
+
+.cb-dash-link-orb {
+  border-color: var(--cb-dashboard-border-soft) !important;
+  color: color-mix(in srgb, var(--primary) 68%, var(--cb-dashboard-muted)) !important;
+  background: var(--cb-dashboard-panel) !important;
+  box-shadow: var(--cb-dashboard-shadow-soft) !important;
+}
+
+.dark .cb-dash-link-orb {
+  color: color-mix(in srgb, var(--primary) 38%, var(--cb-dashboard-muted)) !important;
+  background: rgba(255,255,255,0.026) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.024) !important;
+}
+
+.cb-dash-icon-box {
+  border-color: var(--cb-dashboard-border-soft) !important;
+  background: var(--cb-dashboard-panel) !important;
+  color: var(--cb-dashboard-muted) !important;
+}
+
+.cb-dash-primary-button {
+  border-color: color-mix(in srgb, var(--primary) 22%, transparent) !important;
+  background:
+    radial-gradient(circle at 10% 10%, rgba(255, 255, 255, 0.24), transparent 28%),
+    linear-gradient(135deg, color-mix(in srgb, var(--primary) 14%, white), color-mix(in srgb, var(--primary) 18%, white)) !important;
+  color: color-mix(in srgb, var(--primary) 82%, #11131a 18%) !important;
+  box-shadow: none !important;
+}
+
+.dark .cb-dash-primary-button {
+  background:
+    radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.13), transparent 30%),
+    linear-gradient(135deg, color-mix(in srgb, var(--primary) 42%, rgba(255,255,255,0.06)), color-mix(in srgb, var(--primary) 22%, rgba(255,255,255,0.06))) !important;
+  color: color-mix(in srgb, var(--primary) 28%, white) !important;
+}
+
+.cb-dash-quiet-button {
+  border-color: var(--cb-dashboard-border-soft) !important;
+  background: var(--cb-dashboard-panel) !important;
+  color: var(--cb-dashboard-muted) !important;
+  box-shadow: none !important;
+}
+
+.cb-dash-quiet-button:hover,
+.cb-dash-primary-button:hover {
+  transform: translateY(-1px);
+  color: var(--cb-dashboard-text) !important;
+  border-color: color-mix(in srgb, var(--primary) 20%, var(--cb-dashboard-border)) !important;
+}
+
+.cb-workspace-sidebar .cb-neutral-primary,
+.cb-workspace-sidebar [aria-current='page'],
+.workspace-sidebar-panel .cb-neutral-primary,
+.workspace-sidebar-panel [aria-current='page'],
+.cb-workspace-mobile-topbar .cb-neutral-primary,
+.cb-workspace-mobile-topbar [aria-current='page'] {
+  border-color: color-mix(in srgb, var(--primary) 18%, var(--cb-dashboard-border)) !important;
+  background:
+    radial-gradient(circle at 18% 12%, color-mix(in srgb, var(--primary) 16%, transparent), transparent 42%),
+    linear-gradient(135deg, color-mix(in srgb, var(--primary) 10%, white), color-mix(in srgb, var(--primary) 7%, white)) !important;
+  color: color-mix(in srgb, var(--primary) 78%, #11131a 22%) !important;
+  box-shadow: none !important;
+}
+
+.dark .cb-workspace-sidebar .cb-neutral-primary,
+.dark .cb-workspace-sidebar [aria-current='page'],
+.dark .workspace-sidebar-panel .cb-neutral-primary,
+.dark .workspace-sidebar-panel [aria-current='page'],
+.dark .cb-workspace-mobile-topbar .cb-neutral-primary,
+.dark .cb-workspace-mobile-topbar [aria-current='page'] {
+  border-color: color-mix(in srgb, var(--primary) 26%, rgba(255,255,255,0.10)) !important;
+  background:
+    radial-gradient(circle at 18% 12%, color-mix(in srgb, var(--primary) 28%, transparent), transparent 42%),
+    linear-gradient(135deg, color-mix(in srgb, var(--primary) 20%, rgba(255,255,255,0.055)), color-mix(in srgb, var(--primary) 10%, rgba(255,255,255,0.045))) !important;
+  color: color-mix(in srgb, var(--primary) 34%, white) !important;
+  box-shadow: none !important;
+}
+
+.cb-workspace-mobile-topbar,
+nav[aria-label='КликБук'],
+nav[aria-label='ClickBook'] {
+  background: color-mix(in srgb, var(--cb-dashboard-bg) 92%, transparent) !important;
+  border-color: var(--cb-dashboard-border) !important;
+}
+
+.cb-dash-rank-badge {
+  border-color: color-mix(in srgb, var(--primary) 22%, var(--cb-dashboard-border)) !important;
+  background: color-mix(in srgb, var(--primary) 10%, var(--cb-dashboard-card-solid)) !important;
+  color: color-mix(in srgb, var(--primary) 78%, var(--cb-dashboard-text)) !important;
+}
+
+.dark .cb-dash-rank-badge {
+  background: color-mix(in srgb, var(--primary) 28%, rgba(255,255,255,0.055)) !important;
+  color: color-mix(in srgb, var(--primary) 32%, white) !important;
+}
+
+.cb-dash-status-badge {
+  border-color: var(--cb-dashboard-border-soft) !important;
+  background: color-mix(in srgb, var(--cb-dashboard-success) 8%, var(--cb-dashboard-panel)) !important;
+}
+
+.dark .cb-dash-status-badge {
+  background: color-mix(in srgb, var(--cb-dashboard-success) 13%, rgba(255,255,255,0.045)) !important;
+}
+
+/* Dashboard strict shared blocks: keep every dashboard section visually aligned with the main page. */
+.workspace-page .workspace-card,
+.workspace-page-wide .workspace-card,
+.workspace-page .cb-dash-card,
+.workspace-page-wide .cb-dash-card {
+  border-color: var(--cb-dashboard-border) !important;
+  background: var(--cb-dashboard-card) !important;
+  box-shadow: var(--cb-dashboard-shadow) !important;
+  backdrop-filter: none !important;
+}
+
+.dark .workspace-page .workspace-card,
+.dark .workspace-page-wide .workspace-card,
+.dark .workspace-page .cb-dash-card,
+.dark .workspace-page-wide .cb-dash-card {
+  border-color: var(--cb-dashboard-border) !important;
+  background: #141414 !important;
+  box-shadow: none !important;
+}
+
+.workspace-page .workspace-soft-panel,
+.workspace-page-wide .workspace-soft-panel,
+.workspace-page .cb-dash-panel,
+.workspace-page-wide .cb-dash-panel,
+.workspace-page .cb-dash-hero-stat,
+.workspace-page-wide .cb-dash-hero-stat {
+  border-color: var(--cb-dashboard-border-soft) !important;
+  background: var(--cb-dashboard-panel) !important;
+  box-shadow: var(--cb-dashboard-shadow-soft) !important;
+}
+
+.dark .workspace-page .workspace-soft-panel,
+.dark .workspace-page-wide .workspace-soft-panel,
+.dark .workspace-page .cb-dash-panel,
+.dark .workspace-page-wide .cb-dash-panel,
+.dark .workspace-page .cb-dash-hero-stat,
+.dark .workspace-page-wide .cb-dash-hero-stat {
+  background: rgba(255, 255, 255, 0.026) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.024) !important;
+}
+
+.workspace-page .cb-dash-hero,
+.workspace-page-wide .cb-dash-hero {
+  background: var(--cb-dashboard-card) !important;
+}
+
+.dark .workspace-page .cb-dash-hero,
+.dark .workspace-page-wide .cb-dash-hero {
+  background: #141414 !important;
+}
+
+.workspace-page .cb-dash-link-orb,
+.workspace-page-wide .cb-dash-link-orb {
+  border-color: var(--cb-dashboard-border-soft) !important;
+  color: color-mix(in srgb, var(--primary) 68%, var(--cb-dashboard-muted)) !important;
+  background: var(--cb-dashboard-panel) !important;
+  box-shadow: var(--cb-dashboard-shadow-soft) !important;
+}
+
+.dark .workspace-page .cb-dash-link-orb,
+.dark .workspace-page-wide .cb-dash-link-orb {
+  color: color-mix(in srgb, var(--primary) 38%, var(--cb-dashboard-muted)) !important;
+  background: rgba(255,255,255,0.026) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.024) !important;
 }

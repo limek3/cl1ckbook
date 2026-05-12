@@ -2443,22 +2443,30 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
           </div>
         </div>
 
-        <div className="fixed right-4 top-4 z-50 hidden xl:block">
+        <div className="fixed right-4 top-4 z-50 hidden items-center gap-2 xl:flex">
           <button
             type="button"
             onClick={() => setEventPanelOpen((value) => !value)}
             className={cn(
-              'relative flex h-10 w-10 items-center justify-center overflow-visible rounded-[14px] border border-black/[0.08] bg-[var(--cb-surface)] text-muted-foreground shadow-sm transition hover:text-foreground dark:border-white/[0.08] dark:bg-[#141414]',
-              eventPanelOpen && 'cb-neutral-primary',
+              'cb-dash-quiet-button relative flex h-10 w-10 items-center justify-center overflow-visible rounded-[14px] border text-muted-foreground transition hover:text-foreground',
+              eventPanelOpen && 'cb-dash-primary-button',
             )}
             aria-label={locale === 'ru' ? 'События' : 'Events'}
           >
             <Bell className="size-4" />
             {workspaceUnreadEvents > 0 && (
-              <span className="absolute -right-2.5 -top-2.5 z-20 flex h-5 min-w-[22px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold leading-none text-white ring-2 ring-[#f7f6f2] dark:ring-[#080808]">
+              <span className="absolute -right-2.5 -top-2.5 z-20 flex h-5 min-w-[22px] items-center justify-center rounded-full bg-[var(--primary)] px-1.5 text-[10px] font-bold leading-none text-white ring-2 ring-[var(--cb-dashboard-bg)]">
                 {workspaceUnreadEvents > 99 ? '99+' : workspaceUnreadEvents}
               </span>
             )}
+          </button>
+
+          <button
+            type="button"
+            className="cb-dash-quiet-button inline-flex h-10 items-center gap-2 rounded-[14px] border px-3 text-[12px] font-semibold transition"
+          >
+            <HelpCircle className="size-4" />
+            {labels.help}
           </button>
         </div>
 

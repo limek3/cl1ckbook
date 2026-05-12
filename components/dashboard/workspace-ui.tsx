@@ -65,7 +65,7 @@ export function MetricCard({
   const compactValue = value.trim().length >= 8;
 
   return (
-    <div className="min-w-0 p-4 md:p-5">
+    <div className="workspace-card min-w-0 rounded-[11px] border p-4 md:p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[11px] font-medium text-black/48 dark:text-white/42">{label}</div>
@@ -111,16 +111,16 @@ export function SectionCard({
   bodyClassName?: string;
 }) {
   return (
-    <section className={cn('space-y-3.5', className)}>
-      <div className="flex items-start justify-between gap-3">
+    <section className={cn('workspace-card overflow-hidden rounded-[11px] border', className)}>
+      <div className="flex min-h-[58px] items-center justify-between gap-4 border-b border-black/[0.08] px-4 py-3 dark:border-white/[0.08]">
         <div className="flex min-w-0 items-start gap-3">
           <span className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-[9px] border border-black/[0.07] bg-black/[0.025] text-black/38 dark:border-white/[0.07] dark:bg-white/[0.035] dark:text-white/38">
             <Sparkles className="size-4" />
           </span>
           <div className="min-w-0">
-            <h2 className="text-[13px] font-semibold tracking-[-0.018em] text-[#111111] dark:text-white">{title}</h2>
+            <h2 className="truncate text-[13px] font-semibold tracking-[-0.018em] text-[#111111] dark:text-white">{title}</h2>
             {description ? (
-              <p className="mt-1 max-w-[720px] text-[11px] leading-4 text-black/48 dark:text-white/42">
+              <p className="mt-1 max-w-[720px] truncate text-[11px] leading-4 text-black/48 dark:text-white/42">
                 {description}
               </p>
             ) : null}
@@ -129,9 +129,7 @@ export function SectionCard({
         {actions ? <div className="shrink-0">{actions}</div> : null}
       </div>
 
-      <div className="overflow-hidden rounded-[11px] border border-black/[0.08] bg-[#ffffff] shadow-none dark:border-white/[0.08] dark:bg-[#141414]">
-        <div className={cn('p-4', bodyClassName)}>{children}</div>
-      </div>
+      <div className={cn('p-4', bodyClassName)}>{children}</div>
     </section>
   );
 }

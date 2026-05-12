@@ -76,14 +76,14 @@ function divideTone(light: boolean) {
 
 function cardTone(light: boolean) {
   return light
-    ? 'border-[#e6e2da] bg-white shadow-[0_12px_30px_rgba(17,17,17,0.035)]'
-    : 'border-white/[0.08] bg-[#141414]';
+    ? 'border-[#e6e2da] bg-white shadow-[0_12px_30px_rgba(17,17,17,0.035),0_1px_2px_rgba(17,17,17,0.035)]'
+    : 'border-white/[0.08] bg-[#141414] shadow-none';
 }
 
 function insetTone(light: boolean) {
   return light
-    ? 'border-[#e6e2da] bg-black/[0.015]'
-    : 'border-white/[0.07] bg-white/[0.026]';
+    ? 'border-black/[0.075] bg-black/[0.018] shadow-[0_8px_22px_rgba(17,17,17,0.025),inset_0_1px_0_rgba(255,255,255,0.74)]'
+    : 'border-white/[0.07] bg-white/[0.026] shadow-[inset_0_1px_0_rgba(255,255,255,0.024)]';
 }
 
 function buttonBase(light: boolean, active = false) {

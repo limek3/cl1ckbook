@@ -143,8 +143,8 @@ export const defaultLayoutConstructor: LayoutConstructorSettings = {
 };
 
 export const defaultAppearanceSettings: AppearanceSettings = {
-  accentTone: 'teal',
-  neutralTone: 'zinc',
+  accentTone: 'violet',
+  neutralTone: 'pearl',
   density: 'standard',
   radius: 'medium',
   motion: 'smooth',
@@ -152,7 +152,7 @@ export const defaultAppearanceSettings: AppearanceSettings = {
   dashboardSurface: 'calm',
   dashboardControlStyle: 'capsule',
   publicCover: 'gradient',
-  publicAccent: 'teal',
+  publicAccent: 'lime',
   publicButtonStyle: 'pill',
   publicCardStyle: 'soft',
   publicServicesStyle: 'grid',
@@ -299,6 +299,17 @@ export function normalizeAppearanceSettings(value?: Partial<AppearanceSettings> 
     }
   });
 
+  const legacyAccentTones = new Set<AccentTone>(['teal', 'cyan', 'cobalt', 'peach', 'indigo', 'emerald']);
+  if (legacyAccentTones.has(next.accentTone)) {
+    next.accentTone = 'violet';
+  }
+  if (legacyAccentTones.has(next.publicAccent)) {
+    next.publicAccent = 'lime';
+  }
+  if (next.neutralTone === 'zinc' || next.neutralTone === 'stone' || next.neutralTone === 'slate') {
+    next.neutralTone = 'pearl';
+  }
+
   next.layoutConstructor = normalizeLayoutConstructor(
     typeof value.layoutConstructor === 'object' && value.layoutConstructor ? value.layoutConstructor : null,
   );
@@ -307,7 +318,7 @@ export function normalizeAppearanceSettings(value?: Partial<AppearanceSettings> 
 }
 
 export function applyAppearanceToElement(element: HTMLElement, settings: AppearanceSettings) {
-  const accent = accentPalette[settings.accentTone] ?? accentPalette.teal;
+  const accent = accentPalette[settings.accentTone] ?? accentPalette.violet;
   const publicAccent = accentPalette[settings.publicAccent] ?? accent;
 
   element.style.setProperty('--accent-hue', accent.hue);
@@ -362,7 +373,11 @@ export function buildAppearancePreferenceScript() {
       const raw = window.localStorage.getItem(${key});
       const parsed = raw ? JSON.parse(raw) : fallback;
       const settings = { ...fallback, ...parsed };
-      const accent = palette[settings.accentTone] || palette.teal;
+      const legacyAccentTones = ['teal', 'cyan', 'cobalt', 'peach', 'indigo', 'emerald'];
+      if (legacyAccentTones.includes(settings.accentTone)) settings.accentTone = 'violet';
+      if (legacyAccentTones.includes(settings.publicAccent)) settings.publicAccent = 'lime';
+      if (settings.neutralTone === 'zinc' || settings.neutralTone === 'stone' || settings.neutralTone === 'slate') settings.neutralTone = 'pearl';
+      const accent = palette[settings.accentTone] || palette.violet;
       const publicAccent = palette[settings.publicAccent] || accent;
       const root = document.documentElement;
       root.style.setProperty('--accent-hue', accent.hue);
@@ -404,8 +419,8 @@ export function buildAppearancePreferenceScript() {
       root.dataset.slotyMobileScale = settings.mobileFontScale || 'compact';
     } catch (error) {
       const root = document.documentElement;
-      root.dataset.slotyAccent = 'teal';
-      root.dataset.slotyNeutral = 'zinc';
+      root.dataset.slotyAccent = 'violet';
+      root.dataset.slotyNeutral = 'pearl';
       root.dataset.slotyDensity = 'standard';
       root.dataset.slotyRadius = 'medium';
       root.dataset.slotyMotion = 'smooth';
@@ -413,7 +428,7 @@ export function buildAppearancePreferenceScript() {
       root.dataset.slotyDashboardSurface = 'calm';
       root.dataset.slotyDashboardControl = 'capsule';
       root.dataset.slotyPublicCover = 'gradient';
-      root.dataset.slotyPublicAccent = 'teal';
+      root.dataset.slotyPublicAccent = 'lime';
       root.dataset.slotyPublicButton = 'pill';
       root.dataset.slotyPublicCard = 'soft';
       root.dataset.slotyPublicServices = 'grid';

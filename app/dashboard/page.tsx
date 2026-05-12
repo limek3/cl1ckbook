@@ -1,710 +1,2079 @@
+// app/dashboard/page.tsx
 'use client';
 
 import Link from 'next/link';
-import { useMemo, type ReactNode } from 'react';
 import {
-  ArrowDown,
-  ArrowRight,
-  ArrowUp,
-  ArrowUpRight,
-  ChevronDown,
-  Moon,
-  Quote,
-  Scissors,
-  Sparkles,
-  Star,
-  Sun,
-  TrendingUp,
-  Users,
-} from 'lucide-react';
+  type CSSProperties,
+  type ReactNode,
+  useEffect,
+  useId,
+  useMemo,
+  useState,
+} from 'react';
+import { useTheme } from 'next-themes';
 import {
   Area,
   AreaChart,
+  Bar,
+  BarChart,
   CartesianGrid,
   Line,
   LineChart,
-  ResponsiveContainer,
   XAxis,
   YAxis,
 } from 'recharts';
+import {
+  ArrowUpRight,
+  CalendarClock,
+  Check,
+  Copy,
+  Globe2,
+  LayoutDashboard,
+  Link2,
+  MoreHorizontal,
+  PiggyBank,
+  Sparkles,
+  SquarePen,
+  Users2,
+} from 'lucide-react';
 
-import { KbShell } from '@/components/klikbook/shell';
-import { KbAvatar } from '@/components/klikbook/primitives';
+import { WorkspaceShell } from '@/components/shared/workspace-shell';
+import { Button } from '@/components/ui/button';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from '@/components/ui/chart';
 import { useOwnedWorkspaceData } from '@/hooks/use-owned-workspace-data';
+import { useAppearance } from '@/lib/appearance-context';
+import { accentPalette } from '@/lib/appearance-palette';
 import { formatCurrency } from '@/lib/master-workspace';
+import { cn } from '@/lib/utils';
 
-function greeting() {
-  const hour = new Date().getHours();
-  if (hour < 6) return 'Доброй ночи';
-  if (hour < 12) return 'Доброе утро';
-  if (hour < 18) return 'Добрый день';
-  return 'Добрый вечер';
+import styles from './dashboard-overview.module.css';
+
+type ThemeMode = 'light' | 'dark';
+type TrendMetric = 'revenue' | 'requests' | 'visitors';
+
+function toLocalIsoDate(date: Date) {
+  const timezoneOffset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 10);
 }
 
-const PIPELINE_BOOKINGS = [
-  { stage: 'new', items: [
-    { name: 'Наталья Орлова', service: 'Стрижка', date: '20.05', time: '10:00' },
-    { name: 'Игорь Петров', service: 'Массаж', date: '20.05', time: '11:30' },
-  ], extra: 6 },
-  { stage: 'confirmed', items: [
-    { name: 'Светлана Миронова', service: 'Маникюр', date: '19.05', time: '16:00' },
-    { name: 'Антон Лазарев', service: 'Стрижка', date: '19.05', time: '17:30' },
-  ], extra: 10 },
-  { stage: 'today', items: [
-    { name: 'Дмитрий Соколов', service: 'Массаж спины', date: '', time: '14:00' },
-    { name: 'Ольга Лебедева', service: 'Педикюр', date: '', time: '15:30' },
-  ], extra: 6 },
-  { stage: 'working', items: [
-    { name: 'Мария Иванова', service: 'Маникюр + гель-лак', date: '', time: '09:30' },
-    { name: 'Екатерина Смирнова', service: 'Окрашивание', date: '', time: '11:00' },
-  ], extra: 1 },
-  { stage: 'done', items: [
-    { name: 'Анна Кузнецова', service: 'Стрижка', date: '', time: '12:30' },
-    { name: 'Павел Котов', service: 'Бритьё', date: '', time: '13:15' },
-  ], extra: 3 },
-];
-
-const TODAY_AGENDA = [
-  { time: '09:30', name: 'Мария Иванова', service: 'Маникюр + гель-лак', dotColor: '#FF8B6B' },
-  { time: '11:00', name: 'Екатерина Смирнова', service: 'Окрашивание волос', dotColor: '#7AA269' },
-  { time: '12:30', name: 'Анна Кузнецова', service: 'Стрижка + укладка', dotColor: '#9B7BFF' },
-  { time: '14:00', name: 'Дмитрий Соколов', service: 'Массаж спины', dotColor: '#0A1D37', highlighted: true },
-  { time: '15:30', name: 'Ольга Лебедева', service: 'Педикюр', dotColor: '#D8AB46' },
-];
-
-const REVENUE_WEEK = [
-  { day: 'Пн 19.05', label: '19', fact: 38000, plan: 36000, prev: 31000 },
-  { day: 'Вт 20.05', label: '20', fact: 41000, plan: 38000, prev: 33000 },
-  { day: 'Ср 21.05', label: '21', fact: 35500, plan: 40000, prev: 36000 },
-  { day: 'Чт 22.05', label: '22', fact: 42800, plan: 41000, prev: 38000 },
-  { day: 'Пт 23.05', label: '23', fact: 57200, plan: 44000, prev: 41000 },
-  { day: 'Сб 24.05', label: '24', fact: 36000, plan: 38000, prev: 35000 },
-  { day: 'Вс 25.05', label: '25', fact: 36000, plan: 36000, prev: 31000 },
-];
-
-const TEAM = [
-  { name: 'Мария', role: 'Стилист', percent: 128, revenue: 72300, accent: 'coral' as const },
-  { name: 'Ольга', role: 'Мастер маникюра', percent: 96, revenue: 54800, accent: 'sage' as const },
-  { name: 'Игорь', role: 'Массажист', percent: 87, revenue: 41600, accent: 'cream' as const },
-];
-
-export default function DashboardOverviewPage() {
-  const { ownedProfile, locale } = useOwnedWorkspaceData();
-  const greet = greeting();
-  const ownerName = ownedProfile?.name?.split(' ')?.[0] ?? 'Алина';
-
-  const dateLabel = useMemo(() => {
-    const d = new Date();
-    const monthGen = d.toLocaleDateString('ru-RU', { month: 'long' });
-    const weekday = d.toLocaleDateString('ru-RU', { weekday: 'short' });
-    return { day: d.getDate(), month: monthGen, weekday: weekday[0].toUpperCase() + weekday.slice(1, 2) };
-  }, []);
-
-  return (
-    <KbShell
-      user={{
-        name: ownerName,
-        subtitle: ownedProfile?.profession ?? 'Владелец',
-        avatar: ownedProfile?.avatar ?? null,
-      }}
-      dateRange="19 — 25 мая"
-      notificationsCount={3}
-    >
-      {/* === Row 1: Hero / Clock+agenda / Right column === */}
-      <div className="grid gap-5 lg:grid-cols-12">
-        {/* Hero card */}
-        <section className="kb-card relative col-span-12 overflow-hidden p-8 lg:col-span-4">
-          <DottedRadial className="pointer-events-none absolute -right-20 -top-20 opacity-60" />
-          <div className="relative">
-            <div className="flex items-center gap-2">
-              <span className="kb-icon-tile kb-icon-tile-coral !h-9 !w-9 !rounded-full">
-                <Sun size={16} />
-              </span>
-              <span className="text-[14px] italic text-[var(--kb-coral)]">Сегодня</span>
-            </div>
-            <h1 className="kb-display mt-6 text-[clamp(38px,4vw,52px)] leading-[1.05] tracking-[-0.02em]">
-              {greet},<br />
-              <span className="italic">{ownerName}.</span>
-            </h1>
-            <p className="mt-5 max-w-[280px] text-[14px] leading-relaxed text-[var(--kb-text-secondary)]">
-              Сегодня у вас <strong className="font-medium text-[var(--kb-text)]">8 записей</strong> и
-              хороший темп по выручке.
-            </p>
-          </div>
-
-          <div className="kb-card-dark relative mt-10 overflow-hidden p-6">
-            <div className="text-[12px] uppercase tracking-[0.16em] text-white/55">Выручка сегодня</div>
-            <div className="mt-3 flex items-center gap-3">
-              <span className="kb-metric text-[34px] leading-none text-white">
-                {formatCurrency(42800, locale)}
-              </span>
-              <span className="inline-flex items-center gap-0.5 text-[12px] font-medium text-[#7DCB9C]">
-                <ArrowUp size={11} /> 18%
-              </span>
-            </div>
-            <div className="mt-2 text-[11px] text-white/55">к вчерашнему дню</div>
-            <button className="kb-btn kb-btn-navy mt-6 !bg-white/8 !border-white/12 hover:!bg-white/12 text-white">
-              Перейти к кассе <ArrowRight size={14} />
-            </button>
-          </div>
-        </section>
-
-        {/* Clock + today agenda */}
-        <section className="kb-card relative col-span-12 overflow-hidden p-8 lg:col-span-5">
-          <div className="grid grid-cols-[1fr_minmax(0,200px)] gap-6">
-            <div className="relative aspect-square">
-              <ClockFace day={dateLabel.day} weekday={dateLabel.weekday} month={dateLabel.month} />
-            </div>
-            <ul className="flex flex-col justify-center gap-4">
-              {TODAY_AGENDA.map((item) => (
-                <li
-                  key={item.time}
-                  className={`relative flex items-center gap-2.5 ${item.highlighted ? 'rounded-[14px] border border-[var(--kb-border)] bg-white px-3 py-2 shadow-[var(--kb-shadow-card)]' : ''}`}
-                >
-                  {item.highlighted && (
-                    <span aria-hidden className="absolute -left-3 top-1/2 h-3 w-3 -translate-x-full -translate-y-1/2 border-l border-t border-[var(--kb-border)]" />
-                  )}
-                  <span className="kb-metric w-12 shrink-0 text-[12px] tabular-nums text-[var(--kb-text-secondary)]">
-                    {item.time}
-                  </span>
-                  <KbAvatar src={null} alt={item.name} fallback={item.name} size={28} />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[12px] font-medium leading-tight text-[var(--kb-text)]">{item.name}</div>
-                    <div className="truncate text-[11px] leading-tight text-[var(--kb-text-muted)]">{item.service}</div>
-                  </div>
-                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: item.dotColor }} />
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="mt-3 flex items-center justify-center gap-1 text-[12px] text-[var(--kb-text-muted)]">
-            и ещё 3 записи <ChevronDown size={12} />
-          </div>
-        </section>
-
-        {/* Right column */}
-        <div className="col-span-12 flex flex-col gap-5 lg:col-span-3">
-          {/* Live now (dark) */}
-          <section className="kb-card-dark relative overflow-hidden p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-[12px] uppercase tracking-[0.14em] text-white/60">Сейчас в салоне</span>
-              <span className="inline-flex items-center gap-1.5 text-[11px] text-white/75">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#7DCB9C]" /> 3 клиента
-              </span>
-            </div>
-            <div className="mt-5 grid grid-cols-3 gap-2">
-              <DarkMiniMetric icon="coin" label="Выручка сейчас" value={formatCurrency(18450, locale)} />
-              <DarkMiniMetric icon="cup" label="Средний чек" value={formatCurrency(3280, locale)} />
-              <DarkMiniMetric icon="user" label="Ожидают" value="1" />
-            </div>
-            <svg viewBox="0 0 240 32" className="mt-4 w-full">
-              <path d="M0,18 Q40,2 80,16 T160,16 T240,12" fill="none" stroke="#5DD9FF" strokeWidth="1.5" strokeLinecap="round" />
-              <circle cx="232" cy="13" r="3" fill="#5DD9FF" />
-              <circle cx="232" cy="13" r="6" fill="#5DD9FF" fillOpacity="0.2" />
-            </svg>
-          </section>
-
-          {/* AI card */}
-          <section
-            className="relative overflow-hidden rounded-[22px] border border-[var(--kb-border)] p-5"
-            style={{ background: 'linear-gradient(135deg, #EFF5E2 0%, #E5F0DA 100%)' }}
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-[12px] font-medium text-[var(--kb-text)]">КликБук AI</span>
-              <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-[var(--kb-sage-accent)]">
-                New
-              </span>
-            </div>
-            <p className="mt-3 max-w-[200px] text-[14px] font-medium leading-snug text-[var(--kb-text)]">
-              Похоже, спрос на окрашивание растёт по пятницам <ArrowUpRight size={12} className="inline" />
-            </p>
-            <p className="mt-3 max-w-[220px] text-[11px] leading-relaxed text-[var(--kb-text-secondary)]">
-              Рекомендуем добавить 1 мастера в пятницу — это может увеличить выручку на ~12%.
-            </p>
-            <span className="absolute bottom-4 right-4 inline-flex h-14 w-14 items-center justify-center rounded-full bg-[var(--kb-sage-accent)] text-white shadow-[0_8px_20px_rgba(122,162,105,0.35)]">
-              <Sparkles size={22} fill="currentColor" />
-            </span>
-          </section>
-
-          {/* Client growth */}
-          <section className="kb-card p-5">
-            <div className="text-[14px] font-medium text-[var(--kb-text)]">Рост клиентов</div>
-            <div className="mt-1 text-[11px] text-[var(--kb-text-muted)]">Новые клиенты за неделю</div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="kb-metric text-[34px] leading-none">14</span>
-              <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-[var(--kb-status-confirmed)]">
-                <ArrowUp size={10} /> 27%
-              </span>
-              <span className="text-[11px] text-[var(--kb-text-muted)]">к прошлой неделе</span>
-            </div>
-            <div className="mt-3 h-[64px] w-full">
-              <ResponsiveContainer>
-                <LineChart data={[1, 2, 3, 5, 4, 9, 7].map((v, i) => ({ i, v }))}>
-                  <Line dataKey="v" stroke="var(--kb-lavender-accent)" strokeWidth={2} dot={(props: { cx: number; cy: number; index: number }) => {
-                    if (props.index === 5) {
-                      return <circle key={props.index} cx={props.cx} cy={props.cy} r={4} fill="var(--kb-lavender-accent)" stroke="white" strokeWidth={2} />;
-                    }
-                    return <></>;
-                  }} type="monotone" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="mt-1 grid grid-cols-7 text-[10px] text-[var(--kb-text-muted)]">
-              {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((d) => (
-                <span key={d} className="text-center">{d}</span>
-              ))}
-            </div>
-          </section>
-        </div>
-      </div>
-
-      {/* === Row 2: Pipeline === */}
-      <section className="mt-6 kb-card p-6">
-        <div className="text-[16px] font-medium text-[var(--kb-text)]">Конвейер записей</div>
-        <div className="mt-5 flex items-stretch gap-2 overflow-x-auto pb-1">
-          {PIPELINE_BOOKINGS.map((stage, idx) => (
-            <PipelineColumn key={stage.stage} stage={stage} isLast={idx === PIPELINE_BOOKINGS.length - 1} highlight={idx === 2} />
-          ))}
-        </div>
-      </section>
-
-      {/* === Row 3: Revenue / Heatmap / Goal === */}
-      <div className="mt-6 grid gap-5 lg:grid-cols-12">
-        <section className="kb-card col-span-12 p-6 lg:col-span-6">
-          <div className="text-[14px] font-medium">Выручка за неделю</div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="kb-metric text-[28px]">{formatCurrency(286400, locale)}</span>
-            <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-[var(--kb-status-confirmed)]">
-              <ArrowUp size={10} /> 23%
-            </span>
-            <span className="text-[11px] text-[var(--kb-text-muted)]">к прошлой неделе</span>
-          </div>
-          <div className="mt-3 flex items-center gap-3 text-[11px] text-[var(--kb-text-muted)]">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-[2px] w-3 rounded-full bg-[var(--kb-text)]" /> Факт
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-[2px] w-3 rounded-full border-t border-dashed border-[var(--kb-text-muted)]" /> План
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-2.5 w-3 rounded-sm bg-[var(--kb-lavender)]" /> Прошлая неделя
-            </span>
-          </div>
-          <div className="mt-3 h-[200px] w-full">
-            <ResponsiveContainer>
-              <AreaChart data={REVENUE_WEEK}>
-                <defs>
-                  <linearGradient id="prevGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--kb-lavender-accent)" stopOpacity={0.18} />
-                    <stop offset="100%" stopColor="var(--kb-lavender)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="var(--kb-line)" vertical={false} />
-                <XAxis dataKey="day" tickLine={false} axisLine={false}
-                  tick={{ fill: 'var(--kb-text-muted)', fontSize: 10 }} />
-                <YAxis hide />
-                <Area type="monotone" dataKey="prev" stroke="var(--kb-lavender-accent)" strokeOpacity={0.5}
-                  strokeWidth={1} fill="url(#prevGrad)" />
-                <Line type="monotone" dataKey="plan" stroke="var(--kb-text-muted)" strokeWidth={1.2}
-                  strokeDasharray="4 4" dot={false} />
-                <Line type="monotone" dataKey="fact" stroke="var(--kb-text)" strokeWidth={2}
-                  dot={(props: { cx: number; cy: number; index: number; payload: typeof REVENUE_WEEK[number] }) => {
-                    if (props.payload.label === '23') {
-                      return <circle key={props.index} cx={props.cx} cy={props.cy} r={4} fill="var(--kb-text)" stroke="white" strokeWidth={2} />;
-                    }
-                    return <></>;
-                  }} />
-              </AreaChart>
-            </ResponsiveContainer>
-            <div className="-mt-[180px] ml-[58%] inline-block rounded-[8px] border border-[var(--kb-border)] bg-white px-2 py-1 text-[11px] shadow-[var(--kb-shadow-card)]">
-              <div className="text-[10px] text-[var(--kb-text-muted)]">23.05</div>
-              <div className="kb-metric">{formatCurrency(57200, locale)}</div>
-            </div>
-          </div>
-        </section>
-
-        <section className="kb-card col-span-12 p-6 lg:col-span-3">
-          <div className="text-[14px] font-medium">Загрузка по дням</div>
-          <Heatmap />
-          <div className="mt-3 flex items-center justify-between text-[10px] text-[var(--kb-text-muted)]">
-            <span>Низкая</span>
-            <div className="flex h-1.5 flex-1 mx-2 overflow-hidden rounded-full">
-              {[10, 25, 45, 65, 85].map((v) => (
-                <span key={v} className="flex-1" style={{ background: `color-mix(in srgb, var(--kb-lavender-accent) ${v}%, var(--kb-lavender))` }} />
-              ))}
-            </div>
-            <span>Высокая</span>
-          </div>
-        </section>
-
-        <section className="kb-card relative col-span-12 overflow-hidden p-6 lg:col-span-3">
-          <div className="text-[14px] font-medium">Цель месяца</div>
-          <div className="relative mt-4 flex items-center justify-center">
-            <SemiArc value={68} />
-          </div>
-          <div className="mt-2 text-center">
-            <div className="text-[11px] text-[var(--kb-text-muted)]">Сделайте ещё</div>
-            <div className="kb-metric mt-1 text-[20px]">{formatCurrency(95200, locale)}</div>
-            <div className="text-[11px] text-[var(--kb-text-muted)]">чтобы достичь цели</div>
-          </div>
-          <div className="mt-3 text-center text-[11px] text-[var(--kb-text-muted)]">
-            <span className="kb-metric text-[12px] text-[var(--kb-text)]">{formatCurrency(204800, locale)}</span> /{' '}
-            {formatCurrency(300000, locale)}
-          </div>
-          <div className="mt-2 text-center text-[10px] text-[var(--kb-text-muted)]">Осталось 11 дней</div>
-          <button className="kb-btn kb-btn-outline mt-3 w-full !h-10 !text-[12px]">
-            Смотреть план <ArrowRight size={12} />
-          </button>
-          <PlantSilhouette className="absolute -bottom-3 -right-3 opacity-50" />
-        </section>
-      </div>
-
-      {/* === Row 4: Messages / Quote / Team === */}
-      <div className="mt-6 grid gap-5 lg:grid-cols-12">
-        <section className="kb-card col-span-12 p-6 lg:col-span-4">
-          <div className="flex items-center gap-2">
-            <span className="text-[14px] font-medium">Сообщения</span>
-            <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[var(--kb-coral)] px-1.5 text-[10px] font-semibold text-white">
-              2
-            </span>
-          </div>
-          <ul className="mt-4 space-y-3">
-            <MessageItem name="Екатерина Смирнова" time="16:42"
-              text="Здравствуйте! Можно перенести запись на завтра на 12:00?" hasUnread />
-            <MessageItem name="Наталья Орлова" time="15:10"
-              text="Спасибо за стрижку! Всё супер!" />
-          </ul>
-          <Link href="/dashboard/chats" className="mt-4 inline-flex items-center gap-1 text-[12px] text-[var(--kb-text-secondary)] hover:text-[var(--kb-text)]">
-            Перейти в переписку <ArrowRight size={12} />
-          </Link>
-        </section>
-
-        <section
-          className="relative col-span-12 overflow-hidden rounded-[22px] border border-[var(--kb-border)] p-8 lg:col-span-4"
-          style={{ background: 'linear-gradient(135deg, #FFF6EF 0%, #FBE7DC 100%)' }}
-        >
-          <Quote size={28} className="text-[var(--kb-coral)]" fill="currentColor" />
-          <p className="kb-display mt-3 text-[20px] italic leading-snug text-[var(--kb-text)]">
-            «Всегда выхожу отсюда довольной!<br />
-            Атмосфера, мастера, результат — всё на высоте.»
-          </p>
-          <div className="mt-5 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <KbAvatar src={null} alt="Анна Кузнецова" fallback="АК" size={32} />
-              <div>
-                <div className="text-[12px] font-medium">Анна Кузнецова</div>
-                <div className="text-[10px] text-[var(--kb-text-muted)]">18 мая 2025 · Стрижка + укладка</div>
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="kb-metric text-[20px] text-[var(--kb-coral)]">4.9</div>
-              <div className="flex gap-0.5">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star key={i} size={10} fill="var(--kb-coral)" className="text-[var(--kb-coral)]" />
-                ))}
-              </div>
-            </div>
-          </div>
-          <div className="mt-4 flex justify-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-[var(--kb-coral)]" />
-            <span className="h-1.5 w-1.5 rounded-full bg-[var(--kb-border)]" />
-            <span className="h-1.5 w-1.5 rounded-full bg-[var(--kb-border)]" />
-          </div>
-        </section>
-
-        <section className="kb-card relative col-span-12 overflow-hidden p-6 lg:col-span-4">
-          <div className="text-[14px] font-medium">Команда в тонусе</div>
-          <ul className="mt-4 space-y-4">
-            {TEAM.map((m) => (
-              <li key={m.name} className="flex items-center gap-3">
-                <KbAvatar src={null} alt={m.name} fallback={m.name} size={32} />
-                <div className="flex-1">
-                  <div className="flex items-center justify-between text-[12px]">
-                    <div>
-                      <span className="font-medium">{m.name}</span>
-                      <span className="ml-1.5 text-[10px] text-[var(--kb-text-muted)]">{m.role}</span>
-                    </div>
-                  </div>
-                  <div className="mt-1.5 flex items-center gap-2">
-                    <div className="h-[5px] flex-1 overflow-hidden rounded-full bg-[var(--kb-warm-surface)]">
-                      <span className="block h-full rounded-full"
-                        style={{ width: `${Math.min(100, m.percent)}%`, background: m.accent === 'coral' ? 'var(--kb-coral)' : m.accent === 'sage' ? 'var(--kb-sage-accent)' : 'var(--kb-cream-accent)' }} />
-                    </div>
-                    <span className="kb-metric w-[42px] text-[11px]">{m.percent}%</span>
-                    <span className="kb-metric w-[60px] text-right text-[11px] text-[var(--kb-text-secondary)]">
-                      {m.revenue.toLocaleString('ru-RU')} ₽
-                    </span>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-          <div className="absolute bottom-3 right-3 flex flex-col items-center gap-1">
-            <HighFiveBadge />
-            <span className="rounded-full bg-[var(--kb-coral)] px-2 py-0.5 text-[9px] font-semibold text-white">Так держать!</span>
-            <span className="text-[9px] text-[var(--kb-text-muted)]">Команда на 103%<br />к плану недели</span>
-          </div>
-        </section>
-      </div>
-    </KbShell>
-  );
+function shortDayLabel(date: Date, locale: 'ru' | 'en') {
+  return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
+    day: 'numeric',
+    month: 'short',
+  }).format(date);
 }
 
-/* ============================================================
-   Sub-components
-   ============================================================ */
+function buildCurrentWeekData<T extends { date: string; label: string; revenue: number; requests: number; visitors: number; confirmed: number }>(
+  daily: T[],
+  locale: 'ru' | 'en',
+) {
+  const byDate = new Map(daily.map((item) => [item.date, item]));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const monday = new Date(today);
+  const day = monday.getDay();
+  monday.setDate(today.getDate() - ((day + 6) % 7));
 
-function ClockFace({ day, weekday, month }: { day: number; weekday: string; month: string }) {
-  return (
-    <svg viewBox="0 0 320 320" className="h-full w-full">
-      <defs>
-        <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#FFC09F" />
-          <stop offset="40%" stopColor="#FF8B6B" />
-          <stop offset="80%" stopColor="#A48EFF" />
-          <stop offset="100%" stopColor="#7AA269" />
-        </linearGradient>
-        <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#FFFBF7" />
-          <stop offset="100%" stopColor="#FBE7DC" />
-        </radialGradient>
-      </defs>
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + index);
+    const iso = toLocalIsoDate(date);
+    const item = byDate.get(iso);
 
-      {/* Sun */}
-      <g transform="translate(160 18)">
-        <circle r="6" fill="#F5C24A" />
-        {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
-          <line key={deg} x1="0" y1="-9" x2="0" y2="-13" stroke="#F5C24A" strokeWidth="1.5" strokeLinecap="round"
-            transform={`rotate(${deg})`} />
-        ))}
-      </g>
-      {/* Moon */}
-      <g transform="translate(160 304)">
-        <path d="M -6 0 a 6 6 0 1 0 8 -6 a 5 5 0 1 1 -8 6 z" fill="#A48EFF" />
-      </g>
-
-      {/* Hour markers / time labels */}
-      <text x="160" y="48" textAnchor="middle" fontSize="10" fill="var(--kb-text-muted)" fontFamily="var(--kb-font-sans)">09:00</text>
-      <text x="282" y="164" textAnchor="middle" fontSize="10" fill="var(--kb-text-muted)" fontFamily="var(--kb-font-sans)">12:00</text>
-      <text x="160" y="288" textAnchor="middle" fontSize="10" fill="var(--kb-text-muted)" fontFamily="var(--kb-font-sans)">15:00</text>
-      <text x="38" y="164" textAnchor="middle" fontSize="10" fill="var(--kb-text-muted)" fontFamily="var(--kb-font-sans)">18:00</text>
-
-      {/* Outer dotted ring */}
-      <circle cx="160" cy="160" r="138" fill="none" stroke="var(--kb-border)" strokeWidth="1" strokeDasharray="1 4" opacity="0.6" />
-
-      {/* Hour tick marks */}
-      {Array.from({ length: 60 }).map((_, i) => {
-        const angle = (i * 6 * Math.PI) / 180;
-        const inner = i % 5 === 0 ? 118 : 122;
-        const x1 = 160 + inner * Math.sin(angle);
-        const y1 = 160 - inner * Math.cos(angle);
-        const x2 = 160 + 128 * Math.sin(angle);
-        const y2 = 160 - 128 * Math.cos(angle);
-        return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="var(--kb-text-muted)" strokeOpacity={i % 5 === 0 ? 0.5 : 0.2} strokeWidth="1" />;
-      })}
-
-      {/* Big gradient ring (filled portion) */}
-      <circle cx="160" cy="160" r="100" fill="none" stroke="url(#ringGrad)" strokeWidth="14"
-        strokeDasharray={`${0.7 * 2 * Math.PI * 100} ${2 * Math.PI * 100}`}
-        strokeLinecap="round" transform="rotate(-90 160 160)" />
-      <circle cx="160" cy="160" r="100" fill="none" stroke="var(--kb-warm-surface)" strokeWidth="14" strokeOpacity="0.5"
-        strokeDashoffset={`${0.7 * 2 * Math.PI * 100}`}
-        strokeDasharray={`${0.3 * 2 * Math.PI * 100} ${2 * Math.PI * 100}`}
-        transform="rotate(-90 160 160)" />
-
-      {/* Inner glow */}
-      <circle cx="160" cy="160" r="80" fill="url(#centerGlow)" />
-
-      {/* Center text */}
-      <text x="160" y="138" textAnchor="middle" fontSize="14" fill="var(--kb-text-muted)" fontFamily="var(--kb-font-sans)">{weekday}</text>
-      <text x="160" y="180" textAnchor="middle" fontSize="56" fontWeight="500" fill="var(--kb-text)" fontFamily="var(--kb-font-display)">{day}</text>
-      <text x="160" y="200" textAnchor="middle" fontSize="12" fill="var(--kb-text-muted)" fontFamily="var(--kb-font-sans)">{month}</text>
-    </svg>
-  );
+    return {
+      date: iso,
+      label: shortDayLabel(date, locale),
+      revenue: item?.revenue ?? 0,
+      requests: item?.requests ?? 0,
+      visitors: item?.visitors ?? 0,
+      confirmed: item?.confirmed ?? 0,
+      avgCheck: item?.confirmed ? Math.round(item.revenue / item.confirmed) : 0,
+    };
+  });
 }
 
-function DottedRadial({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 240 240" className={className} width="240" height="240">
-      <defs>
-        <pattern id="dotPattern" width="6" height="6" patternUnits="userSpaceOnUse">
-          <circle cx="3" cy="3" r="0.7" fill="#EADFD5" />
-        </pattern>
-        <radialGradient id="fadeOut">
-          <stop offset="20%" stopColor="white" stopOpacity="1" />
-          <stop offset="100%" stopColor="white" stopOpacity="0" />
-        </radialGradient>
-        <mask id="dotMask">
-          <rect width="240" height="240" fill="url(#fadeOut)" />
-        </mask>
-      </defs>
-      <circle cx="120" cy="120" r="120" fill="url(#dotPattern)" mask="url(#dotMask)" />
-    </svg>
-  );
+function pageBg(light: boolean) {
+  void light;
+  return styles.page;
 }
 
-function DarkMiniMetric({ icon, label, value }: { icon: 'coin' | 'cup' | 'user'; label: string; value: ReactNode }) {
-  return (
-    <div>
-      <div className="flex items-center gap-1.5">
-        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/10">
-          {icon === 'coin' && <span className="text-[10px] text-[#FCC98C]">₽</span>}
-          {icon === 'cup' && <span className="text-[8px] text-[#7DCB9C]">☕</span>}
-          {icon === 'user' && <span className="text-[8px] text-[#A48EFF]">◐</span>}
-        </span>
-        <span className="text-[10px] text-white/55">{label}</span>
-      </div>
-      <div className="kb-metric mt-1.5 text-[16px] text-white">{value}</div>
-    </div>
-  );
+function pageText(light: boolean) {
+  void light;
+  return styles.text;
 }
 
-function PipelineColumn({
-  stage,
-  highlight,
-  isLast,
+function mutedText(light: boolean) {
+  void light;
+  return styles.muted;
+}
+
+function faintText(light: boolean) {
+  void light;
+  return styles.faint;
+}
+
+function borderTone(light: boolean) {
+  void light;
+  return styles.borderTone;
+}
+
+function divideTone(light: boolean) {
+  void light;
+  return styles.divideTone;
+}
+
+function cardTone(light: boolean) {
+  void light;
+  return styles.card;
+}
+
+function insetTone(light: boolean) {
+  void light;
+  return styles.panel;
+}
+
+function buttonBase(light: boolean, active = false) {
+  void light;
+  return cn(styles.button, active ? styles.buttonPrimary : styles.buttonQuiet);
+}
+
+function accentPillStyle(
+  color: string,
+  light: boolean,
+  strength: 'soft' | 'strong' = 'strong',
+): CSSProperties {
+  const bgAmount = strength === 'strong' ? (light ? 18 : 34) : light ? 10 : 22;
+  const borderAmount = strength === 'strong' ? (light ? 34 : 48) : light ? 22 : 34;
+
+  return {
+    background: light
+      ? `color-mix(in srgb, ${color} ${bgAmount}%, #ffffff)`
+      : `color-mix(in srgb, ${color} ${bgAmount}%, #141414)`,
+    borderColor: light
+      ? `color-mix(in srgb, ${color} ${borderAmount}%, rgba(0,0,0,0.1))`
+      : `color-mix(in srgb, ${color} ${borderAmount}%, rgba(255,255,255,0.1))`,
+    color: light
+      ? `color-mix(in srgb, ${color} 70%, #101010)`
+      : `color-mix(in srgb, ${color} 18%, #ffffff)`,
+    boxShadow:
+      strength === 'strong'
+        ? light
+          ? `0 0 0 1px color-mix(in srgb, ${color} 10%, transparent)`
+          : `0 0 0 1px color-mix(in srgb, ${color} 14%, transparent)`
+        : undefined,
+  };
+}
+
+function chartGridStroke(light: boolean) {
+  return light ? 'rgba(0,0,0,0.065)' : 'rgba(255,255,255,0.065)';
+}
+
+function PageAction({
+  href,
+  children,
+  light,
+  active,
 }: {
-  stage: typeof PIPELINE_BOOKINGS[number];
-  highlight?: boolean;
-  isLast?: boolean;
+  href: string;
+  children: ReactNode;
+  light: boolean;
+  active?: boolean;
 }) {
-  const meta = STAGE_META[stage.stage as keyof typeof STAGE_META];
   return (
-    <div className="flex min-w-[180px] flex-1 items-stretch gap-2">
-      <div
-        className={`flex flex-1 flex-col rounded-[18px] border p-3 ${
-          highlight ? 'border-[var(--kb-sage-accent)]' : 'border-[var(--kb-border)]'
-        }`}
-        style={{ background: meta.bg }}
-      >
-        <div className="flex items-center justify-between text-[12px]">
-          <span className="font-medium" style={{ color: meta.fg }}>{meta.label}</span>
-          <span className="kb-metric text-[14px]" style={{ color: meta.fg }}>{stage.items.length + stage.extra}</span>
-        </div>
-        <ul className="mt-3 flex-1 space-y-2.5">
-          {stage.items.map((item) => (
-            <li key={item.name} className="flex items-center gap-2">
-              <KbAvatar src={null} alt={item.name} fallback={item.name} size={26} />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[11px] font-medium leading-tight">{item.name}</div>
-                <div className="truncate text-[10px] leading-tight text-[var(--kb-text-muted)]">{item.service}</div>
-              </div>
-              <div className="text-right text-[10px] tabular-nums leading-tight text-[var(--kb-text-muted)]">
-                {item.date && <div>{item.date}</div>}
-                <div className="kb-metric text-[var(--kb-text)]">{item.time}</div>
-              </div>
-            </li>
-          ))}
-        </ul>
-        <div className="mt-3 text-[10px] text-[var(--kb-text-muted)]">
-          + Ещё {stage.extra} запис{stage.extra === 1 ? 'ь' : stage.extra < 5 ? 'и' : 'ей'}
-        </div>
-      </div>
-      {!isLast && (
-        <div className="flex items-center">
-          <ArrowRight size={14} className="text-[var(--kb-text-muted)]" />
-        </div>
+    <Button asChild className={buttonBase(light, active)}>
+      <Link href={href}>{children}</Link>
+    </Button>
+  );
+}
+
+function Card({
+  children,
+  light,
+  className,
+}: {
+  children: ReactNode;
+  light: boolean;
+  className?: string;
+}) {
+  return (
+    <section className={cn('rounded-[11px] border', cardTone(light), className)}>
+      {children}
+    </section>
+  );
+}
+
+function CardTitle({
+  title,
+  description,
+  light,
+}: {
+  title: string;
+  description?: string;
+  light: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        cn(styles.cardTitle, 'flex min-h-[58px] items-center justify-between gap-4 border-b px-4 py-3'),
+        borderTone(light),
       )}
+    >
+      <div className="min-w-0">
+        <h2
+          className={cn(
+            'truncate text-[13px] font-semibold tracking-[-0.018em]',
+            pageText(light),
+          )}
+        >
+          {title}
+        </h2>
+
+        {description ? (
+          <p className={cn('mt-1 truncate text-[11px]', mutedText(light))}>
+            {description}
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }
 
-const STAGE_META = {
-  new:       { label: 'Новые',         fg: '#8a6b1f', bg: '#FFF4D8' },
-  confirmed: { label: 'Подтверждены',  fg: '#A05E36', bg: '#FBE7DC' },
-  today:     { label: 'Сегодня',       fg: '#5e7a44', bg: '#E5F0DA' },
-  working:   { label: 'В работе',      fg: '#6845B5', bg: '#EEE4FF' },
-  done:      { label: 'Завершены',     fg: '#3F6BA1', bg: '#EAF2FF' },
-};
-
-function MessageItem({ name, time, text, hasUnread }: { name: string; time: string; text: string; hasUnread?: boolean }) {
+function Panel({
+  children,
+  light,
+  className,
+}: {
+  children: ReactNode;
+  light: boolean;
+  className?: string;
+}) {
   return (
-    <li className="flex gap-3">
-      <KbAvatar src={null} alt={name} fallback={name} size={32} />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between">
-          <span className="text-[12px] font-medium">{name}</span>
-          <span className="text-[10px] text-[var(--kb-text-muted)]">{time}</span>
-        </div>
-        <p className="mt-0.5 line-clamp-2 text-[12px] text-[var(--kb-text-secondary)]">{text}</p>
-      </div>
-      {hasUnread && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[var(--kb-lavender-accent)]" />}
-    </li>
+    <div className={cn('rounded-[10px] border', insetTone(light), className)}>
+      {children}
+    </div>
   );
 }
 
-function Heatmap() {
-  const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-  const hours = [9, 11, 13, 15, 17, 19, 21];
+function MicroLabel({
+  children,
+  light,
+  active,
+  accentColor,
+  className,
+}: {
+  children: ReactNode;
+  light: boolean;
+  active?: boolean;
+  accentColor?: string;
+  className?: string;
+}) {
   return (
-    <div className="mt-3 flex gap-1.5">
-      <div className="flex flex-col justify-between text-[10px] text-[var(--kb-text-muted)] py-1">
-        {days.map((d) => <span key={d}>{d}</span>)}
+    <span
+      style={active && accentColor ? accentPillStyle(accentColor, light, 'soft') : undefined}
+      className={cn(
+        'inline-flex h-7 items-center gap-1.5 rounded-[9px] border px-2.5 text-[10.5px] font-medium',
+        active && !accentColor
+          ? light
+            ? 'border-black/[0.1] bg-black/[0.045] text-black/62'
+            : 'border-white/[0.11] bg-white/[0.075] text-white/68'
+          : !active
+            ? light
+              ? 'border-black/[0.08] bg-white text-black/50'
+              : 'border-white/[0.08] bg-white/[0.04] text-white/42'
+            : '',
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+function StatusDot({
+  light,
+  active,
+  accentColor,
+}: {
+  light: boolean;
+  active?: boolean;
+  accentColor?: string;
+}) {
+  return (
+    <span
+      style={active && accentColor ? { background: accentColor } : undefined}
+      className={cn(
+        'size-1.5 shrink-0 rounded-full',
+        !(active && accentColor) &&
+          (active ? 'bg-current' : light ? 'bg-black/24' : 'bg-white/22'),
+      )}
+    />
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  hint,
+  icon,
+  light,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  icon: ReactNode;
+  light: boolean;
+}) {
+  return (
+    <div className="min-w-0 p-4 md:p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className={cn('text-[11px] font-medium', mutedText(light))}>
+            {label}
+          </div>
+
+          <div
+            className={cn(
+              'mt-2 truncate text-[26px] font-semibold tracking-[-0.055em]',
+              pageText(light),
+            )}
+          >
+            {value}
+          </div>
+
+          <div className={cn('mt-1 truncate text-[11px]', faintText(light))}>
+            {hint}
+          </div>
+        </div>
+
+        <div
+          className={cn(
+            cn(styles.iconBox, 'inline-flex size-8 shrink-0 items-center justify-center rounded-[9px] border'),
+          )}
+        >
+          {icon}
+        </div>
       </div>
-      <div className="flex-1">
-        <div className="grid grid-rows-7 gap-1.5">
-          {days.map((d, di) => (
-            <div key={d} className="grid grid-cols-7 gap-1.5">
-              {Array.from({ length: 7 }).map((_, hi) => {
-                const intensity = Math.abs(Math.sin((di + 1) * (hi + 2) * 0.7)) * 0.95;
-                return (
-                  <span key={hi} className="h-4 rounded"
-                    style={{ background: `color-mix(in srgb, var(--kb-lavender-accent) ${Math.round(intensity * 80)}%, var(--kb-lavender))` }}
-                  />
-                );
-              })}
+    </div>
+  );
+}
+
+function ConversionMiniChart({
+  data,
+  color,
+}: {
+  data: Array<{ label: string; conversion: number }>;
+  color: string;
+}) {
+  const gradientId = useId().replace(/:/g, '');
+
+  return (
+    <ChartContainer
+      config={{ conversion: { label: 'Conversion', color } }}
+      className="h-11 w-full"
+    >
+      <AreaChart
+        data={data}
+        margin={{ top: 6, right: 2, bottom: 2, left: 2 }}
+        accessibilityLayer
+      >
+        <defs>
+          <linearGradient id={`conversionMiniArea${gradientId}`} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="5%" stopColor="var(--color-conversion)" stopOpacity={0.22} />
+            <stop offset="95%" stopColor="var(--color-conversion)" stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <ChartTooltip content={<ChartTooltipContent />} cursor={false} />
+        <Area
+          type="monotone"
+          dataKey="conversion"
+          stroke="var(--color-conversion)"
+          fill={`url(#conversionMiniArea${gradientId})`}
+          strokeWidth={2.2}
+          dot={false}
+          activeDot={{ r: 3 }}
+          isAnimationActive={false}
+        />
+      </AreaChart>
+    </ChartContainer>
+  );
+}
+
+function HeroStat({
+  label,
+  value,
+  hint,
+  light,
+  chartData,
+  accentColor,
+}: {
+  label: string;
+  value: string | number;
+  hint?: string;
+  light: boolean;
+  chartData?: Array<{ label: string; conversion: number }>;
+  accentColor?: string;
+}) {
+  return (
+    <div className={cn(styles.heroStat, "min-w-0 rounded-[10px] border px-3.5 py-3 transition-colors duration-150")}>
+      <div className="grid min-h-[42px] grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
+        <div className="min-w-0">
+          <div className={cn('truncate text-[11px] font-semibold', mutedText(light))}>
+            {label}
+          </div>
+
+          {hint ? (
+            <div className={cn('mt-1 truncate text-[10px]', faintText(light))}>
+              {hint}
             </div>
-          ))}
+          ) : null}
         </div>
-        <div className="mt-1 grid grid-cols-7 gap-1.5 text-[10px] text-[var(--kb-text-muted)]">
-          {hours.map((h) => <span key={h} className="text-center">{h}</span>)}
+
+        <div
+          className={cn(
+            'min-w-[54px] max-w-[150px] truncate text-right text-[20px] font-semibold leading-none tracking-[-0.055em] tabular-nums',
+            pageText(light),
+          )}
+        >
+          {value}
         </div>
       </div>
+
+      {chartData ? (
+        <div className="-mb-2 -mt-3 ml-auto h-11 w-[58%] min-w-[150px] max-w-[220px]">
+          <ConversionMiniChart data={chartData} color={accentColor ?? 'currentColor'} />
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function SemiArc({ value }: { value: number }) {
-  const r = 72;
-  const c = Math.PI * r;
+function InlineCopyButton({
+  copied,
+  onClick,
+  copyLabel,
+  copiedLabel,
+  light,
+}: {
+  copied: boolean;
+  onClick: () => void;
+  copyLabel: string;
+  copiedLabel: string;
+  light: boolean;
+}) {
   return (
-    <svg viewBox="0 0 180 110" width="180" height="110">
-      <defs>
-        <linearGradient id="arcGrad" x1="0" x2="1" y1="0" y2="0">
-          <stop offset="0%" stopColor="#FFC09F" />
-          <stop offset="100%" stopColor="#FF8B6B" />
-        </linearGradient>
-      </defs>
-      <path d={`M 18 90 A ${r} ${r} 0 0 1 162 90`} fill="none" stroke="var(--kb-warm-surface)" strokeWidth="14" strokeLinecap="round" />
-      <path d={`M 18 90 A ${r} ${r} 0 0 1 162 90`} fill="none" stroke="url(#arcGrad)" strokeWidth="14"
-        strokeLinecap="round" strokeDasharray={`${(value / 100) * c} ${c}`} />
-      <circle cx={18 + (162 - 18) * (value / 100)} cy={90 - Math.sin(Math.PI * (value / 100)) * r} r="5"
-        fill="white" stroke="var(--kb-coral)" strokeWidth="2" />
-      <text x="90" y="80" textAnchor="middle" fontSize="32" fontWeight="500"
-        fontFamily="var(--kb-font-sans)" fill="var(--kb-text)">{value}%</text>
-    </svg>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={copied ? copiedLabel : copyLabel}
+      className={cn(
+        'inline-flex h-8 shrink-0 items-center justify-center gap-2 overflow-hidden rounded-[9px] border text-[11px] font-medium shadow-none transition-[width,background,border-color,color,opacity,transform] duration-200 active:scale-[0.985]',
+        copied ? 'w-[112px] px-3' : 'w-8 px-0',
+        light
+          ? 'border-black/[0.08] bg-black/[0.035] text-black/54 hover:border-black/[0.12] hover:bg-black/[0.06] hover:text-black'
+          : 'border-white/[0.08] bg-white/[0.055] text-white/58 hover:border-white/[0.13] hover:bg-white/[0.085] hover:text-white',
+      )}
+    >
+      {copied ? (
+        <Check className="size-3.5 shrink-0" />
+      ) : (
+        <Copy className="size-3.5 shrink-0" />
+      )}
+
+      {copied ? <span className="truncate">{copiedLabel}</span> : null}
+    </button>
   );
 }
 
-function PlantSilhouette({ className }: { className?: string }) {
+function bookingStatusLabel(status: string, locale: 'ru' | 'en') {
+  if (locale === 'ru') {
+    if (status === 'new') return 'Запланирована';
+    if (status === 'confirmed') return 'Запланирована';
+    if (status === 'completed') return 'Пришёл';
+    if (status === 'no_show') return 'Не пришёл';
+    if (status === 'cancelled') return 'Отменена';
+    return status;
+  }
+
+  if (status === 'new') return 'Scheduled';
+  if (status === 'confirmed') return 'Scheduled';
+  if (status === 'completed') return 'Arrived';
+  if (status === 'no_show') return 'No-show';
+  if (status === 'cancelled') return 'Cancelled';
+
+  return status;
+}
+
+function bookingStatusHint(status: string, locale: 'ru' | 'en') {
+  if (locale === 'ru') {
+    if (status === 'new') return 'ожидает визита';
+    if (status === 'confirmed') return 'ожидает визита';
+    if (status === 'completed') return 'пришёл';
+    if (status === 'no_show') return 'не пришёл';
+    if (status === 'cancelled') return 'снята';
+    return 'статус';
+  }
+
+  if (status === 'new') return 'waiting visit';
+  if (status === 'confirmed') return 'waiting visit';
+  if (status === 'completed') return 'arrived';
+  if (status === 'no_show') return 'no-show';
+  if (status === 'cancelled') return 'cancelled';
+
+  return 'status';
+}
+
+function statusColor(
+  status: string,
+  accentColor: string,
+  publicAccentColor: string,
+  light: boolean,
+) {
+  if (status === 'new') return accentColor;
+  if (status === 'confirmed') return publicAccentColor;
+
+  if (status === 'completed') {
+    return light ? '#79a96b' : '#8fc76b';
+  }
+
+  if (status === 'cancelled' || status === 'no_show') {
+    return light ? 'rgba(120,40,40,0.72)' : 'rgba(255,130,130,0.72)';
+  }
+
+  return light ? 'rgba(0,0,0,0.34)' : 'rgba(255,255,255,0.38)';
+}
+
+function StatusBadge({
+  status,
+  locale,
+  light,
+  accentColor,
+  publicAccentColor,
+}: {
+  status: string;
+  locale: 'ru' | 'en';
+  light: boolean;
+  accentColor: string;
+  publicAccentColor: string;
+}) {
+  const color = statusColor(status, accentColor, publicAccentColor, light);
+
   return (
-    <svg width="80" height="110" viewBox="0 0 80 110" className={className}>
-      <ellipse cx="40" cy="100" rx="22" ry="6" fill="#EADFD5" />
-      <path d="M 40 95 Q 30 70 18 50 Q 28 60 38 80 Z" fill="#7AA269" opacity="0.7" />
-      <path d="M 40 95 Q 50 65 65 45 Q 56 55 45 78 Z" fill="#A8C496" opacity="0.7" />
-      <path d="M 40 92 Q 38 70 30 55 Q 36 70 40 88 Z" fill="#5e7a44" opacity="0.6" />
-      <path d="M 28 100 L 52 100 L 49 80 L 31 80 Z" fill="#D8C4A8" />
-    </svg>
+    <div className={cn(styles.statusBadge, "flex min-w-[132px] items-center justify-end gap-2 rounded-[9px] border px-3 py-2")}>
+      <div className="min-w-0 text-right">
+        <div
+          className={cn(
+            'text-[11.5px] font-semibold leading-none tracking-[-0.018em]',
+            light ? 'text-black/72' : 'text-white/74',
+          )}
+        >
+          {bookingStatusLabel(status, locale)}
+        </div>
+
+        <div
+          className={cn(
+            'mt-1 text-[9.5px] font-medium uppercase tracking-[0.12em]',
+            light ? 'text-black/32' : 'text-white/28',
+          )}
+        >
+          {bookingStatusHint(status, locale)}
+        </div>
+      </div>
+
+      <span
+        style={{
+          background: color,
+          boxShadow: `0 0 0 3px color-mix(in srgb, ${color} 14%, transparent)`,
+        }}
+        className="size-2 shrink-0 rounded-full"
+      />
+    </div>
   );
 }
 
-function HighFiveBadge() {
+function BookingDateCell({
+  date,
+  time,
+  locale,
+  light,
+}: {
+  date: string;
+  time: string;
+  locale: 'ru' | 'en';
+  light: boolean;
+}) {
+  let dateLabel = date;
+
+  try {
+    dateLabel = new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
+      day: 'numeric',
+      month: 'short',
+    }).format(new Date(`${date}T${time}:00`));
+  } catch {
+    dateLabel = date;
+  }
+
   return (
-    <div className="relative h-12 w-12">
-      <span className="absolute inset-0 rounded-full bg-gradient-to-br from-[#FFC09F] to-[#FF8B6B] opacity-25" />
-      <span className="absolute inset-2 rounded-full bg-gradient-to-br from-[#FFD3B8] to-[#FFAA8E] flex items-center justify-center text-white">
-        🙌
+    <div
+      className={cn(
+        'grid min-w-[170px] grid-cols-[70px_12px_46px] items-center justify-end text-[11.5px] font-medium tabular-nums',
+        light ? 'text-black/48' : 'text-white/42',
+      )}
+    >
+      <span className="truncate text-right">{dateLabel}</span>
+
+      <span className={cn('text-center', light ? 'text-black/22' : 'text-white/18')}>
+        ·
+      </span>
+
+      <span className="text-left">{time}</span>
+    </div>
+  );
+}
+
+function KeyValue({
+  label,
+  value,
+  light,
+}: {
+  label: string;
+  value: string;
+  light: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        'flex min-h-10 items-center justify-between gap-3 rounded-[9px] border px-3',
+        insetTone(light),
+      )}
+    >
+      <span className={cn('text-[11px] font-medium', mutedText(light))}>
+        {label}
+      </span>
+
+      <span
+        className={cn(
+          'truncate text-right text-[11.5px] font-medium',
+          pageText(light),
+        )}
+      >
+        {value}
       </span>
     </div>
+  );
+}
+
+function ListBox({
+  children,
+  light,
+  className,
+}: {
+  children: ReactNode;
+  light: boolean;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        'overflow-hidden rounded-[10px] border divide-y',
+        insetTone(light),
+        divideTone(light),
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+function ListRow({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <div className={cn('px-4 py-3.5', className)}>{children}</div>;
+}
+
+function EmptyState({
+  children,
+  light,
+}: {
+  children: ReactNode;
+  light: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        'rounded-[10px] border px-4 py-5 text-[12px]',
+        insetTone(light),
+        mutedText(light),
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+function ControlGroup({
+  children,
+  light,
+  className,
+}: {
+  children: ReactNode;
+  light: boolean;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        'inline-flex max-w-full shrink-0 items-center overflow-hidden rounded-[12px] border p-0',
+        light
+          ? 'border-black/[0.08] bg-white'
+          : 'border-white/[0.08] bg-white/[0.045]',
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+function FilterChip({
+  label,
+  active,
+  onClick,
+  light,
+  accentColor,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  light: boolean;
+  accentColor: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'group relative inline-flex h-10 min-w-[72px] shrink-0 items-center justify-center border-r px-4 text-[11px] font-semibold tracking-[-0.015em] transition-colors duration-150 last:border-r-0 active:scale-[0.985]',
+        light ? 'border-black/[0.07]' : 'border-white/[0.07]',
+        active
+          ? light
+            ? 'text-black'
+            : 'text-white'
+          : light
+            ? 'text-black/40 hover:text-black/70'
+            : 'text-white/36 hover:text-white/70',
+      )}
+    >
+      <span className="relative z-10">{label}</span>
+
+      <span
+        style={active ? { background: accentColor } : undefined}
+        className={cn(
+          'absolute bottom-1.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full transition-all duration-200',
+          active
+            ? 'opacity-100'
+            : light
+              ? 'bg-black/0 opacity-0 group-hover:bg-black/18 group-hover:opacity-100'
+              : 'bg-white/0 opacity-0 group-hover:bg-white/18 group-hover:opacity-100',
+        )}
+      />
+    </button>
+  );
+}
+
+function ProgressLine({
+  value,
+  color,
+  light,
+}: {
+  value: number;
+  color: string;
+  light: boolean;
+}) {
+  const normalizedValue = Math.min(100, Math.max(0, value));
+
+  return (
+    <div
+      className={cn(
+        'mt-3 h-1.5 overflow-hidden rounded-full',
+        light ? 'bg-black/[0.075]' : 'bg-white/[0.09]',
+      )}
+    >
+      <div
+        className="h-full rounded-full transition-all duration-500"
+        style={{
+          width: `${normalizedValue}%`,
+          minWidth: normalizedValue > 0 ? '34px' : 0,
+          background: color,
+          opacity: light ? 0.72 : 0.95,
+        }}
+      />
+    </div>
+  );
+}
+
+export default function DashboardPage() {
+  const { hasHydrated, ownedProfile, bookings, dataset, locale } =
+    useOwnedWorkspaceData();
+  const { resolvedTheme } = useTheme();
+  const { settings } = useAppearance();
+  const [mounted, setMounted] = useState(false);
+  const [trendMetric, setTrendMetric] = useState<TrendMetric>('revenue');
+  const [selectedFavoriteClientId, setSelectedFavoriteClientId] = useState<string | null>(null);
+  const [copiedPublicLink, setCopiedPublicLink] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const currentTheme: ThemeMode = mounted
+    ? resolvedTheme === 'light'
+      ? 'light'
+      : 'dark'
+    : 'dark';
+
+  const isLight = currentTheme === 'light';
+
+  const accentColor = accentPalette[settings.accentTone]?.solid ?? (isLight ? '#7c5cff' : '#8b6cff');
+  const publicAccentColor = accentPalette[settings.publicAccent]?.solid ?? (isLight ? '#79a96b' : '#8fc76b');
+
+  const copy =
+    locale === 'ru'
+      ? {
+          title: 'Кабинет мастера',
+          subtitle:
+            'Минималистичный рабочий экран: записи, публичная ссылка, деньги, трафик и клиенты без визуального шума.',
+          copy: 'Скопировать',
+          copied: 'Скопировано',
+          live: 'Online',
+          ready: 'Готово',
+          active: 'Активна',
+          publicLink: 'Персональная ссылка',
+          publicHint: 'Отправляйте клиентам или закрепите в Telegram / Instagram.',
+          conversion: 'Конверсия',
+          newClients: 'Новые клиенты',
+          source: 'Источник',
+          visits: 'Визиты',
+          metricsTitle: 'Метрики',
+          metricsDescription: 'Короткий срез по заявкам, деньгам и клиентам.',
+          requestsToday: 'Заявки сегодня',
+          revenueWeek: 'Факт недели',
+          pageViews: 'Просмотры',
+          returning: 'Повторные',
+          confirmed: 'запланировано',
+          avgCheck: 'средний чек',
+          conversionWord: 'конверсия',
+          newIn30: 'новых за 30 дней',
+          nextTitle: 'Ближайшая запись',
+          nextDescription: 'Клиент в фокусе и очередь после него.',
+          focus: 'В фокусе',
+          nextBooking: 'Следующая запись',
+          queue: 'Очередь',
+          emptyBookings: 'Ближайших записей пока нет.',
+          emptyQueue: 'Очередь после записи пока пустая.',
+          slot: 'Слот',
+          phone: 'Телефон',
+          status: 'Статус',
+          weekTitle: 'Неделя',
+          weekDescription: 'Динамика заявок, трафика и дохода.',
+          revenue: 'Доход',
+          requests: 'Заявки',
+          traffic: 'Трафик',
+          confirmedShort: 'Подтв.',
+          averageCheck: 'Средний чек',
+          requestsWord: 'заявок',
+          visitorsWord: 'визитов',
+          confirmedWord: 'подтв.',
+          servicesTitle: 'Услуги',
+          servicesDescription: 'Что чаще выбирают клиенты.',
+          bookingsWord: 'записей',
+          minWord: 'мин',
+          emptyServices: 'Пока нет данных по услугам.',
+          clientsTitle: 'Клиенты',
+          clientsDescription: 'VIP и заметки, которые важно помнить.',
+          visitsWord: 'визитов',
+          emptyClients: 'Пока нет сохранённых заметок по клиентам.',
+          createTitle: 'Профиль ещё не создан',
+          createButton: 'Создать профиль',
+        }
+      : {
+          title: 'Specialist dashboard',
+          subtitle:
+            'A minimal workspace for bookings, public link, revenue, traffic, and clients without visual noise.',
+          copy: 'Copy',
+          copied: 'Copied',
+          live: 'Online',
+          ready: 'Ready',
+          active: 'Active',
+          publicLink: 'Personal link',
+          publicHint: 'Send it to clients or pin it in Telegram / Instagram.',
+          conversion: 'Conversion',
+          newClients: 'New clients',
+          source: 'Source',
+          visits: 'Visits',
+          metricsTitle: 'Metrics',
+          metricsDescription: 'A compact cut of requests, money, and clients.',
+          requestsToday: 'Requests today',
+          revenueWeek: 'Weekly revenue',
+          pageViews: 'Page views',
+          returning: 'Returning',
+          confirmed: 'confirmed',
+          avgCheck: 'avg check',
+          conversionWord: 'conversion',
+          newIn30: 'new in 30 days',
+          nextTitle: 'Next booking',
+          nextDescription: 'Focused client and the queue after them.',
+          focus: 'Focus',
+          nextBooking: 'Next booking',
+          queue: 'Queue',
+          emptyBookings: 'No upcoming bookings yet.',
+          emptyQueue: 'No queue after this booking yet.',
+          slot: 'Slot',
+          phone: 'Phone',
+          status: 'Status',
+          weekTitle: 'Week',
+          weekDescription: 'Revenue, requests, and traffic dynamics.',
+          revenue: 'Revenue',
+          requests: 'Requests',
+          traffic: 'Traffic',
+          confirmedShort: 'Conf.',
+          averageCheck: 'Average check',
+          requestsWord: 'requests',
+          visitorsWord: 'visits',
+          confirmedWord: 'confirmed',
+          servicesTitle: 'Services',
+          servicesDescription: 'What clients choose most often.',
+          bookingsWord: 'bookings',
+          minWord: 'min',
+          emptyServices: 'No service data yet.',
+          clientsTitle: 'Clients',
+          clientsDescription: 'VIP notes worth remembering.',
+          visitsWord: 'visits',
+          emptyClients: 'No saved client notes yet.',
+          createTitle: 'Profile is not created yet',
+          createButton: 'Create profile',
+        };
+
+  const publicHref = ownedProfile ? `/m/${ownedProfile.slug}` : '/create-profile';
+  const publicUrl =
+    mounted && typeof window !== 'undefined'
+      ? `${window.location.origin}${publicHref}`
+      : publicHref;
+
+  const handleCopyPublicLink = async () => {
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(publicUrl);
+      } else if (typeof document !== 'undefined') {
+        const textarea = document.createElement('textarea');
+        textarea.value = publicUrl;
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+
+      setCopiedPublicLink(true);
+      window.setTimeout(() => setCopiedPublicLink(false), 1400);
+    } catch {
+      setCopiedPublicLink(false);
+    }
+  };
+
+  const upcomingBookings = useMemo(() => {
+    return [...bookings]
+      .sort((left, right) => {
+        const a = new Date(`${left.date}T${left.time}:00`).getTime();
+        const b = new Date(`${right.date}T${right.time}:00`).getTime();
+        return a - b;
+      })
+      .slice(0, 5);
+  }, [bookings]);
+
+  const todayActivity = useMemo(() => dataset?.daily.at(-1), [dataset]);
+
+  const weekRevenue = useMemo(
+    () =>
+      dataset?.daily
+        .slice(-7)
+        .reduce((total, item) => total + item.revenue, 0) ?? 0,
+    [dataset],
+  );
+
+  const weekTrendData = useMemo(
+    () => (dataset ? buildCurrentWeekData(dataset.daily, locale) : []),
+    [dataset, locale],
+  );
+
+  const conversionSparklineData = useMemo(() => {
+    const values =
+      dataset?.daily.slice(-14).map((item) => {
+        const base = Math.max(item.visitors, item.requests, 1);
+        return Math.round((item.confirmed / base) * 100);
+      }) ?? [];
+
+    return values;
+  }, [dataset]);
+
+  const conversionChartData = useMemo(
+    () => conversionSparklineData.map((value, index) => ({
+      label: String(index + 1),
+      conversion: value,
+    })),
+    [conversionSparklineData],
+  );
+
+  const trendSummary = useMemo(() => {
+    if (!dataset) return null;
+
+    const lastSeven = dataset.daily.slice(-7);
+    const previousSeven = dataset.daily.slice(-14, -7);
+
+    const currentRevenue = lastSeven.reduce(
+      (total, item) => total + item.revenue,
+      0,
+    );
+    const previousRevenue = previousSeven.reduce(
+      (total, item) => total + item.revenue,
+      0,
+    );
+    const currentRequests = lastSeven.reduce(
+      (total, item) => total + item.requests,
+      0,
+    );
+    const currentVisitors = lastSeven.reduce(
+      (total, item) => total + item.visitors,
+      0,
+    );
+    const currentConfirmed = lastSeven.reduce(
+      (total, item) => total + item.confirmed,
+      0,
+    );
+
+    const revenueDelta =
+      previousRevenue > 0
+        ? Math.round(((currentRevenue - previousRevenue) / previousRevenue) * 100)
+        : currentRevenue > 0
+          ? 100
+          : 0;
+
+    return {
+      revenueDelta,
+      requests: currentRequests,
+      visitors: currentVisitors,
+      confirmed: currentConfirmed,
+      conversion:
+        Math.round((currentConfirmed / Math.max(1, currentVisitors)) * 1000) /
+        10,
+    };
+  }, [dataset]);
+
+  const favoriteClients = useMemo(
+    () => dataset?.clients.filter((item) => item.favorite).slice(0, 4) ?? [],
+    [dataset],
+  );
+
+  const selectedFavoriteClient = useMemo(
+    () => favoriteClients.find((item) => item.id === selectedFavoriteClientId) ?? null,
+    [favoriteClients, selectedFavoriteClientId],
+  );
+
+  const topServices = useMemo(
+    () => dataset?.services.slice(0, 4) ?? [],
+    [dataset],
+  );
+
+  const chartConfig = useMemo(
+    () => ({
+      revenue: { label: copy.revenue, color: accentColor },
+      requests: { label: copy.requests, color: publicAccentColor },
+      visitors: { label: copy.traffic, color: publicAccentColor },
+    }),
+    [copy.revenue, copy.requests, copy.traffic, accentColor, publicAccentColor],
+  );
+
+  const metrics = useMemo(
+    () => [
+      {
+        label: copy.requestsToday,
+        value: String(todayActivity?.requests ?? 0),
+        hint: `${todayActivity?.confirmed ?? 0} ${copy.confirmed}`,
+        icon: <CalendarClock className="size-4" />,
+      },
+      {
+        label: copy.revenueWeek,
+        value: formatCurrency(weekRevenue, locale),
+        hint: `${copy.avgCheck} ${formatCurrency(dataset?.totals.averageCheck ?? 0, locale)}`,
+        icon: <PiggyBank className="size-4" />,
+      },
+      {
+        label: copy.pageViews,
+        value: String(dataset?.totals.visitors ?? 0),
+        hint: `${dataset?.totals.conversion ?? 0}% ${copy.conversionWord}`,
+        icon: <Globe2 className="size-4" />,
+      },
+      {
+        label: copy.returning,
+        value: `${dataset?.totals.returnRate ?? 0}%`,
+        hint: `${dataset?.totals.newClients ?? 0} ${copy.newIn30}`,
+        icon: <Users2 className="size-4" />,
+      },
+    ],
+    [copy, dataset, locale, todayActivity, weekRevenue],
+  );
+
+  const trendMetricOptions = useMemo(
+    () => [
+      { value: 'revenue' as const, label: copy.revenue },
+      { value: 'requests' as const, label: copy.requests },
+      { value: 'visitors' as const, label: copy.traffic },
+    ],
+    [copy.revenue, copy.requests, copy.traffic],
+  );
+
+  const activeTrendValue = useMemo(() => {
+    if (trendMetric === 'revenue') return formatCurrency(weekRevenue, locale);
+    if (trendMetric === 'requests') return String(trendSummary?.requests ?? 0);
+    return String(trendSummary?.visitors ?? 0);
+  }, [trendMetric, weekRevenue, locale, trendSummary]);
+
+  const formatStatusValue = (status: string) => bookingStatusLabel(status, locale);
+
+  const formatBookingSlot = (date: string, time: string) => {
+    try {
+      return (
+        new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
+          day: 'numeric',
+          month: 'short',
+        }).format(new Date(`${date}T${time}:00`)) + ` · ${time}`
+      );
+    } catch {
+      return `${date} · ${time}`;
+    }
+  };
+
+  if (!hasHydrated || !mounted) return null;
+
+  if (!ownedProfile) {
+    return (
+      <WorkspaceShell>
+        <main
+          className={cn(
+            'min-h-[calc(100dvh-68px)] px-4 pb-12 pt-5 md:px-7 md:pt-6',
+            pageBg(isLight),
+          )}
+        style={{ '--dash-accent': accentColor, '--dash-success': publicAccentColor } as CSSProperties}
+        >
+          <div className={cn(styles.container, "mx-auto w-full max-w-[var(--page-max-width)]")}>
+            <div className={cn(styles.pageHeader, "mb-6 md:mb-7")}>
+              <div className="min-w-0">
+                <h1
+                  className={cn(
+                    'text-[31px] font-semibold tracking-[-0.075em] md:text-[42px]',
+                    pageText(isLight),
+                  )}
+                >
+                  {copy.title}
+                </h1>
+
+                <p
+                  className={cn(
+                    'mt-2 max-w-[760px] text-[13px] leading-5',
+                    mutedText(isLight),
+                  )}
+                >
+                  {copy.subtitle}
+                </p>
+              </div>
+            </div>
+
+            <Card light={isLight} className="overflow-hidden">
+              <div className="grid min-h-[320px] place-items-center px-5 py-12 text-center">
+                <div className="mx-auto max-w-[460px]">
+                  <MicroLabel light={isLight}>
+                    <StatusDot light={isLight} />
+                    {locale === 'ru' ? 'Профиль не найден' : 'Profile missing'}
+                  </MicroLabel>
+
+                  <h2
+                    className={cn(
+                      'mt-5 text-[28px] font-semibold tracking-[-0.065em] md:text-[36px]',
+                      pageText(isLight),
+                    )}
+                  >
+                    {copy.createTitle}
+                  </h2>
+
+                  <p
+                    className={cn(
+                      'mt-3 text-[13px] leading-5',
+                      mutedText(isLight),
+                    )}
+                  >
+                    {locale === 'ru'
+                      ? 'Сначала создайте профиль мастера, чтобы открыть кабинет, публичную страницу, онлайн-запись и статистику.'
+                      : 'Create a master profile first to open the workspace, public page, online booking, and stats.'}
+                  </p>
+
+                  <div className="mt-6 flex justify-center">
+                    <PageAction href="/create-profile" light={isLight} active>
+                      <SquarePen className="size-3.5" />
+                      {copy.createButton}
+                    </PageAction>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <div className="mt-4 grid gap-4 md:grid-cols-3">
+              <Card light={isLight}>
+                <div className="p-4">
+                  <MicroLabel light={isLight}>
+                    <LayoutDashboard className="size-3.5" />
+                    {locale === 'ru' ? 'Кабинет' : 'Workspace'}
+                  </MicroLabel>
+
+                  <div
+                    className={cn(
+                      'mt-4 text-[13px] font-semibold tracking-[-0.018em]',
+                      pageText(isLight),
+                    )}
+                  >
+                    {locale === 'ru' ? 'Рабочий экран' : 'Main workspace'}
+                  </div>
+
+                  <p
+                    className={cn(
+                      'mt-1 text-[11px] leading-4',
+                      mutedText(isLight),
+                    )}
+                  >
+                    {locale === 'ru'
+                      ? 'Записи, клиенты, услуги и статистика появятся после создания профиля.'
+                      : 'Bookings, clients, services, and stats will appear after profile setup.'}
+                  </p>
+                </div>
+              </Card>
+
+              <Card light={isLight}>
+                <div className="p-4">
+                  <MicroLabel light={isLight}>
+                    <Globe2 className="size-3.5" />
+                    {locale === 'ru' ? 'Публичная' : 'Public'}
+                  </MicroLabel>
+
+                  <div
+                    className={cn(
+                      'mt-4 text-[13px] font-semibold tracking-[-0.018em]',
+                      pageText(isLight),
+                    )}
+                  >
+                    {locale === 'ru' ? 'Страница клиента' : 'Client page'}
+                  </div>
+
+                  <p
+                    className={cn(
+                      'mt-1 text-[11px] leading-4',
+                      mutedText(isLight),
+                    )}
+                  >
+                    {locale === 'ru'
+                      ? 'После сохранения профиля появится ссылка для клиентов.'
+                      : 'After saving the profile, a client booking link will be created.'}
+                  </p>
+                </div>
+              </Card>
+
+              <Card light={isLight}>
+                <div className="p-4">
+                  <MicroLabel light={isLight}>
+                    <Sparkles className="size-3.5" />
+                    {locale === 'ru' ? 'Старт' : 'Start'}
+                  </MicroLabel>
+
+                  <div
+                    className={cn(
+                      'mt-4 text-[13px] font-semibold tracking-[-0.018em]',
+                      pageText(isLight),
+                    )}
+                  >
+                    {locale === 'ru' ? 'Один шаг до запуска' : 'One step to launch'}
+                  </div>
+
+                  <p
+                    className={cn(
+                      'mt-1 text-[11px] leading-4',
+                      mutedText(isLight),
+                    )}
+                  >
+                    {locale === 'ru'
+                      ? 'Заполните имя, описание, услуги, контакты — и можно принимать записи.'
+                      : 'Fill in name, description, services, and contacts to start accepting bookings.'}
+                  </p>
+                </div>
+              </Card>
+            </div>
+          </div>
+        </main>
+      </WorkspaceShell>
+    );
+  }
+
+  const primaryBooking = upcomingBookings[0] ?? null;
+  const secondaryBookings = primaryBooking ? upcomingBookings.slice(1, 5) : [];
+
+  return (
+    <WorkspaceShell>
+      <main
+        className={cn(
+          'min-h-[calc(100dvh-68px)] px-4 pb-12 pt-5 md:px-7 md:pt-6',
+          pageBg(isLight),
+        )}
+        style={{ '--dash-accent': accentColor, '--dash-success': publicAccentColor } as CSSProperties}
+      >
+        <div className={cn(styles.container, "mx-auto w-full max-w-[var(--page-max-width)]")}>
+          <div className={cn(styles.pageHeader, "mb-6 md:mb-7")}>
+            <div className="min-w-0">
+              <h1
+                className={cn(
+                  'text-[31px] font-semibold tracking-[-0.075em] md:text-[42px]',
+                  pageText(isLight),
+                )}
+              >
+                {copy.title}
+              </h1>
+
+              <p
+                className={cn(
+                  'mt-2 max-w-[760px] text-[13px] leading-5',
+                  mutedText(isLight),
+                )}
+              >
+                {copy.subtitle}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-4">
+            <Card light={isLight} className={cn(styles.hero, "overflow-hidden")}>
+              <div className="p-5">
+                <div className="grid gap-5 xl:grid-cols-[64px_minmax(0,1fr)_auto] xl:items-start">
+                  <div
+                    className={cn(styles.linkOrb, "flex size-14 items-center justify-center rounded-full border md:size-16")}
+                    aria-hidden="true"
+                  >
+                    <Link2 className="size-6" />
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className={cn('text-[12px] font-semibold', mutedText(isLight))}>
+                      {copy.publicLink}
+                    </div>
+
+                    <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2.5">
+                      <div
+                        className={cn(
+                          'min-w-0 break-all text-[30px] font-semibold tracking-[-0.075em] md:text-[38px]',
+                          pageText(isLight),
+                        )}
+                      >
+                        /m/{ownedProfile.slug}
+                      </div>
+
+                      <InlineCopyButton
+                        copied={copiedPublicLink}
+                        onClick={handleCopyPublicLink}
+                        copyLabel={copy.copy}
+                        copiedLabel={copy.copied}
+                        light={isLight}
+                      />
+                    </div>
+
+                    <p
+                      className={cn(
+                        'mt-3 max-w-[720px] text-[13px] leading-6',
+                        mutedText(isLight),
+                      )}
+                    >
+                      {copy.publicHint}
+                    </p>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-2 xl:justify-end">
+                    <Button asChild className={buttonBase(isLight, true)}>
+                      <Link href={publicHref}>
+                        {locale === 'ru' ? 'Открыть страницу' : 'Open page'}
+                        <ArrowUpRight className="size-4" />
+                      </Link>
+                    </Button>
+
+                    <button
+                      type="button"
+                      className={cn(buttonBase(isLight), 'size-9 px-0')}
+                      aria-label={locale === 'ru' ? 'Больше действий' : 'More actions'}
+                    >
+                      <MoreHorizontal className="size-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-5 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+                  <HeroStat
+                    label={copy.conversion}
+                    value={`${dataset.totals.conversion}%`}
+                    hint={copy.conversionWord}
+                    light={isLight}
+                    chartData={conversionChartData}
+                    accentColor={accentColor}
+                  />
+
+                  <HeroStat
+                    label={copy.newClients}
+                    value={dataset.totals.newClients}
+                    hint={copy.newIn30}
+                    light={isLight}
+                  />
+
+                  <HeroStat
+                    label={copy.source}
+                    value={dataset.channels[0]?.label ?? '—'}
+                    hint="channel"
+                    light={isLight}
+                  />
+
+                  <HeroStat
+                    label={copy.visits}
+                    value={trendSummary?.visitors ?? 0}
+                    hint={copy.visitorsWord}
+                    light={isLight}
+                  />
+                </div>
+              </div>
+            </Card>
+
+            <Card light={isLight}>
+              <CardTitle
+                title={copy.metricsTitle}
+                description={copy.metricsDescription}
+                light={isLight}
+              />
+
+              <div
+                className={cn(
+                  'grid divide-y md:grid-cols-4 md:divide-x md:divide-y-0',
+                  divideTone(isLight),
+                )}
+              >
+                {metrics.map((metric) => (
+                  <StatTile
+                    key={metric.label}
+                    label={metric.label}
+                    value={metric.value}
+                    hint={metric.hint}
+                    icon={metric.icon}
+                    light={isLight}
+                  />
+                ))}
+              </div>
+            </Card>
+
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)]">
+              <Card light={isLight}>
+                <CardTitle
+                  title={copy.nextTitle}
+                  description={copy.nextDescription}
+                  light={isLight}
+                />
+
+                <div className="p-4">
+                  {primaryBooking ? (
+                    <div className="space-y-3">
+                      <Panel light={isLight} className="p-4 md:p-5">
+                        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="size-1.5 rounded-full"
+                                style={{ background: publicAccentColor }}
+                              />
+
+                              <span
+                                className={cn(
+                                  'text-[11px] font-medium',
+                                  mutedText(isLight),
+                                )}
+                              >
+                                {copy.focus}
+                              </span>
+                            </div>
+
+                            <div
+                              className={cn(
+                                'mt-4 truncate text-[30px] font-semibold tracking-[-0.065em] md:text-[38px]',
+                                pageText(isLight),
+                              )}
+                            >
+                              {primaryBooking.clientName}
+                            </div>
+
+                            <div className={cn('mt-1 text-[13px]', mutedText(isLight))}>
+                              {primaryBooking.service}
+                            </div>
+                          </div>
+
+                          <div className="lg:flex lg:flex-col lg:items-end lg:text-right">
+                            <div className={cn('text-[11px] font-medium', mutedText(isLight))}>
+                              {copy.nextBooking}
+                            </div>
+
+                            <div className="mt-2">
+                              <BookingDateCell
+                                date={primaryBooking.date}
+                                time={primaryBooking.time}
+                                locale={locale}
+                                light={isLight}
+                              />
+                            </div>
+
+                            <div className="mt-3">
+                              <StatusBadge
+                                status={primaryBooking.status}
+                                locale={locale}
+                                light={isLight}
+                                accentColor={accentColor}
+                                publicAccentColor={publicAccentColor}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-5 grid gap-2 lg:grid-cols-3">
+                          <KeyValue
+                            label={copy.slot}
+                            value={formatBookingSlot(primaryBooking.date, primaryBooking.time)}
+                            light={isLight}
+                          />
+
+                          <KeyValue
+                            label={copy.phone}
+                            value={primaryBooking.clientPhone}
+                            light={isLight}
+                          />
+
+                          <KeyValue
+                            label={copy.status}
+                            value={formatStatusValue(primaryBooking.status)}
+                            light={isLight}
+                          />
+                        </div>
+                      </Panel>
+
+                      <ListBox light={isLight}>
+                        <ListRow>
+                          <div className={cn('text-[11px] font-medium', mutedText(isLight))}>
+                            {copy.queue}
+                          </div>
+                        </ListRow>
+
+                        {secondaryBookings.length ? (
+                          secondaryBookings.map((booking) => {
+                            const color = statusColor(
+                              booking.status,
+                              accentColor,
+                              publicAccentColor,
+                              isLight,
+                            );
+
+                            return (
+                              <ListRow
+                                key={booking.id}
+                                className={cn(
+                                  'relative overflow-hidden px-0 py-0 transition-colors duration-150',
+                                  isLight
+                                    ? 'hover:bg-black/[0.018]'
+                                    : 'hover:bg-white/[0.028]',
+                                )}
+                              >
+                                <div className="grid min-h-[68px] grid-cols-[4px_minmax(0,1fr)]">
+                                  <span
+                                    style={{
+                                      background:
+                                        booking.status === 'completed' ||
+                                        booking.status === 'cancelled'
+                                          ? isLight
+                                            ? 'rgba(0,0,0,0.12)'
+                                            : 'rgba(255,255,255,0.12)'
+                                          : color,
+                                    }}
+                                    className="h-full w-full"
+                                  />
+
+                                  <div className="grid gap-3 px-4 py-3.5 lg:grid-cols-[minmax(0,1fr)_170px_150px] lg:items-center">
+                                    <div className="min-w-0">
+                                      <div
+                                        className={cn(
+                                          'truncate text-[12.5px] font-semibold tracking-[-0.018em]',
+                                          pageText(isLight),
+                                        )}
+                                      >
+                                        {booking.clientName}
+                                      </div>
+
+                                      <div
+                                        className={cn(
+                                          'mt-1.5 truncate text-[11px] leading-4',
+                                          mutedText(isLight),
+                                        )}
+                                      >
+                                        {booking.service}
+                                      </div>
+                                    </div>
+
+                                    <BookingDateCell
+                                      date={booking.date}
+                                      time={booking.time}
+                                      locale={locale}
+                                      light={isLight}
+                                    />
+
+                                    <div className="lg:justify-self-end">
+                                      <StatusBadge
+                                        status={booking.status}
+                                        locale={locale}
+                                        light={isLight}
+                                        accentColor={accentColor}
+                                        publicAccentColor={publicAccentColor}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              </ListRow>
+                            );
+                          })
+                        ) : (
+                          <ListRow>
+                            <div className={cn('text-[12px]', mutedText(isLight))}>
+                              {copy.emptyQueue}
+                            </div>
+                          </ListRow>
+                        )}
+                      </ListBox>
+                    </div>
+                  ) : (
+                    <EmptyState light={isLight}>{copy.emptyBookings}</EmptyState>
+                  )}
+                </div>
+              </Card>
+
+              <Card light={isLight}>
+                <CardTitle
+                  title={copy.servicesTitle}
+                  description={copy.servicesDescription}
+                  light={isLight}
+                />
+
+                <div className="p-4">
+                  {topServices.length ? (
+                    <div className="space-y-3">
+                      <ListBox light={isLight}>
+                        {topServices.map((service, index) => (
+                        <ListRow key={service.id} className="py-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={cn(styles.rankBadge, "inline-flex size-6 items-center justify-center rounded-[8px] border text-[11px] font-semibold")}
+                                >
+                                  {index + 1}
+                                </span>
+
+                                <div
+                                  className={cn(
+                                    'truncate text-[13px] font-semibold',
+                                    pageText(isLight),
+                                  )}
+                                >
+                                  {service.name}
+                                </div>
+                              </div>
+
+                              <div className={cn('mt-2 text-[11px]', mutedText(isLight))}>
+                                {service.bookings} {copy.bookingsWord} ·{' '}
+                                {service.duration} {copy.minWord}
+                              </div>
+                            </div>
+
+                            <div
+                              className={cn(
+                                'shrink-0 text-[13px] font-semibold',
+                                pageText(isLight),
+                              )}
+                            >
+                              {formatCurrency(service.revenue, locale)}
+                            </div>
+                          </div>
+
+                          <ProgressLine
+                            value={service.popularity}
+                            color={accentColor}
+                            light={isLight}
+                          />
+                        </ListRow>
+                        ))}
+                      </ListBox>
+
+                      <Button asChild className={cn(buttonBase(isLight), 'w-full')}>
+                        <Link href="/dashboard/services">
+                          {locale === 'ru' ? 'Все услуги' : 'All services'}
+                          <ArrowUpRight className="size-3.5" />
+                        </Link>
+                      </Button>
+                    </div>
+                  ) : (
+                    <EmptyState light={isLight}>{copy.emptyServices}</EmptyState>
+                  )}
+                </div>
+              </Card>
+            </div>
+
+            <Card light={isLight}>
+              <CardTitle
+                title={copy.weekTitle}
+                description={copy.weekDescription}
+                light={isLight}
+              />
+
+              <div className="space-y-4 p-4">
+                <ControlGroup light={isLight} className="max-w-full overflow-x-auto">
+                  {trendMetricOptions.map((item) => (
+                    <FilterChip
+                      key={item.value}
+                      label={item.label}
+                      active={trendMetric === item.value}
+                      onClick={() => setTrendMetric(item.value)}
+                      light={isLight}
+                      accentColor={accentColor}
+                    />
+                  ))}
+                </ControlGroup>
+
+                <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                    <Panel light={isLight} className="p-4">
+                      <div className={cn('text-[11px] font-medium', mutedText(isLight))}>
+                        {trendMetricOptions.find((item) => item.value === trendMetric)?.label}
+                      </div>
+
+                      <div
+                        className={cn(
+                          'mt-2 text-[32px] font-semibold tracking-[-0.075em]',
+                          pageText(isLight),
+                        )}
+                      >
+                        {activeTrendValue}
+                      </div>
+
+                      <div className={cn('mt-1 text-[11px]', mutedText(isLight))}>
+                        {trendSummary && trendSummary.revenueDelta >= 0
+                          ? `+${trendSummary.revenueDelta}%`
+                          : `${trendSummary?.revenueDelta ?? 0}%`}
+                      </div>
+                    </Panel>
+
+                    <Panel light={isLight} className="p-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <div className={cn('text-[10.5px] font-medium', mutedText(isLight))}>
+                            {copy.confirmedShort}
+                          </div>
+
+                          <div
+                            className={cn(
+                              'mt-1 text-[18px] font-semibold tracking-[-0.04em]',
+                              pageText(isLight),
+                            )}
+                          >
+                            {trendSummary?.confirmed ?? 0}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className={cn('text-[10.5px] font-medium', mutedText(isLight))}>
+                            {copy.averageCheck}
+                          </div>
+
+                          <div
+                            className={cn(
+                              'mt-1 text-[18px] font-semibold tracking-[-0.04em]',
+                              pageText(isLight),
+                            )}
+                          >
+                            {formatCurrency(dataset.totals.averageCheck, locale)}
+                          </div>
+                        </div>
+                      </div>
+                    </Panel>
+
+                    <ListBox light={isLight} className="sm:col-span-2 xl:col-span-1">
+                      {[...weekTrendData]
+                        .slice(-3)
+                        .reverse()
+                        .map((item) => (
+                          <ListRow key={item.date}>
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className={cn('text-[12px] font-medium', pageText(isLight))}>
+                                  {item.label}
+                                </div>
+
+                                <div
+                                  className={cn(
+                                    'mt-1 truncate text-[10.5px]',
+                                    mutedText(isLight),
+                                  )}
+                                >
+                                  {item.requests} {copy.requestsWord} ·{' '}
+                                  {item.confirmed} {copy.confirmedWord}
+                                </div>
+                              </div>
+
+                              <div
+                                className={cn(
+                                  'shrink-0 text-[12px] font-semibold',
+                                  pageText(isLight),
+                                )}
+                              >
+                                {formatCurrency(item.revenue, locale)}
+                              </div>
+                            </div>
+                          </ListRow>
+                        ))}
+                    </ListBox>
+                  </div>
+
+                  <Panel light={isLight} className="p-3">
+                    <ChartContainer config={chartConfig} className="h-[340px] w-full">
+                      {trendMetric === 'revenue' ? (
+                        <AreaChart data={weekTrendData}>
+                          <defs>
+                            <linearGradient
+                              id="dashboardMinimalRevenue"
+                              x1="0"
+                              x2="0"
+                              y1="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="5%"
+                                stopColor="var(--color-revenue)"
+                                stopOpacity={0.16}
+                              />
+                              <stop
+                                offset="95%"
+                                stopColor="var(--color-revenue)"
+                                stopOpacity={0}
+                              />
+                            </linearGradient>
+                          </defs>
+
+                          <CartesianGrid
+                            vertical={false}
+                            strokeDasharray="3 3"
+                            stroke={chartGridStroke(isLight)}
+                          />
+                          <XAxis
+                            dataKey="label"
+                            tickLine={false}
+                            axisLine={false}
+                            minTickGap={18}
+                          />
+                          <YAxis tickLine={false} axisLine={false} width={36} />
+                          <ChartTooltip content={<ChartTooltipContent />} />
+
+                          <Area
+                            type="monotone"
+                            dataKey="revenue"
+                            stroke="var(--color-revenue)"
+                            fill="url(#dashboardMinimalRevenue)"
+                            strokeWidth={2.1}
+                          />
+                        </AreaChart>
+                      ) : null}
+
+                      {trendMetric === 'requests' ? (
+                        <BarChart data={weekTrendData}>
+                          <CartesianGrid
+                            vertical={false}
+                            strokeDasharray="3 3"
+                            stroke={chartGridStroke(isLight)}
+                          />
+                          <XAxis
+                            dataKey="label"
+                            tickLine={false}
+                            axisLine={false}
+                            minTickGap={18}
+                          />
+                          <YAxis tickLine={false} axisLine={false} width={36} />
+                          <ChartTooltip content={<ChartTooltipContent />} />
+
+                          <Bar
+                            dataKey="requests"
+                            fill="var(--color-requests)"
+                            radius={[5, 5, 2, 2]}
+                            maxBarSize={30}
+                          />
+                        </BarChart>
+                      ) : null}
+
+                      {trendMetric === 'visitors' ? (
+                        <LineChart data={weekTrendData}>
+                          <CartesianGrid
+                            vertical={false}
+                            strokeDasharray="3 3"
+                            stroke={chartGridStroke(isLight)}
+                          />
+                          <XAxis
+                            dataKey="label"
+                            tickLine={false}
+                            axisLine={false}
+                            minTickGap={18}
+                          />
+                          <YAxis tickLine={false} axisLine={false} width={36} />
+                          <ChartTooltip content={<ChartTooltipContent />} />
+
+                          <Line
+                            type="monotone"
+                            dataKey="visitors"
+                            stroke="var(--color-visitors)"
+                            strokeWidth={2.1}
+                            dot={false}
+                          />
+                        </LineChart>
+                      ) : null}
+                    </ChartContainer>
+                  </Panel>
+                </div>
+              </div>
+            </Card>
+
+            <Card light={isLight}>
+              <CardTitle
+                title={copy.clientsTitle}
+                description={copy.clientsDescription}
+                light={isLight}
+              />
+
+              <div className="p-4">
+                {favoriteClients.length ? (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {favoriteClients.map((client) => (
+                      <button
+                        key={client.id}
+                        type="button"
+                        onClick={() => setSelectedFavoriteClientId(client.id)}
+                        className={cn(
+                          'rounded-[10px] border p-4 text-left transition-colors active:scale-[0.992]',
+                          insetTone(isLight),
+                          isLight ? 'hover:bg-black/[0.025]' : 'hover:bg-white/[0.055]',
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className={cn('truncate text-[13px] font-semibold', pageText(isLight))}>
+                              {client.name}
+                            </div>
+
+                            <div className={cn('mt-1 text-[11px]', mutedText(isLight))}>
+                              {client.visits} {copy.visitsWord} · {formatCurrency(client.averageCheck, locale)}
+                            </div>
+                          </div>
+
+                          <MicroLabel light={isLight}>{client.segment}</MicroLabel>
+                        </div>
+
+                        <p className={cn('mt-3 line-clamp-2 text-[12px] leading-6', mutedText(isLight))}>
+                          {client.note}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState light={isLight}>{copy.emptyClients}</EmptyState>
+                )}
+              </div>
+            </Card>
+          </div>
+        </div>
+      </main>
+
+      {selectedFavoriteClient ? (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center px-4 py-6"
+          onMouseDown={() => setSelectedFavoriteClientId(null)}
+        >
+          <div className="absolute inset-0 bg-black/35 backdrop-blur-[10px]" />
+          <div
+            onMouseDown={(event) => event.stopPropagation()}
+            className={cn(
+              'relative w-full max-w-[520px] overflow-hidden rounded-[18px] border p-5',
+              isLight
+                ? 'border-black/[0.09] bg-[var(--cb-surface)] text-[#111111] shadow-[0_34px_90px_rgba(0,0,0,0.18)]'
+                : 'border-white/[0.10] bg-[#141414] text-white shadow-[0_34px_90px_rgba(0,0,0,0.55)]',
+            )}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <MicroLabel light={isLight} active accentColor={accentColor}>VIP</MicroLabel>
+                <h2 className="mt-3 truncate text-[26px] font-semibold tracking-[-0.07em]">
+                  {selectedFavoriteClient.name}
+                </h2>
+                <p className={cn('mt-1 text-[12px]', mutedText(isLight))}>
+                  {selectedFavoriteClient.phone} · {selectedFavoriteClient.source}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedFavoriteClientId(null)}
+                className={cn(buttonBase(isLight), 'size-9 px-0')}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              <HeroStat label={copy.visitsWord} value={selectedFavoriteClient.visits} light={isLight} />
+              <HeroStat label={copy.revenue} value={formatCurrency(selectedFavoriteClient.totalRevenue, locale)} light={isLight} />
+            </div>
+
+            <Panel light={isLight} className="mt-4 p-4">
+              <div className={cn('text-[12.5px] font-semibold', pageText(isLight))}>Заметка</div>
+              <p className={cn('mt-2 text-[12px] leading-6', mutedText(isLight))}>
+                {selectedFavoriteClient.note}
+              </p>
+            </Panel>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <Button asChild className={buttonBase(isLight)}>
+                <Link href="/dashboard/clients">Открыть CRM</Link>
+              </Button>
+              <button type="button" onClick={() => setSelectedFavoriteClientId(null)} className={buttonBase(isLight, true)}>
+                Готово
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </WorkspaceShell>
   );
 }

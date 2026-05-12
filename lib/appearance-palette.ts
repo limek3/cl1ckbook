@@ -34,9 +34,9 @@ export const accentPalette: Record<AccentTone, AccentPaletteMeta> = {
   violet: {
     hue: '258',
     sat: '88%',
-    solid: '#8b5cf6',
-    soft: 'rgba(139, 92, 246, 0.14)',
-    gradient: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+    solid: '#7c5cff',
+    soft: 'rgba(124, 92, 255, 0.14)',
+    gradient: 'linear-gradient(135deg, #8b6cff, #6f54ef)',
   },
   sky: {
     hue: '199',
@@ -104,8 +104,8 @@ export const accentPalette: Record<AccentTone, AccentPaletteMeta> = {
   lime: {
     hue: '84',
     sat: '80%',
-    solid: '#84cc16',
-    soft: 'rgba(132, 204, 22, 0.14)',
-    gradient: 'linear-gradient(135deg, #84cc16, #65a30d)',
+    solid: '#79a96b',
+    soft: 'rgba(121, 169, 107, 0.14)',
+    gradient: 'linear-gradient(135deg, #8fc76b, #79a96b)',
   },
 };
