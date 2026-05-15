@@ -8,7 +8,6 @@ import { useChats } from '@/hooks/use-chats';
 import { useMiniData } from '@/hooks/use-mini-data';
 import { ToastCtx, haptic, tgClose, type ToastItem, type MiniToastCtxValue } from './bridge';
 import { buildMiniEventNotifications, unreadEventCount } from '@/lib/notification-events';
-import { applyTelegramMiniAppBase, getTelegramWebApp } from '@/lib/telegram-webapp-safe';
 
 const INTRO_BLACK = '#0b0b0b';
 const INTRO_WHITE = '#ffffff';
@@ -736,9 +735,10 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
   // Telegram WebApp init: keep viewport/safe areas in sync.
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    const tg = (window as any).Telegram?.WebApp;
+
     const applyViewport = () => {
-      const tg = getTelegramWebApp();
-      applyTelegramMiniAppBase(tg);
+      try { tg?.ready?.(); tg?.expand?.(); tg?.requestFullscreen?.(); tg?.disableVerticalSwipes?.(); } catch {}
       const contentSafeArea = tg?.contentSafeAreaInset ?? {};
       const safeArea = tg?.safeAreaInset ?? {};
       const topInset = Number(contentSafeArea.top ?? 0);
@@ -756,11 +756,11 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
 
     applyViewport();
     const onChange = () => applyViewport();
-    try { getTelegramWebApp()?.onEvent?.('viewportChanged', onChange); } catch {}
+    try { tg?.onEvent?.('viewportChanged', onChange); } catch {}
     window.addEventListener('resize', onChange);
     window.addEventListener('orientationchange', onChange);
     return () => {
-      try { getTelegramWebApp()?.offEvent?.('viewportChanged', onChange); } catch {}
+      try { tg?.offEvent?.('viewportChanged', onChange); } catch {}
       window.removeEventListener('resize', onChange);
       window.removeEventListener('orientationchange', onChange);
     };
@@ -769,7 +769,7 @@ function MiniAppInner({ initialTab = 'home', initialSub = null }: { initialTab?:
   // Back button
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const tg = getTelegramWebApp();
+    const tg = (window as any).Telegram?.WebApp;
     const back = tg?.BackButton;
     if (!back) return;
     if (sub) {

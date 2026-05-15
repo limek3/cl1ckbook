@@ -3,12 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useApp } from '@/lib/app-context';
 import { createClient as createSupabaseBrowserClient } from '@/lib/supabase/client';
-import {
-  authorizeTelegramMiniAppSession,
-  getStoredTelegramAppSessionToken,
-  getTelegramAppSessionHeaders,
-  hasTelegramMiniAppRuntime,
-} from '@/lib/telegram-miniapp-auth-client';
 import { adaptThreads } from '@/lib/mini-adapter';
 import type { Thread, Message } from '@/lib/mini-demo';
 
@@ -75,7 +69,6 @@ async function getAuthHeaders(includeJson = false) {
     if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
   } catch {}
 
-  Object.assign(headers, getTelegramAppSessionHeaders());
   return headers;
 }
 
@@ -88,33 +81,8 @@ function mergeHeaders(...sources: Array<HeadersInit | undefined>) {
   return headers;
 }
 
-async function ensureTelegramMiniAppSessionIfNeeded(options?: { force?: boolean; waitMs?: number }) {
-  if (!hasTelegramMiniAppRuntime()) return;
-  const hasStoredToken = Boolean(getStoredTelegramAppSessionToken());
-  if (hasStoredToken && !options?.force) return;
-  await authorizeTelegramMiniAppSession(options);
-}
-
 async function fetchWithTelegramMiniAppRetry(input: RequestInfo | URL, init?: RequestInit) {
-  const headers = await getAuthHeaders(false);
-  const response = await fetch(input, {
-    ...init,
-    credentials: init?.credentials ?? 'include',
-    cache: init?.cache ?? 'no-store',
-    headers: mergeHeaders(headers, init?.headers),
-  });
-
-  if (response.status !== 401) return response;
-
-  await ensureTelegramMiniAppSessionIfNeeded({ force: true, waitMs: 2600 });
-  if (Object.keys(getTelegramAppSessionHeaders()).length === 0) return response;
-
-  return fetch(input, {
-    ...init,
-    credentials: init?.credentials ?? 'include',
-    cache: init?.cache ?? 'no-store',
-    headers: mergeHeaders(init?.headers, await getAuthHeaders(false)),
-  });
+  return fetch(input, init);
 }
 
 function mergeIncoming(prev: Thread[], fresh: Thread[]): Thread[] {

@@ -33,10 +33,6 @@ import { useAppearance } from '@/lib/appearance-context';
 import { accentPalette } from '@/lib/appearance-palette';
 import { useLocale } from '@/lib/locale-context';
 import { createClient } from '@/lib/supabase/client';
-import {
-  authorizeTelegramMiniAppSession,
-  getTelegramAppSessionHeaders,
-} from '@/lib/telegram-miniapp-auth-client';
 import { cn } from '@/lib/utils';
 
 type ThemeMode = 'light' | 'dark';
@@ -425,15 +421,13 @@ function ConnectedAccountsCard({
 
   const refreshUser = async (signal?: AbortSignal) => {
     try {
-      await authorizeTelegramMiniAppSession({ waitMs: 1200 });
-
       const supabase = createClient();
       const {
         data: { session },
       } = await supabase.auth.getSession();
 
       const headers: Record<string, string> = {
-        ...getTelegramAppSessionHeaders(),
+        
       };
 
       if (session?.access_token) {
