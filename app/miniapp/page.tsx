@@ -2,38 +2,26 @@
 
 import { useEffect } from 'react';
 import { MiniApp } from '@/components/mini/mini-app-shell';
+import { TelegramMiniAppSdk } from '@/components/system/telegram-miniapp-sdk';
 import { TelegramMiniAppViewport } from '@/components/system/telegram-miniapp-viewport';
+import {
+  applyTelegramMiniAppBase,
+  applyTelegramMiniAppChrome,
+  getTelegramWebApp,
+} from '@/lib/telegram-webapp-safe';
 
-declare global {
-  interface Window {
-    Telegram?: {
-      WebApp?: {
-        initData: string;
-        ready: () => void;
-        expand: () => void;
-        setHeaderColor?: (color: string) => void;
-        setBackgroundColor?: (color: string) => void;
-        setBottomBarColor?: (color: string) => void;
-        colorScheme?: 'light' | 'dark';
-      };
-    };
-  }
-}
+const MINIAPP_BG = '#0a0a0a';
 
 export default function MiniAppPage() {
   useEffect(() => {
-    const tg = window.Telegram?.WebApp;
-    if (tg) {
-      tg.ready();
-      tg.expand();
-      try { tg.setHeaderColor?.('#0a0a0a'); } catch {}
-      try { tg.setBackgroundColor?.('#0a0a0a'); } catch {}
-      try { tg.setBottomBarColor?.('#0a0a0a'); } catch {}
-    }
+    const tg = getTelegramWebApp();
+    applyTelegramMiniAppBase(tg);
+    applyTelegramMiniAppChrome(MINIAPP_BG, tg);
+
     document.documentElement.dataset.tgMiniapp = 'true';
-    document.documentElement.style.backgroundColor = '#0a0a0a';
+    document.documentElement.style.backgroundColor = MINIAPP_BG;
     document.documentElement.style.colorScheme = 'dark';
-    document.body.style.backgroundColor = '#0a0a0a';
+    document.body.style.backgroundColor = MINIAPP_BG;
     document.body.style.colorScheme = 'dark';
   }, []);
 
@@ -42,6 +30,7 @@ export default function MiniAppPage() {
 
   return (
     <>
+      <TelegramMiniAppSdk />
       <TelegramMiniAppViewport />
       <MiniApp mode={initialMode} />
     </>

@@ -1,34 +1,15 @@
 'use client';
 
 import { useEffect } from 'react';
+import {
+  applyTelegramMiniAppBase,
+  applyTelegramMiniAppChrome,
+  getTelegramWebApp,
+  safeTelegramCall,
+  type TelegramWebAppSafe,
+} from '@/lib/telegram-webapp-safe';
 
-type TelegramWebApp = {
-  ready?: () => void;
-  expand?: () => void;
-  requestFullscreen?: () => void;
-  setHeaderColor?: (color: string) => void;
-  setBackgroundColor?: (color: string) => void;
-  setBottomBarColor?: (color: string) => void;
-  disableVerticalSwipes?: () => void;
-  viewportHeight?: number;
-  viewportStableHeight?: number;
-  safeAreaInset?: { top?: number; bottom?: number; left?: number; right?: number };
-  contentSafeAreaInset?: { top?: number; bottom?: number; left?: number; right?: number };
-  onEvent?: (event: string, callback: () => void) => void;
-  offEvent?: (event: string, callback: () => void) => void;
-};
-
-type TelegramWindow = Window & {
-  Telegram?: {
-    WebApp?: TelegramWebApp;
-  };
-};
-
-function safe(action: () => void) {
-  try {
-    action();
-  } catch {}
-}
+const MINIAPP_BG = '#0a0a0a';
 
 function setPx(name: string, value: unknown) {
   if (typeof document === 'undefined') return;
@@ -47,28 +28,26 @@ function upsertThemeColor(color: string) {
   meta.content = color;
 }
 
-function applyDarkMiniChrome(webApp?: TelegramWebApp) {
+function applyDarkMiniChrome(webApp?: TelegramWebAppSafe) {
   if (typeof document === 'undefined') return;
-  const bg = '#0a0a0a';
   const root = document.documentElement;
   root.dataset.tgMiniapp = 'true';
-  root.style.backgroundColor = bg;
+  root.style.backgroundColor = MINIAPP_BG;
   root.style.colorScheme = 'dark';
-  document.body.style.backgroundColor = bg;
+  document.body.style.backgroundColor = MINIAPP_BG;
   document.body.style.colorScheme = 'dark';
-  upsertThemeColor(bg);
-  safe(() => webApp?.setHeaderColor?.(bg));
-  safe(() => webApp?.setBackgroundColor?.(bg));
-  safe(() => webApp?.setBottomBarColor?.(bg));
+  upsertThemeColor(MINIAPP_BG);
+  applyTelegramMiniAppChrome(MINIAPP_BG, webApp);
 }
 
 export function TelegramMiniAppViewport() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const webApp = (window as TelegramWindow).Telegram?.WebApp;
-
     const apply = () => {
+      const webApp = getTelegramWebApp();
+
+      applyTelegramMiniAppBase(webApp);
       applyDarkMiniChrome(webApp);
 
       const safeArea = webApp?.safeAreaInset ?? {};
@@ -89,19 +68,15 @@ export function TelegramMiniAppViewport() {
       setPx('--tg-viewport-height', webApp?.viewportStableHeight ?? webApp?.viewportHeight ?? window.innerHeight);
     };
 
-    safe(() => window.setTimeout(() => webApp?.ready?.(), 0));
-    safe(() => window.setTimeout(() => webApp?.expand?.(), 0));
-    safe(() => window.setTimeout(() => webApp?.requestFullscreen?.(), 0));
-    safe(() => window.setTimeout(() => webApp?.disableVerticalSwipes?.(), 0));
-    safe(apply);
+    safeTelegramCall(apply);
 
-    const handler = () => safe(apply);
-    safe(() => webApp?.onEvent?.('viewportChanged', handler));
+    const handler = () => safeTelegramCall(apply);
+    safeTelegramCall(() => getTelegramWebApp()?.onEvent?.('viewportChanged', handler));
     window.addEventListener('resize', handler);
     window.addEventListener('orientationchange', handler);
 
     return () => {
-      safe(() => webApp?.offEvent?.('viewportChanged', handler));
+      safeTelegramCall(() => getTelegramWebApp()?.offEvent?.('viewportChanged', handler));
       window.removeEventListener('resize', handler);
       window.removeEventListener('orientationchange', handler);
     };

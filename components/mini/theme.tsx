@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { accentPalette, accentToneValues, type AccentTone } from '@/lib/appearance-palette';
 import type { RadiusMode } from '@/lib/appearance';
+import { applyTelegramMiniAppChrome } from '@/lib/telegram-webapp-safe';
 
 export interface ThemeTokens {
   bg: string;
@@ -121,16 +122,6 @@ function writeStoredAppearance(value: StoredMiniAppearance) {
   } catch {}
 }
 
-type MiniTelegramWindow = Window & {
-  Telegram?: {
-    WebApp?: {
-      setHeaderColor?: (color: string) => void;
-      setBackgroundColor?: (color: string) => void;
-      setBottomBarColor?: (color: string) => void;
-    };
-  };
-};
-
 function upsertMiniThemeColor(color: string) {
   if (typeof document === 'undefined') return;
   let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
@@ -152,10 +143,7 @@ function syncMiniChrome(mode: ThemeMode, bg: string) {
   document.body.style.colorScheme = mode;
   upsertMiniThemeColor(bg);
 
-  const webApp = (window as MiniTelegramWindow).Telegram?.WebApp;
-  try { webApp?.setHeaderColor?.(bg); } catch {}
-  try { webApp?.setBackgroundColor?.(bg); } catch {}
-  try { webApp?.setBottomBarColor?.(bg); } catch {}
+  applyTelegramMiniAppChrome(bg);
 }
 
 interface ThemeCtxValue {

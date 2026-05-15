@@ -1902,7 +1902,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
           },
           items: {
             home: 'Главная',
-            today: 'Записи на сегодня',
+            today: 'Календарь',
             stats: 'Статистика',
             chats: 'Чаты',
             clients: 'Клиенты',
@@ -1948,7 +1948,7 @@ export function WorkspaceShell({ children, className }: WorkspaceShellProps) {
           },
           items: {
             home: 'Home',
-            today: 'Today bookings',
+            today: 'Calendar',
             stats: 'Statistics',
             chats: 'Chats',
             clients: 'Clients',

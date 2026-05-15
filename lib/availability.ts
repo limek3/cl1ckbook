@@ -12,6 +12,7 @@ export type BookingAvailabilityDay = {
   status?: BookingAvailabilityStatus;
   slots?: string[];
   breaks?: string[];
+  blockedSlots?: string[];
   custom?: boolean;
 };
 
@@ -174,6 +175,11 @@ export function normalizeAvailabilityDays(items?: unknown): BookingAvailabilityD
       status: day.status ?? 'workday',
       slots: Array.isArray(day.slots) ? day.slots : [],
       breaks: Array.isArray(day.breaks) ? day.breaks : [],
+      blockedSlots: Array.isArray((day as BookingAvailabilityDay & { blockedSlots?: unknown; blocked_slots?: unknown }).blockedSlots)
+        ? (day as BookingAvailabilityDay & { blockedSlots?: string[] }).blockedSlots
+        : Array.isArray((day as BookingAvailabilityDay & { blocked_slots?: string[] }).blocked_slots)
+          ? (day as BookingAvailabilityDay & { blocked_slots?: string[] }).blocked_slots
+          : [],
     };
   });
 }
@@ -181,7 +187,7 @@ export function normalizeAvailabilityDays(items?: unknown): BookingAvailabilityD
 function isRealDateOverride(day: BookingAvailabilityDay) {
   // A generated month row with custom=false and no slots is only a calendar shell.
   // It must not close the public booking page if a weekly template exists.
-  if (day.custom === false && (day.slots?.length ?? 0) === 0 && (day.breaks?.length ?? 0) === 0) {
+  if (day.custom === false && (day.slots?.length ?? 0) === 0 && (day.breaks?.length ?? 0) === 0 && (day.blockedSlots?.length ?? 0) === 0) {
     return day.status === 'day-off';
   }
 
@@ -257,7 +263,7 @@ export function getAvailableTimesForDate({
 
   const duration = getServiceDuration(serviceName, services, fallbackDurationMinutes);
   const workIntervals = (day.slots ?? []).map(parseInterval).filter(Boolean) as Interval[];
-  const breakIntervals = (day.breaks ?? []).map(parseInterval).filter(Boolean) as Interval[];
+  const breakIntervals = [...(day.breaks ?? []), ...(day.blockedSlots ?? [])].map(parseInterval).filter(Boolean) as Interval[];
   const bookedIntervals = (bookedSlots ?? [])
     .filter((slot) => slot.date === date && slot.status !== 'cancelled')
     .map((slot) => {

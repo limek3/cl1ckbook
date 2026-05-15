@@ -74,16 +74,36 @@ export function getTelegramAppSessionHeaders() {
   return token ? { 'X-ClickBook-App-Session': token } : {};
 }
 
-export function getTelegramMiniAppInitData() {
+
+function getTelegramMiniAppInitDataFromLocation() {
   if (typeof window === 'undefined') return '';
 
   try {
-    const webApp = getTelegramWebApp();
-    webApp?.ready?.();
-    webApp?.expand?.();
-    return webApp?.initData || '';
+    const search = window.location.search.startsWith('?')
+      ? window.location.search.slice(1)
+      : window.location.search;
+    const hash = window.location.hash.startsWith('#')
+      ? window.location.hash.slice(1)
+      : window.location.hash;
+    const params = new URLSearchParams([search, hash].filter(Boolean).join('&'));
+    return params.get('tgWebAppData') || '';
   } catch {
-    return getTelegramWebApp()?.initData || '';
+    return '';
+  }
+}
+
+export function getTelegramMiniAppInitData() {
+  if (typeof window === 'undefined') return '';
+
+  const fallbackInitData = getTelegramMiniAppInitDataFromLocation();
+
+  try {
+    const webApp = getTelegramWebApp();
+    try { webApp?.ready?.(); } catch {}
+    try { webApp?.expand?.(); } catch {}
+    return webApp?.initData || fallbackInitData;
+  } catch {
+    return getTelegramWebApp()?.initData || fallbackInitData;
   }
 }
 
@@ -96,7 +116,11 @@ export function hasTelegramMiniAppRuntime() {
 
   const webApp = getTelegramWebApp();
 
-  return Boolean(webApp?.initData || webApp?.initDataUnsafe?.user);
+  return Boolean(
+    webApp?.initData ||
+      webApp?.initDataUnsafe?.user ||
+      getTelegramMiniAppInitDataFromLocation(),
+  );
 }
 
 export async function waitForTelegramMiniAppInitData(timeoutMs = 1800) {
