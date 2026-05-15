@@ -1,13 +1,14 @@
 'use client';
 
 import { createContext, useContext } from 'react';
+import { getTelegramWebApp } from '@/lib/telegram-webapp-safe';
 
 // ─── Telegram WebApp helpers ───────────────────────
 export type HapticType = 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error';
 
 export function haptic(type: HapticType = 'light') {
   if (typeof window === 'undefined') return;
-  const tg = (window as any).Telegram?.WebApp;
+  const tg = getTelegramWebApp();
   const h = tg?.HapticFeedback;
   if (!h) return;
   try {
@@ -18,7 +19,7 @@ export function haptic(type: HapticType = 'light') {
 
 export function selectionHaptic() {
   if (typeof window === 'undefined') return;
-  const tg = (window as any).Telegram?.WebApp;
+  const tg = getTelegramWebApp();
   const h = tg?.HapticFeedback;
   try {
     if (h?.selectionChanged) h.selectionChanged();
@@ -32,7 +33,7 @@ export function feedback(type: 'success' | 'warning' | 'error' | 'light' = 'ligh
 
 export function tgClose() {
   if (typeof window === 'undefined') return;
-  const tg = (window as any).Telegram?.WebApp;
+  const tg = getTelegramWebApp();
   try { tg?.close?.(); } catch {}
 }
 

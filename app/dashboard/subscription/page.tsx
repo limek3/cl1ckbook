@@ -35,6 +35,7 @@ import { Button } from '@/components/ui/button';
 import { useOwnedWorkspaceData } from '@/hooks/use-owned-workspace-data';
 import { useAppearance } from '@/lib/appearance-context';
 import { accentPalette } from '@/lib/appearance-palette';
+import { getTelegramAppSessionHeaders } from '@/lib/telegram-miniapp-auth-client';
 import { formatCurrency } from '@/lib/master-workspace';
 import { cn } from '@/lib/utils';
 
@@ -1542,7 +1543,7 @@ export default function SubscriptionPage() {
         cache: 'no-store',
         headers: {
           'Content-Type': 'application/json',
-          
+          ...getTelegramAppSessionHeaders(),
         },
         body: JSON.stringify({
           planId: selectedPlan.id,

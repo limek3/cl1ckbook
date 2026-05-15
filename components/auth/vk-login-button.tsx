@@ -42,11 +42,11 @@ function humanVkError(value?: string) {
   }
 
   if (value.includes('Missing VK_BOT_ACCESS_TOKEN')) {
-    return 'Не задан VK_BOT_ACCESS_TOKEN в Vercel.';
+    return 'Не задан VK_BOT_ACCESS_TOKEN в Render.';
   }
 
   if (value.includes('Missing VK_BOT_GROUP_ID') || value.includes('VK_BOT_SCREEN_NAME')) {
-    return 'Не задан VK_BOT_GROUP_ID или VK_BOT_SCREEN_NAME в Vercel.';
+    return 'Не задан VK_BOT_GROUP_ID или VK_BOT_SCREEN_NAME в Render.';
   }
 
   return value;

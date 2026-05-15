@@ -34,7 +34,7 @@ export default function DashboardError({
           </div>
 
           <div className="rounded-[10px] border border-black/[0.08] bg-black/[0.025] p-3 text-[12px] leading-5 text-black/56 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-white/50">
-            Ошибка останется в консоли разработчика, чтобы её можно было увидеть в Vercel Logs,
+            Ошибка останется в консоли разработчика, чтобы её можно было увидеть в Render Logs,
             но клиент больше не должен получать пустой белый экран без управления.
           </div>
 

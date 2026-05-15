@@ -151,6 +151,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('[vk-complete]', error instanceof Error ? error.message : error);
-    return redirectWithMessage(request, 'Не удалось завершить VK-вход. Проверьте Vercel Function Logs.', '/login');
+    return redirectWithMessage(request, 'Не удалось завершить VK-вход. Проверьте Render Logs.', '/login');
   }
 }

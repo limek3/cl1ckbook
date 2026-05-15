@@ -12,6 +12,13 @@ import {
 import { usePathname } from 'next/navigation';
 import { useLocale } from '@/lib/locale-context';
 import { createClient as createSupabaseBrowserClient } from '@/lib/supabase/client';
+import {
+  CLICKBOOK_AUTH_SESSION_READY_EVENT,
+  authorizeTelegramMiniAppSession,
+  getStoredTelegramAppSessionToken,
+  getTelegramAppSessionHeaders,
+  hasTelegramMiniAppRuntime,
+} from '@/lib/telegram-miniapp-auth-client';
 import { parseServices, slugify } from '@/lib/utils';
 import { buildWorkspaceSeed, type WorkspaceSections, type WorkspaceSnapshot } from '@/lib/workspace-store';
 import { getDemoBookings, getDemoProfile, saveStoredDemoProfile, SLOTY_DEMO_SLUG } from '@/lib/demo-data';
@@ -322,8 +329,18 @@ function detectBookingClientChannel() {
     return { sourceChannel: 'web', source: 'Web', clientContext: {} as Record<string, unknown> };
   }
 
+  const telegramWebApp = (window as typeof window & { Telegram?: { WebApp?: { initData?: string } } }).Telegram?.WebApp;
   const params = new URLSearchParams(window.location.search);
+  const hasTelegramContext = Boolean(telegramWebApp?.initData) || params.has('tgWebAppData') || params.get('source') === 'telegram';
   const hasVkContext = Boolean(params.get('vk_app_id') || params.get('viewer_id') || params.get('vk_user_id') || params.get('source') === 'vk');
+
+  if (hasTelegramContext) {
+    return {
+      sourceChannel: 'telegram',
+      source: 'Telegram',
+      clientContext: { entry: 'telegram', hasInitData: Boolean(telegramWebApp?.initData) },
+    };
+  }
 
   if (hasVkContext) {
     return {
@@ -362,6 +379,8 @@ async function getAuthHeaders(includeJson = false) {
     // Cookie-based Telegram app auth can still work without the fallback header.
   }
 
+  Object.assign(headers, getTelegramAppSessionHeaders());
+
   return headers;
 }
 
@@ -376,8 +395,34 @@ function mergeHeaders(...sources: Array<HeadersInit | undefined>) {
   return headers;
 }
 
+async function ensureTelegramMiniAppSessionIfNeeded(options?: { force?: boolean; waitMs?: number }) {
+  if (!hasTelegramMiniAppRuntime()) return;
+
+  const hasStoredToken = Boolean(getStoredTelegramAppSessionToken());
+  if (hasStoredToken && !options?.force) return;
+
+  await authorizeTelegramMiniAppSession(options);
+}
+
 async function fetchWithTelegramMiniAppRetry(input: RequestInfo | URL, init?: RequestInit) {
-  return fetch(input, init);
+  const response = await fetch(input, init);
+
+  if (response.status !== 401) {
+    return response;
+  }
+
+  await ensureTelegramMiniAppSessionIfNeeded({ force: true, waitMs: 2600 });
+
+  if (Object.keys(getTelegramAppSessionHeaders()).length === 0) {
+    return response;
+  }
+
+  return fetch(input, {
+    ...init,
+    credentials: init?.credentials ?? 'include',
+    cache: init?.cache ?? 'no-store',
+    headers: mergeHeaders(init?.headers, await getAuthHeaders(false)),
+  });
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -410,6 +455,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const refreshWorkspace = useCallback(async () => {
     try {
+      await ensureTelegramMiniAppSessionIfNeeded({ waitMs: 1400 });
+
       const response = await fetchWithTelegramMiniAppRetry('/api/workspace', {
         credentials: 'include',
         cache: 'no-store',
@@ -454,6 +501,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [pathname, refreshWorkspace]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleAuthReady = () => {
+      if (pathname === '/app') return;
+      void refreshWorkspace();
+    };
+
+    window.addEventListener(CLICKBOOK_AUTH_SESSION_READY_EVENT, handleAuthReady);
+
+    return () => {
+      window.removeEventListener(CLICKBOOK_AUTH_SESSION_READY_EVENT, handleAuthReady);
+    };
+  }, [pathname, refreshWorkspace]);
 
   const profiles = useMemo(() => {
     return ownedProfile ? [ownedProfile] : [];

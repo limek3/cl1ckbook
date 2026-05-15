@@ -52,6 +52,7 @@ import {
   getTelegramAppSessionHeaders,
 } from '@/lib/telegram-miniapp-auth-client';
 import { cn } from '@/lib/utils';
+import { getTelegramWebApp } from '@/lib/telegram-webapp-safe';
 import type {
   Booking,
   BookingStatus,
@@ -772,7 +773,7 @@ function MiniLoading() {
 function closeTelegramMiniApp() {
   if (typeof window === 'undefined') return;
   try {
-    (window as typeof window & { Telegram?: { WebApp?: { close?: () => void } } }).Telegram?.WebApp?.close?.();
+    getTelegramWebApp()?.close?.();
   } catch {}
 }
 

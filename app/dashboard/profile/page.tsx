@@ -33,6 +33,10 @@ import { useAppearance } from '@/lib/appearance-context';
 import { accentPalette } from '@/lib/appearance-palette';
 import { useLocale } from '@/lib/locale-context';
 import { createClient } from '@/lib/supabase/client';
+import {
+  authorizeTelegramMiniAppSession,
+  getTelegramAppSessionHeaders,
+} from '@/lib/telegram-miniapp-auth-client';
 import { cn } from '@/lib/utils';
 
 type ThemeMode = 'light' | 'dark';
@@ -389,7 +393,7 @@ function ConnectedAccountsCard({
           vkHint: 'Вход через аккаунт ВК',
           ready: 'Аккаунты синхронизированы.',
           setup:
-            'Если Google не открывается, включите его в Supabase Auth. Для VK укажите адрес сайта/домен в настройках приложения и добавьте переменные VK_ID_* в Vercel.',
+            'Если Google не открывается, включите его в Supabase Auth. Для VK укажите адрес сайта/домен в настройках приложения и добавьте переменные VK_ID_* в Render.',
           telegramStarted:
             'Открыл Telegram. Нажмите Start в боте, затем вернитесь сюда — связь обновится автоматически.',
           telegramWaiting: 'Ждём подтверждение в Telegram...',
@@ -411,7 +415,7 @@ function ConnectedAccountsCard({
           vkHint: 'VK account login',
           ready: 'Accounts are synced.',
           setup:
-            'If Google does not open, enable it in Supabase Auth. For VK, set the site/domain in the VK app settings and add VK_ID_* variables in Vercel.',
+            'If Google does not open, enable it in Supabase Auth. For VK, set the site/domain in the VK app settings and add VK_ID_* variables in Render.',
           telegramStarted:
             'Telegram opened. Press Start in the bot, then return here — the link will refresh automatically.',
           telegramWaiting: 'Waiting for Telegram confirmation...',
@@ -421,13 +425,15 @@ function ConnectedAccountsCard({
 
   const refreshUser = async (signal?: AbortSignal) => {
     try {
+      await authorizeTelegramMiniAppSession({ waitMs: 1200 });
+
       const supabase = createClient();
       const {
         data: { session },
       } = await supabase.auth.getSession();
 
       const headers: Record<string, string> = {
-        
+        ...getTelegramAppSessionHeaders(),
       };
 
       if (session?.access_token) {

@@ -10,6 +10,9 @@ export const metadata: Metadata = {
   title: 'КликБук — платформа для записи клиентов',
   description: 'Профиль мастера, страница записи, чаты и аналитика в одной платформе КликБук.',
   generator: 'КликБук',
+  icons: {
+    icon: '/favicon.ico',
+  },
 };
 
 export const viewport: Viewport = {

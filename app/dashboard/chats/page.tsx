@@ -67,6 +67,7 @@ import type {
 } from '@/lib/chat-types';
 import { getDashboardDemoStorageKey, isDashboardDemoEnabled } from '@/lib/dashboard-demo';
 import { getDashboardDemoChatThreads } from '@/lib/demo-data';
+import { getTelegramAppSessionHeaders } from '@/lib/telegram-miniapp-auth-client';
 import { cn } from '@/lib/utils';
 
 type ThemeMode = 'light' | 'dark';
@@ -1752,7 +1753,7 @@ export default function DashboardChatsPage() {
         const response = await fetch('/api/chats', {
           credentials: 'include',
           cache: 'no-store',
-          
+          headers: getTelegramAppSessionHeaders(),
         });
 
         if (!response.ok) {
@@ -1842,7 +1843,7 @@ export default function DashboardChatsPage() {
       cache: 'no-store',
       headers: {
         'Content-Type': 'application/json',
-        
+        ...getTelegramAppSessionHeaders(),
       },
       body: JSON.stringify({
         threadId,
@@ -1877,7 +1878,7 @@ export default function DashboardChatsPage() {
           cache: 'no-store',
           headers: {
             'Content-Type': 'application/json',
-            
+            ...getTelegramAppSessionHeaders(),
           },
           body: JSON.stringify({ threadId }),
         }).catch(() => undefined);
